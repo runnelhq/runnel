@@ -7,7 +7,7 @@ inspiriert vom Modell von Apache Hop: Workflows und Pipelines aus Actions bzw. T
 - **Runner** – Ausführung per CLI, als Server mit Scheduler oder als Windows-Dienst
 - **Eine `easyflow.exe`**, keine Runtime, keine externe Datenbank, Definitionen als YAML (Git-freundlich)
 
-Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md)
+Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Entscheidungen: [docs/adr](docs/adr/README.md)
 
 ## Lizenz
 

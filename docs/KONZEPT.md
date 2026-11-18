@@ -730,7 +730,7 @@ Kernfunktionen:
 
 ---
 
-## 12. Mitgelieferte Bausteine (MVP-Katalog)
+## 12. Mitgelieferte Bausteine (Zielumfang)
 
 ### 12.1 Workflow-Actions
 
@@ -817,16 +817,20 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 
 ## 15. Roadmap
 
-| Phase | Inhalt | Ergebnis |
+Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) zerlegt: [docs/ROADMAP.md](ROADMAP.md).
+
+| Phase | Schritte | Ergebnis |
 |---|---|---|
-| **0.1 – Runner-Kern** | Dateiformat v1, Variablen, Workflow-Engine, 10 Basis-Actions (Start, Shell/PowerShell, HTTP, Datei-Ops, Mail, Run-Workflow), CLI `run`/`validate` | Workflows per YAML + Aufgabenplanung nutzbar |
-| **0.2 – Pipelines** | Pipeline-Engine, CSV/Excel/JSON/DB In/Out, Filter, Select, Berechnen, Lookup, Sort, Group, Fehler-Links, `core.run-pipeline`, Executor-Transforms, `forEachRow`, Ergebnis-Datensätze, dynamische Ziele | ETL-Fälle per CLI |
-| **0.3 – Server & Editor** | `serve`, REST/WS, SQLite-Historie, Editor mit Canvas, Eigenschaften aus Schema, Live-Status, Logs, Teilausführung („Ab hier“, „Nur diese Action“) | Visuelles Designen & Starten |
-| **0.4 – Betrieb** | Scheduler (Cron/File/Webhook), Windows-Dienst, Secret-Store (DPAPI), Zugangsschlüssel + TLS, Retention, Error-Workflow, Run-Konfigurationen, Trigger für Pipelines | Produktionsbetrieb auf Windows-Server |
-| **0.5 – Komfort** | Datenvorschau, Samples, Autovervollständigung, Desktop-Modus (WebView2), MSI, Resume | Rund nutzbares Produkt |
-| **0.6 – Erweiterbarkeit** | Plugin-Protokoll + SDKs (Go, Python, C#), Plugin-Verwaltung im Editor | Eigene Konnektoren |
-| **1.0** | Stabilisierung, Doku, Beispiele, Code-Signing, `winget` | Release |
-| **später** | Remote-Runner (Agenten auf anderen Maschinen, `RunConfig type: remote`), Mappings, Git-Integration im Editor, Breakpoints, Import aus Apache Hop (`.hwf`/`.hpl` → YAML) | |
+| **0.1 – Runner-Kern** | S01–S11: Projektgerüst, Workflow-Format & Validierung, Variablen, Engine (sequenziell, parallel/Join, Retry/Timeout), Ausdrücke, Datei-Actions, HTTP, Sub-Workflows | Workflows per CLI / Aufgabenplanung |
+| **0.2 – Pipelines** | S12–S25: Pipeline-Engine, Typsystem, CSV, Basis-Transforms, Fehler-Links, JSON, Datenbank, Sortieren/Gruppieren, Lookups, Ausführung pro Datensatz | ETL-Fälle per CLI |
+| **0.3 – Server & Editor** | S26–S36: Historie, REST/WebSocket, Resume, Editor (Canvas, Eigenschaften, Ausführen, Ausdruckseditor, Teilausführung) | Visuelles Designen & Starten |
+| **0.4 – Betrieb** | S37–S43: Trigger, Secret-Store, Netzwerkbetrieb, Windows-Dienst, Run-Konfigurationen, Wartung | Produktionsbetrieb auf Windows-Server |
+| **0.5 – Komfort** | S44–S48: Datenvorschau, Samples, Felder ermitteln, Desktop-Modus, Installer | Rund nutzbares Produkt |
+| **0.6 – Erweiterbarkeit** | S49–S52: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung | Eigene Konnektoren |
+| **1.0** | Stabilisierung, Doku, Beispiele | Release |
+| **Backlog** | Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+
+Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 
 ---
 
