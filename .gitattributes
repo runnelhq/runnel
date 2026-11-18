@@ -1,0 +1,3 @@
+# Normalize line endings; golden files and YAML must stay LF on Windows checkouts.
+* text=auto eol=lf
+*.exe binary

@@ -9,6 +9,25 @@ inspiriert vom Modell von Apache Hop: Workflows und Pipelines aus Actions bzw. T
 
 Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Entscheidungen: [docs/adr](docs/adr/README.md)
 
+## Entwicklung
+
+Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`). Für `make lint` zusätzlich
+[golangci-lint](https://golangci-lint.run/) v2.
+
+| Aufgabe | Mit `make` | Ohne `make` (z. B. Windows/PowerShell) |
+|---|---|---|
+| Bauen | `make build` → `bin/runnel` | `go build -o bin/runnel.exe ./cmd/runnel` |
+| Windows-/Linux-Binaries | `make dist` | `$env:GOOS="windows"; go build -o bin/runnel-windows-amd64.exe ./cmd/runnel` |
+| Tests | `make test` (mit Race-Detector) | `go test ./...` |
+| Lint | `make lint` | `golangci-lint run ./...` |
+| Formatieren | `make fmt` | `golangci-lint fmt ./...` |
+
+```bash
+bin/runnel version
+```
+
+Die CI (`.github/workflows/ci.yml`) führt Lint, Tests unter Linux und Windows sowie den Build für beide Plattformen aus.
+
 ## Lizenz
 
 [MIT](LICENSE)
