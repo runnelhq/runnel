@@ -1,0 +1,810 @@
+# easy-flow – Konzept & technische Architektur
+
+> Leichtgewichtige Workflow- und Datenintegrations-Plattform für Windows.
+> Eine einzige ausführbare Datei, kein Docker, keine Java-/Node-Runtime, keine externe Datenbank.
+
+Status: Entwurf v0.1 · Stand: 2026-11-18
+
+---
+
+## 1. Ziele & Abgrenzung
+
+### 1.1 Vision
+
+easy-flow verbindet die **visuelle Einfachheit von n8n/Make** mit dem **sauberen Modell von Apache Hop**
+(Workflows für Ablaufsteuerung, Pipelines für Datenströme) – betrieben als **eine schlanke Windows-Anwendung**,
+die man per Doppelklick startet oder als Windows-Dienst installiert.
+
+### 1.2 Kernziele
+
+| Ziel | Messbares Kriterium |
+|---|---|
+| Kein Overhead | Eine `easyflow.exe` (< 40 MB), keine Abhängigkeiten, Start < 1 s, < 60 MB RAM im Leerlauf |
+| Windows-first | Läuft als Dienst, nutzt DPAPI für Secrets, PowerShell-Integration, Pfade/Freigaben (UNC) |
+| Zwei Komponenten | **Editor** (Designen) und **Runner** (Ausführen) – getrennt nutzbar, gleiche Dateiformate |
+| Git-freundlich | Workflows/Pipelines als lesbare YAML-Dateien, diff- und reviewbar |
+| Erweiterbar | Plugins in beliebiger Sprache (Prozess-Protokoll) oder als JavaScript |
+| Headless betreibbar | Runner per CLI ohne UI ausführbar (CI, Aufgabenplanung, Server) |
+
+### 1.3 Nicht-Ziele (v1)
+
+- Kein Multi-Tenant-SaaS, keine Benutzer-/Mandantenverwaltung im großen Stil
+- Kein Cluster / verteilte Ausführung (Remote-Runner erst in späterer Phase, s. Roadmap)
+- Kein Big-Data-Backend (kein Spark/Beam/Flink wie bei Hop) – Fokus auf Datenmengen bis ca. einige Mio. Zeilen pro Lauf
+- Keine 400+ SaaS-Konnektoren wie Make/n8n – stattdessen starke generische Bausteine (HTTP, SQL, Dateien, Skript) plus Plugin-Modell
+
+### 1.4 Positionierung
+
+| | n8n | Make | Apache Hop | **easy-flow** |
+|---|---|---|---|---|
+| Runtime | Node.js (+DB) | Cloud | Java (JVM) | **Native Binary** |
+| Betrieb Windows | möglich, aufwendig | – (SaaS) | möglich, schwergewichtig | **Doppelklick / Dienst** |
+| Modell | Item-basierter Graph | Szenario | Workflow + Pipeline | **Workflow + Pipeline** |
+| Datenstrom/ETL | eingeschränkt | eingeschränkt | stark | **mittel–stark** |
+| Speicherformat | DB (JSON export) | Cloud | XML-Dateien | **YAML-Dateien** |
+| Footprint | ~300 MB+ | – | ~500 MB+ | **~40 MB** |
+
+---
+
+## 2. Fachliches Modell (Konzepte)
+
+Die Begriffe lehnen sich bewusst an Apache Hop an.
+
+```mermaid
+classDiagram
+    Project "1" --> "*" Workflow
+    Project "1" --> "*" Pipeline
+    Project "1" --> "*" Environment
+    Project "1" --> "*" Connection
+    Project "1" --> "*" Trigger
+    Workflow "1" --> "*" Action
+    Workflow "1" --> "*" Hop
+    Pipeline "1" --> "*" Transform
+    Pipeline "1" --> "*" Hop
+    Action ..> Pipeline : "Run Pipeline"
+    Action ..> Workflow : "Run Workflow"
+    Trigger ..> Workflow : startet
+    Transform ..> Connection : nutzt
+    Action ..> Connection : nutzt
+```
+
+### 2.1 Project
+
+Ein Ordner im Dateisystem – die Einheit für Versionierung (Git), Deployment und Berechtigungen.
+
+```
+my-project/
+├─ project.yaml              # Name, Version, Default-Environment, Plugin-Pfade
+├─ environments/
+│   ├─ dev.yaml              # Variablen je Umgebung
+│   └─ prod.yaml
+├─ connections/
+│   └─ erp-sql.yaml          # DB-/HTTP-/SMTP-/SFTP-Verbindungen (ohne Klartext-Secrets)
+├─ triggers/
+│   └─ nightly-import.yaml   # Cron, Webhook, File-Watch
+├─ workflows/
+│   └─ nightly-import.workflow.yaml
+├─ pipelines/
+│   └─ customers-to-crm.pipeline.yaml
+└─ scripts/                  # gemeinsam genutzte JS-/PowerShell-Skripte
+```
+
+### 2.2 Workflow (Ablaufsteuerung)
+
+- Ein **gerichteter Graph aus Actions**, verbunden durch **Hops**.
+- Actions laufen **sequenziell entlang der Hops** (optional parallel verzweigt).
+- Jede Action liefert ein **Result**: `success | failure` plus Ergebnisdaten (Variablen, Dateiliste, Zeilenanzahl, Exit-Code …).
+- Hops tragen eine **Bedingung**:
+  - `success` (grün) – nur wenn Vorgänger erfolgreich
+  - `failure` (rot) – nur wenn Vorgänger fehlgeschlagen
+  - `always` (schwarz) – unabhängig vom Ergebnis
+  - `expression` (blau) – frei formulierte Bedingung, z. B. `{{ result.rows > 0 }}`
+- Typische Actions: Start, Pipeline ausführen, Sub-Workflow ausführen, PowerShell, HTTP, Datei-Operationen, Mail, Warten, SQL ausführen, Erfolg/Abbruch.
+- Schleifen sind erlaubt, aber nur explizit (Hop zurück mit Bedingung oder „Loop“-Action) und durch `maxIterations` begrenzt.
+
+### 2.3 Pipeline (Datenfluss)
+
+- Ein **gerichteter, azyklischer Graph aus Transforms**.
+- **Alle Transforms laufen gleichzeitig** (wie in Hop) und reichen **Records** über Hops (gepufferte Kanäle) weiter → Streaming, konstanter Speicherverbrauch.
+- Ein Record ist ein **JSON-artiges Objekt** (Feldname → Wert) mit optionalem Schema (Feldtypen: string, int, decimal, bool, date, datetime, binary, json).
+- Hops in Pipelines:
+  - Normaler Daten-Hop
+  - **Error-Hop**: fehlerhafte Records werden mit Fehlerinfos (`_error.message`, `_error.field`) umgeleitet statt die Pipeline abzubrechen
+  - **Info-Hop**: Nebeneingang (z. B. Lookup-Daten für „Stream Lookup“)
+- Verteilungsmodus bei mehreren Ausgängen: `copy` (jeder Ausgang bekommt jeden Record) oder `distribute` (Round-Robin), wie in Hop.
+- Transforms können mit **mehreren Kopien** (Parallelität) laufen, z. B. für teure HTTP-Lookups.
+
+### 2.4 Hop
+
+Verbindung zwischen zwei Knoten. Im Workflow = Kontrollfluss mit Bedingung, in der Pipeline = Datenkanal.
+Hops können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
+
+### 2.5 Environment & Variablen
+
+- Variablen werden hierarchisch aufgelöst (spätere Ebene überschreibt):
+  1. System (`${env:COMPUTERNAME}`, `${env:TEMP}`)
+  2. Project (`project.yaml`)
+  3. Environment (`environments/prod.yaml`)
+  4. Laufzeit-Parameter (CLI `--param`, Webhook-Body, Trigger)
+  5. Zur Laufzeit gesetzte Variablen (Action „Set Variables“)
+- Syntax:
+  - `${NAME}` – einfache Variablenersetzung (Hop-kompatibel)
+  - `{{ expression }}` – JavaScript-Ausdruck, z. B. `{{ now().format('yyyyMMdd') }}`, `{{ record.amount * 1.19 }}`
+
+### 2.6 Connection & Credentials
+
+Wiederverwendbare Metadaten-Objekte (DB, HTTP-API, SMTP, SFTP, SharePoint …).
+Secrets werden **nie im Klartext in YAML** gespeichert, sondern referenziert: `password: ${secret:erp-sql-password}`.
+Der Secret-Store ist lokal verschlüsselt (siehe Kap. 8).
+
+### 2.7 Trigger
+
+| Typ | Beschreibung |
+|---|---|
+| `manual` | Start über UI oder CLI |
+| `cron` | Zeitplan (Cron-Syntax + Zeitzone), Optionen: kein paralleler Lauf, Nachholen verpasster Läufe |
+| `webhook` | HTTP-Endpunkt `/hooks/{name}`, Body/Query werden zu Parametern, synchrone oder asynchrone Antwort |
+| `file` | Dateisystem-Überwachung (Ordner + Pattern), z. B. neue CSV in Eingangsordner |
+| `interval` | Polling alle n Sekunden/Minuten |
+
+---
+
+## 3. Systemarchitektur
+
+### 3.1 Überblick
+
+```mermaid
+flowchart LR
+    subgraph EXE["easyflow.exe (ein Prozess)"]
+        direction TB
+        API["HTTP-Server<br/>REST + WebSocket<br/>+ eingebettete Web-UI"]
+        SCHED["Scheduler &<br/>Trigger-Manager"]
+        QUEUE["Run-Queue<br/>(Concurrency-Limits)"]
+        WFE["Workflow-Engine"]
+        PLE["Pipeline-Engine"]
+        REG["Plugin-Registry<br/>(Actions / Transforms)"]
+        STORE["Store<br/>SQLite + Dateisystem"]
+        API --> QUEUE
+        SCHED --> QUEUE
+        QUEUE --> WFE
+        WFE --> PLE
+        WFE --> REG
+        PLE --> REG
+        WFE --> STORE
+        PLE --> STORE
+        API --> STORE
+    end
+    Browser["Editor<br/>(Browser / WebView2)"] <--> API
+    CLI["easyflow run …<br/>(CLI, ohne Server)"] --> WFE
+    REG <--> EXT["Externe Plugins<br/>(Prozesse, JSON-RPC)"]
+    WFE --> SYS["Dateien, DBs, APIs,<br/>PowerShell, SMTP …"]
+```
+
+### 3.2 Die zwei Kernkomponenten
+
+**Runner / Executor** (`easyflow run`, `easyflow serve`)
+- Lädt Workflow-/Pipeline-YAML, validiert, löst Variablen auf, führt aus.
+- Funktioniert **vollständig ohne Editor und ohne Server** (`easyflow run workflows/x.workflow.yaml --env prod`) – ideal für Windows-Aufgabenplanung oder CI.
+- Im Server-Modus zusätzlich: Scheduler, Trigger, Ausführungshistorie, Live-Status.
+
+**Editor**
+- Web-Single-Page-App, **in die exe eingebettet** (`go:embed`) und unter `http://localhost:7300` erreichbar.
+- Optional als Desktop-Fenster: `easyflow desktop` öffnet die UI in einem **WebView2**-Fenster (in Windows 10/11 bereits vorhanden) – fühlt sich an wie eine native App, ohne Electron.
+- Der Editor arbeitet direkt auf den Projektdateien (über die REST-API des lokalen Servers) → was man im Editor speichert, ist sofort per CLI ausführbar.
+
+### 3.3 Betriebsmodi
+
+| Modus | Befehl | Einsatz |
+|---|---|---|
+| Einmal-Ausführung | `easyflow run <datei> [--env prod] [--param k=v]` | Aufgabenplanung, CI, Skripte. Exit-Code = Ergebnis |
+| Server | `easyflow serve [--project D:\flows]` | Editor + Scheduler + Webhooks |
+| Desktop | `easyflow desktop` | Server + WebView2-Fenster (Einzelplatz) |
+| Windows-Dienst | `easyflow service install/start/stop/uninstall` | Dauerbetrieb auf Server |
+| Validierung | `easyflow validate <datei/ordner>` | Lint/Prüfung in CI |
+| Portable | `easyflow.exe` + `easyflow.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
+
+---
+
+## 4. Technologie-Stack
+
+### 4.1 Entscheidung: Go für Backend/Runner
+
+| Kriterium | Go | .NET 9 (AOT) | Node/Electron | Rust |
+|---|---|---|---|---|
+| Single-Binary ohne Runtime | ✅ nativ | ✅ (AOT mit Einschränkungen bei Reflection) | ❌ | ✅ |
+| Nebenläufigkeit für Pipelines | ✅ Goroutinen + Channels ideal | ✅ Channels/Tasks | ⚠️ Single-Thread | ✅ (komplexer) |
+| Windows-Dienst | ✅ `x/sys/windows/svc` | ✅ | ⚠️ | ✅ |
+| DB-Treiber ohne CGO | ✅ MSSQL, Postgres, MySQL, Oracle, SQLite | ✅ | ✅ | ⚠️ |
+| Entwicklungsgeschwindigkeit | ✅ hoch | ✅ hoch | ✅ hoch | ⚠️ mittel |
+| Cross-Compile Linux/macOS | ✅ trivial | ✅ | ⚠️ | ✅ |
+
+**Empfehlung: Go.** Das Goroutine/Channel-Modell bildet Hops in Pipelines 1:1 ab, die Binary ist klein und ohne CGO
+cross-kompilierbar. **.NET 9** ist die valide Alternative, falls das Team primär C# kann oder enge Office/AD-Integration
+im Vordergrund steht – das Konzept bleibt dann identisch.
+
+### 4.2 Bibliotheken (Backend)
+
+| Zweck | Bibliothek |
+|---|---|
+| HTTP-Router | `net/http` (Go 1.22+ Routing) oder `go-chi/chi` |
+| WebSocket | `coder/websocket` |
+| Lokale DB | `modernc.org/sqlite` (pure Go, kein CGO) |
+| YAML | `gopkg.in/yaml.v3` / `goccy/go-yaml` (bessere Fehlermeldungen mit Zeilennummer) |
+| JSON-Schema-Validierung | `santhosh-tekuri/jsonschema` |
+| Ausdrücke & Skripte | `dop251/goja` (ECMAScript 5.1+/teilweise ES6, eingebettet, sandboxbar) |
+| Cron | `robfig/cron/v3` |
+| Dateiüberwachung | `fsnotify/fsnotify` |
+| Windows-Dienst / DPAPI / EventLog | `golang.org/x/sys/windows`, `.../svc`, `.../svc/eventlog` |
+| SQL Server | `microsoft/go-mssqldb` (inkl. Windows-Authentifizierung) |
+| PostgreSQL | `jackc/pgx/v5` |
+| MySQL/MariaDB | `go-sql-driver/mysql` |
+| Oracle | `sijms/go-ora` (pure Go) |
+| ODBC (optional, Access, Legacy) | `alexbrainman/odbc` |
+| Excel | `xuri/excelize/v2` |
+| CSV | `encoding/csv` (+ eigene Typ-Erkennung) |
+| SFTP | `pkg/sftp` + `x/crypto/ssh` |
+| Mail | `wneessen/go-mail` |
+| Logging | `log/slog` (strukturiert, JSON) |
+| WebView2-Fenster | `jchv/go-webview2` oder Wails v2 |
+
+### 4.3 Frontend (Editor)
+
+| Zweck | Wahl |
+|---|---|
+| Framework | **React 19 + TypeScript**, Build mit **Vite** |
+| Graph-Canvas | **React Flow (xyflow)** – Knoten, Hops, Zoom, Minimap, Auto-Layout (`elkjs`) |
+| Formulare | Automatisch aus JSON-Schema der Action/Transform generiert (`@rjsf/core` oder eigene schlanke Lösung) |
+| Code-/Ausdruckseditor | **Monaco** (Autovervollständigung für Variablen, Felder, Funktionen) |
+| Zustand | `zustand` + Undo/Redo-Stack (Command-Pattern) |
+| Datenvorschau | Virtualisierte Tabelle (`@tanstack/react-table` + `react-virtual`) |
+| UI-Kit | `shadcn/ui` + Tailwind (leicht, kein schweres Komponenten-Framework) |
+
+Ziel-Bundle: < 3 MB gzip, wird in die exe eingebettet.
+
+---
+
+## 5. Dateiformate
+
+YAML, menschenlesbar, stabil sortiert (minimale Git-Diffs). Layout-Informationen (Koordinaten) liegen im selben Dokument,
+aber in einem eigenen `layout`-Block, damit Logik-Diffs nicht vom Verschieben eines Knotens überlagert werden.
+
+### 5.1 Workflow
+
+```yaml
+# workflows/nightly-import.workflow.yaml
+kind: Workflow
+apiVersion: easyflow/v1
+name: nightly-import
+description: Lädt Kunden aus dem ERP und überträgt sie ins CRM
+parameters:
+  - name: IMPORT_DATE
+    default: "{{ today().minusDays(1).format('yyyy-MM-dd') }}"
+settings:
+  timeout: 2h
+  maxConcurrentRuns: 1
+
+actions:
+  - id: start
+    type: core.start
+
+  - id: wait-file
+    type: file.wait
+    with:
+      path: "${INBOX}\\customers_${IMPORT_DATE}.csv"
+      timeout: 30m
+
+  - id: load
+    type: core.run-pipeline
+    with:
+      pipeline: pipelines/customers-to-crm.pipeline.yaml
+      params:
+        FILE: "${INBOX}\\customers_${IMPORT_DATE}.csv"
+    retry: { attempts: 3, backoff: 1m }
+
+  - id: archive
+    type: file.move
+    with:
+      source: "${INBOX}\\customers_${IMPORT_DATE}.csv"
+      target: "${ARCHIVE}\\"
+
+  - id: notify-error
+    type: mail.send
+    with:
+      connection: smtp-office365
+      to: "${ADMIN_MAIL}"
+      subject: "Import fehlgeschlagen: {{ run.id }}"
+      body: "{{ run.lastError }}"
+
+  - id: abort
+    type: core.abort
+
+hops:
+  - { from: start,     to: wait-file }
+  - { from: wait-file, to: load,         when: success }
+  - { from: load,      to: archive,      when: success }
+  - { from: wait-file, to: notify-error, when: failure }
+  - { from: load,      to: notify-error, when: failure }
+  - { from: notify-error, to: abort }
+
+layout:
+  start:        { x: 40,  y: 120 }
+  wait-file:    { x: 200, y: 120 }
+  load:         { x: 380, y: 120 }
+  archive:      { x: 560, y: 120 }
+  notify-error: { x: 380, y: 280 }
+  abort:        { x: 560, y: 280 }
+```
+
+### 5.2 Pipeline
+
+```yaml
+# pipelines/customers-to-crm.pipeline.yaml
+kind: Pipeline
+apiVersion: easyflow/v1
+name: customers-to-crm
+parameters:
+  - name: FILE
+settings:
+  bufferSize: 10000          # Records pro Hop-Puffer (Backpressure)
+
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: "${FILE}"
+      delimiter: ";"
+      encoding: windows-1252
+      header: true
+      fields:
+        - { name: kdnr,   type: int }
+        - { name: name,   type: string }
+        - { name: umsatz, type: decimal, format: "#.##0,00" }
+
+  - id: only-active
+    type: core.filter
+    with:
+      condition: "{{ record.umsatz > 0 }}"
+
+  - id: map
+    type: core.select-fields
+    with:
+      fields:
+        - { from: kdnr, to: externalId }
+        - { from: name, to: companyName }
+        - { name: importedAt, value: "{{ now() }}" }
+
+  - id: to-crm
+    type: http.request
+    copies: 4                # 4 parallele Instanzen
+    with:
+      connection: crm-api
+      method: POST
+      url: /api/accounts
+      body: "{{ record }}"
+    onError: error-hop
+
+  - id: rejected
+    type: csv.output
+    with:
+      path: "${ARCHIVE}\\rejected_${IMPORT_DATE}.csv"
+
+hops:
+  - { from: read,        to: only-active }
+  - { from: only-active, to: map }
+  - { from: map,         to: to-crm }
+  - { from: to-crm,      to: rejected, type: error }
+```
+
+### 5.3 Trigger
+
+```yaml
+kind: Trigger
+apiVersion: easyflow/v1
+name: nightly-import
+type: cron
+target: workflows/nightly-import.workflow.yaml
+environment: prod
+with:
+  schedule: "0 2 * * 1-5"
+  timezone: Europe/Berlin
+  overlap: skip            # skip | queue | allow
+```
+
+---
+
+## 6. Ausführungs-Engine
+
+### 6.1 Workflow-Engine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Queued
+    Queued --> Running
+    Running --> Running: Action fertig → nächste Actions per Hop-Bedingung
+    Running --> Succeeded: keine offenen Actions, kein Fehler / core.success
+    Running --> Failed: unbehandelter Fehler / core.abort
+    Running --> Cancelled: Abbruch durch Benutzer / Timeout
+    Failed --> Running: Resume ab fehlgeschlagener Action
+    Succeeded --> [*]
+    Failed --> [*]
+    Cancelled --> [*]
+```
+
+Ablauf:
+1. **Laden & Validieren**: YAML parsen, gegen JSON-Schema prüfen, Action-Typen in der Registry auflösen, Graph prüfen (Start vorhanden, keine unerreichbaren Knoten, Zyklen nur mit Limit).
+2. **Kontext aufbauen**: Variablen-Scopes, Credentials (lazy entschlüsselt), Logger, `context.Context` für Abbruch/Timeout.
+3. **Ausführen**: Ab `start` werden Actions in eine Ready-Queue gelegt. Jede Action läuft in einer Goroutine; nach Abschluss werden die ausgehenden Hops ausgewertet und Nachfolger „bereit“ gesetzt.
+   - **Parallelität**: Hat eine Action mehrere erfüllte ausgehende Hops, laufen die Nachfolger parallel.
+   - **Join**: Eine Action mit mehreren eingehenden Hops startet standardmäßig beim ersten eingehenden Signal (Hop-Semantik); mit `join: all` wartet sie auf alle aktiven Vorgänger.
+4. **Fehlerbehandlung je Action**: `retry` (Anzahl, Backoff exponentiell/fix), `timeout`, `continueOnError`.
+5. **Persistenz**: Jeder Statuswechsel wird in SQLite geschrieben (Run, ActionRun, Ergebnis, Dauer) → Live-Anzeige im Editor und **Resume** nach Absturz/Fehler ab der fehlgeschlagenen Action.
+
+Schnittstelle einer Action (Go):
+
+```go
+type Action interface {
+    // Wird beim Laden aufgerufen – Konfiguration prüfen, Defaults setzen.
+    Init(cfg ActionConfig) error
+    // Führt die Action aus. ctx wird bei Abbruch/Timeout gecancelt.
+    Execute(ctx context.Context, ec *ExecContext) (Result, error)
+}
+
+type Result struct {
+    Success   bool
+    ExitCode  int
+    Rows      int64
+    Files     []string
+    Variables map[string]any   // werden für Nachfolger sichtbar
+    Output    any               // beliebiges JSON-Ergebnis
+}
+```
+
+### 6.2 Pipeline-Engine
+
+```mermaid
+flowchart LR
+    A["csv.input<br/>(Goroutine)"] -- "chan Record<br/>Puffer 10k" --> B["core.filter"]
+    B --> C["core.select-fields"]
+    C --> D1["http.request #1"]
+    C --> D2["http.request #2"]
+    C --> D3["http.request #3"]
+    D1 -. error .-> E["csv.output"]
+    D2 -. error .-> E
+    D3 -. error .-> E
+```
+
+- Jeder Transform (bzw. jede Kopie) ist eine **Goroutine**, jeder Hop ein **gepufferter Channel** von Record-Batches.
+- **Batching**: Records werden intern in Batches (z. B. 500) übertragen, um Channel-Overhead zu minimieren; für den Transform-Entwickler unsichtbar.
+- **Backpressure** entsteht automatisch: Volle Puffer blockieren den Erzeuger → konstanter Speicher auch bei großen Dateien.
+- **Ende-Signal**: Schließen des Channels propagiert durch den Graphen; die Pipeline ist fertig, wenn alle Transforms beendet sind.
+- **Fehler**: Pro Record → Error-Hop (falls vorhanden), sonst Pipeline-Abbruch (alle Goroutinen via Context gecancelt). Schwelle konfigurierbar (`maxErrors: 100`).
+- **Metriken** je Transform: gelesen/geschrieben/Fehler/Records pro Sekunde/Puffer-Füllstand – live per WebSocket im Editor (wie Hops „Metrics“-Tab).
+- **Transaktionen**: DB-Outputs mit `commitSize`; optional „Unique Connection“-Modus (eine Transaktion über die ganze Pipeline, Rollback bei Fehler).
+
+Schnittstelle eines Transforms (Go):
+
+```go
+type Transform interface {
+    Init(cfg TransformConfig, schemaIn Schema) (schemaOut Schema, err error)
+    // Process erhält Eingangs-Batches und schreibt über out weiter.
+    Process(ctx context.Context, in <-chan Batch, out Emitter) error
+}
+
+type Emitter interface {
+    Emit(r Record)                 // Standardausgang
+    EmitTo(hop string, r Record)   // gezielter Ausgang (z. B. Switch/Case)
+    Error(r Record, err error)     // Error-Hop
+}
+```
+
+Zusätzlich gibt es vereinfachte Basistypen (`RowMapper`, `RowFilter`), sodass einfache Transforms nur eine Funktion `func(Record) (Record, error)` implementieren.
+
+### 6.3 Datenvorschau & Debugging (Editor)
+
+- **Preview**: Pipeline bis zu einem gewählten Transform mit `limit: 100` ausführen, Records je Hop anzeigen (Tabelle + JSON).
+- **Sampling im Lauf**: Bei jedem Lauf werden die ersten N Records pro Hop gespeichert (abschaltbar) → nachträgliche Fehlersuche.
+- **Breakpoints** (Phase 2): Pause bei Bedingung, z. B. `{{ record.kdnr == 4711 }}`.
+- **Testlauf einzelner Actions** im Workflow mit Mock-Eingaben.
+
+### 6.4 Run-Queue & Ressourcen
+
+- Globales Limit gleichzeitiger Runs (`maxConcurrentRuns`), zusätzlich pro Workflow.
+- Prioritäten (manuell > Webhook > Cron).
+- Graceful Shutdown: Dienst-Stopp wartet konfigurierbar auf laufende Runs, danach Abbruch + Status `Cancelled` (resumebar).
+
+---
+
+## 7. Erweiterbarkeit (Plugins)
+
+Drei Stufen – von einfach bis mächtig:
+
+### 7.1 Stufe 1: Skript-Actions/-Transforms (JavaScript, eingebettet)
+
+- `core.script` (Workflow) und `core.script-transform` (Pipeline) führen JS in **goja** aus.
+- Sandbox: kein Dateisystem-/Netzwerkzugriff außer über bereitgestellte APIs (`http`, `fs` – per Projekteinstellung freischaltbar), CPU-Zeitlimit.
+- Wiederverwendbare Skripte in `scripts/` werden über `require('./scripts/utils.js')` geladen.
+
+### 7.2 Stufe 2: PowerShell / Shell
+
+- `shell.powershell` mit Übergabe von Variablen als Parameter und Rückgabe von JSON (`ConvertTo-Json`) als Action-Ergebnis.
+- Bevorzugt `pwsh.exe` (PowerShell 7), Fallback `powershell.exe` (5.1).
+- In Pipelines: `shell.powershell-transform` – Records als NDJSON über stdin/stdout.
+
+### 7.3 Stufe 3: Externe Plugins (beliebige Sprache)
+
+Go-eigene Plugins (`plugin`-Paket) funktionieren unter Windows nicht – deshalb ein **prozessbasiertes Protokoll** (ähnlich LSP/HashiCorp go-plugin):
+
+- Plugin = ausführbare Datei + `plugin.yaml` im Ordner `plugins/<name>/`.
+- Kommunikation: **JSON-RPC 2.0 über stdin/stdout** (NDJSON), Logs über stderr.
+- Methoden:
+  - `describe` → liefert Liste der Actions/Transforms inkl. JSON-Schema der Eigenschaften, Icon (SVG), Kategorie, Ports
+  - `action.execute` → einmaliger Aufruf, Ergebnis zurück
+  - `transform.open` / `transform.batch` / `transform.close` → Streaming von Record-Batches
+- Der Prozess wird pro Run (oder gepoolt) gestartet; Absturz eines Plugins reißt den Runner nicht mit.
+- SDKs: Go (Referenz), Python, C#/.NET, Node – jeweils dünne Wrapper (~200 Zeilen).
+
+```yaml
+# plugins/sap-rfc/plugin.yaml
+name: sap-rfc
+version: 1.0.0
+executable: sap-rfc-plugin.exe
+provides:
+  - sap.rfc-call         # Action
+  - sap.table-input      # Transform
+```
+
+### 7.4 Registry & UI-Integration
+
+Alle Bausteine (eingebaut, JS, extern) beschreiben sich über denselben **Descriptor**:
+
+```json
+{
+  "type": "http.request",
+  "kind": "transform",
+  "category": "Netzwerk",
+  "label": "HTTP-Request",
+  "icon": "globe.svg",
+  "ports": { "in": 1, "out": ["main", "error"] },
+  "properties": { "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "...": {} } },
+  "uiHints": { "body": { "widget": "code", "language": "json" } }
+}
+```
+
+Der Editor rendert Palette und Eigenschaftsdialog **vollständig aus dem Descriptor** – neue Plugins brauchen keinen Frontend-Code.
+
+---
+
+## 8. Sicherheit
+
+| Thema | Lösung |
+|---|---|
+| Netzwerk | Server bindet standardmäßig nur an `127.0.0.1`. Für Netzzugriff explizit `--listen 0.0.0.0:7300` + TLS (eigenes Zertifikat oder selbstsigniert erzeugt) |
+| Authentifizierung | Lokal-Modus ohne Login; im Netzmodus: lokale Benutzer (bcrypt/argon2id) + API-Tokens; optional Windows-Authentifizierung (Negotiate/Kerberos) in späterer Phase |
+| Rollen | `viewer` (ansehen), `operator` (starten/stoppen), `editor` (ändern), `admin` |
+| Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `EASYFLOW_MASTER_KEY` |
+| Secrets im Log | Automatische Maskierung aller bekannten Secret-Werte in Logs und Vorschauen |
+| Webhooks | Pro Webhook eigenes Token (Header/Query) oder HMAC-Signaturprüfung, Rate-Limit |
+| Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
+| Dienstkonto | Empfehlung: dedizierter Dienstbenutzer mit minimalen Rechten (bzw. gMSA in Domänen) |
+| Audit | Änderungen an Workflows (wer/wann) und manuelle Starts werden protokolliert |
+
+---
+
+## 9. Persistenz & Logging
+
+### 9.1 Was liegt wo?
+
+| Daten | Ort | Format |
+|---|---|---|
+| Workflows, Pipelines, Trigger, Connections | Projektordner | YAML (Git) |
+| Run-Historie, Status, Metriken, Samples | `data\easyflow.db` | SQLite (WAL-Modus) |
+| Secrets | `data\easyflow.db` (Tabelle `secrets`) | verschlüsselt |
+| Run-Logs | `data\logs\<jahr>\<run-id>.log` | JSON-Lines (slog) |
+| Dienst-Ereignisse | Windows-Ereignisanzeige | EventLog-Quelle „easy-flow“ |
+
+Standardpfade: `%ProgramData%\easy-flow\` (Dienst) bzw. `%LOCALAPPDATA%\easy-flow\` (Desktop) bzw. neben der exe (portabel).
+
+### 9.2 Datenmodell (SQLite, vereinfacht)
+
+```sql
+CREATE TABLE runs (
+  id            TEXT PRIMARY KEY,          -- ULID (zeitlich sortierbar)
+  kind          TEXT NOT NULL,             -- workflow | pipeline
+  path          TEXT NOT NULL,             -- relativer Pfad im Projekt
+  file_hash     TEXT NOT NULL,             -- Version der ausgeführten Definition
+  environment   TEXT,
+  trigger       TEXT,                      -- manual | cron:<name> | webhook:<name> | cli
+  parent_run_id TEXT REFERENCES runs(id),  -- Sub-Workflow / Pipeline aus Workflow
+  status        TEXT NOT NULL,             -- queued|running|succeeded|failed|cancelled
+  params_json   TEXT,
+  started_at    INTEGER, finished_at INTEGER,
+  error         TEXT
+);
+
+CREATE TABLE node_runs (
+  run_id     TEXT REFERENCES runs(id),
+  node_id    TEXT,                         -- Action- oder Transform-ID
+  attempt    INTEGER DEFAULT 1,
+  status     TEXT,
+  rows_in    INTEGER, rows_out INTEGER, rows_err INTEGER,
+  result_json TEXT,
+  started_at INTEGER, finished_at INTEGER,
+  PRIMARY KEY (run_id, node_id, attempt)
+);
+
+CREATE TABLE samples (run_id TEXT, hop TEXT, seq INTEGER, record_json TEXT);
+CREATE TABLE secrets (name TEXT PRIMARY KEY, nonce BLOB, ciphertext BLOB, updated_at INTEGER);
+CREATE TABLE users   (name TEXT PRIMARY KEY, password_hash TEXT, role TEXT, token_hash TEXT);
+```
+
+Aufbewahrung: konfigurierbare Retention (z. B. 30 Tage Historie, 7 Tage Samples), Bereinigung durch internen Job.
+
+### 9.3 Observability
+
+- `/metrics` im Prometheus-Format (optional), `/health` für Monitoring (z. B. PRTG, Checkmk).
+- Benachrichtigungen bei Fehlschlag: global konfigurierbarer „Error-Workflow“ (wie n8n), der bei jedem fehlgeschlagenen Run mit dessen Kontext gestartet wird.
+
+---
+
+## 10. API (Server-Modus)
+
+REST unter `/api/v1`, JSON. Der Editor nutzt ausschließlich diese API – damit ist alles auch skriptbar.
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| GET | `/projects/current/tree` | Dateibaum des Projekts |
+| GET/PUT/DELETE | `/files/{path}` | Workflow/Pipeline/Trigger lesen, speichern (mit ETag gegen Überschreiben) |
+| POST | `/validate` | Definition prüfen, Fehler mit Zeilen-/Knotenbezug |
+| GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
+| POST | `/runs` | Run starten `{ path, environment, params }` |
+| GET | `/runs?status=&path=` | Historie |
+| GET | `/runs/{id}` | Details inkl. Knotenstatus |
+| POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern |
+| GET | `/runs/{id}/logs?follow=true` | Logs (SSE-Stream) |
+| POST | `/preview` | Pipeline-Vorschau bis Transform X |
+| GET/PUT | `/secrets/{name}` | Secrets setzen (Wert nie lesbar zurück) |
+| GET/POST | `/triggers`, `/triggers/{name}/enable` | Trigger verwalten |
+| ANY | `/hooks/{name}` | Webhook-Endpunkte |
+| WS | `/ws` | Live-Events: `run.started`, `node.status`, `node.metrics`, `log.line`, `file.changed` |
+
+---
+
+## 11. Editor – UX-Konzept
+
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ easy-flow   Projekt: my-project ▾   Env: dev ▾        ▶ Ausführen  ⏸  ⟲  💾    │
+├───────────────┬──────────────────────────────────────────────┬─────────────────┤
+│ Explorer      │                                              │ Eigenschaften   │
+│ ▸ workflows   │    (Start)──▶[Datei warten]──✔──▶[Pipeline]  │ HTTP-Request    │
+│ ▸ pipelines   │                    │✖           │✔           │ URL: ________   │
+│ ▸ triggers    │                    ▼            ▼            │ Methode: POST ▾ │
+│ ▸ connections │              [Mail senden]  [Archivieren]    │ Body: {{ … }}   │
+│───────────────│                                              │ Retry: 3        │
+│ Palette 🔍    │                                              │                 │
+│ ▸ Allgemein   │                                              │                 │
+│ ▸ Dateien     │                                              │                 │
+│ ▸ Datenbank   │                                              │                 │
+│ ▸ Netzwerk    │                                              │                 │
+├───────────────┴──────────────────────────────────────────────┴─────────────────┤
+│ Logs │ Metriken │ Vorschau │ Probleme │ Historie                                 │
+│ 14:02:11 load        ✔  12.430 Zeilen   1,8 s                                   │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Kernfunktionen:
+- Drag & Drop aus der Palette, Hops per Ziehen zwischen Ports, Hop-Typ per Klick umschalten (✔/✖/∞/ƒ)
+- Live-Status auf dem Canvas (Knotenfarbe, Zeilenzähler an Hops)
+- Inline-Validierung (rote Markierung + „Probleme“-Tab)
+- Feld-Autovervollständigung: Der Editor kennt das Ausgabeschema jedes Transforms (aus `Init`) und schlägt Feldnamen vor
+- Copy/Paste von Knoten als YAML (zwischen Instanzen und in Tickets/Chats teilbar)
+- Tastatur-Shortcuts, Undo/Redo, Auto-Layout, Gruppierung/Notizen auf dem Canvas
+- Dateiänderungen von außen (z. B. `git pull`) werden per `file.changed` erkannt und neu geladen
+
+---
+
+## 12. Mitgelieferte Bausteine (MVP-Katalog)
+
+### 12.1 Workflow-Actions
+
+| Kategorie | Actions |
+|---|---|
+| Allgemein | Start, Erfolg, Abbruch, Warten, Variablen setzen, Bedingung prüfen, Log schreiben, Schleife (ForEach über Liste/Dateien) |
+| Ausführung | Pipeline ausführen, Workflow ausführen, JavaScript, PowerShell, Programm starten |
+| Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, ZIP/Entpacken, Dateiliste |
+| Netzwerk | HTTP-Request, SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
+| Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
+
+### 12.2 Pipeline-Transforms
+
+| Kategorie | Transforms |
+|---|---|
+| Eingabe | CSV, Excel, JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste |
+| Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
+| Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
+| Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
+| Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
+
+Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dateien bei Überschreiten eines Speicherlimits.
+
+---
+
+## 13. Windows-Betrieb im Detail
+
+- **Installation**: (a) ZIP entpacken und starten (portabel), (b) MSI (WiX v4) mit Dienst-Registrierung und Startmenü-Eintrag, (c) `winget install easy-flow`.
+- **Dienst**: `easyflow service install --project D:\flows --account "DOMAIN\svc-easyflow"` registriert über den Service Control Manager; automatischer Neustart bei Absturz (Recovery-Optionen), verzögerter Autostart.
+- **Code-Signing** der exe (Authenticode) – wichtig, damit SmartScreen/Virenscanner nicht anschlagen.
+- **Pfade**: UNC-Pfade (`\\server\share`) und lange Pfade (`\\?\`) werden unterstützt; Encoding-Unterstützung für `windows-1252`/`UTF-16` bei Dateien.
+- **Updates**: `easyflow update` lädt neue Version, prüft Signatur, ersetzt exe über Rename-Trick und startet Dienst neu.
+- **Ressourcen**: Leerlauf ~30–60 MB RAM, keine Hintergrund-CPU-Last außer Scheduler-Tick.
+- **Tray-Icon** (Desktop-Modus, optional): Status, „Editor öffnen“, letzte Fehler.
+
+Linux/macOS: dank Go ohne Mehraufwand mitgebaut (systemd statt Dienst, Keychain/Masterkey statt DPAPI) – aber nicht Fokus.
+
+---
+
+## 14. Code-Struktur (Monorepo)
+
+```
+easy-flow/
+├─ cmd/easyflow/            # main.go – CLI (cobra o. ä.): run, serve, desktop, service, validate
+├─ internal/
+│  ├─ model/                # Workflow, Pipeline, Hop, Trigger – Structs + YAML-(De)Serialisierung
+│  ├─ schema/               # JSON-Schemas für Dateien & Descriptors
+│  ├─ vars/                 # Variablen-Auflösung, Scopes
+│  ├─ expr/                 # goja-Integration, Funktionsbibliothek (now, today, format …)
+│  ├─ engine/
+│  │  ├─ workflow/          # Workflow-Engine, Hop-Auswertung, Retry, Resume
+│  │  └─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
+│  ├─ registry/             # Katalog aller Actions/Transforms
+│  ├─ actions/              # eingebaute Actions (je Paket: core, file, http, mail, sql, shell)
+│  ├─ transforms/           # eingebaute Transforms (csv, excel, json, db, core …)
+│  ├─ connections/          # DB-/HTTP-/SMTP-Verbindungen, Pooling
+│  ├─ secrets/              # Secret-Store, DPAPI, Maskierung
+│  ├─ store/                # SQLite-Zugriff, Migrationen
+│  ├─ scheduler/            # Cron, File-Watch, Interval, Run-Queue
+│  ├─ server/               # REST, WebSocket, Webhooks, Auth, eingebettete UI
+│  ├─ plugin/               # Externes Plugin-Protokoll (JSON-RPC Host)
+│  └─ winsvc/               # Windows-Dienst, EventLog (build tag windows)
+├─ pkg/sdk/                 # Öffentliches Go-SDK für Plugin-Entwickler
+├─ web/                     # Editor (React + Vite + React Flow)
+├─ examples/                # Beispielprojekte
+├─ docs/                    # Konzept, Benutzerhandbuch, ADRs
+└─ build/                   # WiX-Installer, Signierung, CI-Skripte
+```
+
+**Build**: `make build` → `web` wird mit Vite gebaut, nach `internal/server/ui/dist` kopiert, per `go:embed` eingebettet,
+dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w"`. CI über GitHub Actions
+(Windows-Runner für Tests von Dienst/DPAPI/PowerShell).
+
+**Tests**:
+- Unit-Tests je Action/Transform (Tabellen-Tests)
+- Golden-File-Tests: Beispiel-Pipelines mit Eingabedateien → erwartete Ausgabedateien
+- Engine-Tests: Hop-Semantik, Parallelität, Abbruch, Resume (mit `-race`)
+- E2E Editor: Playwright gegen `easyflow serve`
+
+---
+
+## 15. Roadmap
+
+| Phase | Inhalt | Ergebnis |
+|---|---|---|
+| **0.1 – Runner-Kern** | Dateiformat v1, Variablen, Workflow-Engine, 10 Basis-Actions (Start, Shell/PowerShell, HTTP, Datei-Ops, Mail, Run-Workflow), CLI `run`/`validate` | Workflows per YAML + Aufgabenplanung nutzbar |
+| **0.2 – Pipelines** | Pipeline-Engine, CSV/Excel/JSON/DB In/Out, Filter, Select, Berechnen, Lookup, Sort, Group, Error-Hops, `core.run-pipeline` | ETL-Fälle per CLI |
+| **0.3 – Server & Editor** | `serve`, REST/WS, SQLite-Historie, Editor mit Canvas, Eigenschaften aus Schema, Live-Status, Logs | Visuelles Designen & Starten |
+| **0.4 – Betrieb** | Scheduler (Cron/File/Webhook), Windows-Dienst, Secret-Store (DPAPI), Auth/Rollen, Retention, Error-Workflow | Produktionsbetrieb auf Windows-Server |
+| **0.5 – Komfort** | Datenvorschau, Samples, Autovervollständigung, Desktop-Modus (WebView2), MSI, Resume | Rund nutzbares Produkt |
+| **0.6 – Erweiterbarkeit** | Plugin-Protokoll + SDKs (Go, Python, C#), Plugin-Verwaltung im Editor | Eigene Konnektoren |
+| **1.0** | Stabilisierung, Doku, Beispiele, Code-Signing, `winget` | Release |
+| **später** | Remote-Runner (Agenten auf anderen Maschinen), Git-Integration im Editor, Breakpoints, Windows-Auth, Hop-Import (`.hwf`/`.hpl` → YAML) | |
+
+---
+
+## 16. Offene Entscheidungen
+
+1. **Go vs. .NET** – Empfehlung Go (s. 4.1); abhängig von Team-Skills.
+2. **Ausdruckssprache** – JavaScript (goja) vs. eine einfachere eigene Sprache (z. B. `expr-lang/expr`, schneller und sicherer, aber weniger mächtig). Vorschlag: `expr-lang/expr` für Bedingungen/Hop-Ausdrücke (Performance in Pipelines), goja für Skript-Bausteine.
+3. **Join-Semantik im Workflow** – Hop-kompatibel („erster gewinnt“) als Default oder n8n-artig („warte auf alle“)?
+4. **Typsystem in Pipelines** – strikt (Schema Pflicht, wie Hop) oder locker (schemalos, wie n8n)? Vorschlag: schemalos mit optionalem Schema; Schema-Inferenz für Editor-Autovervollständigung.
+5. **Mehrbenutzerbetrieb** – reicht „ein Server, mehrere Browser“ mit ETag-Konfliktschutz oder wird Echtzeit-Kollaboration gebraucht? Vorschlag: Ersteres, Git als Kollaborationsmodell.
+6. **Lizenz** – z. B. Apache 2.0 (wie Hop) vs. Fair-Code (wie n8n).
