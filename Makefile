@@ -13,7 +13,13 @@ LDFLAGS := -s -w \
 
 GOBUILD := CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)"
 
-.PHONY: all build build-windows build-linux dist notices package test lint fmt tidy clean
+# Pinned tool versions (installed on demand into bin/tools/<version>/).
+CYCLONEDX_GOMOD_VERSION := v1.12.0
+GOVULNCHECK_VERSION     := v1.9.0
+CYCLONEDX_GOMOD := bin/tools/$(CYCLONEDX_GOMOD_VERSION)/cyclonedx-gomod
+GOVULNCHECK     := bin/tools/$(GOVULNCHECK_VERSION)/govulncheck
+
+.PHONY: all build build-windows build-linux dist notices sbom package test vulncheck lint fmt tidy clean
 
 all: lint test build
 
@@ -37,13 +43,30 @@ notices:
 	mkdir -p bin
 	./scripts/third-party-notices.sh > bin/THIRD_PARTY_NOTICES.txt
 
-## package: build release archives (zip/tar.gz) and SHA256SUMS into dist/
-package: dist notices
+## sbom: write CycloneDX SBOMs (JSON) for each release target to bin/
+sbom: $(CYCLONEDX_GOMOD)
+	GOOS=windows GOARCH=amd64 $(CYCLONEDX_GOMOD) app -json -licenses -assert-licenses -std \
+		-main cmd/runnel -output bin/runnel-windows-amd64.cdx.json .
+	GOOS=linux GOARCH=amd64 $(CYCLONEDX_GOMOD) app -json -licenses -assert-licenses -std \
+		-main cmd/runnel -output bin/runnel-linux-amd64.cdx.json .
+
+## package: build release archives (zip/tar.gz), SBOMs and SHA256SUMS into dist/
+package: dist notices sbom
 	./scripts/package.sh $(VERSION)
 
 ## test: run all tests with the race detector
 test:
 	go test -race ./...
+
+## vulncheck: report known vulnerabilities in dependencies and the Go standard library
+vulncheck: $(GOVULNCHECK)
+	$(GOVULNCHECK) ./...
+
+$(CYCLONEDX_GOMOD):
+	GOBIN=$(CURDIR)/$(dir $@) go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CYCLONEDX_GOMOD_VERSION)
+
+$(GOVULNCHECK):
+	GOBIN=$(CURDIR)/$(dir $@) go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 
 ## lint: run golangci-lint (includes go vet and formatting checks)
 lint:

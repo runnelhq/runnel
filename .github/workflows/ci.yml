@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 5 * * 1" # weekly, to catch newly published vulnerabilities
 
 permissions:
   contents: read
@@ -21,9 +23,22 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          check-latest: true
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+
+  vulncheck:
+    name: Vulnerability check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: govulncheck
+        run: make vulncheck
 
   test:
     name: Test (${{ matrix.os }})
@@ -37,6 +52,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          check-latest: true
       - name: Test with race detector
         if: runner.os == 'Linux'
         run: go test -race ./...
@@ -46,14 +62,15 @@ jobs:
 
   build:
     name: Build
-    needs: [lint, test]
+    needs: [lint, vulncheck, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Build and package Windows and Linux binaries
+          check-latest: true
+      - name: Build and package Windows and Linux binaries (incl. SBOMs)
         run: make package
       - name: Smoke test
         run: ./bin/runnel-linux-amd64 version

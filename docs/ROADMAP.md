@@ -27,6 +27,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 |---|---|---|---|
 | S01 ✅ | Projektgerüst | `go.mod`, `cmd/runnel` mit `version`, Ordnerstruktur, Makefile/Taskfile, CI (Lint, Test, Build für Windows + Linux) | `runnel version`; CI grün |
 | S01a ✅ | Release-Workflow | Bei Tag `v*`: Tests, Build, ZIP/tar.gz mit `THIRD_PARTY_NOTICES.txt`, `SHA256SUMS`, GitHub-Release (Tags mit `-` als Vorabversion); CI lädt dieselben Archive als Artefakt hoch | `make package VERSION=v0.0.0-test`; Tag pushen |
+| S01b ✅ | SBOM, Schwachstellen-Check, Herkunftsnachweis | CycloneDX-SBOM je Plattform (`cyclonedx-gomod`), `govulncheck` in CI (auch wöchentlich), signierte Build-Provenance und SBOM-Attestierung im Release, manueller Release-Start über GitHub; Go 1.26 | CI grün; `make package`; Release über *Run workflow* |
 | S02 | Workflow-Dateiformat | Go-Strukturen für `Workflow`, `Action`, `Link`; YAML laden mit Zeilenangabe bei Fehlern | Golden-Tests mit gültigen/ungültigen Dateien |
 | S03 | Workflow-Validierung | Start vorhanden, IDs eindeutig, Links zeigen auf existierende Actions, unerreichbare Knoten, Rückwärts-Links nur als Schleifen-Link; `runnel validate` | `runnel validate examples/…` mit Fehlerbeispielen |
 | S04 | Projekt & Variablen | `project.yaml`, `environments/*.yaml`, Auflösung von `${VAR}` und `${env:…}` in fester Rangfolge; `--env`, `--param` | Unit-Tests der Rangfolge |
@@ -73,7 +74,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S27 | Server & Datei-API | `runnel serve` (nur `127.0.0.1`), `/files` mit ETag, `/catalog`, `/validate` | Tests mit `httptest`; `curl` |
 | S28 | Run-API & Live-Events | `POST /runs`, Abbrechen, WebSocket-Events (Status, Metriken, Logs), Log-Stream per SSE | Tests; `curl`/`websocat` |
 | S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`) | Test: Fehler beheben, fortsetzen |
-| S30 | Editor-Gerüst | Vite + React + TypeScript, in exe eingebettet, Projekt-Explorer, Datei als YAML anzeigen | Browser öffnen, Dateien durchklicken |
+| S30 | Editor-Gerüst | Vite + React + TypeScript, in exe eingebettet, Projekt-Explorer, Datei als YAML anzeigen; SBOM um npm-Pakete ergänzen (`cyclonedx-npm`, mit Go-SBOM zusammenführen) | Browser öffnen, Dateien durchklicken |
 | S31 | Canvas (nur lesen) | Workflow/Pipeline mit React Flow darstellen, Layout aus Datei, Auto-Layout falls fehlend | Beispiele werden korrekt angezeigt |
 | S32 | Canvas bearbeiten | Knoten verschieben/anlegen/löschen, Links ziehen und Typ umschalten, Palette aus `/catalog`, Speichern mit ETag-Konfliktdialog, Undo/Redo | Playwright-Test; zwei Browser gleichzeitig |
 | S33 | Eigenschaften | Eigenschaftsfenster aus JSON-Schema der Bausteine, Inline-Validierung, Tab „Probleme“ | Playwright-Test |

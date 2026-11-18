@@ -27,7 +27,7 @@ Ernsthaft abgewogen wurden **Go** und **.NET 9**.
 ## Entscheidung
 
 Backend, Runner, Server und eingebaute Actions/Transforms werden in **Go** entwickelt
-(aktuelle stabile Go-Version, Build mit `CGO_ENABLED=0`).
+(unterstützte, stabile Go-Version, Build mit `CGO_ENABLED=0`).
 
 Begründung:
 
@@ -37,6 +37,13 @@ Begründung:
 - **Reine Go-Treiber** für SQL Server, PostgreSQL, MySQL, Oracle und SQLite – kein CGO, einfacher Build.
 - **Windows-Integration** (Dienst, EventLog, DPAPI) über `golang.org/x/sys/windows` vorhanden.
 - **Cross-Compile** für Linux/macOS ohne Mehraufwand.
+
+### Go-Version
+
+- Es wird immer eine **vom Go-Projekt unterstützte Version** verwendet (unterstützt werden jeweils die zwei neuesten
+  Hauptversionen); nur diese erhalten Sicherheitskorrekturen der Standardbibliothek.
+- `go.mod` legt die Hauptversion (`go 1.26`) und den Mindest-Patchstand (`toolchain go1.26.11`) fest; die CI verwendet
+  zusätzlich jeweils den neuesten Patch (`check-latest`). `govulncheck` meldet veraltete Stände automatisch.
 
 ## Konsequenzen
 
