@@ -247,7 +247,7 @@ flowchart LR
 
 | Modus | Befehl | Einsatz |
 |---|---|---|
-| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v] [--run-config name]` | Aufgabenplanung, CI, Skripte. Exit-Code = Ergebnis |
+| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v] [--run-config name]` | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet |
 | Server | `runnel serve [--project D:\flows]` | Editor + Scheduler + Webhooks |
 | Desktop | `runnel desktop` | Server + WebView2-Fenster (Einzelplatz) |
 | Windows-Dienst | `runnel service install/start/stop/uninstall` | Dauerbetrieb auf Server |
@@ -506,6 +506,7 @@ Ablauf:
    - **Parallelität**: Hat eine Action mehrere erfüllte ausgehende Links, laufen die Nachfolger parallel.
    - **Join**: Konfigurierbar pro Action (`join: all | first | each`), Projektstandard `all`: Eine Action mit mehreren eingehenden Links startet einmal, sobald alle Vorgänger fertig sind, die noch ein Signal liefern können (Dead-Path-Elimination; nicht durchlaufene Actions erhalten den Status `skipped`). Details: [ADR 0003](adr/0003-join-semantik.md).
 4. **Fehlerbehandlung je Action**: `retry` (Anzahl, Backoff exponentiell/fix), `timeout`, `continueOnError`.
+   **Ergebnis des Workflows:** `core.success` beendet ihn erfolgreich, `core.abort` als fehlgeschlagen (ohne Fehler-Links). Folgt auf eine Action kein Link mehr, entscheidet ihr Ergebnis: Ein Fehler, den kein Fehler- oder Immer-Link behandelt, lässt den Workflow fehlschlagen. Eine Action darf höchstens 10.000-mal je Lauf ausgeführt werden (Schutz vor Endlosschleifen).
 5. **Persistenz**: Jeder Statuswechsel wird in SQLite geschrieben (Run, ActionRun, Ergebnis, Dauer) → Live-Anzeige im Editor und **Resume** nach Absturz/Fehler ab der fehlgeschlagenen Action.
 
 Schnittstelle einer Action (Go):

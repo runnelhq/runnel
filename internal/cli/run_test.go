@@ -1,0 +1,146 @@
+package cli
+
+import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"testing"
+)
+
+// timestamps and run ids vary between runs; replace them for comparisons.
+var (
+	timePattern  = regexp.MustCompile(`(?m)^\d\d:\d\d:\d\d\.\d{3} `)
+	runIDPattern = regexp.MustCompile(`run [0-9A-HJKMNP-TV-Z]{26}`)
+	durPattern   = regexp.MustCompile(`(in|after) [0-9.]+(ms|µs|s)`)
+)
+
+func normalizeLog(s string) string {
+	s = timePattern.ReplaceAllString(s, "TIME ")
+	s = runIDPattern.ReplaceAllString(s, "run RUNID")
+	return durPattern.ReplaceAllString(s, "$1 DURATION")
+}
+
+func TestRunHello(t *testing.T) {
+	chdirRepoRoot(t)
+	t.Setenv("COMPUTERNAME", "TESTPC")
+	t.Setenv("TEMP", `C:\Temp`)
+
+	code, out, errOut := run(t, "run", "--env", "prod", "--param", "GREETING=Moin", "examples/hello/workflows/hello.workflow.yaml")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit code %d, stderr %q, stdout:\n%s", code, errOut, out)
+	}
+	want := `TIME INFO  workflow "hello" started (environment prod), run RUNID
+TIME INFO  [greet] Moin, Production! (production on TESTPC, files in \\fileserver\exchange\runnel-hello)
+TIME INFO  workflow "hello" succeeded in DURATION
+`
+	if got := normalizeLog(out); got != want {
+		t.Errorf("output:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestRunVerbose(t *testing.T) {
+	chdirRepoRoot(t)
+	t.Setenv("COMPUTERNAME", "TESTPC")
+	t.Setenv("TEMP", `C:\Temp`)
+
+	code, out, _ := run(t, "run", "-v", "examples/hello/workflows/hello.workflow.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s", code, out)
+	}
+	for _, want := range []string{
+		`workflow "hello" started (environment dev)`,
+		"DEBUG [pause] started (core.wait)",
+		"DEBUG [pause] waiting 1s",
+		"[greet] Hello, World! (development on TESTPC, files in C:\\Temp\\runnel-hello)",
+		"DEBUG [done] succeeded in",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+}
+
+func writeWorkflow(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test.workflow.yaml")
+	if err := os.WriteFile(path, []byte("kind: Workflow\napiVersion: runnel/v1\nname: test\n"+body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestRunFailed(t *testing.T) {
+	file := writeWorkflow(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: check, type: core.wait, with: { duration: "${WAIT}" } }
+  - { id: report, type: core.log, with: { message: "check failed, aborting" } }
+  - { id: stop, type: core.abort, with: { message: "input not ready" } }
+links:
+  - { from: start, to: check }
+  - { from: check, to: report, when: failure }
+  - { from: report, to: stop }
+`)
+	code, out, _ := run(t, "run", "--param", "WAIT=later", file)
+	if code != exitRunFailed {
+		t.Errorf("exit code %d, want %d", code, exitRunFailed)
+	}
+	want := `TIME INFO  workflow "test" started, run RUNID
+TIME ERROR [check] failed after DURATION: invalid duration "later" (examples: 30s, 5m, 2h, 1h30m)
+TIME INFO  [report] check failed, aborting
+TIME ERROR workflow "test" failed after DURATION: input not ready
+`
+	if got := normalizeLog(out); got != want {
+		t.Errorf("output:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestRunNotStarted(t *testing.T) {
+	chdirRepoRoot(t)
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"invalid workflow", []string{"run", "examples/broken/graph.workflow.yaml"}, `unknown action "imprt"`},
+		{"unknown action type", []string{"run", writeWorkflow(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: copy, type: file.copy }
+links:
+  - { from: start, to: copy }
+`)}, `unknown action type "file.copy"`},
+		{"missing required parameter", []string{"run", writeWorkflow(t, `
+parameters:
+  - { name: TARGET, required: true }
+actions:
+  - { id: start, type: core.start }
+`)}, "missing required parameter(s) [TARGET]"},
+		{"unknown environment", []string{"run", "--env", "qa", "examples/hello/workflows/hello.workflow.yaml"}, `environment "qa" not found`},
+		{"env without project", []string{"run", "--env", "dev", writeWorkflow(t, "actions:\n  - { id: start, type: core.start }\n")}, "no project (project.yaml) found"},
+		{"missing file", []string{"run", "does-not-exist.workflow.yaml"}, "does-not-exist.workflow.yaml"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out, errOut := run(t, tt.args...)
+			if code != exitNotRun {
+				t.Errorf("exit code %d, want %d", code, exitNotRun)
+			}
+			if out != "" {
+				t.Errorf("unexpected run output:\n%s", out)
+			}
+			if !strings.Contains(errOut, tt.want) && !strings.Contains(strings.ToLower(errOut), tt.want) {
+				t.Errorf("stderr %q, want containing %q", errOut, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunUndeclaredParamWarning(t *testing.T) {
+	file := writeWorkflow(t, "actions:\n  - { id: start, type: core.start }\n")
+	code, _, errOut := run(t, "run", "--param", "EXTRA=1", file)
+	if code != 0 || !strings.Contains(errOut, `warning: parameter "EXTRA" is not declared`) {
+		t.Errorf("exit code %d, stderr %q", code, errOut)
+	}
+}
