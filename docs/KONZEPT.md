@@ -218,9 +218,8 @@ flowchart LR
 | Entwicklungsgeschwindigkeit | ✅ hoch | ✅ hoch | ✅ hoch | ⚠️ mittel |
 | Cross-Compile Linux/macOS | ✅ trivial | ✅ | ⚠️ | ✅ |
 
-**Empfehlung: Go.** Das Goroutine/Channel-Modell bildet Hops in Pipelines 1:1 ab, die Binary ist klein und ohne CGO
-cross-kompilierbar. **.NET 9** ist die valide Alternative, falls das Team primär C# kann oder enge Office/AD-Integration
-im Vordergrund steht – das Konzept bleibt dann identisch.
+**Entscheidung: Go** ([ADR 0002](adr/0002-go-backend.md)). Das Goroutine/Channel-Modell bildet Hops in Pipelines 1:1 ab,
+die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternative betrachtet und verworfen.
 
 ### 4.2 Bibliotheken (Backend)
 
@@ -804,7 +803,7 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 
 ## 16. Offene Entscheidungen
 
-1. **Go vs. .NET** – Empfehlung Go (s. 4.1); abhängig von Team-Skills.
+1. ~~**Go vs. .NET**~~ – entschieden: Go ([ADR 0002](adr/0002-go-backend.md)).
 2. **Ausdruckssprache** – JavaScript (goja) vs. eine einfachere eigene Sprache (z. B. `expr-lang/expr`, schneller und sicherer, aber weniger mächtig). Vorschlag: `expr-lang/expr` für Bedingungen/Hop-Ausdrücke (Performance in Pipelines), goja für Skript-Bausteine.
 3. **Join-Semantik im Workflow** – Hop-kompatibel („erster gewinnt“) als Default oder n8n-artig („warte auf alle“)?
 4. **Typsystem in Pipelines** – strikt (Schema Pflicht, wie Hop) oder locker (schemalos, wie n8n)? Vorschlag: schemalos mit optionalem Schema; Schema-Inferenz für Editor-Autovervollständigung.
