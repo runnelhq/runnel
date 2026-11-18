@@ -21,19 +21,34 @@ Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`). Für `make lint
 | Tests | `make test` (mit Race-Detector) | `go test ./...` |
 | Lint | `make lint` | `golangci-lint run ./...` |
 | Formatieren | `make fmt` | `golangci-lint fmt ./...` |
+| Bekannte Sicherheitslücken prüfen | `make vulncheck` | `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` |
+| SBOMs erzeugen | `make sbom` | – |
 
 ```bash
 bin/runnel version
 ```
 
-Die CI (`.github/workflows/ci.yml`) führt Lint, Tests unter Linux und Windows sowie den Build für beide Plattformen aus.
+Die CI (`.github/workflows/ci.yml`) führt Lint, `govulncheck`, Tests unter Linux und Windows sowie Build und Packen
+(inkl. SBOMs) für beide Plattformen aus – bei jedem PR, auf `main` und wöchentlich, damit neu bekannt gewordene
+Sicherheitslücken auffallen.
 
 ## Releases
 
-Fertige Builds gibt es unter [Releases](https://github.com/runnelhq/runnel/releases): je Version eine ZIP für Windows,
-ein `tar.gz` für Linux (jeweils mit `LICENSE`, `README.md` und `THIRD_PARTY_NOTICES.txt`) sowie `SHA256SUMS`.
+Fertige Builds gibt es unter [Releases](https://github.com/runnelhq/runnel/releases). Je Version:
 
-Ein Release entsteht automatisch (`.github/workflows/release.yml`), sobald ein Versions-Tag gepusht wird:
+| Datei | Inhalt |
+|---|---|
+| `runnel_<version>_windows_amd64.zip` | `runnel.exe`, `LICENSE`, `README.md`, `THIRD_PARTY_NOTICES.txt` |
+| `runnel_<version>_linux_amd64.tar.gz` | `runnel` und dieselben Begleitdateien |
+| `runnel_<version>_<os>_amd64.cdx.json` | SBOM (Software-Stückliste) im Format CycloneDX 1.6 |
+| `SHA256SUMS` | Prüfsummen aller Dateien |
+
+### Release erstellen
+
+**Über GitHub (ohne lokales Git):** *Actions → Release → Run workflow*, Branch `main` lassen, Version eintragen
+(z. B. `v0.1.0`) und starten. Der Workflow testet, baut, erzeugt das Tag und veröffentlicht das Release.
+
+**Per Tag:**
 
 ```bash
 git tag -a v0.1.0 -m "Runnel v0.1.0"
@@ -43,8 +58,17 @@ git tag -a v0.1.0 -m "Runnel v0.1.0"
 git push origin v0.1.0
 ```
 
-Tags mit Bindestrich (z. B. `v0.1.0-rc.1`) werden als Vorabversion veröffentlicht. Lokal lassen sich die Archive mit
-`make package VERSION=v0.1.0` erzeugen (Ausgabe in `dist/`).
+Versionen mit Bindestrich (z. B. `v0.1.0-rc.1`) werden als Vorabversion veröffentlicht. Lokal lassen sich die Archive
+mit `make package VERSION=v0.1.0` erzeugen (Ausgabe in `dist/`).
+
+### Herkunft prüfen
+
+Jedes Release-Archiv ist mit einer signierten Herkunftsbestätigung (SLSA Build Provenance) und seiner SBOM verknüpft.
+Prüfen mit der [GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify runnel_0.1.0_windows_amd64.zip --repo runnelhq/runnel
+```
 
 ## Lizenz
 
