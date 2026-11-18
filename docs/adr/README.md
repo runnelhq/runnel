@@ -12,6 +12,7 @@
 | [0008](0008-ausfuehrungsvarianten.md) | Ausführungsvarianten – Run-Konfigurationen, dynamische Ziele, Ausführung pro Datensatz | Angenommen |
 | [0009](0009-begriff-link.md) | „Link“ statt „Hop“ für Verbindungen zwischen Knoten | Angenommen |
 | [0010](0010-projektname-runnel.md) | Projektname „Runnel“ | Angenommen |
+| [0011](0011-corporate-design.md) | Corporate Design | Angenommen |
 
 Neue ADRs: nächste freie Nummer, Aufbau wie die bestehenden (Kontext, Entscheidung, Konsequenzen).
 Wird eine Entscheidung revidiert, erhält die alte ADR den Status „Ersetzt durch ADR xxxx“.
