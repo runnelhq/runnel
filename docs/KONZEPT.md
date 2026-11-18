@@ -434,7 +434,7 @@ Ablauf:
 2. **Kontext aufbauen**: Variablen-Scopes, Credentials (lazy entschlüsselt), Logger, `context.Context` für Abbruch/Timeout.
 3. **Ausführen**: Ab `start` werden Actions in eine Ready-Queue gelegt. Jede Action läuft in einer Goroutine; nach Abschluss werden die ausgehenden Hops ausgewertet und Nachfolger „bereit“ gesetzt.
    - **Parallelität**: Hat eine Action mehrere erfüllte ausgehende Hops, laufen die Nachfolger parallel.
-   - **Join**: Eine Action mit mehreren eingehenden Hops startet standardmäßig beim ersten eingehenden Signal (Hop-Semantik); mit `join: all` wartet sie auf alle aktiven Vorgänger.
+   - **Join**: Konfigurierbar pro Action (`join: all | first | each`), Projektstandard `all`: Eine Action mit mehreren eingehenden Hops startet einmal, sobald alle Vorgänger fertig sind, die noch ein Signal liefern können (Dead-Path-Elimination; nicht durchlaufene Actions erhalten den Status `skipped`). Details: [ADR 0003](adr/0003-join-semantik.md).
 4. **Fehlerbehandlung je Action**: `retry` (Anzahl, Backoff exponentiell/fix), `timeout`, `continueOnError`.
 5. **Persistenz**: Jeder Statuswechsel wird in SQLite geschrieben (Run, ActionRun, Ergebnis, Dauer) → Live-Anzeige im Editor und **Resume** nach Absturz/Fehler ab der fehlgeschlagenen Action.
 
@@ -805,7 +805,7 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 
 1. ~~**Go vs. .NET**~~ – entschieden: Go ([ADR 0002](adr/0002-go-backend.md)).
 2. **Ausdruckssprache** – JavaScript (goja) vs. eine einfachere eigene Sprache (z. B. `expr-lang/expr`, schneller und sicherer, aber weniger mächtig). Vorschlag: `expr-lang/expr` für Bedingungen/Hop-Ausdrücke (Performance in Pipelines), goja für Skript-Bausteine.
-3. **Join-Semantik im Workflow** – Hop-kompatibel („erster gewinnt“) als Default oder n8n-artig („warte auf alle“)?
+3. ~~**Join-Semantik im Workflow**~~ – entschieden: konfigurierbar, Standard `all` ([ADR 0003](adr/0003-join-semantik.md)).
 4. **Typsystem in Pipelines** – strikt (Schema Pflicht, wie Hop) oder locker (schemalos, wie n8n)? Vorschlag: schemalos mit optionalem Schema; Schema-Inferenz für Editor-Autovervollständigung.
 5. **Mehrbenutzerbetrieb** – reicht „ein Server, mehrere Browser“ mit ETag-Konfliktschutz oder wird Echtzeit-Kollaboration gebraucht? Vorschlag: Ersteres, Git als Kollaborationsmodell.
 6. **Lizenz** – z. B. Apache 2.0 (wie Hop) vs. Fair-Code (wie n8n).
