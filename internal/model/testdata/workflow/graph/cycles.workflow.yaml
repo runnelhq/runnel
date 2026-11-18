@@ -1,0 +1,16 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: cycles
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: core.log }
+  - { id: b, type: core.log }
+  - { id: c, type: core.log }
+  - { id: d, type: core.log, join: first, joinTimeout: 1m }
+links:
+  - { from: start, to: a }
+  - { from: a, to: b }
+  - { from: b, to: c }
+  - { from: c, to: a }
+  - { from: start, to: d }
+  - { from: a, to: d, loop: true }

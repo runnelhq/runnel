@@ -2,6 +2,8 @@
 package cli
 
 import (
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -21,7 +23,7 @@ func NewRootCommand(out, errOut io.Writer) *cobra.Command {
 	root.SetOut(out)
 	root.SetErr(errOut)
 
-	root.AddCommand(newVersionCommand())
+	root.AddCommand(newVersionCommand(), newValidateCommand())
 	return root
 }
 
@@ -30,8 +32,18 @@ func Execute(args []string, out, errOut io.Writer) int {
 	root := NewRootCommand(out, errOut)
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
+		var exit errExitCode
+		if errors.As(err, &exit) {
+			return int(exit)
+		}
 		root.PrintErrln("Error:", err)
 		return 1
 	}
 	return 0
 }
+
+// errExitCode ends the command with the given exit code without printing an error;
+// the command has already reported the details.
+type errExitCode int
+
+func (e errExitCode) Error() string { return fmt.Sprintf("exit code %d", int(e)) }

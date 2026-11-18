@@ -60,6 +60,73 @@ func TestWorkflowGolden(t *testing.T) {
 	}
 }
 
+// TestWorkflowValidateGolden runs the graph validation on every file in testdata/workflow/graph
+// and compares the diagnostics with a .golden file. Files in testdata/workflow/valid must have none.
+func TestWorkflowValidateGolden(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("testdata", "workflow", "graph", "*.workflow.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		name := filepath.Base(file)
+		t.Run(name, func(t *testing.T) {
+			data, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w, err := ParseWorkflow(name, data)
+			if err != nil {
+				t.Fatalf("parse error:\n%v", err)
+			}
+			got := "no problems"
+			if diags := w.Validate(); len(diags) > 0 {
+				got = diags.Error()
+			}
+			compareGolden(t, strings.TrimSuffix(file, ".workflow.yaml")+".golden", []byte(got+"\n"))
+		})
+	}
+
+	valid, _ := filepath.Glob(filepath.Join("testdata", "workflow", "valid", "*.workflow.yaml"))
+	for _, file := range valid {
+		w, err := LoadWorkflow(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diags := w.Validate(); len(diags) > 0 {
+			t.Errorf("%s: expected no problems, got:\n%v", file, diags)
+		}
+	}
+}
+
+func TestEditDistance(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want int
+	}{
+		{"", "", 0},
+		{"load", "load", 0},
+		{"laod", "load", 2},
+		{"lod", "load", 1},
+		{"archive", "arch", 3},
+		{"über", "uber", 1},
+	}
+	for _, tt := range tests {
+		if got := editDistance(tt.a, tt.b); got != tt.want {
+			t.Errorf("editDistance(%q, %q) = %d, want %d", tt.a, tt.b, got, tt.want)
+		}
+	}
+}
+
+func TestErrorsHasErrors(t *testing.T) {
+	warn := &Error{Severity: SeverityWarning, Msg: "w"}
+	if (Errors{warn}).HasErrors() {
+		t.Error("only warnings: HasErrors() = true")
+	}
+	if !(Errors{warn, {Msg: "e"}}).HasErrors() {
+		t.Error("with error: HasErrors() = false")
+	}
+}
+
 func compareGolden(t *testing.T, path string, got []byte) {
 	t.Helper()
 	if *update {
