@@ -2,6 +2,8 @@
 
 Die Phasen aus dem [Konzept (Kap. 15)](KONZEPT.md#15-roadmap) sind hier in **kleine, einzeln prüfbare Schritte** zerlegt.
 
+Erledigte Schritte sind mit ✅ markiert.
+
 ## Regeln für jeden Schritt
 
 - **Ein Schritt = ein Pull Request.** Richtwert: höchstens ca. 1.000 geänderte Zeilen inklusive Tests
@@ -23,7 +25,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| S01 | Projektgerüst | `go.mod`, `cmd/runnel` mit `version`, Ordnerstruktur, Makefile/Taskfile, CI (Lint, Test, Build für Windows + Linux) | `runnel version`; CI grün |
+| S01 ✅ | Projektgerüst | `go.mod`, `cmd/runnel` mit `version`, Ordnerstruktur, Makefile/Taskfile, CI (Lint, Test, Build für Windows + Linux) | `runnel version`; CI grün |
 | S02 | Workflow-Dateiformat | Go-Strukturen für `Workflow`, `Action`, `Link`; YAML laden mit Zeilenangabe bei Fehlern | Golden-Tests mit gültigen/ungültigen Dateien |
 | S03 | Workflow-Validierung | Start vorhanden, IDs eindeutig, Links zeigen auf existierende Actions, unerreichbare Knoten, Rückwärts-Links nur als Schleifen-Link; `runnel validate` | `runnel validate examples/…` mit Fehlerbeispielen |
 | S04 | Projekt & Variablen | `project.yaml`, `environments/*.yaml`, Auflösung von `${VAR}` und `${env:…}` in fester Rangfolge; `--env`, `--param` | Unit-Tests der Rangfolge |
