@@ -1,0 +1,18 @@
+# Valid fields, but problems in the graph.
+kind: Workflow
+apiVersion: runnel/v1
+name: graph
+actions:
+  - id: start
+    type: core.start
+  - id: download
+    type: http.request
+  - id: import
+    type: core.run-pipeline
+  - id: cleanup
+    type: file.delete
+links:
+  - { from: start, to: download }
+  - { from: download, to: imprt }
+  - { from: import, to: download }
+  - { from: download, to: import }

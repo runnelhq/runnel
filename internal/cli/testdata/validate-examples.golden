@@ -1,0 +1,6 @@
+examples/broken/broken.workflow.yaml:11:14: error: action "download" timeout: invalid duration "30" (examples: 30s, 5m, 2h, 1h30m)
+examples/broken/broken.workflow.yaml:20:40: error: link #4: invalid condition "sucess" (expected success, failure, always or an expression "{{ … }}")
+examples/broken/graph.workflow.yaml:12:9: warning: action "cleanup" is not reachable from the start action "start" and will never run
+examples/broken/graph.workflow.yaml:16:27: error: link #2 (download → imprt): unknown action "imprt" (did you mean "import"?)
+examples/broken/graph.workflow.yaml:17:7: error: link #3 (import → download) closes a cycle (download → import → download); mark the link back with loop: true if the repetition is intended
+3 workflow files checked: 4 errors, 1 warning

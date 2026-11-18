@@ -1,0 +1,3 @@
+cycles.workflow.yaml:9:56: warning: action "d": joinTimeout has no effect with join "first" (only with join all)
+cycles.workflow.yaml:14:7: link #4 (c → a) closes a cycle (a → b → c → a); mark the link back with loop: true if the repetition is intended
+cycles.workflow.yaml:16:29: warning: link #6 (a → d) is marked as loop link but does not lead back to an earlier action

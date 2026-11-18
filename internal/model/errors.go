@@ -23,11 +23,29 @@ func (p Position) String() string {
 	return fmt.Sprintf("%d:%d", p.Line, p.Column)
 }
 
+// Severity distinguishes errors (the file cannot be used) from warnings
+// (probably a mistake, but the file can be used).
+type Severity int
+
+// Severities.
+const (
+	SeverityError Severity = iota
+	SeverityWarning
+)
+
+func (s Severity) String() string {
+	if s == SeverityWarning {
+		return "warning"
+	}
+	return "error"
+}
+
 // Error is a problem found in a file, with its location.
 type Error struct {
-	File string
-	Pos  Position
-	Msg  string
+	File     string
+	Pos      Position
+	Severity Severity
+	Msg      string
 }
 
 func (e *Error) Error() string {
@@ -43,12 +61,25 @@ func (e *Error) Error() string {
 	if b.Len() > 0 {
 		b.WriteString(" ")
 	}
+	if e.Severity == SeverityWarning {
+		b.WriteString("warning: ")
+	}
 	b.WriteString(e.Msg)
 	return b.String()
 }
 
 // Errors is a list of problems in a file, sorted by position.
 type Errors []*Error
+
+// HasErrors reports whether the list contains at least one problem of severity error.
+func (es Errors) HasErrors() bool {
+	for _, e := range es {
+		if e.Severity == SeverityError {
+			return true
+		}
+	}
+	return false
+}
 
 func (es Errors) Error() string {
 	msgs := make([]string, len(es))

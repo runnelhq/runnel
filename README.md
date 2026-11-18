@@ -9,6 +9,19 @@ inspiriert vom Modell von Apache Hop: Workflows und Pipelines aus Actions bzw. T
 
 Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Entscheidungen: [docs/adr](docs/adr/README.md)
 
+## Verwendung
+
+Noch im Aufbau – bisher können Workflows geprüft, aber noch nicht ausgeführt werden.
+
+```bash
+runnel validate examples/hello
+```
+
+`runnel validate [pfad...]` prüft Workflow-Dateien (`*.workflow.yaml`, Ordner werden rekursiv durchsucht) auf
+Syntax- und Feldfehler, Links auf unbekannte Actions, Zyklen ohne `loop: true` und unerreichbare Actions. Meldungen
+erscheinen als `datei:zeile:spalte: error|warning: text`; bei Fehlern ist der Exit-Code 1 (mit `--strict` auch bei
+Warnungen). Beispiele liegen unter [`examples/`](examples/).
+
 ## Entwicklung
 
 Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`). Für `make lint` zusätzlich

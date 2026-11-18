@@ -1,0 +1,34 @@
+# A small, valid workflow. Check it with:  runnel validate examples/hello
+kind: Workflow
+apiVersion: runnel/v1
+name: hello
+description: Greets, waits a moment and reports success or failure.
+parameters:
+  - name: GREETING
+    default: Hello from Runnel
+actions:
+  - id: start
+    type: core.start
+  - id: greet
+    type: core.log
+    with:
+      message: "${GREETING}"
+  - id: pause
+    type: core.wait
+    with:
+      duration: 2s
+  - id: done
+    type: core.success
+  - id: failed
+    type: core.abort
+links:
+  - { from: start, to: greet }
+  - { from: greet, to: pause }
+  - { from: pause, to: done }
+  - { from: pause, to: failed, when: failure }
+layout:
+  start:  { x: 40,  y: 120 }
+  greet:  { x: 200, y: 120 }
+  pause:  { x: 360, y: 120 }
+  done:   { x: 520, y: 120 }
+  failed: { x: 520, y: 260 }

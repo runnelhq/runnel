@@ -370,6 +370,10 @@ Regeln des Workflow-Formats (umgesetzt in `internal/model`):
 - Unbekannte Felder sind ein Fehler (Schutz vor Tippfehlern). Fehler werden mit Datei, Zeile und Spalte gemeldet;
   alle Feldfehler einer Datei auf einmal.
 - Eine Datei enthält genau ein YAML-Dokument.
+- Graph (`runnel validate`): genau eine Action vom Typ `core.start` ohne eingehende Links; eindeutige Action-IDs;
+  Links nur zwischen existierenden Actions; Zyklen nur über Links mit `loop: true`.
+  Warnungen: vom Start aus unerreichbare Actions, doppelte Links, `loop: true` ohne Rücksprung,
+  `joinTimeout` bei `join: first/each`, Layout-Einträge für unbekannte Actions.
 
 ### 5.2 Pipeline
 

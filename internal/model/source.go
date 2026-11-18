@@ -70,6 +70,22 @@ func (s *source) errorf(path, format string, args ...any) *Error {
 	return &Error{File: s.name, Pos: s.pos(path), Msg: fmt.Sprintf(format, args...)}
 }
 
+// warnf creates a warning located at the given YAML path.
+func (s *source) warnf(path, format string, args ...any) *Error {
+	e := s.errorf(path, format, args...)
+	e.Severity = SeverityWarning
+	return e
+}
+
+// keyPath appends a mapping key to a YAML path, quoting it so that keys
+// containing "." or "-" are addressed correctly.
+func keyPath(parent, key string) string {
+	if strings.ContainsAny(key, "'\\") {
+		return parent
+	}
+	return parent + ".'" + key + "'"
+}
+
 // parentPath strips the last element from a YAML path: "$.a[1].b" → "$.a[1]" → "$.a" → "$" → "".
 func parentPath(p string) string {
 	if p == "$" {
