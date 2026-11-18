@@ -28,7 +28,7 @@ die man per Doppelklick startet oder als Windows-Dienst installiert.
 
 ### 1.3 Nicht-Ziele (v1)
 
-- Kein Multi-Tenant-SaaS, keine Benutzer-/Mandantenverwaltung im großen Stil
+- Kein Multi-Tenant-SaaS, **keine Benutzer-/Rollenverwaltung** (wie bei Apache Hop; s. [ADR 0005](adr/0005-mehrbenutzerbetrieb.md))
 - Kein Cluster / verteilte Ausführung (Remote-Runner erst in späterer Phase, s. Roadmap)
 - Kein Big-Data-Backend (kein Spark/Beam/Flink wie bei Hop) – Fokus auf Datenmengen bis ca. einige Mio. Zeilen pro Lauf
 - Keine 400+ SaaS-Konnektoren wie Make/n8n – stattdessen starke generische Bausteine (HTTP, SQL, Dateien, Skript) plus Plugin-Modell
@@ -578,14 +578,14 @@ Der Editor rendert Palette und Eigenschaftsdialog **vollständig aus dem Descrip
 | Thema | Lösung |
 |---|---|
 | Netzwerk | Server bindet standardmäßig nur an `127.0.0.1`. Für Netzzugriff explizit `--listen 0.0.0.0:7300` + TLS (eigenes Zertifikat oder selbstsigniert erzeugt) |
-| Authentifizierung | Lokal-Modus ohne Login; im Netzmodus: lokale Benutzer (bcrypt/argon2id) + API-Tokens; optional Windows-Authentifizierung (Negotiate/Kerberos) in späterer Phase |
-| Rollen | `viewer` (ansehen), `operator` (starten/stoppen), `editor` (ändern), `admin` |
+| Authentifizierung | **Keine Benutzerverwaltung** ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)). Lokal-Modus ohne Zugangsschutz; im Netzmodus ein gemeinsamer Zugangsschlüssel für den Server (+ TLS), gleichzeitig nutzbar als API-Token |
+| Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
 | Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `EASYFLOW_MASTER_KEY` |
 | Secrets im Log | Automatische Maskierung aller bekannten Secret-Werte in Logs und Vorschauen |
 | Webhooks | Pro Webhook eigenes Token (Header/Query) oder HMAC-Signaturprüfung, Rate-Limit |
 | Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
 | Dienstkonto | Empfehlung: dedizierter Dienstbenutzer mit minimalen Rechten (bzw. gMSA in Domänen) |
-| Audit | Änderungen an Workflows (wer/wann) und manuelle Starts werden protokolliert |
+| Audit | Dateiänderungen über den Editor, manuelle Starts und Abbrüche werden mit Client-Informationen (IP, Rechnername, User-Agent) protokolliert |
 
 ---
 
@@ -616,6 +616,7 @@ CREATE TABLE runs (
   parent_run_id TEXT REFERENCES runs(id),  -- Sub-Workflow / Pipeline aus Workflow
   status        TEXT NOT NULL,             -- queued|running|succeeded|failed|cancelled
   params_json   TEXT,
+  client_info   TEXT,                      -- IP/Rechnername bei manuellen Starts
   started_at    INTEGER, finished_at INTEGER,
   error         TEXT
 );
@@ -633,7 +634,6 @@ CREATE TABLE node_runs (
 
 CREATE TABLE samples (run_id TEXT, hop TEXT, seq INTEGER, record_json TEXT);
 CREATE TABLE secrets (name TEXT PRIMARY KEY, nonce BLOB, ciphertext BLOB, updated_at INTEGER);
-CREATE TABLE users   (name TEXT PRIMARY KEY, password_hash TEXT, role TEXT, token_hash TEXT);
 ```
 
 Aufbewahrung: konfigurierbare Retention (z. B. 30 Tage Historie, 7 Tage Samples), Bereinigung durch internen Job.
@@ -764,7 +764,7 @@ easy-flow/
 │  ├─ secrets/              # Secret-Store, DPAPI, Maskierung
 │  ├─ store/                # SQLite-Zugriff, Migrationen
 │  ├─ scheduler/            # Cron, File-Watch, Interval, Run-Queue
-│  ├─ server/               # REST, WebSocket, Webhooks, Auth, eingebettete UI
+│  ├─ server/               # REST, WebSocket, Webhooks, Zugangsschutz, eingebettete UI
 │  ├─ plugin/               # Externes Plugin-Protokoll (JSON-RPC Host)
 │  └─ winsvc/               # Windows-Dienst, EventLog (build tag windows)
 ├─ pkg/sdk/                 # Öffentliches Go-SDK für Plugin-Entwickler
@@ -793,11 +793,11 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 | **0.1 – Runner-Kern** | Dateiformat v1, Variablen, Workflow-Engine, 10 Basis-Actions (Start, Shell/PowerShell, HTTP, Datei-Ops, Mail, Run-Workflow), CLI `run`/`validate` | Workflows per YAML + Aufgabenplanung nutzbar |
 | **0.2 – Pipelines** | Pipeline-Engine, CSV/Excel/JSON/DB In/Out, Filter, Select, Berechnen, Lookup, Sort, Group, Error-Hops, `core.run-pipeline` | ETL-Fälle per CLI |
 | **0.3 – Server & Editor** | `serve`, REST/WS, SQLite-Historie, Editor mit Canvas, Eigenschaften aus Schema, Live-Status, Logs | Visuelles Designen & Starten |
-| **0.4 – Betrieb** | Scheduler (Cron/File/Webhook), Windows-Dienst, Secret-Store (DPAPI), Auth/Rollen, Retention, Error-Workflow | Produktionsbetrieb auf Windows-Server |
+| **0.4 – Betrieb** | Scheduler (Cron/File/Webhook), Windows-Dienst, Secret-Store (DPAPI), Zugangsschlüssel + TLS, Retention, Error-Workflow | Produktionsbetrieb auf Windows-Server |
 | **0.5 – Komfort** | Datenvorschau, Samples, Autovervollständigung, Desktop-Modus (WebView2), MSI, Resume | Rund nutzbares Produkt |
 | **0.6 – Erweiterbarkeit** | Plugin-Protokoll + SDKs (Go, Python, C#), Plugin-Verwaltung im Editor | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele, Code-Signing, `winget` | Release |
-| **später** | Remote-Runner (Agenten auf anderen Maschinen), Git-Integration im Editor, Breakpoints, Windows-Auth, Hop-Import (`.hwf`/`.hpl` → YAML) | |
+| **später** | Remote-Runner (Agenten auf anderen Maschinen), Git-Integration im Editor, Breakpoints, Hop-Import (`.hwf`/`.hpl` → YAML) | |
 
 ---
 
@@ -807,5 +807,5 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 2. **Ausdruckssprache** – JavaScript (goja) vs. eine einfachere eigene Sprache (z. B. `expr-lang/expr`, schneller und sicherer, aber weniger mächtig). Vorschlag: `expr-lang/expr` für Bedingungen/Hop-Ausdrücke (Performance in Pipelines), goja für Skript-Bausteine.
 3. ~~**Join-Semantik im Workflow**~~ – entschieden: konfigurierbar, Standard `all` ([ADR 0003](adr/0003-join-semantik.md)).
 4. **Typsystem in Pipelines** – strikt (Schema Pflicht, wie Hop) oder locker (schemalos, wie n8n)? Vorschlag: schemalos mit optionalem Schema; Schema-Inferenz für Editor-Autovervollständigung.
-5. **Mehrbenutzerbetrieb** – reicht „ein Server, mehrere Browser“ mit ETag-Konfliktschutz oder wird Echtzeit-Kollaboration gebraucht? Vorschlag: Ersteres, Git als Kollaborationsmodell.
+5. ~~**Mehrbenutzerbetrieb**~~ – entschieden: ein Server, mehrere Browser, keine Benutzerverwaltung ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)).
 6. ~~**Lizenz**~~ – entschieden: MIT ([ADR 0004](adr/0004-lizenz-mit.md)).
