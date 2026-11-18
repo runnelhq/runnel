@@ -55,7 +55,7 @@ Im Workflow werden Links nach ihrer Bedingung benannt: **Erfolgs-Link**, **Fehle
 
 **Negativ / zu beachten**
 - Nutzer mit Hop-Erfahrung müssen umdenken; die Doku enthält dafür eine kurze Begriffsgegenüberstellung
-  (Hop ↔ easy-flow).
+  (Hop ↔ Runnel).
 - Ein späterer Import aus Apache Hop bildet dessen Hops auf Links ab.
 
 ## Umsetzung

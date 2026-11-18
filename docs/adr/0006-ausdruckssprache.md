@@ -6,7 +6,7 @@
 
 ## Kontext
 
-Ausdrücke kommen in easy-flow an vielen Stellen vor: Link-Bedingungen, Filter, berechnete Felder, dynamische
+Ausdrücke kommen in Runnel an vielen Stellen vor: Link-Bedingungen, Filter, berechnete Felder, dynamische
 Eigenschaften (Pfade, URLs, Mail-Betreff). In Pipelines werden sie **pro Datensatz** ausgewertet – bei Millionen Zeilen
 ist die Ausführungsgeschwindigkeit entscheidend. Gleichzeitig gibt es Fälle, die echte Programmlogik brauchen.
 
@@ -31,7 +31,7 @@ Betrachtet wurden:
   (Zahl, Datum, Objekt, Liste).
 - Ist der Ausdruck **Teil eines Textes** (`"Import {{ run.id }} fehlgeschlagen"`), wird das Ergebnis als Text eingefügt.
 - Ausdrücke werden **einmal beim Laden kompiliert** und dann pro Datensatz bzw. Aufruf ausgeführt.
-  Syntaxfehler fallen damit schon bei `easyflow validate` bzw. im Editor auf, nicht erst im Lauf.
+  Syntaxfehler fallen damit schon bei `runnel validate` bzw. im Editor auf, nicht erst im Lauf.
 
 ### Verfügbarer Kontext
 

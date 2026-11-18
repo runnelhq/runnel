@@ -6,7 +6,7 @@
 
 ## Kontext
 
-Zu klären war, ob mehrere Personen gleichzeitig mit easy-flow arbeiten können sollen und welche Infrastruktur
+Zu klären war, ob mehrere Personen gleichzeitig mit Runnel arbeiten können sollen und welche Infrastruktur
 dafür nötig ist: Benutzerkonten und Rollen, Echtzeit-Kollaboration im Editor oder ein einfacheres Modell.
 
 Apache Hop kommt ohne Benutzerverwaltung aus: Projekte sind Ordner, Zusammenarbeit läuft über Git,
@@ -14,7 +14,7 @@ der Schutz erfolgt über Betriebssystem, Netzwerk und Dateirechte.
 
 ## Entscheidung
 
-1. **Ein Server, mehrere Browser.** Eine `easyflow`-Instanz bedient beliebig viele gleichzeitig geöffnete Editoren.
+1. **Ein Server, mehrere Browser.** Eine `runnel`-Instanz bedient beliebig viele gleichzeitig geöffnete Editoren.
 2. **Keine Benutzerverwaltung** – keine Benutzerkonten, keine Rollen, kein Login pro Person (wie bei Apache Hop).
 3. **Keine Echtzeit-Kollaboration** (kein gleichzeitiges Bearbeiten derselben Datei à la Google Docs).
    Zusammenarbeit über Projekte hinweg erfolgt über **Git**.
@@ -33,7 +33,7 @@ der Schutz erfolgt über Betriebssystem, Netzwerk und Dateirechte.
 | Modus | Schutz |
 |---|---|
 | Standard | Server bindet nur an `127.0.0.1` – nur lokal erreichbar, kein Schutz nötig |
-| Netzwerk (`--listen 0.0.0.0:7300`) | **TLS** + ein **gemeinsamer Zugangsschlüssel** für den Server (in `easyflow.yaml` bzw. als Secret, nicht pro Person). Der Browser fragt ihn einmal ab und merkt ihn sich als Cookie |
+| Netzwerk (`--listen 0.0.0.0:7300`) | **TLS** + ein **gemeinsamer Zugangsschlüssel** für den Server (in `runnel.yaml` bzw. als Secret, nicht pro Person). Der Browser fragt ihn einmal ab und merkt ihn sich als Cookie |
 | Webhooks | Weiterhin eigenes Token bzw. HMAC-Signatur pro Webhook, unabhängig vom Zugangsschlüssel |
 | Zusätzlich möglich | Windows-Firewall (nur bestimmte Hosts) oder Reverse-Proxy (IIS, Caddy) mit eigener Anmeldung davor |
 

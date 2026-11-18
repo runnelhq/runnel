@@ -1,4 +1,4 @@
-# easy-flow – Roadmap in kleinen Schritten
+# Runnel – Roadmap in kleinen Schritten
 
 Die Phasen aus dem [Konzept (Kap. 15)](KONZEPT.md#15-roadmap) sind hier in **kleine, einzeln prüfbare Schritte** zerlegt.
 
@@ -23,11 +23,11 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| S01 | Projektgerüst | `go.mod`, `cmd/easyflow` mit `version`, Ordnerstruktur, Makefile/Taskfile, CI (Lint, Test, Build für Windows + Linux) | `easyflow version`; CI grün |
+| S01 | Projektgerüst | `go.mod`, `cmd/runnel` mit `version`, Ordnerstruktur, Makefile/Taskfile, CI (Lint, Test, Build für Windows + Linux) | `runnel version`; CI grün |
 | S02 | Workflow-Dateiformat | Go-Strukturen für `Workflow`, `Action`, `Link`; YAML laden mit Zeilenangabe bei Fehlern | Golden-Tests mit gültigen/ungültigen Dateien |
-| S03 | Workflow-Validierung | Start vorhanden, IDs eindeutig, Links zeigen auf existierende Actions, unerreichbare Knoten, Rückwärts-Links nur als Schleifen-Link; `easyflow validate` | `easyflow validate examples/…` mit Fehlerbeispielen |
+| S03 | Workflow-Validierung | Start vorhanden, IDs eindeutig, Links zeigen auf existierende Actions, unerreichbare Knoten, Rückwärts-Links nur als Schleifen-Link; `runnel validate` | `runnel validate examples/…` mit Fehlerbeispielen |
 | S04 | Projekt & Variablen | `project.yaml`, `environments/*.yaml`, Auflösung von `${VAR}` und `${env:…}` in fester Rangfolge; `--env`, `--param` | Unit-Tests der Rangfolge |
-| S05 | Engine: sequenziell | Ausführung entlang von Erfolgs-/Fehler-/Immer-Links (zunächst max. ein eingehender Link pro Action); Actions `core.start`, `core.success`, `core.abort`, `core.log`, `core.wait`; `easyflow run`, Exit-Code, Konsolen-Log | Beispiel-Workflow läuft, Exit-Code 0/1 |
+| S05 | Engine: sequenziell | Ausführung entlang von Erfolgs-/Fehler-/Immer-Links (zunächst max. ein eingehender Link pro Action); Actions `core.start`, `core.success`, `core.abort`, `core.log`, `core.wait`; `runnel run`, Exit-Code, Konsolen-Log | Beispiel-Workflow läuft, Exit-Code 0/1 |
 | S06 | Engine: parallel & Join | Parallele Zweige, `join: all/first/each`, Dead-Path-Elimination, Status `skipped` ([ADR 0003](adr/0003-join-semantik.md)) | Tests mit `-race`; Beispiel mit Fehler-Sammelpfad |
 | S07 | Retry, Timeout, Abbruch | `retry`, `timeout`, `continueOnError`, Workflow-Timeout, Abbruch per Strg+C (sauberes Beenden) | Tests; Strg+C während `core.wait` |
 | S08 | Ausdrücke | `expr-lang` für `{{ … }}`, Kontext `vars`/`params`/`env`/`run`/`result`/`results`, Bedingungs-Links, Funktionsbibliothek Teil 1 (Datum, Text, Null) ([ADR 0006](adr/0006-ausdruckssprache.md)) | Unit-Tests je Funktion; Beispiel mit Bedingungs-Link |
@@ -66,10 +66,10 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| S26 | Run-Historie | SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `easyflow runs` listet Läufe | Unit-Tests; CLI-Ausgabe |
-| S27 | Server & Datei-API | `easyflow serve` (nur `127.0.0.1`), `/files` mit ETag, `/catalog`, `/validate` | Tests mit `httptest`; `curl` |
+| S26 | Run-Historie | SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | Unit-Tests; CLI-Ausgabe |
+| S27 | Server & Datei-API | `runnel serve` (nur `127.0.0.1`), `/files` mit ETag, `/catalog`, `/validate` | Tests mit `httptest`; `curl` |
 | S28 | Run-API & Live-Events | `POST /runs`, Abbrechen, WebSocket-Events (Status, Metriken, Logs), Log-Stream per SSE | Tests; `curl`/`websocat` |
-| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `easyflow resume`) | Test: Fehler beheben, fortsetzen |
+| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`) | Test: Fehler beheben, fortsetzen |
 | S30 | Editor-Gerüst | Vite + React + TypeScript, in exe eingebettet, Projekt-Explorer, Datei als YAML anzeigen | Browser öffnen, Dateien durchklicken |
 | S31 | Canvas (nur lesen) | Workflow/Pipeline mit React Flow darstellen, Layout aus Datei, Auto-Layout falls fehlend | Beispiele werden korrekt angezeigt |
 | S32 | Canvas bearbeiten | Knoten verschieben/anlegen/löschen, Links ziehen und Typ umschalten, Palette aus `/catalog`, Speichern mit ETag-Konfliktdialog, Undo/Redo | Playwright-Test; zwei Browser gleichzeitig |
@@ -90,7 +90,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S38 | Weitere Trigger | Webhook (Token/HMAC), Datei-Überwachung, Intervall; Trigger für Pipelines | Tests; `curl` auf Webhook |
 | S39 | Secret-Store | Verschlüsselung (AES-GCM), Schlüssel per DPAPI bzw. Master-Key, `${secret:…}`, Maskierung in Logs | Tests; unter Windows DPAPI manuell |
 | S40 | Netzwerkbetrieb | `--listen`, TLS, gemeinsamer Zugangsschlüssel, Client-Infos im Protokoll ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)) | Zugriff von zweitem Rechner |
-| S41 | Windows-Dienst | `easyflow service install/start/stop/uninstall`, Ereignisanzeige, Recovery-Optionen | Manuell auf Windows |
+| S41 | Windows-Dienst | `runnel service install/start/stop/uninstall`, Ereignisanzeige, Recovery-Optionen | Manuell auf Windows |
 | S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | Tests der Rangfolge |
 | S43 | Wartung & Monitoring | Retention, Error-Workflow, `/health`, optional `/metrics` | Tests |
 
@@ -105,7 +105,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S44 | Datenvorschau | Pipeline bis Transform X mit Limit, Records je Link als Tabelle/JSON | Manuell im Editor |
 | S45 | Samples | Erste N Records pro Link je Lauf speichern, in Historie anzeigen | Manuell |
 | S46 | Felder ermitteln | „Felder ermitteln“ für CSV/JSON schreibt `fields:` in die Datei | Playwright-Test |
-| S47 | Desktop-Modus | `easyflow desktop` mit WebView2-Fenster | Manuell auf Windows |
+| S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster | Manuell auf Windows |
 | S48 | Installer | MSI (WiX) mit Dienst-Option, ZIP für portablen Betrieb, `THIRD_PARTY_NOTICES` | Installation auf frischem Windows |
 
 ---
@@ -135,4 +135,4 @@ Werden bei Bedarf als eigener Schritt (je ein PR) eingeplant. Reihenfolge ist of
 | Datenbanken | Treiber MySQL/MariaDB, Oracle, ODBC |
 | Transforms | Pivot/Unpivot, Feld teilen, Wertzuordnung, String-/Datum-Funktionen als eigene Transforms, Sequenz, externes Sortieren (große Datenmengen) |
 | Plugin-SDKs | Python, C#/.NET, Node |
-| Später (Konzept) | Mappings, Remote-Runner (`RunConfig type: remote`), Git-Integration im Editor, Breakpoints, Import aus Apache Hop, Tray-Icon, `easyflow update`, `winget`, Code-Signing |
+| Später (Konzept) | Mappings, Remote-Runner (`RunConfig type: remote`), Git-Integration im Editor, Breakpoints, Import aus Apache Hop, Tray-Icon, `runnel update`, `winget`, Code-Signing |

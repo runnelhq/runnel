@@ -28,7 +28,7 @@ Pipeline ausgeführt wird – unabhängig davon, **was** ausgeführt wird.
 ```yaml
 # run-configs/local-fast.yaml
 kind: RunConfig
-apiVersion: easyflow/v1
+apiVersion: runnel/v1
 name: local-fast
 type: local                  # local (ab 0.4) | remote (später)
 with:
@@ -49,7 +49,7 @@ with:
   3. aufrufende Action (`core.run-pipeline` / `core.run-workflow` mit `runConfig:`)
   4. Standard des Projekts
 - Im Editor: Auswahlfeld neben „Ausführen“ (zusammen mit Umgebung und Parametern).
-- `type: remote` (später, zusammen mit den Remote-Runnern): führt auf einem anderen easy-flow-Server aus,
+- `type: remote` (später, zusammen mit den Remote-Runnern): führt auf einem anderen Runnel-Server aus,
   adressiert über URL + Zugangsschlüssel (siehe [ADR 0005](0005-mehrbenutzerbetrieb.md)).
 - Spark/Flink/Beam-Engines wie in Hop sind **nicht** vorgesehen (Nicht-Ziel Big Data).
 

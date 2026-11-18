@@ -1,4 +1,4 @@
-# easy-flow – Konzept & technische Architektur
+# Runnel – Konzept & technische Architektur
 
 > Leichtgewichtige Workflow- und Datenintegrations-Plattform für Windows.
 > Eine einzige ausführbare Datei, kein Docker, keine Java-/Node-Runtime, keine externe Datenbank.
@@ -11,7 +11,7 @@ Status: Entwurf v0.1 · Stand: 2026-11-18
 
 ### 1.1 Vision
 
-easy-flow verbindet die **visuelle Einfachheit von n8n/Make** mit dem **sauberen Modell von Apache Hop**
+Runnel verbindet die **visuelle Einfachheit von n8n/Make** mit dem **sauberen Modell von Apache Hop**
 (Workflows für Ablaufsteuerung, Pipelines für Datenströme) – betrieben als **eine schlanke Windows-Anwendung**,
 die man per Doppelklick startet oder als Windows-Dienst installiert.
 
@@ -19,7 +19,7 @@ die man per Doppelklick startet oder als Windows-Dienst installiert.
 
 | Ziel | Messbares Kriterium |
 |---|---|
-| Kein Overhead | Eine `easyflow.exe` (< 40 MB), keine Abhängigkeiten, Start < 1 s, < 60 MB RAM im Leerlauf |
+| Kein Overhead | Eine `runnel.exe` (< 40 MB), keine Abhängigkeiten, Start < 1 s, < 60 MB RAM im Leerlauf |
 | Windows-first | Läuft als Dienst, nutzt DPAPI für Secrets, PowerShell-Integration, Pfade/Freigaben (UNC) |
 | Zwei Komponenten | **Editor** (Designen) und **Runner** (Ausführen) – getrennt nutzbar, gleiche Dateiformate |
 | Git-freundlich | Workflows/Pipelines als lesbare YAML-Dateien, diff- und reviewbar |
@@ -35,7 +35,7 @@ die man per Doppelklick startet oder als Windows-Dienst installiert.
 
 ### 1.4 Positionierung
 
-| | n8n | Make | Apache Hop | **easy-flow** |
+| | n8n | Make | Apache Hop | **Runnel** |
 |---|---|---|---|---|
 | Runtime | Node.js (+DB) | Cloud | Java (JVM) | **Native Binary** |
 | Betrieb Windows | möglich, aufwendig | – (SaaS) | möglich, schwergewichtig | **Doppelklick / Dienst** |
@@ -179,7 +179,7 @@ Details: [ADR 0008](adr/0008-ausfuehrungsvarianten.md).
 
 ```mermaid
 flowchart LR
-    subgraph EXE["easyflow.exe (ein Prozess)"]
+    subgraph EXE["runnel.exe (ein Prozess)"]
         direction TB
         API["HTTP-Server<br/>REST + WebSocket<br/>+ eingebettete Web-UI"]
         SCHED["Scheduler &<br/>Trigger-Manager"]
@@ -199,33 +199,33 @@ flowchart LR
         API --> STORE
     end
     Browser["Editor<br/>(Browser / WebView2)"] <--> API
-    CLI["easyflow run …<br/>(CLI, ohne Server)"] --> WFE
+    CLI["runnel run …<br/>(CLI, ohne Server)"] --> WFE
     REG <--> EXT["Externe Plugins<br/>(Prozesse, JSON-RPC)"]
     WFE --> SYS["Dateien, DBs, APIs,<br/>PowerShell, SMTP …"]
 ```
 
 ### 3.2 Die zwei Kernkomponenten
 
-**Runner / Executor** (`easyflow run`, `easyflow serve`)
+**Runner / Executor** (`runnel run`, `runnel serve`)
 - Lädt Workflow-/Pipeline-YAML, validiert, löst Variablen auf, führt aus.
-- Funktioniert **vollständig ohne Editor und ohne Server** (`easyflow run workflows/x.workflow.yaml --env prod`) – ideal für Windows-Aufgabenplanung oder CI.
+- Funktioniert **vollständig ohne Editor und ohne Server** (`runnel run workflows/x.workflow.yaml --env prod`) – ideal für Windows-Aufgabenplanung oder CI.
 - Im Server-Modus zusätzlich: Scheduler, Trigger, Ausführungshistorie, Live-Status.
 
 **Editor**
 - Web-Single-Page-App, **in die exe eingebettet** (`go:embed`) und unter `http://localhost:7300` erreichbar.
-- Optional als Desktop-Fenster: `easyflow desktop` öffnet die UI in einem **WebView2**-Fenster (in Windows 10/11 bereits vorhanden) – fühlt sich an wie eine native App, ohne Electron.
+- Optional als Desktop-Fenster: `runnel desktop` öffnet die UI in einem **WebView2**-Fenster (in Windows 10/11 bereits vorhanden) – fühlt sich an wie eine native App, ohne Electron.
 - Der Editor arbeitet direkt auf den Projektdateien (über die REST-API des lokalen Servers) → was man im Editor speichert, ist sofort per CLI ausführbar.
 
 ### 3.3 Betriebsmodi
 
 | Modus | Befehl | Einsatz |
 |---|---|---|
-| Einmal-Ausführung | `easyflow run <datei> [--env prod] [--param k=v] [--run-config name]` | Aufgabenplanung, CI, Skripte. Exit-Code = Ergebnis |
-| Server | `easyflow serve [--project D:\flows]` | Editor + Scheduler + Webhooks |
-| Desktop | `easyflow desktop` | Server + WebView2-Fenster (Einzelplatz) |
-| Windows-Dienst | `easyflow service install/start/stop/uninstall` | Dauerbetrieb auf Server |
-| Validierung | `easyflow validate <datei/ordner>` | Lint/Prüfung in CI |
-| Portable | `easyflow.exe` + `easyflow.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
+| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v] [--run-config name]` | Aufgabenplanung, CI, Skripte. Exit-Code = Ergebnis |
+| Server | `runnel serve [--project D:\flows]` | Editor + Scheduler + Webhooks |
+| Desktop | `runnel desktop` | Server + WebView2-Fenster (Einzelplatz) |
+| Windows-Dienst | `runnel service install/start/stop/uninstall` | Dauerbetrieb auf Server |
+| Validierung | `runnel validate <datei/ordner>` | Lint/Prüfung in CI |
+| Portable | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
 
@@ -298,7 +298,7 @@ aber in einem eigenen `layout`-Block, damit Logik-Diffs nicht vom Verschieben ei
 ```yaml
 # workflows/nightly-import.workflow.yaml
 kind: Workflow
-apiVersion: easyflow/v1
+apiVersion: runnel/v1
 name: nightly-import
 description: Lädt Kunden aus dem ERP und überträgt sie ins CRM
 parameters:
@@ -365,7 +365,7 @@ layout:
 ```yaml
 # pipelines/customers-to-crm.pipeline.yaml
 kind: Pipeline
-apiVersion: easyflow/v1
+apiVersion: runnel/v1
 name: customers-to-crm
 parameters:
   - name: FILE
@@ -424,7 +424,7 @@ links:
 
 ```yaml
 kind: Trigger
-apiVersion: easyflow/v1
+apiVersion: runnel/v1
 name: nightly-import
 type: cron
 target: workflows/nightly-import.workflow.yaml   # auch Pipelines möglich
@@ -608,7 +608,7 @@ Der Editor rendert Palette und Eigenschaftsdialog **vollständig aus dem Descrip
 | Netzwerk | Server bindet standardmäßig nur an `127.0.0.1`. Für Netzzugriff explizit `--listen 0.0.0.0:7300` + TLS (eigenes Zertifikat oder selbstsigniert erzeugt) |
 | Authentifizierung | **Keine Benutzerverwaltung** ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)). Lokal-Modus ohne Zugangsschutz; im Netzmodus ein gemeinsamer Zugangsschlüssel für den Server (+ TLS), gleichzeitig nutzbar als API-Token |
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
-| Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `EASYFLOW_MASTER_KEY` |
+| Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `RUNNEL_MASTER_KEY` |
 | Secrets im Log | Automatische Maskierung aller bekannten Secret-Werte in Logs und Vorschauen |
 | Webhooks | Pro Webhook eigenes Token (Header/Query) oder HMAC-Signaturprüfung, Rate-Limit |
 | Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
@@ -624,12 +624,12 @@ Der Editor rendert Palette und Eigenschaftsdialog **vollständig aus dem Descrip
 | Daten | Ort | Format |
 |---|---|---|
 | Workflows, Pipelines, Trigger, Connections | Projektordner | YAML (Git) |
-| Run-Historie, Status, Metriken, Samples | `data\easyflow.db` | SQLite (WAL-Modus) |
-| Secrets | `data\easyflow.db` (Tabelle `secrets`) | verschlüsselt |
+| Run-Historie, Status, Metriken, Samples | `data\runnel.db` | SQLite (WAL-Modus) |
+| Secrets | `data\runnel.db` (Tabelle `secrets`) | verschlüsselt |
 | Run-Logs | `data\logs\<jahr>\<run-id>.log` | JSON-Lines (slog) |
-| Dienst-Ereignisse | Windows-Ereignisanzeige | EventLog-Quelle „easy-flow“ |
+| Dienst-Ereignisse | Windows-Ereignisanzeige | EventLog-Quelle „Runnel“ |
 
-Standardpfade: `%ProgramData%\easy-flow\` (Dienst) bzw. `%LOCALAPPDATA%\easy-flow\` (Desktop) bzw. neben der exe (portabel).
+Standardpfade: `%ProgramData%\runnel\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\` (Desktop) bzw. neben der exe (portabel).
 
 ### 9.2 Datenmodell (SQLite, vereinfacht)
 
@@ -700,7 +700,7 @@ REST unter `/api/v1`, JSON. Der Editor nutzt ausschließlich diese API – damit
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ easy-flow   Projekt: my-project ▾   Env: dev ▾        ▶ Ausführen  ⏸  ⟲  💾    │
+│ Runnel      Projekt: my-project ▾   Env: dev ▾        ▶ Ausführen  ⏸  ⟲  💾    │
 ├───────────────┬──────────────────────────────────────────────┬─────────────────┤
 │ Explorer      │                                              │ Eigenschaften   │
 │ ▸ workflows   │    (Start)──▶[Datei warten]──✔──▶[Pipeline]  │ HTTP-Request    │
@@ -759,11 +759,11 @@ Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dat
 
 ## 13. Windows-Betrieb im Detail
 
-- **Installation**: (a) ZIP entpacken und starten (portabel), (b) MSI (WiX v4) mit Dienst-Registrierung und Startmenü-Eintrag, (c) `winget install easy-flow`.
-- **Dienst**: `easyflow service install --project D:\flows --account "DOMAIN\svc-easyflow"` registriert über den Service Control Manager; automatischer Neustart bei Absturz (Recovery-Optionen), verzögerter Autostart.
+- **Installation**: (a) ZIP entpacken und starten (portabel), (b) MSI (WiX v4) mit Dienst-Registrierung und Startmenü-Eintrag, (c) `winget install runnel`.
+- **Dienst**: `runnel service install --project D:\flows --account "DOMAIN\svc-runnel"` registriert über den Service Control Manager; automatischer Neustart bei Absturz (Recovery-Optionen), verzögerter Autostart.
 - **Code-Signing** der exe (Authenticode) – wichtig, damit SmartScreen/Virenscanner nicht anschlagen.
 - **Pfade**: UNC-Pfade (`\\server\share`) und lange Pfade (`\\?\`) werden unterstützt; Encoding-Unterstützung für `windows-1252`/`UTF-16` bei Dateien.
-- **Updates**: `easyflow update` lädt neue Version, prüft Signatur, ersetzt exe über Rename-Trick und startet Dienst neu.
+- **Updates**: `runnel update` lädt neue Version, prüft Signatur, ersetzt exe über Rename-Trick und startet Dienst neu.
 - **Ressourcen**: Leerlauf ~30–60 MB RAM, keine Hintergrund-CPU-Last außer Scheduler-Tick.
 - **Tray-Icon** (Desktop-Modus, optional): Status, „Editor öffnen“, letzte Fehler.
 
@@ -775,9 +775,11 @@ Linux/macOS: dank Go ohne Mehraufwand mitgebaut (systemd statt Dienst, Keychain/
 
 Entscheidung und Begründung: [ADR 0001 – Monorepo](adr/0001-monorepo.md).
 
+Repository: `github.com/runnelhq/runnel` · Go-Modul: `github.com/runnelhq/runnel` ([ADR 0010](adr/0010-projektname-runnel.md)).
+
 ```
-easy-flow/
-├─ cmd/easyflow/            # main.go – CLI (cobra o. ä.): run, serve, desktop, service, validate
+runnel/
+├─ cmd/runnel/              # main.go – CLI (cobra o. ä.): run, serve, desktop, service, validate
 ├─ internal/
 │  ├─ model/                # Workflow, Pipeline, Link, Trigger – Structs + YAML-(De)Serialisierung
 │  ├─ schema/               # JSON-Schemas für Dateien & Descriptors
@@ -811,7 +813,7 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 - Unit-Tests je Action/Transform (Tabellen-Tests)
 - Golden-File-Tests: Beispiel-Pipelines mit Eingabedateien → erwartete Ausgabedateien
 - Engine-Tests: Link-Bedingungen, Join, Parallelität, Abbruch, Resume (mit `-race`)
-- E2E Editor: Playwright gegen `easyflow serve`
+- E2E Editor: Playwright gegen `runnel serve`
 
 ---
 

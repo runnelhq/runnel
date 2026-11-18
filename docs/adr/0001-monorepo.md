@@ -6,13 +6,13 @@
 
 ## Kontext
 
-easy-flow besteht aus mehreren Teilen: Runner/Engine, Server, Editor (Web-UI), eingebaute Actions/Transforms,
+Runnel besteht aus mehreren Teilen: Runner/Engine, Server, Editor (Web-UI), eingebaute Actions/Transforms,
 JSON-Schemas, Plugin-SDKs, Beispielprojekte und Installer. Zu entscheiden war, ob diese Teile in einem gemeinsamen
 Repository (Monorepo) oder in mehreren Repositories entwickelt werden.
 
 Rahmenbedingungen:
 
-- Der Editor wird per `go:embed` in die `easyflow.exe` eingebettet – Editor und Backend werden gemeinsam ausgeliefert.
+- Der Editor wird per `go:embed` in die `runnel.exe` eingebettet – Editor und Backend werden gemeinsam ausgeliefert.
 - In den frühen Phasen (0.1–0.5) ändern sich Datenmodell, Dateiformat, Descriptor und REST-API häufig;
   solche Änderungen betreffen fast immer Backend **und** Editor gleichzeitig.
 - Das Plugin-Protokoll ist noch nicht stabil.
@@ -20,8 +20,8 @@ Rahmenbedingungen:
 
 ## Betrachtete Optionen
 
-1. **Monorepo** – alles in `easy-flow`.
-2. **Mehrere Repos** – z. B. `easy-flow-core`, `easy-flow-editor`, `easy-flow-sdk-*`, je Plugin ein Repo.
+1. **Monorepo** – alles in `runnel`.
+2. **Mehrere Repos** – z. B. `runnel-core`, `runnel-editor`, `runnel-sdk-*`, je Plugin ein Repo.
 
 ### Mehrere Repos – Vorteile
 
@@ -40,7 +40,7 @@ Rahmenbedingungen:
 
 ## Entscheidung
 
-Wir entwickeln easy-flow **vorerst als Monorepo** (Struktur gemäß Konzept, Kap. 14).
+Wir entwickeln Runnel **vorerst als Monorepo** (Struktur gemäß Konzept, Kap. 14).
 
 Das Go-Plugin-SDK (`pkg/sdk`) bleibt im Monorepo; bei Bedarf wird es als eigenes Go-Modul innerhalb des Repos geführt.
 

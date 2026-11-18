@@ -6,7 +6,7 @@
 
 ## Kontext
 
-Für easy-flow war eine Lizenz festzulegen. Betrachtet wurden:
+Für Runnel war eine Lizenz festzulegen. Betrachtet wurden:
 
 | Lizenz | Charakter | Beispiel |
 |---|---|---|
@@ -17,7 +17,7 @@ Für easy-flow war eine Lizenz festzulegen. Betrachtet wurden:
 
 ## Entscheidung
 
-easy-flow wird unter der **MIT-Lizenz** veröffentlicht. Der Lizenztext liegt in [`LICENSE`](../../LICENSE).
+Runnel wird unter der **MIT-Lizenz** veröffentlicht. Der Lizenztext liegt in [`LICENSE`](../../LICENSE).
 
 Die Lizenz gilt für das gesamte Monorepo (Runner, Server, Editor, SDKs, Beispiele, Doku) – siehe [ADR 0001](0001-monorepo.md).
 
@@ -37,7 +37,7 @@ Die Lizenz gilt für das gesamte Monorepo (Runner, Server, Editor, SDKs, Beispie
 
 **Negativ / zu beachten**
 - **Keine ausdrückliche Patentlizenz** (anders als Apache 2.0).
-- **Kein Schutz vor kommerzieller Weiterverwendung** – Dritte dürfen easy-flow z. B. als eigenes Produkt oder
+- **Kein Schutz vor kommerzieller Weiterverwendung** – Dritte dürfen Runnel z. B. als eigenes Produkt oder
   gehostetes Angebot vertreiben. Ein späterer Wechsel zu einer restriktiveren Lizenz wirkt nur für neue Versionen.
 - **Third-Party-Hinweise**: Lizenztexte aller eingebetteten Abhängigkeiten (Go-Module und Frontend-Pakete) müssen
   mit der exe ausgeliefert werden. Umsetzung: `THIRD_PARTY_NOTICES` wird im Build automatisch erzeugt
