@@ -1,0 +1,7 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: one
+---
+kind: Workflow
+apiVersion: runnel/v1
+name: two

@@ -1,0 +1,3 @@
+actions:
+  - id: start
+    type: core.start

@@ -1,0 +1,6 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: wrong-type
+actions:
+  start:
+    type: core.start
