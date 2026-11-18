@@ -2,7 +2,7 @@
 
 - **Status:** Angenommen
 - **Datum:** 2026-11-18
-- **Bezug:** [Konzept, Kap. 16 – Offene Entscheidungen](../KONZEPT.md#16-offene-entscheidungen)
+- **Bezug:** [Konzept, Kap. 16 – Entscheidungen](../KONZEPT.md#16-entscheidungen)
 
 ## Kontext
 

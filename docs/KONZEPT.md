@@ -106,7 +106,7 @@ my-project/
 
 - Ein **gerichteter, azyklischer Graph aus Transforms**.
 - **Alle Transforms laufen gleichzeitig** (wie in Hop) und reichen **Records** über Hops (gepufferte Kanäle) weiter → Streaming, konstanter Speicherverbrauch.
-- Ein Record ist ein **JSON-artiges Objekt** (Feldname → Wert) mit optionalem Schema (Feldtypen: string, int, decimal, bool, date, datetime, binary, json).
+- Ein Record ist ein **geordnetes, JSON-artiges Objekt** (Feldname → Wert). Pipelines sind **schemalos mit optionalen Typen** (string, int, decimal, float, bool, date, datetime, binary, json) – Details: [ADR 0007](adr/0007-typsystem-pipelines.md).
 - Hops in Pipelines:
   - Normaler Daten-Hop
   - **Error-Hop**: fehlerhafte Records werden mit Fehlerinfos (`_error.message`, `_error.field`) umgeleitet statt die Pipeline abzubrechen
@@ -129,7 +129,7 @@ Hops können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
   5. Zur Laufzeit gesetzte Variablen (Action „Set Variables“)
 - Syntax:
   - `${NAME}` – einfache Variablenersetzung (Hop-kompatibel)
-  - `{{ expression }}` – JavaScript-Ausdruck, z. B. `{{ now().format('yyyyMMdd') }}`, `{{ record.amount * 1.19 }}`
+  - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
 
 ### 2.6 Connection & Credentials
 
@@ -230,7 +230,9 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 | Lokale DB | `modernc.org/sqlite` (pure Go, kein CGO) |
 | YAML | `gopkg.in/yaml.v3` / `goccy/go-yaml` (bessere Fehlermeldungen mit Zeilennummer) |
 | JSON-Schema-Validierung | `santhosh-tekuri/jsonschema` |
-| Ausdrücke & Skripte | `dop251/goja` (ECMAScript 5.1+/teilweise ES6, eingebettet, sandboxbar) |
+| Ausdrücke | `expr-lang/expr` (kompiliert, schnell, ohne Seiteneffekte) |
+| Skript-Bausteine | `dop251/goja` (JavaScript, eingebettet, sandboxbar) |
+| Exakte Dezimalzahlen | `shopspring/decimal` |
 | Cron | `robfig/cron/v3` |
 | Dateiüberwachung | `fsnotify/fsnotify` |
 | Windows-Dienst / DPAPI / EventLog | `golang.org/x/sys/windows`, `.../svc`, `.../svc/eventlog` |
@@ -277,7 +279,7 @@ name: nightly-import
 description: Lädt Kunden aus dem ERP und überträgt sie ins CRM
 parameters:
   - name: IMPORT_DATE
-    default: "{{ today().minusDays(1).format('yyyy-MM-dd') }}"
+    default: "{{ formatDate(addDays(today(), -1), 'yyyy-MM-dd') }}"
 settings:
   timeout: 2h
   maxConcurrentRuns: 1
@@ -484,6 +486,7 @@ Schnittstelle eines Transforms (Go):
 
 ```go
 type Transform interface {
+    // Init leitet das Ausgabeschema ab (geschlossen oder offen, s. ADR 0007).
     Init(cfg TransformConfig, schemaIn Schema) (schemaOut Schema, err error)
     // Process erhält Eingangs-Batches und schreibt über out weiter.
     Process(ctx context.Context, in <-chan Batch, out Emitter) error
@@ -519,7 +522,7 @@ Drei Stufen – von einfach bis mächtig:
 
 ### 7.1 Stufe 1: Skript-Actions/-Transforms (JavaScript, eingebettet)
 
-- `core.script` (Workflow) und `core.script-transform` (Pipeline) führen JS in **goja** aus.
+- `core.script` (Workflow) und `core.script-transform` (Pipeline) führen JS in **goja** aus. JavaScript gibt es nur hier; `{{ … }}`-Ausdrücke nutzen `expr-lang` ([ADR 0006](adr/0006-ausdruckssprache.md)).
 - Sandbox: kein Dateisystem-/Netzwerkzugriff außer über bereitgestellte APIs (`http`, `fs` – per Projekteinstellung freischaltbar), CPU-Zeitlimit.
 - Wiederverwendbare Skripte in `scripts/` werden über `require('./scripts/utils.js')` geladen.
 
@@ -753,7 +756,7 @@ easy-flow/
 │  ├─ model/                # Workflow, Pipeline, Hop, Trigger – Structs + YAML-(De)Serialisierung
 │  ├─ schema/               # JSON-Schemas für Dateien & Descriptors
 │  ├─ vars/                 # Variablen-Auflösung, Scopes
-│  ├─ expr/                 # goja-Integration, Funktionsbibliothek (now, today, format …)
+│  ├─ expr/                 # expr-lang + goja, gemeinsame Funktionsbibliothek (now, formatDate …)
 │  ├─ engine/
 │  │  ├─ workflow/          # Workflow-Engine, Hop-Auswertung, Retry, Resume
 │  │  └─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
@@ -801,11 +804,13 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 
 ---
 
-## 16. Offene Entscheidungen
+## 16. Entscheidungen
+
+Alle ursprünglich offenen Punkte sind entschieden. Übersicht aller Architekturentscheidungen: [docs/adr](adr/README.md).
 
 1. ~~**Go vs. .NET**~~ – entschieden: Go ([ADR 0002](adr/0002-go-backend.md)).
-2. **Ausdruckssprache** – JavaScript (goja) vs. eine einfachere eigene Sprache (z. B. `expr-lang/expr`, schneller und sicherer, aber weniger mächtig). Vorschlag: `expr-lang/expr` für Bedingungen/Hop-Ausdrücke (Performance in Pipelines), goja für Skript-Bausteine.
+2. ~~**Ausdruckssprache**~~ – entschieden: `expr-lang` für Ausdrücke, JavaScript nur in Skript-Bausteinen ([ADR 0006](adr/0006-ausdruckssprache.md)).
 3. ~~**Join-Semantik im Workflow**~~ – entschieden: konfigurierbar, Standard `all` ([ADR 0003](adr/0003-join-semantik.md)).
-4. **Typsystem in Pipelines** – strikt (Schema Pflicht, wie Hop) oder locker (schemalos, wie n8n)? Vorschlag: schemalos mit optionalem Schema; Schema-Inferenz für Editor-Autovervollständigung.
+4. ~~**Typsystem in Pipelines**~~ – entschieden: schemalos mit optionalen Typen ([ADR 0007](adr/0007-typsystem-pipelines.md)).
 5. ~~**Mehrbenutzerbetrieb**~~ – entschieden: ein Server, mehrere Browser, keine Benutzerverwaltung ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)).
 6. ~~**Lizenz**~~ – entschieden: MIT ([ADR 0004](adr/0004-lizenz-mit.md)).
