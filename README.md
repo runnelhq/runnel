@@ -1,3 +1,12 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="design/logo/runnel-logo-inverse.svg">
+    <img src="design/logo/runnel-logo.svg" alt="Runnel" height="64">
+  </picture>
+</p>
+
+<p align="center"><strong>Leicht. Lokal. Im Fluss.</strong></p>
+
 # Runnel
 
 Leichtgewichtige Workflow- und Datenintegrations-Plattform für Windows – eine Alternative zu n8n, Make & Co.,
@@ -7,7 +16,7 @@ inspiriert vom Modell von Apache Hop: Workflows und Pipelines aus Actions bzw. T
 - **Runner** – Ausführung per CLI, als Server mit Scheduler oder als Windows-Dienst
 - **Eine `runnel.exe`**, keine Runtime, keine externe Datenbank, Definitionen als YAML (Git-freundlich)
 
-Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Entscheidungen: [docs/adr](docs/adr/README.md)
+Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Entscheidungen: [docs/adr](docs/adr/README.md) · Corporate Design: [design/](design/README.md)
 
 ## Entwicklung
 

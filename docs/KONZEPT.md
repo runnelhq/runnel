@@ -283,6 +283,7 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 | Zustand | `zustand` + Undo/Redo-Stack (Command-Pattern) |
 | Datenvorschau | Virtualisierte Tabelle (`@tanstack/react-table` + `react-virtual`) |
 | UI-Kit | `shadcn/ui` + Tailwind (leicht, kein schweres Komponenten-Framework) |
+| Gestaltung | Design Tokens aus [`design/tokens`](../design/README.md) (Farben, Schriften, Radien, hell/dunkel) – [ADR 0011](adr/0011-corporate-design.md) |
 
 Ziel-Bundle: < 3 MB gzip, wird in die exe eingebettet.
 
@@ -802,6 +803,7 @@ runnel/
 ├─ web/                     # Editor (React + Vite + React Flow)
 ├─ examples/                # Beispielprojekte
 ├─ docs/                    # Konzept, Benutzerhandbuch, ADRs
+├─ design/                  # Corporate Design: Logos, Design Tokens, Social-Grafiken
 └─ build/                   # WiX-Installer, Signierung, CI-Skripte
 ```
 
