@@ -57,6 +57,7 @@ classDiagram
     Project "1" --> "*" Environment
     Project "1" --> "*" Connection
     Project "1" --> "*" Trigger
+    Project "1" --> "*" RunConfig
     Workflow "1" --> "*" Action
     Workflow "1" --> "*" Hop
     Pipeline "1" --> "*" Transform
@@ -64,6 +65,10 @@ classDiagram
     Action ..> Pipeline : "Run Pipeline"
     Action ..> Workflow : "Run Workflow"
     Trigger ..> Workflow : startet
+    Trigger ..> Pipeline : startet
+    RunConfig ..> Workflow : "wie ausführen"
+    RunConfig ..> Pipeline : "wie ausführen"
+    Transform ..> Pipeline : "Pipeline Executor"
     Transform ..> Connection : nutzt
     Action ..> Connection : nutzt
 ```
@@ -82,6 +87,8 @@ my-project/
 │   └─ erp-sql.yaml          # DB-/HTTP-/SMTP-/SFTP-Verbindungen (ohne Klartext-Secrets)
 ├─ triggers/
 │   └─ nightly-import.yaml   # Cron, Webhook, File-Watch
+├─ run-configs/
+│   └─ local-fast.yaml       # Wie wird ausgeführt (Puffer, Logging, Sampling …)
 ├─ workflows/
 │   └─ nightly-import.workflow.yaml
 ├─ pipelines/
@@ -147,6 +154,23 @@ Der Secret-Store ist lokal verschlüsselt (siehe Kap. 8).
 | `file` | Dateisystem-Überwachung (Ordner + Pattern), z. B. neue CSV in Eingangsordner |
 | `interval` | Polling alle n Sekunden/Minuten |
 
+Trigger können sowohl Workflows als auch Pipelines direkt starten.
+
+### 2.8 Ausführungsvarianten
+
+Details: [ADR 0008](adr/0008-ausfuehrungsvarianten.md).
+
+| Variante | Umsetzung |
+|---|---|
+| Workflow oder einzelne Pipeline direkt ausführen | CLI, Editor, API, Trigger |
+| **Run-Konfiguration** (wie wird ausgeführt) | Metadaten-Objekt `RunConfig` (`local`, später `remote`): Puffergrößen, Parallelität, Sampling, Log-Level, Timeout. Auswahl per CLI, Editor, Trigger oder aufrufender Action |
+| Dynamisches Ziel | `pipeline: "pipelines/import-${MANDANT}.pipeline.yaml"`, optional eingeschränkt über `allowedTargets` |
+| Ausführung pro Datensatz (Pipeline) | `core.pipeline-executor`, `core.workflow-executor` – pro Datensatz, pro Gruppe fester Größe oder pro Feldwechsel |
+| Ausführung pro Datensatz (Workflow) | `forEachRow` an `core.run-pipeline` / `core.run-workflow`, optional parallel |
+| Datensätze zwischen Pipelines weitergeben | `core.to-result` / `core.from-result` |
+| Teilausführung | Editor: „Ab hier ausführen“, „Nur diese Action ausführen“, Pipeline-Vorschau bis Transform X |
+| Später | Mappings (wiederverwendbare Unter-Pipelines), Remote-Ausführung |
+
 ---
 
 ## 3. Systemarchitektur
@@ -196,7 +220,7 @@ flowchart LR
 
 | Modus | Befehl | Einsatz |
 |---|---|---|
-| Einmal-Ausführung | `easyflow run <datei> [--env prod] [--param k=v]` | Aufgabenplanung, CI, Skripte. Exit-Code = Ergebnis |
+| Einmal-Ausführung | `easyflow run <datei> [--env prod] [--param k=v] [--run-config name]` | Aufgabenplanung, CI, Skripte. Exit-Code = Ergebnis |
 | Server | `easyflow serve [--project D:\flows]` | Editor + Scheduler + Webhooks |
 | Desktop | `easyflow desktop` | Server + WebView2-Fenster (Einzelplatz) |
 | Windows-Dienst | `easyflow service install/start/stop/uninstall` | Dauerbetrieb auf Server |
@@ -403,8 +427,9 @@ kind: Trigger
 apiVersion: easyflow/v1
 name: nightly-import
 type: cron
-target: workflows/nightly-import.workflow.yaml
+target: workflows/nightly-import.workflow.yaml   # auch Pipelines möglich
 environment: prod
+runConfig: local-fast
 with:
   schedule: "0 2 * * 1-5"
   timezone: Europe/Berlin
@@ -506,7 +531,7 @@ Zusätzlich gibt es vereinfachte Basistypen (`RowMapper`, `RowFilter`), sodass e
 - **Preview**: Pipeline bis zu einem gewählten Transform mit `limit: 100` ausführen, Records je Hop anzeigen (Tabelle + JSON).
 - **Sampling im Lauf**: Bei jedem Lauf werden die ersten N Records pro Hop gespeichert (abschaltbar) → nachträgliche Fehlersuche.
 - **Breakpoints** (Phase 2): Pause bei Bedingung, z. B. `{{ record.kdnr == 4711 }}`.
-- **Testlauf einzelner Actions** im Workflow mit Mock-Eingaben.
+- **Teilausführung im Workflow**: „Ab hier ausführen“ (optional mit Ergebnissen des letzten Laufs) und „Nur diese Action ausführen“ (s. [ADR 0008](adr/0008-ausfuehrungsvarianten.md)).
 
 ### 6.4 Run-Queue & Ressourcen
 
@@ -658,7 +683,7 @@ REST unter `/api/v1`, JSON. Der Editor nutzt ausschließlich diese API – damit
 | GET/PUT/DELETE | `/files/{path}` | Workflow/Pipeline/Trigger lesen, speichern (mit ETag gegen Überschreiben) |
 | POST | `/validate` | Definition prüfen, Fehler mit Zeilen-/Knotenbezug |
 | GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
-| POST | `/runs` | Run starten `{ path, environment, params }` |
+| POST | `/runs` | Run starten `{ path, environment, params, runConfig, startAt?, only?, reuseResultsFrom? }` |
 | GET | `/runs?status=&path=` | Historie |
 | GET | `/runs/{id}` | Details inkl. Knotenstatus |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern |
@@ -712,7 +737,7 @@ Kernfunktionen:
 | Kategorie | Actions |
 |---|---|
 | Allgemein | Start, Erfolg, Abbruch, Warten, Variablen setzen, Bedingung prüfen, Log schreiben, Schleife (ForEach über Liste/Dateien) |
-| Ausführung | Pipeline ausführen, Workflow ausführen, JavaScript, PowerShell, Programm starten |
+| Ausführung | Pipeline ausführen, Workflow ausführen (jeweils optional `forEachRow`), JavaScript, PowerShell, Programm starten |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, ZIP/Entpacken, Dateiliste |
 | Netzwerk | HTTP-Request, SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
@@ -724,6 +749,7 @@ Kernfunktionen:
 | Eingabe | CSV, Excel, JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste |
 | Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
+| Ausführung | Pipeline Executor, Workflow Executor, In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
 
@@ -794,13 +820,13 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 | Phase | Inhalt | Ergebnis |
 |---|---|---|
 | **0.1 – Runner-Kern** | Dateiformat v1, Variablen, Workflow-Engine, 10 Basis-Actions (Start, Shell/PowerShell, HTTP, Datei-Ops, Mail, Run-Workflow), CLI `run`/`validate` | Workflows per YAML + Aufgabenplanung nutzbar |
-| **0.2 – Pipelines** | Pipeline-Engine, CSV/Excel/JSON/DB In/Out, Filter, Select, Berechnen, Lookup, Sort, Group, Error-Hops, `core.run-pipeline` | ETL-Fälle per CLI |
-| **0.3 – Server & Editor** | `serve`, REST/WS, SQLite-Historie, Editor mit Canvas, Eigenschaften aus Schema, Live-Status, Logs | Visuelles Designen & Starten |
-| **0.4 – Betrieb** | Scheduler (Cron/File/Webhook), Windows-Dienst, Secret-Store (DPAPI), Zugangsschlüssel + TLS, Retention, Error-Workflow | Produktionsbetrieb auf Windows-Server |
+| **0.2 – Pipelines** | Pipeline-Engine, CSV/Excel/JSON/DB In/Out, Filter, Select, Berechnen, Lookup, Sort, Group, Error-Hops, `core.run-pipeline`, Executor-Transforms, `forEachRow`, Ergebnis-Datensätze, dynamische Ziele | ETL-Fälle per CLI |
+| **0.3 – Server & Editor** | `serve`, REST/WS, SQLite-Historie, Editor mit Canvas, Eigenschaften aus Schema, Live-Status, Logs, Teilausführung („Ab hier“, „Nur diese Action“) | Visuelles Designen & Starten |
+| **0.4 – Betrieb** | Scheduler (Cron/File/Webhook), Windows-Dienst, Secret-Store (DPAPI), Zugangsschlüssel + TLS, Retention, Error-Workflow, Run-Konfigurationen, Trigger für Pipelines | Produktionsbetrieb auf Windows-Server |
 | **0.5 – Komfort** | Datenvorschau, Samples, Autovervollständigung, Desktop-Modus (WebView2), MSI, Resume | Rund nutzbares Produkt |
 | **0.6 – Erweiterbarkeit** | Plugin-Protokoll + SDKs (Go, Python, C#), Plugin-Verwaltung im Editor | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele, Code-Signing, `winget` | Release |
-| **später** | Remote-Runner (Agenten auf anderen Maschinen), Git-Integration im Editor, Breakpoints, Hop-Import (`.hwf`/`.hpl` → YAML) | |
+| **später** | Remote-Runner (Agenten auf anderen Maschinen, `RunConfig type: remote`), Mappings, Git-Integration im Editor, Breakpoints, Hop-Import (`.hwf`/`.hpl` → YAML) | |
 
 ---
 
