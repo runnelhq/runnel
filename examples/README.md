@@ -2,11 +2,15 @@
 
 | Ordner | Inhalt |
 |---|---|
-| [`hello/`](hello/) | Kleiner, gültiger Workflow |
+| [`hello/`](hello/) | Kleines Projekt mit zwei Environments (`dev`, `prod`) und einem gültigen Workflow |
 | [`broken/`](broken/) | Absichtlich fehlerhafte Workflows, um die Meldungen von `runnel validate` zu zeigen |
 
 ```bash
 runnel validate examples/hello
+```
+
+```bash
+runnel validate --env prod examples/hello
 ```
 
 ```bash

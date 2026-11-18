@@ -1,0 +1,8 @@
+kind: Project
+apiVersion: runnel/v1
+name: ok
+defaultEnvironment: dev
+variables:
+  BASE: D:\data
+  INBOX: ${BASE}\inbox
+  TARGET: World

@@ -6,13 +6,38 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/runnelhq/runnel/internal/vars"
 )
 
 // File format constants.
 const (
-	APIVersion   = "runnel/v1"
-	KindWorkflow = "Workflow"
+	APIVersion      = "runnel/v1"
+	KindWorkflow    = "Workflow"
+	KindProject     = "Project"
+	KindEnvironment = "Environment"
 )
+
+// checkHeader validates the fields every file starts with.
+func checkHeader(s *source, kind, wantKind, apiVersion, name string) Errors {
+	var errs Errors
+	switch {
+	case kind == "":
+		errs = append(errs, s.errorf("$.kind", `missing required field "kind" (expected %q)`, wantKind))
+	case kind != wantKind:
+		errs = append(errs, s.errorf("$.kind", "kind must be %q, got %q", wantKind, kind))
+	}
+	switch {
+	case apiVersion == "":
+		errs = append(errs, s.errorf("$.apiVersion", `missing required field "apiVersion" (expected %q)`, APIVersion))
+	case apiVersion != APIVersion:
+		errs = append(errs, s.errorf("$.apiVersion", "unsupported apiVersion %q (supported: %s)", apiVersion, APIVersion))
+	}
+	if strings.TrimSpace(name) == "" {
+		errs = append(errs, s.errorf("$.name", `missing required field "name"`))
+	}
+	return errs
+}
 
 // Workflow is the content of a *.workflow.yaml file: actions connected by links.
 type Workflow struct {
@@ -153,7 +178,6 @@ func ParseWorkflow(name string, data []byte) (*Workflow, error) {
 var (
 	idPattern         = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 	actionTypePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$`)
-	paramNamePattern  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
 // validate checks each field on its own. References between elements
@@ -170,28 +194,14 @@ func (w *Workflow) validate() error {
 		}
 	}
 
-	switch {
-	case w.Kind == "":
-		add("$.kind", `missing required field "kind" (expected %q)`, KindWorkflow)
-	case w.Kind != KindWorkflow:
-		add("$.kind", "kind must be %q, got %q", KindWorkflow, w.Kind)
-	}
-	switch {
-	case w.APIVersion == "":
-		add("$.apiVersion", `missing required field "apiVersion" (expected %q)`, APIVersion)
-	case w.APIVersion != APIVersion:
-		add("$.apiVersion", "unsupported apiVersion %q (supported: %s)", w.APIVersion, APIVersion)
-	}
-	if strings.TrimSpace(w.Name) == "" {
-		add("$.name", `missing required field "name"`)
-	}
+	errs = append(errs, checkHeader(s, w.Kind, KindWorkflow, w.APIVersion, w.Name)...)
 
 	for i, p := range w.Parameters {
 		path := fmt.Sprintf("$.parameters[%d]", i)
 		switch {
 		case p.Name == "":
 			add(path, `parameter: missing required field "name"`)
-		case !paramNamePattern.MatchString(p.Name):
+		case !vars.ValidName(p.Name):
 			add(path+".name", "invalid parameter name %q (letters, digits and _, not starting with a digit)", p.Name)
 		}
 	}

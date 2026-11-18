@@ -1,0 +1,6 @@
+kind: Environment
+apiVersion: runnel/v1
+name: dev
+variables:
+  TARGET: Dev
+  API_URL: http://localhost:8080

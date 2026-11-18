@@ -1,0 +1,6 @@
+kind: Environment
+apiVersion: runnel/v1
+name: dev
+description: Local development
+variables:
+  STAGE: development

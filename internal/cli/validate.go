@@ -13,23 +13,31 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/vars"
 )
 
 const workflowSuffix = ".workflow.yaml"
 
 func newValidateCommand() *cobra.Command {
-	var strict bool
+	var opts validateOptions
 	cmd := &cobra.Command{
 		Use:   "validate [path...]",
 		Short: "Check workflow files for errors",
 		Long: "Checks workflow files (*" + workflowSuffix + ") for syntax errors, invalid fields,\n" +
-			"links to unknown actions, cycles and unreachable actions.\n\n" +
+			"links to unknown actions, cycles, unreachable actions and undefined variables.\n\n" +
 			"Paths can be files or directories; directories are searched recursively.\n" +
 			"Without a path, the current directory is checked.\n\n" +
+			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
+			"are checked as well. Variables are checked against every environment of the project,\n" +
+			"or only against the one given with --env.\n\n" +
 			"Exit code 1 if an error was found (or a warning, with --strict).",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				args = []string{"."}
+			}
+			params, err := parseParams(opts.params)
+			if err != nil {
+				return err
 			}
 			files, err := findWorkflowFiles(args)
 			if err != nil {
@@ -38,49 +46,158 @@ func newValidateCommand() *cobra.Command {
 			if len(files) == 0 {
 				return fmt.Errorf("no workflow files (*%s) found in %s", workflowSuffix, strings.Join(args, ", "))
 			}
-			return validateFiles(cmd.OutOrStdout(), files, strict)
+			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{}}
+			return v.run(files)
 		},
 	}
-	cmd.Flags().BoolVar(&strict, "strict", false, "treat warnings as errors")
+	cmd.Flags().BoolVar(&opts.strict, "strict", false, "treat warnings as errors")
+	cmd.Flags().StringVar(&opts.env, "env", "", "check variables only against this environment of the project")
+	cmd.Flags().StringArrayVar(&opts.params, "param", nil, "parameter `KEY=VALUE` passed at start (repeatable)")
 	return cmd
 }
 
-func validateFiles(out io.Writer, files []string, strict bool) error {
-	var nErrors, nWarnings int
+type validateOptions struct {
+	strict bool
+	env    string
+	params []string
+}
+
+type validator struct {
+	out    io.Writer
+	opts   validateOptions
+	params map[string]string
+	// projects caches loaded projects by absolute directory; nil if loading failed.
+	projects           map[string]*model.Project
+	nErrors, nWarnings int
+}
+
+func (v *validator) run(files []string) error {
 	for _, file := range files {
-		diags, err := validateFile(file)
-		if err != nil {
+		if err := v.file(file); err != nil {
 			return err
 		}
-		for _, d := range diags {
-			_, _ = fmt.Fprintln(out, formatDiagnostic(d))
-			if d.Severity == model.SeverityWarning {
-				nWarnings++
-			} else {
-				nErrors++
-			}
-		}
 	}
-	_, _ = fmt.Fprintf(out, "%s checked: %s, %s\n",
-		plural(len(files), "workflow file"), plural(nErrors, "error"), plural(nWarnings, "warning"))
-	if nErrors > 0 || (strict && nWarnings > 0) {
+	_, _ = fmt.Fprintf(v.out, "%s checked: %s, %s\n",
+		plural(len(files), "workflow file"), plural(v.nErrors, "error"), plural(v.nWarnings, "warning"))
+	if v.nErrors > 0 || (v.opts.strict && v.nWarnings > 0) {
 		return errExitCode(1)
 	}
 	return nil
 }
 
-// validateFile loads and validates one file. The returned error is only set for
-// problems unrelated to the content (e.g. the file cannot be read).
-func validateFile(file string) (model.Errors, error) {
+// file checks one workflow file. The returned error is only set for problems
+// unrelated to the content (e.g. unreadable files or invalid command line flags).
+func (v *validator) file(file string) error {
 	w, err := model.LoadWorkflow(file)
 	if err != nil {
 		var diags model.Errors
-		if errors.As(err, &diags) {
-			return diags, nil
+		if !errors.As(err, &diags) {
+			return err
 		}
-		return nil, err
+		v.report(diags)
+		return nil
 	}
-	return w.Validate(), nil
+	diags := w.Validate()
+
+	p, found, err := v.project(filepath.Dir(file))
+	if err != nil {
+		return err
+	}
+	if !found && v.opts.env != "" {
+		return fmt.Errorf("--env %s: no project (%s) found for %s", v.opts.env, model.ProjectFile, file)
+	}
+	if !found || p != nil {
+		contexts, err := v.varContexts(w, p)
+		if err != nil {
+			return err
+		}
+		diags = append(diags, w.CheckVariables(contexts)...)
+	}
+	diags.Sort()
+	v.report(diags)
+	return nil
+}
+
+// project returns the project of a directory, loading and reporting it on first use.
+// p is nil if no project was found or it could not be loaded.
+func (v *validator) project(dir string) (p *model.Project, found bool, err error) {
+	root, found, err := model.FindProjectDir(dir)
+	if err != nil || !found {
+		return nil, false, err
+	}
+	if p, seen := v.projects[root]; seen {
+		return p, true, nil
+	}
+	p, err = model.LoadProject(displayPath(root))
+	var diags model.Errors
+	if errors.As(err, &diags) {
+		v.report(diags)
+		if diags.HasErrors() {
+			p = nil
+		}
+	} else if err != nil {
+		return nil, true, err
+	}
+	v.projects[root] = p
+	return p, true, nil
+}
+
+func (v *validator) varContexts(w *model.Workflow, p *model.Project) ([]model.VarContext, error) {
+	if p == nil {
+		return []model.VarContext{{Scope: model.Scope(w, nil, nil, v.params)}}, nil
+	}
+	envs := p.EnvironmentNames()
+	if v.opts.env != "" {
+		if _, err := p.SelectEnvironment(v.opts.env); err != nil {
+			return nil, err
+		}
+		envs = []string{v.opts.env}
+	}
+	if len(envs) == 0 {
+		return []model.VarContext{{Scope: model.Scope(w, p, nil, v.params)}}, nil
+	}
+	contexts := make([]model.VarContext, len(envs))
+	for i, name := range envs {
+		contexts[i] = model.VarContext{Environment: name, Scope: model.Scope(w, p, p.Environments[name], v.params)}
+	}
+	return contexts, nil
+}
+
+func (v *validator) report(diags model.Errors) {
+	for _, d := range diags {
+		_, _ = fmt.Fprintln(v.out, formatDiagnostic(d))
+		if d.Severity == model.SeverityWarning {
+			v.nWarnings++
+		} else {
+			v.nErrors++
+		}
+	}
+}
+
+// parseParams parses "KEY=VALUE" arguments.
+func parseParams(args []string) (map[string]string, error) {
+	params := map[string]string{}
+	for _, a := range args {
+		k, val, ok := strings.Cut(a, "=")
+		if !ok || !vars.ValidName(k) {
+			return nil, fmt.Errorf("invalid --param %q (expected KEY=VALUE, KEY: letters, digits and _)", a)
+		}
+		params[k] = val
+	}
+	return params, nil
+}
+
+// displayPath shortens an absolute path to a path relative to the working directory, if it lies below it.
+func displayPath(abs string) string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return abs
+	}
+	rel, err := filepath.Rel(wd, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return abs
+	}
+	return rel
 }
 
 func formatDiagnostic(d *model.Error) string {

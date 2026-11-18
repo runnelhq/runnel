@@ -68,7 +68,7 @@ func (e *Error) Error() string {
 	return b.String()
 }
 
-// Errors is a list of problems in a file, sorted by position.
+// Errors is a list of problems, sorted by file and position.
 type Errors []*Error
 
 // HasErrors reports whether the list contains at least one problem of severity error.
@@ -89,9 +89,11 @@ func (es Errors) Error() string {
 	return strings.Join(msgs, "\n")
 }
 
-func (es Errors) sort() {
+// Sort orders the list by file and position.
+func (es Errors) Sort() {
 	slices.SortStableFunc(es, func(a, b *Error) int {
-		return cmp.Or(cmp.Compare(a.Pos.Line, b.Pos.Line), cmp.Compare(a.Pos.Column, b.Pos.Column))
+		return cmp.Or(strings.Compare(a.File, b.File),
+			cmp.Compare(a.Pos.Line, b.Pos.Line), cmp.Compare(a.Pos.Column, b.Pos.Column))
 	})
 }
 
@@ -100,6 +102,6 @@ func (es Errors) errOrNil() error {
 	if len(es) == 0 {
 		return nil
 	}
-	es.sort()
+	es.Sort()
 	return es
 }
