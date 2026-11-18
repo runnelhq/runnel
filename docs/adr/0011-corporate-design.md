@@ -24,7 +24,7 @@ Das Corporate Design liegt unter [`design/`](../../design/README.md) und besteht
 
 | Baustein | Festlegung |
 |---|---|
-| Bildmarke | Start-Punkt → geschwungener Link → Ziel-Ring (kleinster Workflow, zugleich Wasserlauf) |
+| Bildmarke | Start-Punkt → geschwungener Link → Ziel-Ring (kleinster Workflow, zugleich Wasserlauf); drei getrennte Elemente, dünner Link |
 | Wortmarke | „runnel“, Kleinbuchstaben, Inter SemiBold, −2 % Laufweite, als Pfade |
 | Markenfarbe | **Strom** (Wasserblau), Hauptton Strom 600 `#0A6DA6` |
 | Neutralfarbe | **Tiefe** (kühles Schiefergrau), dunkler Grund Tiefe 950 `#0E151D` |

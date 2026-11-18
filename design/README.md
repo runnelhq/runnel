@@ -49,6 +49,8 @@ Drei Eigenschaften leiten jede Gestaltungsentscheidung:
 
 Die Bildmarke zeigt den kleinsten möglichen Runnel-Workflow: **Start → Link → Ziel**.
 Der gefüllte Punkt ist der Start, die geschwungene Linie der Link (wie im Editor-Canvas), der Ring das Ziel.
+Die drei Elemente stehen getrennt: Der Link ist deutlich dünner als die Knoten (3,5 : 13 Einheiten) und hält zu Start
+und Ziel denselben Abstand – wie ein Link zwischen zwei Ports im Editor.
 Gleichzeitig liest sie sich als Wasserlauf, der von oben links nach unten rechts fließt.
 
 | Datei | Verwendung |
@@ -88,7 +90,7 @@ als Befehl (`runnel`).
 - **Hintergründe:** Standard-Logo auf Weiß bis Tiefe-100; Inverse-Logo auf Tiefe-800 bis Tiefe-950 und Strom-700 bis Strom-950.
   Auf Fotos nur das App-Icon (mit eigener Fläche).
 - **Nicht erlaubt:** verzerren, drehen, spiegeln (der Fluss geht immer von oben links nach unten rechts), Farben
-  austauschen, Schatten/Verläufe/Konturen hinzufügen, Wortmarke in einer anderen Schrift nachsetzen, Ring und Punkt vertauschen.
+  austauschen, Link verdicken oder an Start/Ziel anschließen, Schatten/Verläufe/Konturen hinzufügen, Wortmarke in einer anderen Schrift nachsetzen, Ring und Punkt vertauschen.
 
 ---
 
