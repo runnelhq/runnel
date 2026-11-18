@@ -360,6 +360,17 @@ layout:
   abort:        { x: 560, y: 280 }
 ```
 
+Regeln des Workflow-Formats (umgesetzt in `internal/model`):
+
+- Pflichtfelder: `kind: Workflow`, `apiVersion: runnel/v1`, `name`; je Action `id` und `type`; je Link `from` und `to`.
+- Action-IDs: Buchstaben, Ziffern, `-` und `_`, beginnend mit einem Buchstaben. Action-Typen: `<namespace>.<name>`, z. B. `file.copy`.
+- Parameternamen: Buchstaben, Ziffern und `_`, nicht mit einer Ziffer beginnend (für `${NAME}`).
+- Link-Bedingung `when`: `success` (Standard, wenn nicht angegeben), `failure`, `always` oder ein Ausdruck `{{ … }}`.
+- Zeitangaben: Go-Syntax mit Einheit, z. B. `30s`, `5m`, `2h`, `1h30m`.
+- Unbekannte Felder sind ein Fehler (Schutz vor Tippfehlern). Fehler werden mit Datei, Zeile und Spalte gemeldet;
+  alle Feldfehler einer Datei auf einmal.
+- Eine Datei enthält genau ein YAML-Dokument.
+
 ### 5.2 Pipeline
 
 ```yaml

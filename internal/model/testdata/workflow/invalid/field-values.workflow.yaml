@@ -1,0 +1,30 @@
+# Several field-level problems; all are reported at once, sorted by position.
+kind: Workflow
+apiVersion: runnel/v1
+name: field-values
+parameters:
+  - description: no name
+  - name: 1ST_PARAM
+settings:
+  timeout: 2x
+  maxConcurrentRuns: -1
+actions:
+  - type: core.start
+  - id: 9lives
+    type: core.log
+  - id: no-type
+  - id: bad-type
+    type: copy
+  - id: bad-values
+    type: core.wait
+    timeout: 30
+    join: any
+    joinTimeout: -5m
+    retry:
+      attempts: 0
+      backoff: soon
+links:
+  - { to: no-type }
+  - { from: bad-type }
+  - { from: bad-type, to: bad-values, when: sucess }
+  - { from: bad-type, to: bad-values, when: "{{ }}" }

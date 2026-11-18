@@ -1,0 +1,1 @@
+duplicate-key.workflow.yaml:4:1: syntax error: mapping key "name" already defined at [3:1]

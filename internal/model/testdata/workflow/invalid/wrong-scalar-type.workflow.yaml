@@ -1,0 +1,5 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: wrong-scalar-type
+settings:
+  maxConcurrentRuns: many
