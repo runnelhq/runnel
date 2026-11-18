@@ -10,6 +10,7 @@
 | [0006](0006-ausdruckssprache.md) | Ausdruckssprache – `expr-lang` für Ausdrücke, JavaScript für Skripte | Angenommen |
 | [0007](0007-typsystem-pipelines.md) | Typsystem in Pipelines – schemalos mit optionalen Typen | Angenommen |
 | [0008](0008-ausfuehrungsvarianten.md) | Ausführungsvarianten – Run-Konfigurationen, dynamische Ziele, Ausführung pro Datensatz | Angenommen |
+| [0009](0009-begriff-link.md) | „Link“ statt „Hop“ für Verbindungen zwischen Knoten | Angenommen |
 
 Neue ADRs: nächste freie Nummer, Aufbau wie die bestehenden (Kontext, Entscheidung, Konsequenzen).
 Wird eine Entscheidung revidiert, erhält die alte ADR den Status „Ersetzt durch ADR xxxx“.

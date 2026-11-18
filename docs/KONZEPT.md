@@ -30,7 +30,7 @@ die man per Doppelklick startet oder als Windows-Dienst installiert.
 
 - Kein Multi-Tenant-SaaS, **keine Benutzer-/Rollenverwaltung** (wie bei Apache Hop; s. [ADR 0005](adr/0005-mehrbenutzerbetrieb.md))
 - Kein Cluster / verteilte Ausführung (Remote-Runner erst in späterer Phase, s. Roadmap)
-- Kein Big-Data-Backend (kein Spark/Beam/Flink wie bei Hop) – Fokus auf Datenmengen bis ca. einige Mio. Zeilen pro Lauf
+- Kein Big-Data-Backend (kein Spark/Beam/Flink wie bei Apache Hop) – Fokus auf Datenmengen bis ca. einige Mio. Zeilen pro Lauf
 - Keine 400+ SaaS-Konnektoren wie Make/n8n – stattdessen starke generische Bausteine (HTTP, SQL, Dateien, Skript) plus Plugin-Modell
 
 ### 1.4 Positionierung
@@ -48,7 +48,7 @@ die man per Doppelklick startet oder als Windows-Dienst installiert.
 
 ## 2. Fachliches Modell (Konzepte)
 
-Die Begriffe lehnen sich bewusst an Apache Hop an.
+Das Modell (Workflow/Pipeline) lehnt sich an Apache Hop an; die Begriffe sind bewusst allgemein gehalten – Verbindungen heißen **Links** ([ADR 0009](adr/0009-begriff-link.md)).
 
 ```mermaid
 classDiagram
@@ -59,9 +59,9 @@ classDiagram
     Project "1" --> "*" Trigger
     Project "1" --> "*" RunConfig
     Workflow "1" --> "*" Action
-    Workflow "1" --> "*" Hop
+    Workflow "1" --> "*" Link
     Pipeline "1" --> "*" Transform
-    Pipeline "1" --> "*" Hop
+    Pipeline "1" --> "*" Link
     Action ..> Pipeline : "Run Pipeline"
     Action ..> Workflow : "Run Workflow"
     Trigger ..> Workflow : startet
@@ -98,33 +98,33 @@ my-project/
 
 ### 2.2 Workflow (Ablaufsteuerung)
 
-- Ein **gerichteter Graph aus Actions**, verbunden durch **Hops**.
-- Actions laufen **sequenziell entlang der Hops** (optional parallel verzweigt).
+- Ein **gerichteter Graph aus Actions**, verbunden durch **Links**.
+- Actions laufen **sequenziell entlang der Links** (optional parallel verzweigt).
 - Jede Action liefert ein **Result**: `success | failure` plus Ergebnisdaten (Variablen, Dateiliste, Zeilenanzahl, Exit-Code …).
-- Hops tragen eine **Bedingung**:
+- Links tragen eine **Bedingung**:
   - `success` (grün) – nur wenn Vorgänger erfolgreich
   - `failure` (rot) – nur wenn Vorgänger fehlgeschlagen
   - `always` (schwarz) – unabhängig vom Ergebnis
   - `expression` (blau) – frei formulierte Bedingung, z. B. `{{ result.rows > 0 }}`
 - Typische Actions: Start, Pipeline ausführen, Sub-Workflow ausführen, PowerShell, HTTP, Datei-Operationen, Mail, Warten, SQL ausführen, Erfolg/Abbruch.
-- Schleifen sind erlaubt, aber nur explizit (Hop zurück mit Bedingung oder „Loop“-Action) und durch `maxIterations` begrenzt.
+- Schleifen sind erlaubt, aber nur explizit (Link zurück mit Bedingung oder „Loop“-Action) und durch `maxIterations` begrenzt.
 
 ### 2.3 Pipeline (Datenfluss)
 
 - Ein **gerichteter, azyklischer Graph aus Transforms**.
-- **Alle Transforms laufen gleichzeitig** (wie in Hop) und reichen **Records** über Hops (gepufferte Kanäle) weiter → Streaming, konstanter Speicherverbrauch.
+- **Alle Transforms laufen gleichzeitig** (wie in Apache Hop) und reichen **Records** über Links (gepufferte Kanäle) weiter → Streaming, konstanter Speicherverbrauch.
 - Ein Record ist ein **geordnetes, JSON-artiges Objekt** (Feldname → Wert). Pipelines sind **schemalos mit optionalen Typen** (string, int, decimal, float, bool, date, datetime, binary, json) – Details: [ADR 0007](adr/0007-typsystem-pipelines.md).
-- Hops in Pipelines:
-  - Normaler Daten-Hop
-  - **Error-Hop**: fehlerhafte Records werden mit Fehlerinfos (`_error.message`, `_error.field`) umgeleitet statt die Pipeline abzubrechen
-  - **Info-Hop**: Nebeneingang (z. B. Lookup-Daten für „Stream Lookup“)
-- Verteilungsmodus bei mehreren Ausgängen: `copy` (jeder Ausgang bekommt jeden Record) oder `distribute` (Round-Robin), wie in Hop.
+- Links in Pipelines:
+  - Normaler **Daten-Link**
+  - **Fehler-Link**: fehlerhafte Records werden mit Fehlerinfos (`_error.message`, `_error.field`) umgeleitet statt die Pipeline abzubrechen
+  - **Info-Link**: Nebeneingang (z. B. Lookup-Daten für „Stream Lookup“)
+- Verteilungsmodus bei mehreren Ausgängen: `copy` (jeder Ausgang bekommt jeden Record) oder `distribute` (Round-Robin), wie in Apache Hop.
 - Transforms können mit **mehreren Kopien** (Parallelität) laufen, z. B. für teure HTTP-Lookups.
 
-### 2.4 Hop
+### 2.4 Link
 
 Verbindung zwischen zwei Knoten. Im Workflow = Kontrollfluss mit Bedingung, in der Pipeline = Datenkanal.
-Hops können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
+Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
 
 ### 2.5 Environment & Variablen
 
@@ -135,7 +135,7 @@ Hops können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
   4. Laufzeit-Parameter (CLI `--param`, Webhook-Body, Trigger)
   5. Zur Laufzeit gesetzte Variablen (Action „Set Variables“)
 - Syntax:
-  - `${NAME}` – einfache Variablenersetzung (Hop-kompatibel)
+  - `${NAME}` – einfache Variablenersetzung (kompatibel zu Apache Hop)
   - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
 
 ### 2.6 Connection & Credentials
@@ -242,7 +242,7 @@ flowchart LR
 | Entwicklungsgeschwindigkeit | ✅ hoch | ✅ hoch | ✅ hoch | ⚠️ mittel |
 | Cross-Compile Linux/macOS | ✅ trivial | ✅ | ⚠️ | ✅ |
 
-**Entscheidung: Go** ([ADR 0002](adr/0002-go-backend.md)). Das Goroutine/Channel-Modell bildet Hops in Pipelines 1:1 ab,
+**Entscheidung: Go** ([ADR 0002](adr/0002-go-backend.md)). Das Goroutine/Channel-Modell bildet Links in Pipelines 1:1 ab,
 die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternative betrachtet und verworfen.
 
 ### 4.2 Bibliotheken (Backend)
@@ -277,7 +277,7 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 | Zweck | Wahl |
 |---|---|
 | Framework | **React 19 + TypeScript**, Build mit **Vite** |
-| Graph-Canvas | **React Flow (xyflow)** – Knoten, Hops, Zoom, Minimap, Auto-Layout (`elkjs`) |
+| Graph-Canvas | **React Flow (xyflow)** – Knoten, Links, Zoom, Minimap, Auto-Layout (`elkjs`) |
 | Formulare | Automatisch aus JSON-Schema der Action/Transform generiert (`@rjsf/core` oder eigene schlanke Lösung) |
 | Code-/Ausdruckseditor | **Monaco** (Autovervollständigung für Variablen, Felder, Funktionen) |
 | Zustand | `zustand` + Undo/Redo-Stack (Command-Pattern) |
@@ -343,7 +343,7 @@ actions:
   - id: abort
     type: core.abort
 
-hops:
+links:
   - { from: start,     to: wait-file }
   - { from: wait-file, to: load,         when: success }
   - { from: load,      to: archive,      when: success }
@@ -370,7 +370,7 @@ name: customers-to-crm
 parameters:
   - name: FILE
 settings:
-  bufferSize: 10000          # Records pro Hop-Puffer (Backpressure)
+  bufferSize: 10000          # Records pro Link-Puffer (Backpressure)
 
 transforms:
   - id: read
@@ -406,14 +406,14 @@ transforms:
       method: POST
       url: /api/accounts
       body: "{{ record }}"
-    onError: error-hop
+    onError: error-link
 
   - id: rejected
     type: csv.output
     with:
       path: "${ARCHIVE}\\rejected_${IMPORT_DATE}.csv"
 
-hops:
+links:
   - { from: read,        to: only-active }
   - { from: only-active, to: map }
   - { from: map,         to: to-crm }
@@ -446,7 +446,7 @@ with:
 stateDiagram-v2
     [*] --> Queued
     Queued --> Running
-    Running --> Running: Action fertig → nächste Actions per Hop-Bedingung
+    Running --> Running: Action fertig → nächste Actions per Link-Bedingung
     Running --> Succeeded: keine offenen Actions, kein Fehler / core.success
     Running --> Failed: unbehandelter Fehler / core.abort
     Running --> Cancelled: Abbruch durch Benutzer / Timeout
@@ -459,9 +459,9 @@ stateDiagram-v2
 Ablauf:
 1. **Laden & Validieren**: YAML parsen, gegen JSON-Schema prüfen, Action-Typen in der Registry auflösen, Graph prüfen (Start vorhanden, keine unerreichbaren Knoten, Zyklen nur mit Limit).
 2. **Kontext aufbauen**: Variablen-Scopes, Credentials (lazy entschlüsselt), Logger, `context.Context` für Abbruch/Timeout.
-3. **Ausführen**: Ab `start` werden Actions in eine Ready-Queue gelegt. Jede Action läuft in einer Goroutine; nach Abschluss werden die ausgehenden Hops ausgewertet und Nachfolger „bereit“ gesetzt.
-   - **Parallelität**: Hat eine Action mehrere erfüllte ausgehende Hops, laufen die Nachfolger parallel.
-   - **Join**: Konfigurierbar pro Action (`join: all | first | each`), Projektstandard `all`: Eine Action mit mehreren eingehenden Hops startet einmal, sobald alle Vorgänger fertig sind, die noch ein Signal liefern können (Dead-Path-Elimination; nicht durchlaufene Actions erhalten den Status `skipped`). Details: [ADR 0003](adr/0003-join-semantik.md).
+3. **Ausführen**: Ab `start` werden Actions in eine Ready-Queue gelegt. Jede Action läuft in einer Goroutine; nach Abschluss werden die ausgehenden Links ausgewertet und Nachfolger „bereit“ gesetzt.
+   - **Parallelität**: Hat eine Action mehrere erfüllte ausgehende Links, laufen die Nachfolger parallel.
+   - **Join**: Konfigurierbar pro Action (`join: all | first | each`), Projektstandard `all`: Eine Action mit mehreren eingehenden Links startet einmal, sobald alle Vorgänger fertig sind, die noch ein Signal liefern können (Dead-Path-Elimination; nicht durchlaufene Actions erhalten den Status `skipped`). Details: [ADR 0003](adr/0003-join-semantik.md).
 4. **Fehlerbehandlung je Action**: `retry` (Anzahl, Backoff exponentiell/fix), `timeout`, `continueOnError`.
 5. **Persistenz**: Jeder Statuswechsel wird in SQLite geschrieben (Run, ActionRun, Ergebnis, Dauer) → Live-Anzeige im Editor und **Resume** nach Absturz/Fehler ab der fehlgeschlagenen Action.
 
@@ -499,12 +499,12 @@ flowchart LR
     D3 -. error .-> E
 ```
 
-- Jeder Transform (bzw. jede Kopie) ist eine **Goroutine**, jeder Hop ein **gepufferter Channel** von Record-Batches.
+- Jeder Transform (bzw. jede Kopie) ist eine **Goroutine**, jeder Link ein **gepufferter Channel** von Record-Batches.
 - **Batching**: Records werden intern in Batches (z. B. 500) übertragen, um Channel-Overhead zu minimieren; für den Transform-Entwickler unsichtbar.
 - **Backpressure** entsteht automatisch: Volle Puffer blockieren den Erzeuger → konstanter Speicher auch bei großen Dateien.
 - **Ende-Signal**: Schließen des Channels propagiert durch den Graphen; die Pipeline ist fertig, wenn alle Transforms beendet sind.
-- **Fehler**: Pro Record → Error-Hop (falls vorhanden), sonst Pipeline-Abbruch (alle Goroutinen via Context gecancelt). Schwelle konfigurierbar (`maxErrors: 100`).
-- **Metriken** je Transform: gelesen/geschrieben/Fehler/Records pro Sekunde/Puffer-Füllstand – live per WebSocket im Editor (wie Hops „Metrics“-Tab).
+- **Fehler**: Pro Record → Fehler-Link (falls vorhanden), sonst Pipeline-Abbruch (alle Goroutinen via Context gecancelt). Schwelle konfigurierbar (`maxErrors: 100`).
+- **Metriken** je Transform: gelesen/geschrieben/Fehler/Records pro Sekunde/Puffer-Füllstand – live per WebSocket im Editor (vergleichbar mit dem „Metrics“-Tab in Apache Hop).
 - **Transaktionen**: DB-Outputs mit `commitSize`; optional „Unique Connection“-Modus (eine Transaktion über die ganze Pipeline, Rollback bei Fehler).
 
 Schnittstelle eines Transforms (Go):
@@ -519,8 +519,8 @@ type Transform interface {
 
 type Emitter interface {
     Emit(r Record)                 // Standardausgang
-    EmitTo(hop string, r Record)   // gezielter Ausgang (z. B. Switch/Case)
-    Error(r Record, err error)     // Error-Hop
+    EmitTo(link string, r Record)   // gezielter Ausgang (z. B. Switch/Case)
+    Error(r Record, err error)     // Fehler-Link
 }
 ```
 
@@ -528,8 +528,8 @@ Zusätzlich gibt es vereinfachte Basistypen (`RowMapper`, `RowFilter`), sodass e
 
 ### 6.3 Datenvorschau & Debugging (Editor)
 
-- **Preview**: Pipeline bis zu einem gewählten Transform mit `limit: 100` ausführen, Records je Hop anzeigen (Tabelle + JSON).
-- **Sampling im Lauf**: Bei jedem Lauf werden die ersten N Records pro Hop gespeichert (abschaltbar) → nachträgliche Fehlersuche.
+- **Preview**: Pipeline bis zu einem gewählten Transform mit `limit: 100` ausführen, Records je Link anzeigen (Tabelle + JSON).
+- **Sampling im Lauf**: Bei jedem Lauf werden die ersten N Records pro Link gespeichert (abschaltbar) → nachträgliche Fehlersuche.
 - **Breakpoints** (Phase 2): Pause bei Bedingung, z. B. `{{ record.kdnr == 4711 }}`.
 - **Teilausführung im Workflow**: „Ab hier ausführen“ (optional mit Ergebnissen des letzten Laufs) und „Nur diese Action ausführen“ (s. [ADR 0008](adr/0008-ausfuehrungsvarianten.md)).
 
@@ -660,7 +660,7 @@ CREATE TABLE node_runs (
   PRIMARY KEY (run_id, node_id, attempt)
 );
 
-CREATE TABLE samples (run_id TEXT, hop TEXT, seq INTEGER, record_json TEXT);
+CREATE TABLE samples (run_id TEXT, link TEXT, seq INTEGER, record_json TEXT);
 CREATE TABLE secrets (name TEXT PRIMARY KEY, nonce BLOB, ciphertext BLOB, updated_at INTEGER);
 ```
 
@@ -720,8 +720,8 @@ REST unter `/api/v1`, JSON. Der Editor nutzt ausschließlich diese API – damit
 ```
 
 Kernfunktionen:
-- Drag & Drop aus der Palette, Hops per Ziehen zwischen Ports, Hop-Typ per Klick umschalten (✔/✖/∞/ƒ)
-- Live-Status auf dem Canvas (Knotenfarbe, Zeilenzähler an Hops)
+- Drag & Drop aus der Palette, Links per Ziehen zwischen Ports, Link-Typ per Klick umschalten (✔/✖/∞/ƒ)
+- Live-Status auf dem Canvas (Knotenfarbe, Zeilenzähler an Links)
 - Inline-Validierung (rote Markierung + „Probleme“-Tab)
 - Feld-Autovervollständigung: Der Editor kennt das Ausgabeschema jedes Transforms (aus `Init`) und schlägt Feldnamen vor
 - Copy/Paste von Knoten als YAML (zwischen Instanzen und in Tickets/Chats teilbar)
@@ -779,12 +779,12 @@ Entscheidung und Begründung: [ADR 0001 – Monorepo](adr/0001-monorepo.md).
 easy-flow/
 ├─ cmd/easyflow/            # main.go – CLI (cobra o. ä.): run, serve, desktop, service, validate
 ├─ internal/
-│  ├─ model/                # Workflow, Pipeline, Hop, Trigger – Structs + YAML-(De)Serialisierung
+│  ├─ model/                # Workflow, Pipeline, Link, Trigger – Structs + YAML-(De)Serialisierung
 │  ├─ schema/               # JSON-Schemas für Dateien & Descriptors
 │  ├─ vars/                 # Variablen-Auflösung, Scopes
 │  ├─ expr/                 # expr-lang + goja, gemeinsame Funktionsbibliothek (now, formatDate …)
 │  ├─ engine/
-│  │  ├─ workflow/          # Workflow-Engine, Hop-Auswertung, Retry, Resume
+│  │  ├─ workflow/          # Workflow-Engine, Link-Auswertung, Retry, Resume
 │  │  └─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
 │  ├─ registry/             # Katalog aller Actions/Transforms
 │  ├─ actions/              # eingebaute Actions (je Paket: core, file, http, mail, sql, shell)
@@ -810,7 +810,7 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 **Tests**:
 - Unit-Tests je Action/Transform (Tabellen-Tests)
 - Golden-File-Tests: Beispiel-Pipelines mit Eingabedateien → erwartete Ausgabedateien
-- Engine-Tests: Hop-Semantik, Parallelität, Abbruch, Resume (mit `-race`)
+- Engine-Tests: Link-Bedingungen, Join, Parallelität, Abbruch, Resume (mit `-race`)
 - E2E Editor: Playwright gegen `easyflow serve`
 
 ---
@@ -820,13 +820,13 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 | Phase | Inhalt | Ergebnis |
 |---|---|---|
 | **0.1 – Runner-Kern** | Dateiformat v1, Variablen, Workflow-Engine, 10 Basis-Actions (Start, Shell/PowerShell, HTTP, Datei-Ops, Mail, Run-Workflow), CLI `run`/`validate` | Workflows per YAML + Aufgabenplanung nutzbar |
-| **0.2 – Pipelines** | Pipeline-Engine, CSV/Excel/JSON/DB In/Out, Filter, Select, Berechnen, Lookup, Sort, Group, Error-Hops, `core.run-pipeline`, Executor-Transforms, `forEachRow`, Ergebnis-Datensätze, dynamische Ziele | ETL-Fälle per CLI |
+| **0.2 – Pipelines** | Pipeline-Engine, CSV/Excel/JSON/DB In/Out, Filter, Select, Berechnen, Lookup, Sort, Group, Fehler-Links, `core.run-pipeline`, Executor-Transforms, `forEachRow`, Ergebnis-Datensätze, dynamische Ziele | ETL-Fälle per CLI |
 | **0.3 – Server & Editor** | `serve`, REST/WS, SQLite-Historie, Editor mit Canvas, Eigenschaften aus Schema, Live-Status, Logs, Teilausführung („Ab hier“, „Nur diese Action“) | Visuelles Designen & Starten |
 | **0.4 – Betrieb** | Scheduler (Cron/File/Webhook), Windows-Dienst, Secret-Store (DPAPI), Zugangsschlüssel + TLS, Retention, Error-Workflow, Run-Konfigurationen, Trigger für Pipelines | Produktionsbetrieb auf Windows-Server |
 | **0.5 – Komfort** | Datenvorschau, Samples, Autovervollständigung, Desktop-Modus (WebView2), MSI, Resume | Rund nutzbares Produkt |
 | **0.6 – Erweiterbarkeit** | Plugin-Protokoll + SDKs (Go, Python, C#), Plugin-Verwaltung im Editor | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele, Code-Signing, `winget` | Release |
-| **später** | Remote-Runner (Agenten auf anderen Maschinen, `RunConfig type: remote`), Mappings, Git-Integration im Editor, Breakpoints, Hop-Import (`.hwf`/`.hpl` → YAML) | |
+| **später** | Remote-Runner (Agenten auf anderen Maschinen, `RunConfig type: remote`), Mappings, Git-Integration im Editor, Breakpoints, Import aus Apache Hop (`.hwf`/`.hpl` → YAML) | |
 
 ---
 

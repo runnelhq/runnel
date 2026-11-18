@@ -6,7 +6,7 @@
 
 ## Kontext
 
-Ausdrücke kommen in easy-flow an vielen Stellen vor: Hop-Bedingungen, Filter, berechnete Felder, dynamische
+Ausdrücke kommen in easy-flow an vielen Stellen vor: Link-Bedingungen, Filter, berechnete Felder, dynamische
 Eigenschaften (Pfade, URLs, Mail-Betreff). In Pipelines werden sie **pro Datensatz** ausgewertet – bei Millionen Zeilen
 ist die Ausführungsgeschwindigkeit entscheidend. Gleichzeitig gibt es Fälle, die echte Programmlogik brauchen.
 
@@ -21,9 +21,9 @@ Betrachtet wurden:
 ## Entscheidung
 
 1. **`{{ … }}`-Ausdrücke werden mit [`expr-lang/expr`](https://github.com/expr-lang/expr) ausgewertet** – überall:
-   Hop-Bedingungen, Filter, Berechnen, dynamische Eigenschaften, Breakpoints.
+   Link-Bedingungen, Filter, Berechnen, dynamische Eigenschaften, Breakpoints.
 2. **JavaScript (goja) nur in den Skript-Bausteinen** `core.script` (Workflow) und `core.script-transform` (Pipeline).
-3. **`${VAR}`** bleibt reine Textersetzung (Hop-kompatibel) und wird vor der Ausdrucksauswertung aufgelöst.
+3. **`${VAR}`** bleibt reine Textersetzung (kompatibel zu Apache Hop) und wird vor der Ausdrucksauswertung aufgelöst.
 
 ### Auswertungsregeln
 
@@ -83,7 +83,7 @@ when:      "{{ result.rows > 0 }}"
 
 - Läuft in **goja** mit Sandbox (CPU-Zeitlimit, kein Datei-/Netzwerkzugriff außer über freigeschaltete APIs).
 - Dieselbe Funktionsbibliothek (`formatDate`, `addDays` …) ist dort unter denselben Namen verfügbar.
-- Pipeline-API: `record` lesen/ändern, `emit(record)`, `emitTo('hop', record)`, `error(record, 'msg')`, `log.info(...)`.
+- Pipeline-API: `record` lesen/ändern, `emit(record)`, `emitTo('link', record)`, `error(record, 'msg')`, `log.info(...)`.
 
 ### Editor
 

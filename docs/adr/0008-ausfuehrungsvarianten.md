@@ -32,7 +32,7 @@ apiVersion: easyflow/v1
 name: local-fast
 type: local                  # local (ab 0.4) | remote (später)
 with:
-  bufferSize: 50000          # Records pro Hop-Puffer (überschreibt Pipeline-Einstellung)
+  bufferSize: 50000          # Records pro Link-Puffer (überschreibt Pipeline-Einstellung)
   batchSize: 1000
   maxParallelActions: 4      # parallele Actions im Workflow
   sampling: false            # keine Vorschau-Samples speichern

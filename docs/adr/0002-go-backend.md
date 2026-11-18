@@ -31,7 +31,7 @@ Backend, Runner, Server und eingebaute Actions/Transforms werden in **Go** entwi
 
 Begründung:
 
-- **Goroutinen und Channels bilden das Pipeline-Modell direkt ab**: Transform = Goroutine, Hop = gepufferter Channel,
+- **Goroutinen und Channels bilden das Pipeline-Modell direkt ab**: Transform = Goroutine, Link = gepufferter Channel,
   Backpressure ergibt sich automatisch.
 - **Kleine, statische Binary** ohne Laufzeitumgebung; Editor per `go:embed` eingebettet.
 - **Reine Go-Treiber** für SQL Server, PostgreSQL, MySQL, Oracle und SQLite – kein CGO, einfacher Build.

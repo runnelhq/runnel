@@ -51,9 +51,9 @@ wird es genutzt – für Konvertierung, Validierung und Autovervollständigung i
 vor und schreibt sie als `fields:` in die YAML-Datei. Typen werden **zur Laufzeit nicht geraten** – das Verhalten
 hängt nur von der Definition ab, nicht vom Inhalt der jeweiligen Datei.
 
-### Schema an Hops
+### Schema an Links
 
-Das Schema an einem Hop ist entweder
+Das Schema an einem Link ist entweder
 
 - **geschlossen** – alle Felder bekannt (z. B. nach „Felder auswählen“ oder Datenbank-Eingabe), oder
 - **offen** – bekannte Felder plus möglicherweise weitere (z. B. nach JSON-Eingabe oder JavaScript).
@@ -64,7 +64,7 @@ Der Editor ergänzt sie um Felder aus der Datenvorschau bzw. aus Samples des let
 ### Konvertierung und Fehler
 
 - Ausgaben mit festem Ziel (Datenbanktabelle, Excel mit Formaten) konvertieren in die Zieltypen.
-  Nicht konvertierbare Werte gehen auf den **Error-Hop** (bzw. brechen ab, wenn keiner existiert).
+  Nicht konvertierbare Werte gehen auf den **Fehler-Link** (bzw. brechen ab, wenn keiner existiert).
 - Transform „Typ konvertieren“ für explizite Umwandlung mit Format (z. B. `"1.234,56"` → `decimal`).
 - In Ausdrücken gibt es **keine implizite Typumwandlung** zwischen Text und Zahl (`"5" > 3` ist ein Fehler);
   umgewandelt wird explizit mit `int()`, `decimal()`, `parseDate()` (siehe [ADR 0006](0006-ausdruckssprache.md)).
@@ -73,13 +73,13 @@ Der Editor ergänzt sie um Felder aus der Datenvorschau bzw. aus Samples des let
 
 | Prüfung | Stufe |
 |---|---|
-| Feld wird verwendet, existiert im **geschlossenen** Schema des Hops aber nicht | Fehler |
+| Feld wird verwendet, existiert im **geschlossenen** Schema des Links aber nicht | Fehler |
 | Feld wird verwendet, ist im **offenen** Schema nicht bekannt | Warnung („Tippfehler?“, mit Vorschlag ähnlicher Feldnamen) |
 | Bekannter Typ passt nicht zur Verwendung (z. B. `string` in Rechenoperation) | Warnung |
 
 ### Strikter Modus (optional)
 
-Mit `settings.strict: true` an einer Pipeline müssen alle Hops ein **geschlossenes** Schema haben; Warnungen zu
+Mit `settings.strict: true` an einer Pipeline müssen alle Links ein **geschlossenes** Schema haben; Warnungen zu
 unbekannten Feldern werden zu Fehlern. Gedacht für produktive, stabile Pipelines.
 
 ## Konsequenzen

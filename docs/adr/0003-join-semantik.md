@@ -6,7 +6,7 @@
 
 ## Kontext
 
-In einem Workflow kann eine Action mehrere eingehende Hops haben, z. B. wenn parallele Zweige zusammenlaufen
+In einem Workflow kann eine Action mehrere eingehende Links haben, z. B. wenn parallele Zweige zusammenlaufen
 oder mehrere Fehlerpfade auf dieselbe Benachrichtigung zeigen. Zu entscheiden war, **wann** eine solche Action startet:
 
 - Apache Hop startet die Action für jedes eingehende Signal (ggf. mehrfach).
@@ -23,9 +23,9 @@ Die Join-Semantik ist **pro Action konfigurierbar**, mit einem projektweiten Sta
 
 | Modus | Verhalten |
 |---|---|
-| `all` (Standard) | Startet **einmal**, sobald jeder eingehende Hop entweder `fired` oder `dead` ist und mindestens einer `fired` ist |
+| `all` (Standard) | Startet **einmal**, sobald jeder eingehende Link entweder `fired` oder `dead` ist und mindestens einer `fired` ist |
 | `first` | Startet **einmal** beim ersten eingehenden Signal; weitere Signale werden ignoriert |
-| `each` | Startet **für jedes** eingehende Signal (klassisches Hop-Verhalten), kann also mehrfach laufen |
+| `each` | Startet **für jedes** eingehende Signal (Verhalten von Apache Hop), kann also mehrfach laufen |
 
 ### Konfiguration
 
@@ -48,32 +48,32 @@ Rangfolge: Action (`join`) > Projekt (`workflow.defaultJoin`) > eingebauter Stan
 
 ### Dead-Path-Elimination
 
-Damit `all` nicht auf Zweige wartet, die nie ein Signal liefern, verfolgt die Engine den Zustand jedes Hops
+Damit `all` nicht auf Zweige wartet, die nie ein Signal liefern, verfolgt die Engine den Zustand jedes Links
 (`pending` → `fired` | `dead`):
 
-1. Ist eine Action beendet, werden ausgehende Hops mit erfüllter Bedingung `fired`, alle anderen `dead`.
-2. Sind **alle** eingehenden Hops einer Action `dead`, wird die Action selbst `skipped`, und **alle** ihre ausgehenden
-   Hops werden `dead` (rekursive Propagation).
-3. Eine `all`-Action wird bereit, sobald kein eingehender Hop mehr `pending` ist und mindestens einer `fired` ist.
-4. Deaktivierte Hops zählen nicht als Eingang.
+1. Ist eine Action beendet, werden ausgehende Links mit erfüllter Bedingung `fired`, alle anderen `dead`.
+2. Sind **alle** eingehenden Links einer Action `dead`, wird die Action selbst `skipped`, und **alle** ihre ausgehenden
+   Links werden `dead` (rekursive Propagation).
+3. Eine `all`-Action wird bereit, sobald kein eingehender Link mehr `pending` ist und mindestens einer `fired` ist.
+4. Deaktivierte Links zählen nicht als Eingang.
 
-Beispiel (Fehlerbehandlung aus dem Konzept): `notify-error` hat zwei eingehende `failure`-Hops von `wait-file` und `load`.
-Schlägt `wait-file` fehl, wird `load` übersprungen, sein Hop ist `dead` → `notify-error` startet genau einmal.
-Schlägt `load` fehl, ist der `failure`-Hop von `wait-file` bereits `dead` → ebenso genau ein Start.
+Beispiel (Fehlerbehandlung aus dem Konzept): `notify-error` hat zwei eingehende `failure`-Links von `wait-file` und `load`.
+Schlägt `wait-file` fehl, wird `load` übersprungen, sein Link ist `dead` → `notify-error` startet genau einmal.
+Schlägt `load` fehl, ist der `failure`-Link von `wait-file` bereits `dead` → ebenso genau ein Start.
 
 Übersprungene Actions werden in der Run-Historie mit Status `skipped` geführt und im Editor ausgegraut dargestellt.
 
 ### Schleifen
 
-- Hops zurück im Graphen werden als **Schleifen-Hop** markiert (`loop: true`, im Editor automatisch erkannt).
-- Schleifen-Hops zählen **nicht** als Eingang für die Join-Auswertung.
-- Bei jedem neuen Schleifendurchlauf werden die Hop-Zustände innerhalb des Schleifenkörpers zurückgesetzt.
+- Links zurück im Graphen werden als **Schleifen-Link** markiert (`loop: true`, im Editor automatisch erkannt).
+- Schleifen-Links zählen **nicht** als Eingang für die Join-Auswertung.
+- Bei jedem neuen Schleifendurchlauf werden die Link-Zustände innerhalb des Schleifenkörpers zurückgesetzt.
 
 ### Validierung
 
 | Prüfung | Stufe |
 |---|---|
-| `all` an einem Knoten mit nicht markiertem Rückwärts-Hop | Fehler |
+| `all` an einem Knoten mit nicht markiertem Rückwärts-Link | Fehler |
 | `each` an einem Knoten hinter parallel laufenden Zweigen | Hinweis („Action kann mehrfach laufen“) |
 | `joinTimeout` bei `first`/`each` | Warnung (wird ignoriert) |
 
@@ -87,7 +87,7 @@ Schlägt `load` fehl, ist der `failure`-Hop von `wait-file` bereits `dead` → e
 - **Keine versehentliche Mehrfachausführung** (z. B. doppelt versendete Mails, doppelt importierte Daten).
 - **Deterministisch**: Ergebnis hängt nicht von der Reihenfolge ab, in der parallele Zweige fertig werden.
 - **Intuitiv** für Nutzer von n8n/Make; mit Dead-Path-Elimination funktionieren auch Fehler-Sammelpfade wie erwartet.
-- Hop-Verhalten bleibt über `each` verfügbar (relevant für einen späteren Import von Hop-Workflows).
+- Das Verhalten von Apache Hop bleibt über `each` verfügbar (relevant für einen späteren Import von Hop-Workflows).
 
 ## Konsequenzen
 
@@ -96,6 +96,6 @@ Schlägt `load` fehl, ist der `failure`-Hop von `wait-file` bereits `dead` → e
 - Status `skipped` macht nachvollziehbar, welche Pfade nicht durchlaufen wurden.
 
 **Negativ / zu beachten**
-- Die Engine muss Hop-Zustände je Run verwalten und persistieren (auch für Resume) → zusätzliche Tabelle bzw. Feld in `node_runs`.
-- Schleifen benötigen die explizite Markierung von Rückwärts-Hops und das Zurücksetzen von Zuständen.
+- Die Engine muss Link-Zustände je Run verwalten und persistieren (auch für Resume) → zusätzliche Tabelle bzw. Feld in `node_runs`.
+- Schleifen benötigen die explizite Markierung von Rückwärts-Links und das Zurücksetzen von Zuständen.
 - Ein späterer Hop-Import muss `join: each` setzen, um das Originalverhalten zu erhalten.
