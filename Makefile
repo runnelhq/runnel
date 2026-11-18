@@ -13,7 +13,7 @@ LDFLAGS := -s -w \
 
 GOBUILD := CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)"
 
-.PHONY: all build build-windows build-linux dist test lint fmt tidy clean
+.PHONY: all build build-windows build-linux dist notices package test lint fmt tidy clean
 
 all: lint test build
 
@@ -31,6 +31,15 @@ build-linux:
 
 ## dist: build all release targets
 dist: build-windows build-linux
+
+## notices: write license texts of compiled-in dependencies to bin/THIRD_PARTY_NOTICES.txt
+notices:
+	mkdir -p bin
+	./scripts/third-party-notices.sh > bin/THIRD_PARTY_NOTICES.txt
+
+## package: build release archives (zip/tar.gz) and SHA256SUMS into dist/
+package: dist notices
+	./scripts/package.sh $(VERSION)
 
 ## test: run all tests with the race detector
 test:
@@ -50,4 +59,4 @@ tidy:
 
 ## clean: remove build output
 clean:
-	rm -rf bin
+	rm -rf bin dist

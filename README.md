@@ -28,6 +28,24 @@ bin/runnel version
 
 Die CI (`.github/workflows/ci.yml`) führt Lint, Tests unter Linux und Windows sowie den Build für beide Plattformen aus.
 
+## Releases
+
+Fertige Builds gibt es unter [Releases](https://github.com/runnelhq/runnel/releases): je Version eine ZIP für Windows,
+ein `tar.gz` für Linux (jeweils mit `LICENSE`, `README.md` und `THIRD_PARTY_NOTICES.txt`) sowie `SHA256SUMS`.
+
+Ein Release entsteht automatisch (`.github/workflows/release.yml`), sobald ein Versions-Tag gepusht wird:
+
+```bash
+git tag -a v0.1.0 -m "Runnel v0.1.0"
+```
+
+```bash
+git push origin v0.1.0
+```
+
+Tags mit Bindestrich (z. B. `v0.1.0-rc.1`) werden als Vorabversion veröffentlicht. Lokal lassen sich die Archive mit
+`make package VERSION=v0.1.0` erzeugen (Ausgabe in `dist/`).
+
 ## Lizenz
 
 [MIT](LICENSE)

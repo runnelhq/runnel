@@ -53,12 +53,12 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Build Windows and Linux binaries
-        run: make dist
+      - name: Build and package Windows and Linux binaries
+        run: make package
       - name: Smoke test
         run: ./bin/runnel-linux-amd64 version
       - uses: actions/upload-artifact@v7
         with:
           name: runnel-${{ github.sha }}
-          path: bin/
+          path: dist/
           if-no-files-found: error
