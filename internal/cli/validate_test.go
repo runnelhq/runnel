@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -105,5 +106,62 @@ func TestFindWorkflowFiles(t *testing.T) {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestValidateProject(t *testing.T) {
+	golden, err := filepath.Abs(filepath.Join("testdata", "validate-project.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	chdirRepoRoot(t)
+	const okProject = "internal/model/testdata/project/ok"
+
+	var all strings.Builder
+	for _, args := range [][]string{
+		{"validate", okProject},                                                 // all environments
+		{"validate", "--env", "dev", okProject},                                 // only dev: API_URL is defined
+		{"validate", "--env", "dev", "--param", "UNDEFINED_USER=me", okProject}, // parameter defines the variable
+		{"validate", "internal/model/testdata/project/invalid"},                 // errors in project and environments
+	} {
+		code, out, errOut := run(t, args...)
+		all.WriteString("$ runnel " + strings.Join(args, " ") + "\n" + out + errOut)
+		all.WriteString("exit code " + strconv.Itoa(code) + "\n\n")
+	}
+	compareGoldenFile(t, golden, all.String())
+}
+
+func TestValidateFlagErrors(t *testing.T) {
+	chdirRepoRoot(t)
+	for _, tt := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"validate", "--env", "qa", "examples/hello"}, `environment "qa" not found in project "hello" (available: dev, prod)`},
+		{[]string{"validate", "--env", "dev", "examples/broken/graph.workflow.yaml"}, "no project (project.yaml) found"},
+		{[]string{"validate", "--param", "no-equals", "examples/hello"}, `invalid --param "no-equals"`},
+		{[]string{"validate", "--param", "1X=y", "examples/hello"}, `invalid --param "1X=y"`},
+	} {
+		code, _, errOut := run(t, tt.args...)
+		if code != 1 || !strings.Contains(errOut, tt.want) {
+			t.Errorf("%v: exit code %d, stderr %q, want containing %q", tt.args, code, errOut, tt.want)
+		}
+	}
+}
+
+func compareGoldenFile(t *testing.T, path, got string) {
+	t.Helper()
+	if *update {
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("missing golden file (run with -update): %v", err)
+	}
+	if got != string(want) {
+		t.Errorf("output differs from %s (run with -update if intended)\n--- got:\n%s\n--- want:\n%s", path, got, want)
 	}
 }

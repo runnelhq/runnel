@@ -20,7 +20,7 @@ func (w *Workflow) Validate() Errors {
 	v.checkCycles()
 	v.checkReachability()
 	v.checkLayout()
-	v.diags.sort()
+	v.diags.Sort()
 	return v.diags
 }
 

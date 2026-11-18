@@ -27,9 +27,11 @@ runnel validate examples/hello
 ```
 
 `runnel validate [pfad...]` prüft Workflow-Dateien (`*.workflow.yaml`, Ordner werden rekursiv durchsucht) auf
-Syntax- und Feldfehler, Links auf unbekannte Actions, Zyklen ohne `loop: true` und unerreichbare Actions. Meldungen
-erscheinen als `datei:zeile:spalte: error|warning: text`; bei Fehlern ist der Exit-Code 1 (mit `--strict` auch bei
-Warnungen). Beispiele liegen unter [`examples/`](examples/).
+Syntax- und Feldfehler, Links auf unbekannte Actions, Zyklen ohne `loop: true`, unerreichbare Actions und nicht
+definierte Variablen. Das zugehörige Projekt (`project.yaml` im Ordner oder darüber) und seine Environments werden
+mitgeprüft; Variablen gegen jedes Environment oder nur gegen eines (`--env prod`). Mit `--param KEY=VALUE` lassen
+sich Startparameter angeben. Meldungen erscheinen als `datei:zeile:spalte: error|warning: text`; bei Fehlern ist der
+Exit-Code 1 (mit `--strict` auch bei Warnungen). Beispiele liegen unter [`examples/`](examples/).
 
 ## Entwicklung
 

@@ -1,0 +1,22 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: vars
+parameters:
+  - name: IMPORT_DATE
+    default: "{{ formatDate(today(), 'yyyy-MM-dd') }}"
+actions:
+  - id: start
+    type: core.start
+  - id: log
+    type: core.log
+    with:
+      message: |
+        Hello ${TARGET} on ${env:COMPUTERNAME}
+        Prices in $${CURRENCY} stay literal
+      file: ${INBOX}\${IMPORT_DATE}.csv
+      url: ${API_URL}/import
+      user: ${UNDEFINED_USER}
+      password: ${secret:api-password}
+      bad: ${not-valid}
+links:
+  - { from: start, to: log }

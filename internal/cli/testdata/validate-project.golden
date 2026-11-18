@@ -1,0 +1,28 @@
+$ runnel validate internal/model/testdata/project/ok
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:17:12: warning: variable "API_URL" is not defined in environment "prod"
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:18:13: warning: variable "UNDEFINED_USER" is not defined (neither as workflow parameter nor in the project or environment)
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:20:12: error: invalid variable name "not-valid" in "${not-valid}" (letters, digits and _, not starting with a digit)
+1 workflow file checked: 1 error, 2 warnings
+exit code 1
+
+$ runnel validate --env dev internal/model/testdata/project/ok
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:18:13: warning: variable "UNDEFINED_USER" is not defined (neither as workflow parameter nor in the project or environment)
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:20:12: error: invalid variable name "not-valid" in "${not-valid}" (letters, digits and _, not starting with a digit)
+1 workflow file checked: 1 error, 1 warning
+exit code 1
+
+$ runnel validate --env dev --param UNDEFINED_USER=me internal/model/testdata/project/ok
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:20:12: error: invalid variable name "not-valid" in "${not-valid}" (letters, digits and _, not starting with a digit)
+1 workflow file checked: 1 error, 0 warnings
+exit code 1
+
+$ runnel validate internal/model/testdata/project/invalid
+internal/model/testdata/project/invalid/environments/dev.yaml:3:7: error: environment name "development" must match the file name ("dev")
+internal/model/testdata/project/invalid/environments/dev.yaml:5:7: error: invalid variable name "1X" (letters, digits and _, not starting with a digit)
+internal/model/testdata/project/invalid/environments/test.yaml:4:12: error: sequence was used where mapping is expected
+internal/model/testdata/project/invalid/project.yaml:4:21: error: default environment "staging" not found (expected internal/model/testdata/project/invalid/environments/staging.yaml)
+internal/model/testdata/project/invalid/project.yaml:7:13: error: invalid variable name "bad-name" (letters, digits and _, not starting with a digit)
+internal/model/testdata/project/invalid/project.yaml:8:11: error: unclosed "${" at position 1
+1 workflow file checked: 6 errors, 0 warnings
+exit code 1
+

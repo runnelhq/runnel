@@ -5,14 +5,14 @@ name: hello
 description: Greets, waits a moment and reports success or failure.
 parameters:
   - name: GREETING
-    default: Hello from Runnel
+    default: Hello
 actions:
   - id: start
     type: core.start
   - id: greet
     type: core.log
     with:
-      message: "${GREETING}"
+      message: "${GREETING}, ${TARGET}! (${STAGE} on ${env:COMPUTERNAME}, files in ${OUTBOX})"
   - id: pause
     type: core.wait
     with:

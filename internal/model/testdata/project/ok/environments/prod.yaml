@@ -1,0 +1,6 @@
+kind: Environment
+apiVersion: runnel/v1
+name: prod
+description: Production server
+variables:
+  BASE: \\server\share

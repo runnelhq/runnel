@@ -128,15 +128,42 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
 
 ### 2.5 Environment & Variablen
 
-- Variablen werden hierarchisch aufgelöst (spätere Ebene überschreibt):
-  1. System (`${env:COMPUTERNAME}`, `${env:TEMP}`)
-  2. Project (`project.yaml`)
-  3. Environment (`environments/prod.yaml`)
-  4. Laufzeit-Parameter (CLI `--param`, Webhook-Body, Trigger)
-  5. Zur Laufzeit gesetzte Variablen (Action „Set Variables“)
+- Variablen werden über Ebenen aufgelöst (spätere Ebene überschreibt):
+  1. Standardwerte der Workflow-Parameter (`parameters[].default`)
+  2. Project (`project.yaml`, Abschnitt `variables`)
+  3. Environment (`environments/<name>.yaml`; Auswahl per `--env`, sonst `defaultEnvironment` des Projekts)
+  4. Beim Start übergebene Parameter (CLI `--param KEY=VALUE`, Webhook-Body, Trigger, aufrufende Action)
+  5. Zur Laufzeit gesetzte Variablen (Action „Set Variables“, ab S08)
 - Syntax:
-  - `${NAME}` – einfache Variablenersetzung (kompatibel zu Apache Hop)
+  - `${NAME}` – Variable aus den Ebenen oben (kompatibel zu Apache Hop); Werte dürfen selbst Variablen enthalten
+    (z. B. `INBOX: ${BASE}\inbox`), Zyklen sind ein Fehler
+  - `${env:NAME}` – Umgebungsvariable des Betriebssystems, z. B. `${env:COMPUTERNAME}`, `${env:TEMP}`
+  - `${secret:NAME}` – Secret aus dem Secret-Store (Kap. 8)
+  - `$${` – ein wörtliches `${`
   - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
+- Das Projekt wird über `project.yaml` im Ordner des Workflows oder einem übergeordneten Ordner gefunden (wie `.git`).
+- `runnel validate` meldet nicht definierte Variablen als Warnung – je Environment des Projekts, damit z. B. eine nur in
+  `dev` gesetzte Variable für `prod` auffällt.
+
+```yaml
+# project.yaml
+kind: Project
+apiVersion: runnel/v1
+name: my-project
+defaultEnvironment: dev
+variables:
+  BASE: D:\data
+  INBOX: ${BASE}\inbox
+```
+
+```yaml
+# environments/prod.yaml – der Name muss dem Dateinamen entsprechen
+kind: Environment
+apiVersion: runnel/v1
+name: prod
+variables:
+  BASE: \\fileserver\data
+```
 
 ### 2.6 Connection & Credentials
 
