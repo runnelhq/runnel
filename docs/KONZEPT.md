@@ -808,4 +808,4 @@ dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w
 3. ~~**Join-Semantik im Workflow**~~ – entschieden: konfigurierbar, Standard `all` ([ADR 0003](adr/0003-join-semantik.md)).
 4. **Typsystem in Pipelines** – strikt (Schema Pflicht, wie Hop) oder locker (schemalos, wie n8n)? Vorschlag: schemalos mit optionalem Schema; Schema-Inferenz für Editor-Autovervollständigung.
 5. **Mehrbenutzerbetrieb** – reicht „ein Server, mehrere Browser“ mit ETag-Konfliktschutz oder wird Echtzeit-Kollaboration gebraucht? Vorschlag: Ersteres, Git als Kollaborationsmodell.
-6. **Lizenz** – z. B. Apache 2.0 (wie Hop) vs. Fair-Code (wie n8n).
+6. ~~**Lizenz**~~ – entschieden: MIT ([ADR 0004](adr/0004-lizenz-mit.md)).

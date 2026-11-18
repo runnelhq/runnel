@@ -8,3 +8,7 @@ inspiriert vom Modell von Apache Hop (Workflows, Pipelines, Hops, Actions, Trans
 - **Eine `easyflow.exe`**, keine Runtime, keine externe Datenbank, Definitionen als YAML (Git-freundlich)
 
 Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md)
+
+## Lizenz
+
+[MIT](LICENSE)
