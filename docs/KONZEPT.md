@@ -745,6 +745,8 @@ Linux/macOS: dank Go ohne Mehraufwand mitgebaut (systemd statt Dienst, Keychain/
 
 ## 14. Code-Struktur (Monorepo)
 
+Entscheidung und Begründung: [ADR 0001 – Monorepo](adr/0001-monorepo.md).
+
 ```
 easy-flow/
 ├─ cmd/easyflow/            # main.go – CLI (cobra o. ä.): run, serve, desktop, service, validate
