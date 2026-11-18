@@ -26,6 +26,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
 | S01 ✅ | Projektgerüst | `go.mod`, `cmd/runnel` mit `version`, Ordnerstruktur, Makefile/Taskfile, CI (Lint, Test, Build für Windows + Linux) | `runnel version`; CI grün |
+| S01a ✅ | Release-Workflow | Bei Tag `v*`: Tests, Build, ZIP/tar.gz mit `THIRD_PARTY_NOTICES.txt`, `SHA256SUMS`, GitHub-Release (Tags mit `-` als Vorabversion); CI lädt dieselben Archive als Artefakt hoch | `make package VERSION=v0.0.0-test`; Tag pushen |
 | S02 | Workflow-Dateiformat | Go-Strukturen für `Workflow`, `Action`, `Link`; YAML laden mit Zeilenangabe bei Fehlern | Golden-Tests mit gültigen/ungültigen Dateien |
 | S03 | Workflow-Validierung | Start vorhanden, IDs eindeutig, Links zeigen auf existierende Actions, unerreichbare Knoten, Rückwärts-Links nur als Schleifen-Link; `runnel validate` | `runnel validate examples/…` mit Fehlerbeispielen |
 | S04 | Projekt & Variablen | `project.yaml`, `environments/*.yaml`, Auflösung von `${VAR}` und `${env:…}` in fester Rangfolge; `--env`, `--param` | Unit-Tests der Rangfolge |
@@ -108,7 +109,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S45 | Samples | Erste N Records pro Link je Lauf speichern, in Historie anzeigen | Manuell |
 | S46 | Felder ermitteln | „Felder ermitteln“ für CSV/JSON schreibt `fields:` in die Datei | Playwright-Test |
 | S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster | Manuell auf Windows |
-| S48 | Installer | MSI (WiX) mit Dienst-Option, ZIP für portablen Betrieb, `THIRD_PARTY_NOTICES` | Installation auf frischem Windows |
+| S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | Installation auf frischem Windows |
 
 ---
 

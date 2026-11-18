@@ -40,8 +40,8 @@ Die Lizenz gilt für das gesamte Monorepo (Runner, Server, Editor, SDKs, Beispie
 - **Kein Schutz vor kommerzieller Weiterverwendung** – Dritte dürfen Runnel z. B. als eigenes Produkt oder
   gehostetes Angebot vertreiben. Ein späterer Wechsel zu einer restriktiveren Lizenz wirkt nur für neue Versionen.
 - **Third-Party-Hinweise**: Lizenztexte aller eingebetteten Abhängigkeiten (Go-Module und Frontend-Pakete) müssen
-  mit der exe ausgeliefert werden. Umsetzung: `THIRD_PARTY_NOTICES` wird im Build automatisch erzeugt
-  (z. B. `go-licenses` für Go, `license-checker` für npm) und in Installer/ZIP aufgenommen; zusätzlich in der UI unter „Über“ abrufbar.
+  mit der exe ausgeliefert werden. Umsetzung: `THIRD_PARTY_NOTICES.txt` wird im Build automatisch erzeugt
+  (Go: `scripts/third-party-notices.sh`, später für npm z. B. `license-checker`) und in Installer/ZIP aufgenommen; zusätzlich in der UI unter „Über“ abrufbar.
 - **Abhängigkeitsprüfung in CI**: Neue Abhängigkeiten mit Copyleft-Lizenz (GPL/AGPL/LGPL statisch gelinkt) werden
   automatisch gemeldet und nur nach bewusster Entscheidung zugelassen.
 - **Beiträge**: Externe Beiträge werden unter derselben Lizenz angenommen (Inbound = Outbound); ein CLA ist nicht vorgesehen,

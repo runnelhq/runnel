@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Build and package
+        run: make package VERSION="$GITHUB_REF_NAME"
+
+      - name: Check version of built binary
+        run: |
+          got="$(./bin/runnel-linux-amd64 version --short)"
+          if [[ "$got" != "$GITHUB_REF_NAME" ]]; then
+            echo "binary reports version '$got', expected '$GITHUB_REF_NAME'" >&2
+            exit 1
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=(--verify-tag --generate-notes --title "Runnel $GITHUB_REF_NAME")
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.tar.gz dist/SHA256SUMS "${flags[@]}"
