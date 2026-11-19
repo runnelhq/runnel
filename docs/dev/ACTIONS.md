@@ -80,6 +80,7 @@ Regeln:
   mit dem Text aus der Datei (Werte können noch `${…}` enthalten) und vor jeder Ausführung mit aufgelösten Variablen.
   **Werte** wie Dauern, Zahlen in Textform oder Pfade werden daher erst in `Execute` geprüft.
 - **Zeitangaben** als `string` übernehmen und in `Execute` mit `model.Duration(s).Value()` umwandeln.
+- **Actions ohne Konfiguration** lehnen jedes Feld ab (`len(with) > 0` → Fehler); Vorlage: `core/dummy.go`.
 - **Beschreibung** (`Description`): ein kurzer englischer Satz ohne Punkt; erscheint später in der Palette des Editors.
 - Kommentar über der Definition: was die Action tut, Besonderheiten.
 
@@ -143,13 +144,16 @@ Pflicht:
 - **Vertragstest:** Braucht die Action Pflichtfelder, eine Beispielkonfiguration in `samples` von
   `TestContractCancellation` (`internal/actions/actions_test.go`) ergänzen – der Test meldet sich sonst.
 - Nur `t.TempDir()` und lokale Testserver (`httptest`), keine Abhängigkeit von Netz oder Rechnernamen.
+- Tests dürfen nicht die **vollständige Liste** aller Action-Typen erwarten – sie wächst mit jeder neuen Action.
 - Tests müssen unter Linux und Windows laufen (CI prüft beides).
 
 ## 8. Dokumentation und Beispiel im selben PR
 
 - Bausteinliste im [Konzept, Kap. 12](../KONZEPT.md#12-mitgelieferte-bausteine-zielumfang) bzw. Roadmap-Schritt als erledigt markieren.
 - Neue Konfigurationsfelder kurz im Kommentar der Definition beschreiben (später die Grundlage für das Schema im Editor).
-- Bei Bedarf ein Beispiel-Workflow unter `examples/`, der in `internal/cli/validate_test.go` mitgeprüft wird.
+- Bei Bedarf ein Beispiel-Workflow unter `examples/`, der in `internal/cli/validate_test.go` mitgeprüft wird. Ein neues
+  Beispiel ändert die Anzahl geprüfter Dateien: Erwartung in `TestValidateExamples` anpassen und
+  `go test ./internal/cli -update` ausführen, danach den Diff der Golden-Datei prüfen.
 
 ## 9. Checkliste für den PR
 
