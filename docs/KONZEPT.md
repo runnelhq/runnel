@@ -879,7 +879,7 @@ runnel/
 ├─ pkg/sdk/                 # Öffentliches Go-SDK für Plugin-Entwickler
 ├─ web/                     # Editor (React + Vite + React Flow)
 ├─ examples/                # Beispielprojekte
-├─ docs/                    # Konzept, Benutzerhandbuch, ADRs
+├─ docs/                    # Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (docs/dev/)
 ├─ design/                  # Corporate Design: Logos, Design Tokens, Social-Grafiken
 └─ build/                   # WiX-Installer, Signierung, CI-Skripte
 ```

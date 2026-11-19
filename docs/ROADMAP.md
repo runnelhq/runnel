@@ -15,6 +15,9 @@ Erledigte Schritte sind mit ✅ markiert.
   Dazu gibt es bei Bedarf ein Beispiel unter `examples/`.
 - **Nur das Nötige:** Keine Vorab-Implementierung für spätere Schritte. Schnittstellen werden erweitert, wenn sie gebraucht werden.
 - **Doku im selben PR:** Betroffene Abschnitte in Konzept/ADRs werden mit angepasst.
+- **Anleitungen aktuell halten:** Ändert ein Schritt den Vertrag einer Action (oder später eines Transforms bzw.
+  Plugins), aktualisiert derselbe PR die Anleitung in [`docs/dev/`](dev/ACTIONS.md); ebenso [`AGENTS.md`](../AGENTS.md)
+  bei neuen Befehlen, Paketen oder Konventionen.
 
 Bausteine, die vorerst nicht benötigt werden (z. B. Mail, Shell/PowerShell, Excel), stehen im [Backlog](#backlog) und
 werden bei Bedarf als eigener kleiner Schritt eingeplant.
@@ -37,6 +40,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S07 ✅ | Retry, Timeout, Abbruch | `retry`, `timeout`, `joinTimeout`, Workflow-Timeout, Abbruch per Strg+C (sauberes Beenden) | Tests; Strg+C während `core.wait` |
 | Q1 ✅ | Qualitätsrunde | Fuzz-Tests (YAML-Parser, Variablen) inkl. wöchentlichem CI-Lauf; Fehlerbehebungen: Absturz bei bestimmtem fehlerhaftem YAML, UTF-8 mit BOM, UTF-16, ungültige Kodierung, Statusfehler bei spätem Abbruch, Leerzeile bei `core.log`, Meldung bei Ordner statt Datei; Testplan für Windows und Liste bekannter Einschränkungen ([TESTPLAN.md](TESTPLAN.md)) | `make fuzz`; manueller Windows-Test |
 | Q2 ✅ | Typnamen & Code-Aufbau | Getrennte Typ-Namensräume für Actions/Transforms, reservierte Namensräume, `provides:` nach Art ([ADR 0013](adr/0013-typnamen-namensraeume.md)); `internal/actions/core` aufgeteilt (eine Datei je Action), zentrale `actions.Builtin()`, Test-Hilfen `actiontest`, Vertragstest für alle eingebauten Actions | `make test` |
+| Q3 ✅ | Anleitungen | `docs/dev/ACTIONS.md` (neue Action entwickeln), `AGENTS.md`/`CLAUDE.md` (Regeln für KI-Agenten), `CONTRIBUTING.md`; Regel „Anleitungen aktuell halten“ | – |
 | S08 | Ausdrücke | `expr-lang` für `{{ … }}`, Kontext `vars`/`params`/`env`/`run`/`result`/`results`, Bedingungs-Links, Funktionsbibliothek Teil 1 (Datum, Text, Null) ([ADR 0006](adr/0006-ausdruckssprache.md)); **Ausgabedaten von Actions** (`result.output`) für nachfolgende Actions; Ausdrücke in `outputs` | Unit-Tests je Funktion; Beispiel mit Bedingungs-Link |
 | S09 | Datei-Actions | `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list` (Ergebnis = Dateiliste) | Tests mit temporären Ordnern; UNC-Pfad manuell unter Windows |
 | S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis) | Tests gegen lokalen Testserver |
