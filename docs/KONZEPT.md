@@ -221,7 +221,7 @@ Details: [ADR 0012](adr/0012-ki-faehigkeit.md).
 flowchart LR
     subgraph EXE["runnel.exe (ein Prozess)"]
         direction TB
-        API["HTTP-Server<br/>REST + WebSocket<br/>+ eingebettete Web-UI"]
+        API["HTTP-Server<br/>REST + Server-Sent Events<br/>+ eingebettete Web-UI"]
         SCHED["Scheduler &<br/>Trigger-Manager"]
         QUEUE["Run-Queue<br/>(Concurrency-Limits)"]
         WFE["Workflow-Engine"]
@@ -289,8 +289,8 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 
 | Zweck | Bibliothek |
 |---|---|
-| HTTP-Router | `net/http` (Go 1.22+ Routing) oder `go-chi/chi` |
-| WebSocket | `coder/websocket` |
+| HTTP-Router | `net/http` (Go 1.22+ Routing) |
+| Live-Events | Server-Sent Events mit `net/http` ([ADR 0016](adr/0016-live-events-sse.md)) |
 | Lokale DB | `modernc.org/sqlite` (pure Go, kein CGO) |
 | YAML | `gopkg.in/yaml.v3` / `goccy/go-yaml` (bessere Fehlermeldungen mit Zeilennummer) |
 | JSON-Schema-Validierung | `santhosh-tekuri/jsonschema` |
@@ -568,7 +568,7 @@ flowchart LR
 - **Backpressure** entsteht automatisch: Volle Puffer blockieren den Erzeuger → konstanter Speicher auch bei großen Dateien.
 - **Ende-Signal**: Schließen des Channels propagiert durch den Graphen; die Pipeline ist fertig, wenn alle Transforms beendet sind.
 - **Fehler**: Pro Record → Fehler-Link (falls vorhanden), sonst Pipeline-Abbruch (alle Goroutinen via Context gecancelt). Schwelle konfigurierbar (`maxErrors: 100`).
-- **Metriken** je Transform: gelesen/geschrieben/Fehler/Records pro Sekunde/Puffer-Füllstand – live per WebSocket im Editor (vergleichbar mit dem „Metrics“-Tab in Apache Hop).
+- **Metriken** je Transform: gelesen/geschrieben/Fehler/Records pro Sekunde/Puffer-Füllstand – live per Server-Sent Events im Editor (vergleichbar mit dem „Metrics“-Tab in Apache Hop).
 - **Transaktionen**: DB-Outputs mit `commitSize`; optional „Unique Connection“-Modus (eine Transaktion über die ganze Pipeline, Rollback bei Fehler).
 
 Schnittstelle eines Transforms (Go):
@@ -763,15 +763,14 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | POST | `/validate` | Definition prüfen (auch ungespeicherten Inhalt), Fehler mit Zeilen- und Knotenbezug (YAML-Pfad) |
 | GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
 | POST | `/runs` | Run starten `{ path, environment, params, runConfig, startAt?, only?, reuseResultsFrom? }` |
-| GET | `/runs?status=&path=` | Historie |
-| GET | `/runs/{id}` | Details inkl. Knotenstatus |
+| GET | `/runs?status=&path=` | Historie (seit E3 im Speicher, Filter folgen mit S26) |
+| GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern |
-| GET | `/runs/{id}/logs?follow=true` | Logs (SSE-Stream) |
 | POST | `/preview` | Pipeline-Vorschau bis Transform X |
 | GET/PUT | `/secrets/{name}` | Secrets setzen (Wert nie lesbar zurück) |
 | GET/POST | `/triggers`, `/triggers/{name}/enable` | Trigger verwalten |
 | ANY | `/hooks/{name}` | Webhook-Endpunkte |
-| WS | `/ws` | Live-Events: `run.started`, `node.status`, `node.metrics`, `log.line`, `file.changed` |
+| GET | `/events?since=&run=` | Live-Events als Server-Sent Events ([ADR 0016](adr/0016-live-events-sse.md)): `run.started`, `run.finished`, `action.started`, `action.finished`, `action.skipped`, `log`; später Metriken und `file.changed` |
 
 ---
 
@@ -882,7 +881,8 @@ runnel/
 │  ├─ secrets/              # Secret-Store, DPAPI, Maskierung
 │  ├─ store/                # SQLite-Zugriff, Migrationen
 │  ├─ scheduler/            # Cron, File-Watch, Interval, Run-Queue
-│  ├─ server/               # REST, WebSocket, Webhooks, Zugangsschutz, eingebettete UI
+│  ├─ server/               # REST, Server-Sent Events, Webhooks, Zugangsschutz, eingebettete UI
+│  ├─ runs/                 # Läufe vorbereiten (CLI und Server), laufende Läufe und Ereignisse verwalten
 │  ├─ plugin/               # Externes Plugin-Protokoll (JSON-RPC Host)
 │  └─ winsvc/               # Windows-Dienst, EventLog (build tag windows)
 ├─ pkg/sdk/                 # Öffentliches Go-SDK für Plugin-Entwickler

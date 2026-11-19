@@ -55,8 +55,8 @@ runnel serve examples/hello
 
 `runnel serve [projektordner]` startet den Server für ein Projekt unter `http://127.0.0.1:7300` (anderer Port mit
 `--port`). Er ist nur vom eigenen Rechner aus erreichbar und bietet die API für den Editor: Projektbaum, Dateien lesen
-und speichern mit Konfliktschutz, Katalog der Actions und Prüfung von Workflows – beschrieben in
-[docs/dev/API.md](docs/dev/API.md). Der Editor selbst folgt mit den nächsten Schritten.
+und speichern mit Konfliktschutz, Katalog der Actions, Prüfung von Workflows sowie Läufe starten, abbrechen und live
+verfolgen – beschrieben in [docs/dev/API.md](docs/dev/API.md). Der Editor selbst folgt mit den nächsten Schritten.
 
 ```bash
 runnel catalog core.wait

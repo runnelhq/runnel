@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"net/http"
@@ -47,7 +48,10 @@ func newProject(t *testing.T) (string, *Server) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = s.Close() })
+	t.Cleanup(func() {
+		_ = s.Shutdown(context.Background())
+		_ = s.Close()
+	})
 	return dir, s
 }
 

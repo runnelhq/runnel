@@ -33,7 +33,8 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
-| `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung; Doku in `docs/dev/API.md` |
+| `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |
+| `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Läufe und Ereignisse im Speicher |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
 | `examples/` | Beispiele, in Tests mitgeprüft |

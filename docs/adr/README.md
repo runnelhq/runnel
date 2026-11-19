@@ -17,6 +17,7 @@
 | [0013](0013-typnamen-namensraeume.md) | Typnamen, Namensräume und Aufbau der Bausteine | Angenommen |
 | [0014](0014-action-descriptor-schema.md) | Action-Descriptor und Schema aus den Konfigurations-Structs | Angenommen |
 | [0015](0015-sprache-oberflaeche.md) | Sprache der Oberfläche – Englisch | Angenommen |
+| [0016](0016-live-events-sse.md) | Live-Events per Server-Sent Events statt WebSocket | Angenommen |
 
 Neue ADRs: nächste freie Nummer, Aufbau wie die bestehenden (Kontext, Entscheidung, Konsequenzen).
 Wird eine Entscheidung revidiert, erhält die alte ADR den Status „Ersetzt durch ADR xxxx“.

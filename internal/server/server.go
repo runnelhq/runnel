@@ -1,6 +1,6 @@
 // Package server implements "runnel serve": the HTTP API under /api/v1 that the
-// editor uses to read and write project files, list the available actions and
-// validate workflows (docs/KONZEPT.md, chapter 10).
+// editor uses to read and write project files, list the available actions, validate
+// workflows, start and cancel runs and follow them live (docs/dev/API.md).
 //
 // The server only listens on the loopback interface. It rejects requests whose
 // Host header is not a loopback address (protection against DNS rebinding) and
@@ -8,6 +8,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/runs"
 )
 
 // APIPrefix is the path prefix of all API endpoints.
@@ -39,6 +41,10 @@ type Server struct {
 	// writeMu serializes changes to files, so that the ETag check and the write
 	// happen atomically with respect to other requests of this server.
 	writeMu sync.Mutex
+	runs    *runs.Manager
+	// stop is closed by Shutdown to end open event streams.
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 // New opens the project directory. Close releases it.
@@ -47,7 +53,15 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{dir: opts.Dir, root: root, registry: opts.Registry}, nil
+	return &Server{dir: opts.Dir, root: root, registry: opts.Registry, runs: runs.NewManager(), stop: make(chan struct{})}, nil
+}
+
+// Shutdown ends open event streams, cancels running runs and waits until they have
+// ended or ctx is done. Call it before shutting down the HTTP server, which otherwise
+// waits for the event streams.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.stopOnce.Do(func() { close(s.stop) })
+	return s.runs.Shutdown(ctx)
 }
 
 // Close releases the project directory.
@@ -65,6 +79,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE "+APIPrefix+"/files/{path...}", s.handleDeleteFile)
 	mux.HandleFunc("GET "+APIPrefix+"/catalog", s.handleCatalog)
 	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
+	mux.HandleFunc("POST "+APIPrefix+"/runs", s.handleStartRun)
+	mux.HandleFunc("GET "+APIPrefix+"/runs", s.handleListRuns)
+	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}", s.handleGetRun)
+	mux.HandleFunc("POST "+APIPrefix+"/runs/{id}/cancel", s.handleCancelRun)
+	mux.HandleFunc("GET "+APIPrefix+"/events", s.handleEvents)
 	mux.HandleFunc("GET /{$}", handleIndex)
 	mux.HandleFunc(APIPrefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown endpoint %s %s", r.Method, r.URL.Path))
