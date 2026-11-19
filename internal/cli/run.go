@@ -15,8 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/runnelhq/runnel/internal/action"
-	"github.com/runnelhq/runnel/internal/actions/core"
+	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 )
@@ -28,13 +27,6 @@ const (
 	// ExitCancelled: the run was cancelled (Ctrl+C), as is customary for SIGINT.
 	ExitCancelled = 130
 )
-
-// newRegistry returns all action types built into this binary.
-func newRegistry() *action.Registry {
-	r := action.NewRegistry()
-	core.Register(r)
-	return r
-}
 
 type runOptions struct {
 	env     string
@@ -151,7 +143,7 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 		defaultJoin = p.Workflow.DefaultJoin
 	}
 	runner, err := workflow.Prepare(w, workflow.Options{
-		Registry:    newRegistry(),
+		Registry:    actions.Builtin(),
 		DefaultJoin: defaultJoin,
 		Scope:       model.Scope(w, p, env, params),
 		Observer:    logger.event,

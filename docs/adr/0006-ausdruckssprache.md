@@ -22,7 +22,7 @@ Betrachtet wurden:
 
 1. **`{{ … }}`-Ausdrücke werden mit [`expr-lang/expr`](https://github.com/expr-lang/expr) ausgewertet** – überall:
    Link-Bedingungen, Filter, Berechnen, dynamische Eigenschaften, Breakpoints.
-2. **JavaScript (goja) nur in den Skript-Bausteinen** `core.script` (Workflow) und `core.script-transform` (Pipeline).
+2. **JavaScript (goja) nur in den Skript-Bausteinen** – Action `core.script` (Workflow) und Transform `core.script` (Pipeline), siehe ADR 0013.
 3. **`${VAR}`** bleibt reine Textersetzung (kompatibel zu Apache Hop) und wird vor der Ausdrucksauswertung aufgelöst.
 
 ### Auswertungsregeln
@@ -103,4 +103,4 @@ when:      "{{ result.rows > 0 }}"
 - Zwei Syntaxen: wer Skripte schreibt, muss die Unterschiede kennen (in der Doku gegenübergestellt).
 - Die Funktionsbibliothek muss für `expr` und goja doppelt registriert und gemeinsam getestet werden.
 - Ein späterer Import von Hop-Workflows muss Hop-Ausdrücke (z. B. aus „Formula“/JavaScript-Transforms) übersetzen
-  oder in `core.script-transform` übernehmen.
+  oder in den Transform `core.script` übernehmen.

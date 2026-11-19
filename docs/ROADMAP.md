@@ -36,6 +36,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S06 ✅ | Engine: parallel & Join | Parallele Zweige, `join: all/first/each`, Dead-Path-Elimination, Status `skipped` ([ADR 0003](adr/0003-join-semantik.md)) | Tests mit `-race`; Beispiel mit Fehler-Sammelpfad |
 | S07 ✅ | Retry, Timeout, Abbruch | `retry`, `timeout`, `joinTimeout`, Workflow-Timeout, Abbruch per Strg+C (sauberes Beenden) | Tests; Strg+C während `core.wait` |
 | Q1 ✅ | Qualitätsrunde | Fuzz-Tests (YAML-Parser, Variablen) inkl. wöchentlichem CI-Lauf; Fehlerbehebungen: Absturz bei bestimmtem fehlerhaftem YAML, UTF-8 mit BOM, UTF-16, ungültige Kodierung, Statusfehler bei spätem Abbruch, Leerzeile bei `core.log`, Meldung bei Ordner statt Datei; Testplan für Windows und Liste bekannter Einschränkungen ([TESTPLAN.md](TESTPLAN.md)) | `make fuzz`; manueller Windows-Test |
+| Q2 ✅ | Typnamen & Code-Aufbau | Getrennte Typ-Namensräume für Actions/Transforms, reservierte Namensräume, `provides:` nach Art ([ADR 0013](adr/0013-typnamen-namensraeume.md)); `internal/actions/core` aufgeteilt (eine Datei je Action), zentrale `actions.Builtin()`, Test-Hilfen `actiontest`, Vertragstest für alle eingebauten Actions | `make test` |
 | S08 | Ausdrücke | `expr-lang` für `{{ … }}`, Kontext `vars`/`params`/`env`/`run`/`result`/`results`, Bedingungs-Links, Funktionsbibliothek Teil 1 (Datum, Text, Null) ([ADR 0006](adr/0006-ausdruckssprache.md)); **Ausgabedaten von Actions** (`result.output`) für nachfolgende Actions; Ausdrücke in `outputs` | Unit-Tests je Funktion; Beispiel mit Bedingungs-Link |
 | S09 | Datei-Actions | `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list` (Ergebnis = Dateiliste) | Tests mit temporären Ordnern; UNC-Pfad manuell unter Windows |
 | S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis) | Tests gegen lokalen Testserver |
@@ -135,7 +136,7 @@ Werden bei Bedarf als eigener Schritt (je ein PR) eingeplant. Reihenfolge ist of
 | Bereich | Bausteine |
 |---|---|
 | Kommunikation | `mail.send` (SMTP), Mail abrufen (IMAP) |
-| Skripte & Programme | `shell.powershell` (Action + Transform), Programm starten, JavaScript (`core.script`, `core.script-transform` mit goja) |
+| Skripte & Programme | `shell.powershell` (Action + Transform), Programm starten, JavaScript (`core.script` als Action und Transform, mit goja) |
 | Dateiformate | Excel (Ein-/Ausgabe), XML, Fixed-Width |
 | Dateitransfer | SFTP/FTP Upload/Download, ZIP/Entpacken |
 | Netzwerk-Transforms | REST-Eingabe mit Paging, HTTP-Lookup, REST-Ausgabe |
