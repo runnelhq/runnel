@@ -1,5 +1,6 @@
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from "@xyflow/react";
-import type { Problem } from "../workflow";
+import { useEffect, useRef, useState } from "react";
+import { idPattern, type Problem } from "../workflow";
 import { ActionIcon } from "./Icons";
 
 export interface ActionNodeData extends Record<string, unknown> {
@@ -10,6 +11,12 @@ export interface ActionNodeData extends Record<string, unknown> {
   color?: string;
   problems: Problem[];
   onShowInYAML: (line: number) => void;
+  /** Ports accept new links (editable canvas). */
+  connectable?: boolean;
+  /** Starts editing the id (double-click on it). */
+  onStartRename?: () => void;
+  /** Set while the id is edited: ids in use and the callback with the new id (null: keep). */
+  rename?: { taken: Set<string>; onDone: (id: string | null) => void };
 }
 
 export type ActionNodeType = Node<ActionNodeData, "action">;
@@ -43,7 +50,7 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
           join: {data.join}
         </span>
       )}
-      {hasInput && <Handle type="target" position={Position.Left} isConnectable={false} className="runnel-port" />}
+      {hasInput && <Handle type="target" position={Position.Left} isConnectable={!!data.connectable} className="runnel-port" />}
       <span
         className="grid size-7 shrink-0 place-items-center rounded-md"
         style={known ? { background: data.color, color: "var(--rn-tiefe-0)" } : { background: "var(--rn-tiefe-300)", color: "var(--rn-tiefe-800)" }}
@@ -51,10 +58,20 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
         <ActionIcon type={data.type} known={known} />
       </span>
       <span className="min-w-0 leading-tight">
-        <span className="block truncate font-semibold">{data.id}</span>
+        {data.rename ? (
+          <RenameField id={data.id} {...data.rename} />
+        ) : (
+          <span
+            className="block truncate font-semibold"
+            title={data.onStartRename ? "Double-click to rename" : undefined}
+            onDoubleClick={data.onStartRename}
+          >
+            {data.id}
+          </span>
+        )}
         <span className="block truncate font-mono text-2xs text-muted-foreground">{data.type}</span>
       </span>
-      {hasOutput && <Handle type="source" position={Position.Right} isConnectable={false} className="runnel-port" />}
+      {hasOutput && <Handle type="source" position={Position.Right} isConnectable={!!data.connectable} className="runnel-port" />}
       {severity && (
         <span
           aria-label={severity === "error" ? "Error" : "Warning"}
@@ -66,7 +83,7 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
           {severity === "error" ? "✖" : "⚠"}
         </span>
       )}
-      <NodeToolbar isVisible={selected && data.problems.length > 0} position={Position.Bottom} offset={12}>
+      <NodeToolbar isVisible={selected && data.problems.length > 0 && !data.rename} position={Position.Bottom} offset={12}>
         <div
           role="dialog"
           aria-label={`Problems of ${data.id}`}
@@ -101,5 +118,66 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
         </div>
       </NodeToolbar>
     </div>
+  );
+}
+
+/**
+ * Edits the id of an action (mockup E6b): Enter renames, Esc keeps the id; leaving the
+ * field renames if the new id is valid.
+ */
+function RenameField(props: { id: string; taken: Set<string>; onDone: (id: string | null) => void }) {
+  const [value, setValue] = useState(props.id);
+  const done = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
+  // React Flow shows a new node only once it has been measured; focus it as soon as it is visible.
+  useEffect(() => {
+    let frame = 0;
+    let tries = 0;
+    const focus = () => {
+      const el = input.current;
+      if (!el || done.current) return;
+      el.focus();
+      if (document.activeElement === el) el.select();
+      else if (tries++ < 30) frame = requestAnimationFrame(focus);
+    };
+    focus();
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const error = !idPattern.test(value)
+    ? "Use letters, digits, - and _, starting with a letter"
+    : value !== props.id && props.taken.has(value)
+      ? `“${value}” is already used`
+      : null;
+  const finish = (id: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    props.onDone(id === props.id ? null : id);
+  };
+  return (
+    <>
+      <input
+        ref={input}
+        aria-label="Action id"
+        aria-invalid={error !== null}
+        value={value}
+        onChange={(e) => setValue(e.target.value.trim())}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter" && !error) finish(value);
+          else if (e.key === "Escape") finish(null);
+        }}
+        onBlur={() => finish(error ? null : value)}
+        className={
+          "nodrag nopan -mt-0.5 -ml-1 block h-[22px] w-[104px] rounded-sm border bg-background px-1 text-sm font-semibold text-foreground outline-2 " +
+          (error ? "border-destructive outline-danger-soft" : "border-ring outline-ring/25")
+        }
+      />
+      <span
+        role={error ? "alert" : undefined}
+        className="absolute top-[60px] left-1/2 -translate-x-1/2 rounded-sm border border-border bg-card px-1.5 py-0.5 text-2xs whitespace-nowrap text-muted-foreground shadow-sm"
+      >
+        {error ? <span className="text-destructive">✖ {error}</span> : <>Enter: rename · Esc: keep “{props.id}” · letters, digits, - and _</>}
+      </span>
+    </>
   );
 }

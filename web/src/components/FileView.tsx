@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
-import { editWorkflow, validate, type Validation, type WorkflowEdit } from "../workflow";
+import { editWorkflow, validate, type Link, type Validation, type WorkflowEdit } from "../workflow";
 import { Canvas } from "./Canvas";
 import { CodeView } from "./CodeView";
 import { Dialog } from "./Dialog";
+import type { SettableKind } from "./LinkEdge";
+import type { PaletteTarget } from "./Palette";
 import { CodeIcon, CopyIcon, LockIcon, RedoIcon, ReloadIcon, SaveIcon, UndoIcon, WorkflowIcon } from "./Icons";
 
 type View = "canvas" | "yaml";
@@ -32,7 +34,7 @@ export function fileSummary(path: string, text: string, encoding: string): strin
 const historyLimit = 100;
 
 /**
- * Shows one file. Workflows open as canvas and can be edited there (E6a): every change
+ * Shows one file. Workflows open as canvas and can be edited there (E6a, E6b): every change
  * is applied to the text by the server; undo/redo keep text versions; saving uses the
  * ETag and asks what to do when the file was changed elsewhere. Other files are read-only.
  * The view stays mounted while its tab is open, so that unsaved changes survive tab switches.
@@ -43,11 +45,12 @@ export function FileView(props: {
   projectDir: string | null;
   epoch: number;
   onSummary: (summary: string | null) => void;
+  onPalette: (target: PaletteTarget | null) => void;
   onDirty: (path: string, dirty: boolean) => void;
   onRegister: (path: string, handle: FileHandle | null) => void;
   onReloadExplorer: () => void;
 }) {
-  const { path, active, epoch, onSummary, onDirty, onRegister } = props;
+  const { path, active, epoch, onSummary, onPalette, onDirty, onRegister } = props;
   const [state, setState] = useState<State>({ status: "loading" });
   const isWorkflow = kindOf(path) === "workflow";
   const [view, setView] = useState<View>(isWorkflow ? "canvas" : "yaml");
@@ -58,6 +61,7 @@ export function FileView(props: {
   const [toast, setToast] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
 
   const doc = state.status === "loaded" ? state.doc : null;
   const dirty = doc !== null && doc.text !== doc.saved;
@@ -141,38 +145,62 @@ export function FileView(props: {
     setState((s) => (s.status === "loaded" ? { status: "loaded", doc: { ...s.doc, text: next } } : s));
   }, []);
 
-  // The edit on its way to the server; saving waits for it.
+  // The edits on their way to the server, one after the other; saving waits for them.
   const pending = useRef<Promise<unknown> | null>(null);
   const applyEdit = useCallback(
-    async (edit: WorkflowEdit) => {
-      if (!doc) return null;
-      try {
-        const request = editWorkflow(path, doc.text, edit);
-        pending.current = request;
-        const next = await request;
-        setText(next, "push");
-        setEditError(null);
-        return next;
-      } catch (err) {
-        setEditError(err instanceof Error ? err.message : String(err));
-        return null;
-      }
+    (edit: WorkflowEdit): Promise<string | null> => {
+      const run = async () => {
+        await pending.current?.catch(() => undefined);
+        const current = docRef.current;
+        if (!current) return null;
+        try {
+          const next = await editWorkflow(path, current.text, edit);
+          setText(next, "push");
+          setEditError(null);
+          return next;
+        } catch (err) {
+          setEditError(err instanceof Error ? err.message : String(err));
+          return null;
+        }
+      };
+      const request = run();
+      pending.current = request;
+      return request;
     },
-    [doc, path, setText],
+    [path, setText],
   );
 
-  const onMove = useCallback((positions: Record<string, { x: number; y: number }>) => void applyEdit({ move: positions }), [applyEdit]);
+  type Positions = Record<string, { x: number; y: number }>;
+  const onMove = useCallback((positions: Positions) => void applyEdit({ move: positions }), [applyEdit]);
   const onDelete = useCallback(
-    async (ids: string[]) => {
+    async (ids: string[], links: number[]) => {
       const before = validation?.workflow?.links?.length ?? 0;
-      const next = await applyEdit({ delete: ids });
+      const next = await applyEdit({ delete: ids, deleteLinks: links });
       if (next === null) return;
       const v = await validate(path, next).catch(() => null);
-      const removed = v?.workflow ? before - (v.workflow.links?.length ?? 0) : 0;
+      const removed = v?.workflow ? before - (v.workflow.links?.length ?? 0) : links.length;
+      const linkText = `${removed} ${removed === 1 ? "link" : "links"}`;
+      if (ids.length === 0) {
+        setToast(`Deleted ${linkText}`);
+        return;
+      }
       const what = ids.length === 1 ? ids[0] : `${ids.length} actions`;
-      setToast(`Deleted ${what}${removed > 0 ? ` and ${removed} ${removed === 1 ? "link" : "links"}` : ""}`);
+      setToast(`Deleted ${what}${removed > 0 ? ` and ${linkText}` : ""}`);
     },
     [applyEdit, validation, path],
+  );
+  // A new action from the palette; its id can be changed right away (mockup E6b).
+  const onAdd = useCallback(
+    async (action: { id: string; type: string }, positions: Positions) => {
+      if ((await applyEdit({ add: [action], move: positions })) !== null) setRenaming(action.id);
+    },
+    [applyEdit],
+  );
+  const onRename = useCallback((from: string, to: string) => void applyEdit({ rename: { [from]: to } }), [applyEdit]);
+  const onConnect = useCallback((link: Link) => void applyEdit({ addLinks: [link] }), [applyEdit]);
+  const onLinkKind = useCallback(
+    (index: number, when: SettableKind) => void applyEdit({ updateLinks: [{ index, when }] }),
+    [applyEdit],
   );
 
   const doUndo = useCallback(() => {
@@ -214,6 +242,9 @@ export function FileView(props: {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const k = e.key.toLowerCase();
+      // In a text field (id, search), undo and redo belong to the field.
+      const t = e.target as HTMLElement | null;
+      if (k !== "s" && t && ["INPUT", "TEXTAREA"].includes(t.tagName)) return;
       if (k === "s") {
         e.preventDefault();
         void save();
@@ -234,6 +265,14 @@ export function FileView(props: {
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // The palette can add actions while an editable canvas is shown.
+  const wf = validation?.workflow;
+  const canEdit = isWorkflow && view === "canvas" && !!wf;
+  const hasStart = !!wf?.actions?.some((a) => a.type === "core.start");
+  useEffect(() => {
+    if (active) onPalette(isWorkflow ? { editable: canEdit, hasStart } : null);
+  }, [active, isWorkflow, canEdit, hasStart, onPalette]);
 
   const showInYAML = useCallback((line: number) => {
     setView("yaml");
@@ -337,6 +376,12 @@ export function FileView(props: {
             onShowInYAML={showInYAML}
             onMove={editable ? onMove : undefined}
             onDelete={editable ? onDelete : undefined}
+            onAdd={editable ? onAdd : undefined}
+            onRename={editable ? onRename : undefined}
+            onConnect={editable ? onConnect : undefined}
+            onLinkKind={editable ? onLinkKind : undefined}
+            renaming={renaming}
+            onRenaming={setRenaming}
           />
         ) : validation ? (
           <NotAGraph path={path} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />

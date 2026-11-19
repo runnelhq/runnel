@@ -11,7 +11,7 @@ export function Explorer(props: {
   onReload: () => void;
 }) {
   return (
-    <aside className="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <section aria-label="Explorer" className="flex min-h-[120px] flex-[0_1_auto] flex-col">
       <div className="flex h-9 items-center justify-between pr-2 pl-4">
         <span className="label-caps">Explorer</span>
         <button
@@ -30,7 +30,7 @@ export function Explorer(props: {
           <Node key={e.path} entry={e} depth={0} selected={props.selected} onOpen={props.onOpen} />
         ))}
       </ul>
-    </aside>
+    </section>
   );
 }
 

@@ -159,6 +159,19 @@ export const LayoutIcon = (p: P) => (
   </Icon>
 );
 
+export const SearchIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="6" />
+    <path d="M20 20l-4.5-4.5" />
+  </Icon>
+);
+
+export const TrashIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+  </Icon>
+);
+
 // Icons of the built-in action types (white on the category tile of a node).
 const actionIcons: Record<string, ReactNode> = {
   "core.start": <path d="M8 5l11 7-11 7z" fill="currentColor" />,

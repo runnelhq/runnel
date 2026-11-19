@@ -129,6 +129,45 @@ export function place(wf: Workflow): Placement {
 export interface WorkflowEdit {
   move?: Record<string, { x: number; y: number }>;
   delete?: string[];
+  add?: { id: string; type: string }[];
+  rename?: Record<string, string>;
+  addLinks?: Link[];
+  deleteLinks?: number[];
+  updateLinks?: { index: number; when: "success" | "failure" | "always" }[];
+}
+
+/** Allowed action ids (as checked by the server). */
+export const idPattern = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
+/** A new id for an action of the given type: its name and the lowest free number, e.g. "log-1". */
+export function newActionId(wf: Workflow, type: string): string {
+  const name = type.slice(type.lastIndexOf(".") + 1);
+  const used = new Set((wf.actions ?? []).map((a) => a.id));
+  for (let i = 1; ; i++) {
+    if (!used.has(`${name}-${i}`)) return `${name}-${i}`;
+  }
+}
+
+/**
+ * Whether a new link from → to would close a cycle, i.e. "to" already leads to "from"
+ * over links that are neither loop links nor disabled. Such a link is a link back to an
+ * earlier action and is created with loop: true (decision for mockup E6b).
+ */
+export function closesCycle(wf: Workflow, from: string, to: string): boolean {
+  const next = new Map<string, string[]>();
+  for (const l of wf.links ?? []) {
+    if (!l.loop && !l.disabled) next.set(l.from, [...(next.get(l.from) ?? []), l.to]);
+  }
+  const seen = new Set<string>();
+  const stack = [to];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (id === from) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    stack.push(...(next.get(id) ?? []));
+  }
+  return false;
 }
 
 /** Applies an edit to the text on the server and returns the new text (not saved). */
