@@ -1,10 +1,14 @@
 package model
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
@@ -21,7 +25,12 @@ type source struct {
 }
 
 // parseSource parses data as a single YAML document.
-func parseSource(name string, data []byte) (*source, error) {
+func parseSource(name string, data []byte) (src *source, err error) {
+	defer recoverYAML(name, &err)
+	data, err = normalizeEncoding(data)
+	if err != nil {
+		return nil, Errors{{File: name, Msg: err.Error()}}
+	}
 	file, err := parser.ParseBytes(data, 0)
 	if err != nil {
 		return nil, Errors{yamlError(name, err)}
@@ -43,11 +52,20 @@ func parseSource(name string, data []byte) (*source, error) {
 }
 
 // decode decodes the document into v. Unknown fields are rejected.
-func (s *source) decode(v any) error {
+func (s *source) decode(v any) (err error) {
+	defer recoverYAML(s.name, &err)
 	if err := yaml.NodeToValue(s.body, v, yaml.Strict()); err != nil {
 		return Errors{yamlError(s.name, err)}
 	}
 	return nil
+}
+
+// recoverYAML turns a panic of the YAML library on malformed input (found by fuzzing)
+// into an error, so that a broken file cannot crash Runnel.
+func recoverYAML(name string, err *error) {
+	if r := recover(); r != nil {
+		*err = Errors{{File: name, Msg: fmt.Sprintf("the file could not be read; check the YAML structure near unusual syntax such as tags (!) or anchors (internal error: %v)", r)}}
+	}
 }
 
 // pos returns the position of the node at the given YAML path. If the node does not
@@ -162,4 +180,32 @@ func yamlKind(t reflect.Type) string {
 	default:
 		return "a value"
 	}
+}
+
+// normalizeEncoding returns the file content as UTF-8 without byte order mark.
+// Windows editors often save UTF-8 with BOM or UTF-16 ("Unicode" in Notepad).
+func normalizeEncoding(data []byte) ([]byte, error) {
+	switch {
+	case bytes.HasPrefix(data, []byte{0xEF, 0xBB, 0xBF}):
+		return data[3:], nil
+	case bytes.HasPrefix(data, []byte{0xFF, 0xFE}):
+		return decodeUTF16(data[2:], binary.LittleEndian)
+	case bytes.HasPrefix(data, []byte{0xFE, 0xFF}):
+		return decodeUTF16(data[2:], binary.BigEndian)
+	}
+	if !utf8.Valid(data) {
+		return nil, errors.New("the file is not valid UTF-8; save it as UTF-8 (in Notepad: \"Save as\" → Encoding \"UTF-8\")")
+	}
+	return data, nil
+}
+
+func decodeUTF16(data []byte, order binary.ByteOrder) ([]byte, error) {
+	if len(data)%2 != 0 {
+		return nil, errors.New("the file looks like UTF-16 but has an odd length; save it as UTF-8")
+	}
+	units := make([]uint16, len(data)/2)
+	for i := range units {
+		units[i] = order.Uint16(data[2*i:])
+	}
+	return []byte(string(utf16.Decode(units))), nil
 }

@@ -68,7 +68,11 @@ func TestLog(t *testing.T) {
 			t.Errorf("level %q: logs %v, err %v", level, logs, err)
 		}
 	}
-	a, _ := newAction(t, "core.log", map[string]any{"message": "x", "level": "loud"})
+	a, _ := newAction(t, "core.log", map[string]any{"message": "block\nscalar\r\n"})
+	if _, logs, _ := execute(context.Background(), t, a); len(logs) != 1 || logs[0].msg != "block\nscalar" {
+		t.Errorf("trailing line break not removed: %v", logs)
+	}
+	a, _ = newAction(t, "core.log", map[string]any{"message": "x", "level": "loud"})
 	if _, _, err := execute(context.Background(), t, a); err == nil || !strings.Contains(err.Error(), `invalid level "loud"`) {
 		t.Errorf("invalid level: %v", err)
 	}

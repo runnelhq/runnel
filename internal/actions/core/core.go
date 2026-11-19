@@ -103,7 +103,8 @@ func (a *logAction) Execute(_ context.Context, ec *action.ExecContext) (action.R
 	if err != nil {
 		return action.Result{}, err
 	}
-	ec.Log(level, a.Message)
+	// Block scalars (message: |) end with a line break; it would show as an empty log line.
+	ec.Log(level, strings.TrimRight(a.Message, "\r\n"))
 	return action.Result{}, nil
 }
 

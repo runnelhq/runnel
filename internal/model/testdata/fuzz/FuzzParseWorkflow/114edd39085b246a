@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("kind: Workflow\napiVersion: runnel/v1\nname: 0\nactions:\n  !\n 00000000000000000000000000000000000000000000000000000000000000000000000000")

@@ -19,7 +19,7 @@ GOVULNCHECK_VERSION     := v1.9.0
 CYCLONEDX_GOMOD := bin/tools/$(CYCLONEDX_GOMOD_VERSION)/cyclonedx-gomod
 GOVULNCHECK     := bin/tools/$(GOVULNCHECK_VERSION)/govulncheck
 
-.PHONY: all build build-windows build-linux dist notices sbom package test vulncheck lint fmt tidy clean
+.PHONY: all build build-windows build-linux dist notices sbom package test fuzz vulncheck lint fmt tidy clean
 
 all: lint test build
 
@@ -57,6 +57,12 @@ package: dist notices sbom
 ## test: run all tests with the race detector
 test:
 	go test -race ./...
+
+## fuzz: run the fuzz tests for FUZZTIME each (default 30s)
+FUZZTIME ?= 30s
+fuzz:
+	go test ./internal/vars -run '^$$' -fuzz FuzzParseExpand -fuzztime $(FUZZTIME)
+	go test ./internal/model -run '^$$' -fuzz FuzzParseWorkflow -fuzztime $(FUZZTIME)
 
 ## vulncheck: report known vulnerabilities in dependencies and the Go standard library
 vulncheck: $(GOVULNCHECK)
