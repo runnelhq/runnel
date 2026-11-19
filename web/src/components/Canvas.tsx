@@ -29,6 +29,7 @@ import {
   type Problem,
   type Workflow,
 } from "../workflow";
+import type { RunView } from "../run";
 import { ActionNode, type ActionNodeType } from "./ActionNode";
 import { ActionIcon, FitIcon, LayoutIcon, MinusIcon, PlusIcon } from "./Icons";
 import { LinkEdge, linkPath, type LinkEdgeType, type SettableKind } from "./LinkEdge";
@@ -75,6 +76,8 @@ export interface CanvasProps {
   selection?: Selection;
   /** The properties panel is shown and lists the problems of the selected action. */
   problemsInPanel?: boolean;
+  /** The current or last run, shown as status at the actions and links (mockup E8). */
+  run?: RunView | null;
   /** Id of the action whose id is being edited. */
   renaming?: string | null;
   onRenaming?: (id: string | null) => void;
@@ -96,7 +99,7 @@ export function Canvas(props: CanvasProps) {
 }
 
 function Graph(props: CanvasProps) {
-  const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel } =
+  const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel, run } =
     props;
   const catalog = useCatalog();
   const editable = onMove !== undefined;
@@ -138,6 +141,7 @@ function Graph(props: CanvasProps) {
           problems: byAction.get(a.id) ?? [],
           onShowInYAML,
           problemsInPanel,
+          run: run?.actions[a.id],
           connectable: editable,
           onStartRename: editable ? () => onRenaming?.(a.id) : undefined,
           rename: renaming === a.id ? { taken: ids, onDone: (to: string | null) => finishRename(a.id, to) } : undefined,
@@ -153,10 +157,10 @@ function Graph(props: CanvasProps) {
         target: l.to,
         type: "link",
         selectable: editable,
-        data: { kind: linkKind(l.when), when: l.when, loop: l.loop, disabled: l.disabled },
+        data: { kind: linkKind(l.when), when: l.when, loop: l.loop, disabled: l.disabled, run: linkRun(run, l) },
       }));
     return { computed, computedEdges, auto };
-  }, [workflow, problems, catalog, onShowInYAML, problemsInPanel, editable, renaming, onRenaming, finishRename]);
+  }, [workflow, problems, catalog, onShowInYAML, problemsInPanel, run, editable, renaming, onRenaming, finishRename]);
 
   // Local node and edge state for dragging and selection; it follows the workflow and keeps the selection.
   // The nodes start with the current selection, so that React Flow does not report an empty one first.
@@ -372,6 +376,25 @@ function Graph(props: CanvasProps) {
       </ReactFlow>
     </div>
   );
+}
+
+/**
+ * How a link looks in a run: it "flows" while it leads to the running action, and is
+ * faded once its source has finished without the link applying (or never ran).
+ */
+function linkRun(run: RunView | null | undefined, l: Link): "flow" | "dead" | undefined {
+  if (!run || l.disabled) return undefined;
+  const from = run.actions[l.from]?.status;
+  const to = run.actions[l.to]?.status;
+  if (!from || from === "pending" || from === "running") return undefined;
+  const kind = linkKind(l.when);
+  if (kind === "expression") return undefined;
+  const applies =
+    (kind === "success" && from === "succeeded") ||
+    (kind === "failure" && from === "failed") ||
+    (kind === "always" && (from === "succeeded" || from === "failed"));
+  if (!applies) return "dead";
+  return to === "running" ? "flow" : undefined;
 }
 
 /** Preview of an action dropped from the palette: a dashed card on the 8-px grid. */

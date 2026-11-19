@@ -36,12 +36,18 @@ type Entry struct {
 type projectInfo struct {
 	Name string `json:"name"`
 	Dir  string `json:"dir"`
+	// Environments are the names of the environments, sorted (for the run dialog, E8a).
+	Environments []string `json:"environments"`
+	// DefaultEnvironment is used when a run names no environment; empty if none is set.
+	DefaultEnvironment string `json:"defaultEnvironment,omitempty"`
 }
 
 func (s *Server) handleProject(w http.ResponseWriter, _ *http.Request) {
-	info := projectInfo{Dir: s.dir}
+	info := projectInfo{Dir: s.dir, Environments: []string{}}
 	if p, _ := model.LoadProject(s.dir); p != nil {
 		info.Name = p.Name
+		info.Environments = p.EnvironmentNames()
+		info.DefaultEnvironment = p.DefaultEnvironment
 	}
 	writeJSON(w, http.StatusOK, info)
 }

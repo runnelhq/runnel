@@ -6,6 +6,9 @@ export const apiBase = "/api/v1";
 export interface ProjectInfo {
   name: string;
   dir: string;
+  /** Names of the environments, sorted. */
+  environments?: string[];
+  defaultEnvironment?: string;
 }
 
 export interface VersionInfo {

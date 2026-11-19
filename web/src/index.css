@@ -72,6 +72,31 @@
   color: var(--muted-foreground);
 }
 
+/* Running (mockup E8): the link to a running action "flows", the running symbol turns. */
+.runnel-canvas .runnel-flow {
+  stroke-dasharray: 6 6;
+  animation: runnel-flow 1.2s linear infinite;
+}
+.runnel-spin {
+  animation: runnel-spin 0.9s linear infinite;
+}
+@keyframes runnel-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes runnel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .runnel-canvas .runnel-flow,
+  .runnel-spin {
+    animation: none;
+  }
+}
+
 /* A field shown after a click on a problem lights up briefly (mockup E7). */
 .runnel-flash input,
 .runnel-flash textarea,

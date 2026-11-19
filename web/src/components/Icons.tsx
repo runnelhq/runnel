@@ -166,6 +166,18 @@ export const PanelIcon = (p: P) => (
   </Icon>
 );
 
+export const PlayIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none" />
+  </Icon>
+);
+
+export const StopIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none" />
+  </Icon>
+);
+
 export const SearchIcon = (p: P) => (
   <Icon {...p}>
     <circle cx="11" cy="11" r="6" />

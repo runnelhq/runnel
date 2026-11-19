@@ -3,12 +3,28 @@ import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } fr
 import { editWorkflow, problemTarget, validate, type Link, type Problem, type Validation, type WorkflowEdit } from "../workflow";
 import { Canvas, type Selection } from "./Canvas";
 import { ProblemsBar } from "./ProblemsBar";
+import { RunDialog } from "./RunDialog";
+import type { ProjectInfo } from "../api";
+import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
 import { Dialog } from "./Dialog";
 import { PropertiesPanel, type FieldValue } from "./PropertiesPanel";
 import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
-import { CodeIcon, CopyIcon, LockIcon, PanelIcon, RedoIcon, ReloadIcon, SaveIcon, UndoIcon, WorkflowIcon } from "./Icons";
+import {
+  ChevronIcon,
+  CodeIcon,
+  CopyIcon,
+  LockIcon,
+  PanelIcon,
+  PlayIcon,
+  RedoIcon,
+  ReloadIcon,
+  SaveIcon,
+  StopIcon,
+  UndoIcon,
+  WorkflowIcon,
+} from "./Icons";
 
 type View = "canvas" | "yaml";
 
@@ -45,6 +61,9 @@ export function FileView(props: {
   path: string;
   active: boolean;
   projectDir: string | null;
+  project: ProjectInfo | null;
+  /** The run of this file to show in the status bar (only called while the tab is active). */
+  onRun: (run: RunView | null) => void;
   epoch: number;
   onSummary: (summary: string | null) => void;
   onPalette: (target: PaletteTarget | null) => void;
@@ -52,7 +71,7 @@ export function FileView(props: {
   onRegister: (path: string, handle: FileHandle | null) => void;
   onReloadExplorer: () => void;
 }) {
-  const { path, active, epoch, onSummary, onPalette, onDirty, onRegister } = props;
+  const { path, active, epoch, onSummary, onPalette, onDirty, onRegister, onRun } = props;
   const [state, setState] = useState<State>({ status: "loading" });
   const isWorkflow = kindOf(path) === "workflow";
   const [view, setView] = useState<View>(isWorkflow ? "canvas" : "yaml");
@@ -280,11 +299,68 @@ export function FileView(props: {
     return () => onRegister(path, null);
   }, [path, save, onRegister]);
 
-  // Keyboard shortcuts of the active tab: Ctrl+S, Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z.
+  // Running (mockup E8): Run uses the remembered values; the dialog opens on the first run of a
+  // workflow with parameters or several environments, or via the arrow. Unsaved changes are asked about.
+  const { run, start: startRun, cancel: cancelRun } = useRun(path);
+  const [runDialog, setRunDialog] = useState(false);
+  const [unsavedAsk, setUnsavedAsk] = useState<null | { dialog: boolean }>(null);
+  const running = run?.status === "running";
+  const wfNow = validation?.workflow;
+  // The status belongs to the actions and links it ran with; it is hidden once they change.
+  const shownRun = run && wfNow && run.signature === structureSignature(wfNow) ? run : null;
+  useEffect(() => {
+    if (active) onRun(run);
+  }, [active, run, onRun]);
+
+  const doRun = useCallback(
+    async (settings: RunSettings) => {
+      const wf = validation?.workflow;
+      if (!wf) return;
+      try {
+        await startRun(settings, wf);
+        setEditError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setEditError(`Could not start the run: ${msg}`);
+        if (err instanceof StartError && err.problems.length > 0) setProblemsOpen(true);
+      }
+    },
+    [validation, startRun],
+  );
+  const proceedRun = useCallback(
+    (dialog: boolean) => {
+      const remembered = loadRunSettings(path);
+      const params = validation?.workflow?.parameters ?? [];
+      const envs = props.project?.environments ?? [];
+      if (dialog || (!remembered && (params.length > 0 || envs.length > 1))) setRunDialog(true);
+      else void doRun(remembered ?? { environment: "", params: {} });
+    },
+    [path, validation, props.project, doRun],
+  );
+  const requestRun = useCallback(
+    (dialog: boolean) => {
+      if (running) return;
+      if (docRef.current && docRef.current.text !== docRef.current.saved) setUnsavedAsk({ dialog });
+      else proceedRun(dialog);
+    },
+    [running, proceedRun],
+  );
+
+  // Keyboard shortcuts of the active tab: Ctrl+S, Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z, F5 (run), Ctrl+. (cancel).
   useEffect(() => {
     if (!active || !isWorkflow) return;
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F5" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault(); // instead of reloading the page
+        requestRun(e.shiftKey);
+        return;
+      }
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (e.key === ".") {
+        e.preventDefault();
+        void cancelRun();
+        return;
+      }
       const k = e.key.toLowerCase();
       // In a text field (id, search), undo and redo belong to the field.
       const t = e.target as HTMLElement | null;
@@ -302,7 +378,7 @@ export function FileView(props: {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, isWorkflow, save, doUndo, doRedo]);
+  }, [active, isWorkflow, save, doUndo, doRedo, requestRun, cancelRun]);
 
   useEffect(() => {
     if (!toast) return;
@@ -375,7 +451,12 @@ export function FileView(props: {
           {slash >= 0 && !showPanel && `${path.slice(0, slash).split("/").join(" / ")} / `}
           <b className="font-medium text-foreground">{path.slice(slash + 1)}</b>
         </span>
-        <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
+        {/* Compact file bar with the properties panel (mockup E8): no kind badge, "Copy path" next to the name. */}
+        {showPanel ? (
+          <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} compact />
+        ) : (
+          <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
+        )}
         {!isWorkflow && (
           <Badge title="Only workflows can be edited in this version">
             <LockIcon width={12} height={12} />
@@ -403,6 +484,41 @@ export function FileView(props: {
           </Badge>
         )}
         <span className="flex-1" />
+        {isWorkflow &&
+          (running ? (
+            <button
+              type="button"
+              title="Cancel the run (Ctrl+.)"
+              onClick={() => void cancelRun()}
+              className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-destructive bg-background px-2.5 text-xs font-medium text-destructive hover:bg-danger-soft"
+            >
+              <StopIcon width={14} height={14} />
+              Cancel
+            </button>
+          ) : (
+            <span className="inline-flex">
+              <button
+                type="button"
+                title="Run (F5)"
+                onClick={() => requestRun(false)}
+                className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-l-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted"
+              >
+                <span className="text-status-success">
+                  <PlayIcon width={14} height={14} />
+                </span>
+                Run
+              </button>
+              <button
+                type="button"
+                title="Run with other values… (Shift+F5)"
+                aria-label="Run with other values"
+                onClick={() => requestRun(true)}
+                className="inline-grid h-7 w-7 cursor-pointer place-items-center rounded-r-md border border-l-0 border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <ChevronIcon open width={14} height={14} />
+              </button>
+            </span>
+          ))}
         {isWorkflow && (
           <>
             <div className="inline-flex gap-1">
@@ -431,7 +547,7 @@ export function FileView(props: {
             )}
           </>
         )}
-        <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} compact={showPanel} />
+        {!showPanel && <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} />}
       </div>
       {editError && (
         <div role="alert" className="flex shrink-0 items-center gap-3 border-b border-border bg-danger-soft px-4 py-1.5 text-xs text-destructive">
@@ -463,6 +579,7 @@ export function FileView(props: {
             onSelect={onSelect}
             selection={selection}
             problemsInPanel={showPanel}
+            run={shownRun}
           />
         ) : validation ? (
           <NotAGraph path={path} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
@@ -515,6 +632,50 @@ export function FileView(props: {
         />
       )}
       </div>
+      {runDialog && (
+        <RunDialog
+          path={path}
+          project={props.project}
+          parameters={validation?.workflow?.parameters ?? []}
+          initial={loadRunSettings(path)}
+          onCancel={() => setRunDialog(false)}
+          onRun={(settings) => {
+            setRunDialog(false);
+            saveRunSettings(path, settings);
+            void doRun(settings);
+          }}
+        />
+      )}
+      {unsavedAsk && (
+        <Dialog
+          title="Save before running?"
+          onCancel={() => setUnsavedAsk(null)}
+          actions={[
+            { label: "Cancel", onClick: () => setUnsavedAsk(null) },
+            {
+              label: "Run saved version",
+              onClick: () => {
+                const { dialog } = unsavedAsk;
+                setUnsavedAsk(null);
+                proceedRun(dialog);
+              },
+            },
+            {
+              label: "Save and run",
+              tone: "primary",
+              onClick: async () => {
+                const { dialog } = unsavedAsk;
+                setUnsavedAsk(null);
+                if (await save()) proceedRun(dialog);
+              },
+            },
+          ]}
+        >
+          <p>
+            <code className="text-xs">{path}</code> has unsaved changes. A run always uses the saved file.
+          </p>
+        </Dialog>
+      )}
       {conflict && (
         <Dialog
           title="File changed outside the editor"

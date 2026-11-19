@@ -10,6 +10,8 @@ export interface LinkEdgeData extends Record<string, unknown> {
   when?: string;
   loop?: boolean;
   disabled?: boolean;
+  /** During or after a run: "flow" = leads to the running action, "dead" = not followed (mockup E8). */
+  run?: "flow" | "dead";
   /** The link menu is open (mockup E6b). */
   menu?: boolean;
   onOpenMenu?: () => void;
@@ -65,7 +67,13 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
         id={id}
         path={path}
         interactionWidth={16}
-        style={{ stroke: color, strokeWidth: selected ? 3.5 : 2, strokeDasharray: data?.disabled ? "5 4" : undefined }}
+        className={data?.run === "flow" ? "runnel-flow" : undefined}
+        style={{
+          stroke: color,
+          strokeWidth: selected ? 3.5 : 2,
+          strokeDasharray: data?.disabled ? "5 4" : undefined,
+          opacity: data?.run === "dead" ? 0.3 : undefined,
+        }}
       />
       <EdgeLabelRenderer>
         <span
@@ -81,7 +89,8 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
             (data?.onOpenMenu ? " cursor-pointer" : "") +
             (selected ? " outline-2 outline-offset-2 outline-node-selected" : "")
           }
-          style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`, color }}
+          data-run={data?.run}
+          style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`, color, opacity: data?.run === "dead" ? 0.45 : undefined }}
         >
           {symbols[kind]}
           {data?.loop ? " ↻" : ""}

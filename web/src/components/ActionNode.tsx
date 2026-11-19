@@ -1,5 +1,6 @@
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
+import { formatDuration, type ActionRun } from "../run";
 import { idPattern, type Problem } from "../workflow";
 import { ActionIcon } from "./Icons";
 
@@ -17,6 +18,8 @@ export interface ActionNodeData extends Record<string, unknown> {
   connectable?: boolean;
   /** Starts editing the id (double-click on it). */
   onStartRename?: () => void;
+  /** Status in the current or last run (mockup E8). */
+  run?: ActionRun;
   /** Set while the id is edited: ids in use and the callback with the new id (null: keep). */
   rename?: { taken: Set<string>; onDone: (id: string | null) => void };
 }
@@ -26,9 +29,34 @@ export type ActionNodeType = Node<ActionNodeData, "action">;
 const severityRank = (ps: Problem[]) =>
   ps.some((p) => p.severity === "error") ? "error" : ps.length > 0 ? "warning" : null;
 
-/** An action on the canvas: a card with category tile, id and type (mockup E5). */
+/** Run status: bar colour, symbol (design/README.md 3.2, 6.1). */
+const runLook: Record<string, { bar: string; marker: string; symbol: string; label: string }> = {
+  running: { bar: "bg-status-running", marker: "bg-status-running", symbol: "", label: "Running" },
+  succeeded: { bar: "bg-status-success", marker: "bg-status-success", symbol: "✔", label: "Succeeded" },
+  failed: { bar: "bg-status-failed", marker: "bg-status-failed", symbol: "✖", label: "Failed" },
+  cancelled: { bar: "bg-status-skipped", marker: "bg-status-skipped", symbol: "■", label: "Cancelled" },
+  skipped: { bar: "", marker: "bg-status-skipped", symbol: "–", label: "Skipped" },
+};
+
+/** Seconds since the start, updated while the action runs. */
+function useElapsed(started: number | undefined, running: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(t);
+  }, [running]);
+  return started && running ? Math.max(0, now - started) : undefined;
+}
+
+/** An action on the canvas: a card with category tile, id and type (mockup E5), and its run status (E8). */
 export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
-  const severity = severityRank(data.problems);
+  const run = data.run;
+  const look = run && runLook[run.status];
+  const elapsed = useElapsed(run?.started, run?.status === "running");
+  const duration = run?.durationMs ?? elapsed;
+  // During a run, its status has precedence over problems (decision for mockup E5).
+  const severity = look ? null : severityRank(data.problems);
   const known = data.color !== undefined;
   const hasInput = data.type !== "core.start";
   const hasOutput = data.type !== "core.success" && data.type !== "core.abort";
@@ -39,9 +67,11 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
     <div
       data-testid={`node-${data.id}`}
       data-severity={severity ?? undefined}
+      data-run={run?.status}
       className={
         `relative flex h-[52px] w-[176px] items-center gap-2.5 rounded-lg border bg-node pr-3 pl-2.5 shadow-sm ${border}` +
-        (selected ? " outline-2 outline-offset-1 outline-node-selected" : "")
+        (selected ? " outline-2 outline-offset-1 outline-node-selected" : "") +
+        (run && (run.status === "pending" || run.status === "skipped") ? " opacity-55" : "")
       }
     >
       {data.join && data.join !== "all" && (
@@ -71,9 +101,41 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
             {data.id}
           </span>
         )}
-        <span className="block truncate font-mono text-2xs text-muted-foreground">{data.type}</span>
+        <span className="block truncate font-mono text-2xs text-muted-foreground">
+          {data.type}
+          {duration !== undefined && (
+            <>
+              {" · "}
+              <span className="text-foreground" data-testid="duration">
+                {formatDuration(duration)}
+              </span>
+            </>
+          )}
+        </span>
       </span>
       {hasOutput && <Handle type="source" position={Position.Right} isConnectable={!!data.connectable} className="runnel-port" />}
+      {look && (
+        <>
+          <span
+            className={
+              "absolute right-1.5 -bottom-px left-1.5 h-[3px] rounded-t-[3px] " +
+              (run.status === "skipped" ? "border-t-[3px] border-dashed border-status-skipped" : look.bar)
+            }
+          />
+          <span
+            role="img"
+            aria-label={look.label}
+            title={run.error ? `${look.label}: ${run.error}` : look.label}
+            className={`absolute -top-[9px] -right-[9px] grid size-5 place-items-center rounded-full text-[11px] font-bold text-tiefe-0 shadow-sm ${look.marker}`}
+          >
+            {run.status === "running" ? (
+              <span className="runnel-spin block size-2.5 rounded-full border-2 border-current border-r-transparent" />
+            ) : (
+              look.symbol
+            )}
+          </span>
+        </>
+      )}
       {severity && (
         <span
           aria-label={severity === "error" ? "Error" : "Warning"}
