@@ -902,12 +902,13 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 
 | Phase | Schritte | Ergebnis |
 |---|---|---|
-| **0.1 – Runner-Kern** | S01–S11: Projektgerüst, Workflow-Format & Validierung, Variablen, typisierte Parameter & Outputs, Engine (sequenziell, parallel/Join, Retry/Timeout), Ausdrücke, Datei-Actions, HTTP, Sub-Workflows | Workflows per CLI / Aufgabenplanung |
-| **0.2 – Pipelines** | S12–S25: Pipeline-Engine, Typsystem, CSV, Basis-Transforms, Fehler-Links, JSON, Datenbank, Sortieren/Gruppieren, Lookups, Ausführung pro Datensatz | ETL-Fälle per CLI |
-| **0.3 – Server & Editor** | S26–S36: Historie, REST/WebSocket, Resume, Editor (Canvas, Eigenschaften, Ausführen, Ausdruckseditor, Teilausführung) | Visuelles Designen & Starten |
-| **0.4 – Betrieb** | S37–S43: Trigger, Secret-Store, Netzwerkbetrieb, Windows-Dienst, Run-Konfigurationen, Wartung | Produktionsbetrieb auf Windows-Server |
-| **0.5 – Komfort** | S44–S48: Datenvorschau, Samples, Felder ermitteln, Desktop-Modus, Installer | Rund nutzbares Produkt |
-| **0.6 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
+| **0.1 – Runner-Basis** ✅ | S01–S07, S05a, Q1–Q4: Projektgerüst, Workflow-Format & Validierung, Variablen, typisierte Parameter & Outputs, Engine (sequenziell, parallel/Join, Retry/Timeout/Abbruch), Core-Actions | Workflows per CLI / Aufgabenplanung |
+| **0.2 – Editor-Grundlage** | E1–E8: Action-Descriptor & Schema, Server mit Datei- und Run-API, Live-Events, Editor (Canvas, Bearbeiten, Eigenschaften, Ausführen) | Workflows visuell bauen und testen |
+| **0.3 – Workflow-Ausbau** | S08–S11, S26, S29, S35, S36: Ausdrücke, Datei-/HTTP-Actions, Sub-Workflows, Historie, Resume, Ausdruckseditor, Teilausführung | Praxistaugliche Workflows |
+| **0.4 – Pipelines** | S12–S25a: Pipeline-Engine, Typsystem, CSV, JSON, Datenbank, Transforms, Ausführung pro Datensatz, Pipeline-Canvas | ETL per CLI und Editor |
+| **0.5 – Betrieb** | S37–S43: Trigger, Secret-Store, Netzwerkbetrieb, Windows-Dienst, Run-Konfigurationen, Wartung | Produktionsbetrieb auf Windows-Server |
+| **0.6 – Komfort** | S44–S48: Datenvorschau, Samples, Felder ermitteln, Desktop-Modus, Installer | Rund nutzbares Produkt |
+| **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
 | **Backlog** | KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 

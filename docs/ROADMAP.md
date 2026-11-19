@@ -4,6 +4,11 @@ Die Phasen aus dem [Konzept (Kap. 15)](KONZEPT.md#15-roadmap) sind hier in **kle
 
 Erledigte Schritte sind mit ✅ markiert.
 
+> **Umbau vom 2026-11-19:** Um schneller einen testbaren Editor zu haben, folgt auf die Runner-Basis direkt die
+> Editor-Grundlage (E1–E8). Sie ersetzt die bisherigen Schritte S27, S28 und S30–S34. Ausdrücke, weitere Actions,
+> Historie und Resume sowie Pipelines folgen danach. Bestehende Schrittnummern bleiben erhalten, weil ADRs und PRs
+> darauf verweisen; nur die Phasen sind neu nummeriert.
+
 ## Regeln für jeden Schritt
 
 - **Ein Schritt = ein Pull Request.** Richtwert: höchstens ca. 1.000 geänderte Zeilen inklusive Tests
@@ -24,7 +29,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 ---
 
-## Phase 0.1 – Runner-Kern (Workflows per CLI)
+## Phase 0.1 – Runner-Basis (Workflows per CLI) ✅
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
@@ -42,16 +47,49 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | Q2 ✅ | Typnamen & Code-Aufbau | Getrennte Typ-Namensräume für Actions/Transforms, reservierte Namensräume, `provides:` nach Art ([ADR 0013](adr/0013-typnamen-namensraeume.md)); `internal/actions/core` aufgeteilt (eine Datei je Action), zentrale `actions.Builtin()`, Test-Hilfen `actiontest`, Vertragstest für alle eingebauten Actions | `make test` |
 | Q3 ✅ | Anleitungen | `docs/dev/ACTIONS.md` (neue Action entwickeln), `AGENTS.md`/`CLAUDE.md` (Regeln für KI-Agenten), `CONTRIBUTING.md`; Regel „Anleitungen aktuell halten“ | – |
 | Q4 ✅ | `core.dummy` | Sammelpunkt für Zweige (wie Dummy in Apache Hop); erste Action nach `docs/dev/ACTIONS.md` – Anleitung dabei erprobt und ergänzt; Beispiel `collector.workflow.yaml` | `runnel run -v examples/hello/workflows/collector.workflow.yaml` |
+
+**Ergebnis 0.1:** Workflows mit den Core-Actions laufen per CLI bzw. Windows-Aufgabenplanung – parallel, mit Retry, Timeouts und Abbruch.
+
+---
+
+## Phase 0.2 – Editor-Grundlage
+
+Ziel: Workflows im Browser entwerfen, prüfen, ausführen und beobachten. Die vorhandenen Core-Actions reichen dafür;
+neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsdialog.
+
+| Nr. | Schritt | Inhalt | Prüfen |
+|---|---|---|---|
+| E1 | Action-Beschreibung (Descriptor) | Jede Action erhält Kategorie, Bezeichnung und ein JSON-Schema ihrer `with:`-Felder (Grundlage für Palette und Eigenschaftsdialog); `/catalog`-taugliche Ausgabe; Vertragstest erzwingt Descriptor und Schema; ADR 0014 | Vertragstest; `runnel catalog` o. ä. |
+| E2 | Server & Datei-API | `runnel serve` (nur `127.0.0.1`): Projektbaum, Dateien lesen/speichern mit ETag (Konfliktschutz), `/catalog`, `/validate` | Tests mit `httptest`; `curl` |
+| E3 | Run-API & Live-Events | Läufe starten und abbrechen, Ereignisse und Logs live per WebSocket; Läufe **zunächst nur im Speicher** (letzte N), SQLite-Historie folgt mit S26 ohne API-Änderung | Tests; `curl`/`websocat` |
+| E4 | Editor-Gerüst | Vite + React + TypeScript, in die exe eingebettet; Projekt-Explorer, Datei als YAML anzeigen; Frontend-Build in CI und Release; SBOM um npm-Pakete ergänzen (`cyclonedx-npm`, mit Go-SBOM zusammenführen); Playwright-Grundlage; Design-Tokens (ADR 0011) | Browser; erster Playwright-Test |
+| E5 | Canvas (nur lesen) | Workflows mit React Flow darstellen, Layout aus der Datei, Auto-Layout falls fehlend; Meldungen aus `/validate` an den Knoten | `examples/` im Editor öffnen |
+| E6 | Canvas bearbeiten | Knoten anlegen/verschieben/löschen, Links ziehen und Typ umschalten, Palette aus `/catalog`, Speichern mit Konfliktdialog, Undo/Redo; bei Bedarf geteilt in E6a/E6b | Playwright; zwei Browser gleichzeitig |
+| E7 | Eigenschaften | Eigenschaftsdialog aus dem Schema (E1) inkl. Join, Retry, Timeouts; Prüfung beim Tippen, Tab „Probleme“ | Playwright |
+| E8 | Ausführen im Editor | Ausführen mit Environment und Parametern, Live-Status auf dem Canvas, Log-Bereich, Abbrechen | Manuell; Playwright |
+
+**Ergebnis 0.2:** Workflows unter `http://localhost:7300` visuell bauen, prüfen, starten und beobachten – auf denselben YAML-Dateien wie die CLI.
+
+---
+
+## Phase 0.3 – Workflow-Ausbau
+
+| Nr. | Schritt | Inhalt | Prüfen |
+|---|---|---|---|
 | S08 | Ausdrücke | `expr-lang` für `{{ … }}`, Kontext `vars`/`params`/`env`/`run`/`result`/`results`, Bedingungs-Links, Funktionsbibliothek Teil 1 (Datum, Text, Null) ([ADR 0006](adr/0006-ausdruckssprache.md)); **Ausgabedaten von Actions** (`result.output`) für nachfolgende Actions; Ausdrücke in `outputs` | Unit-Tests je Funktion; Beispiel mit Bedingungs-Link |
 | S09 | Datei-Actions | `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list` (Ergebnis = Dateiliste) | Tests mit temporären Ordnern; UNC-Pfad manuell unter Windows |
 | S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis) | Tests gegen lokalen Testserver |
 | S11 | Sub-Workflows | `core.run-workflow` mit Parametern und Ergebnisrückgabe über `outputs` | Beispiel Eltern-/Kind-Workflow |
+| S26 | Run-Historie | Ersetzt den Speicher aus E3 ohne API-Änderung; SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | Unit-Tests; CLI-Ausgabe |
+| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | Test: Fehler beheben, fortsetzen |
+| S35 | Ausdruckseditor | Monaco mit Syntaxhervorhebung, Autovervollständigung (Kontext, Felder, Funktionen), Fehleranzeige | Playwright-Test |
+| S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | Manuell |
 
-**Ergebnis 0.1:** Workflows mit Datei- und HTTP-Schritten laufen per CLI bzw. Windows-Aufgabenplanung.
+**Ergebnis 0.3:** Workflows mit Ausdrücken, Datei- und HTTP-Schritten, Sub-Workflows, Historie und Resume – in CLI und Editor.
 
 ---
 
-## Phase 0.2 – Pipelines (ETL per CLI)
+## Phase 0.4 – Pipelines (ETL)
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
@@ -69,32 +107,13 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S23 | Lookups & Join | Info-Link, `core.stream-lookup`, `db.lookup`, `core.merge-join` | Golden-Tests |
 | S24 | Ergebnis-Datensätze | `core.to-result`, `core.from-result`, `forEachRow` an `core.run-pipeline`/`core.run-workflow` ([ADR 0008](adr/0008-ausfuehrungsvarianten.md)) | Beispiel: Dateiliste → Pipeline je Datei |
 | S25 | Executor & dynamische Ziele | `core.pipeline-executor`, `core.workflow-executor` (pro Datensatz/Gruppe), Pfade mit Variablen, `allowedTargets` | Beispiel: Pipeline je Kunde |
+| S25a | Pipeline-Canvas | Pipelines im Editor anzeigen und bearbeiten: Transform-Palette, Daten-/Fehler-/Info-Links, Eigenschaften aus dem Schema, Ausführen mit Metriken je Transform | Playwright; Beispiel-Pipeline im Editor |
 
-**Ergebnis 0.2:** ETL-Fälle mit CSV, JSON und Datenbanken laufen per CLI.
-
----
-
-## Phase 0.3 – Server & Editor
-
-| Nr. | Schritt | Inhalt | Prüfen |
-|---|---|---|---|
-| S26 | Run-Historie | SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | Unit-Tests; CLI-Ausgabe |
-| S27 | Server & Datei-API | `runnel serve` (nur `127.0.0.1`), `/files` mit ETag, `/catalog`, `/validate` | Tests mit `httptest`; `curl` |
-| S28 | Run-API & Live-Events | `POST /runs`, Abbrechen, WebSocket-Events (Status, Metriken, Logs), Log-Stream per SSE | Tests; `curl`/`websocat` |
-| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | Test: Fehler beheben, fortsetzen |
-| S30 | Editor-Gerüst | Vite + React + TypeScript, in exe eingebettet, Projekt-Explorer, Datei als YAML anzeigen; SBOM um npm-Pakete ergänzen (`cyclonedx-npm`, mit Go-SBOM zusammenführen) | Browser öffnen, Dateien durchklicken |
-| S31 | Canvas (nur lesen) | Workflow/Pipeline mit React Flow darstellen, Layout aus Datei, Auto-Layout falls fehlend | Beispiele werden korrekt angezeigt |
-| S32 | Canvas bearbeiten | Knoten verschieben/anlegen/löschen, Links ziehen und Typ umschalten, Palette aus `/catalog`, Speichern mit ETag-Konfliktdialog, Undo/Redo | Playwright-Test; zwei Browser gleichzeitig |
-| S33 | Eigenschaften | Eigenschaftsfenster aus JSON-Schema der Bausteine, Inline-Validierung, Tab „Probleme“ | Playwright-Test |
-| S34 | Ausführen im Editor | Ausführen-Knopf mit Umgebung/Parametern, Live-Status auf Canvas, Logs- und Metriken-Tab, Historie | Manuell: Beispiel starten und beobachten |
-| S35 | Ausdruckseditor | Monaco mit Syntaxhervorhebung, Autovervollständigung (Kontext, Felder, Funktionen), Fehleranzeige | Playwright-Test |
-| S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | Manuell |
-
-**Ergebnis 0.3:** Workflows und Pipelines visuell bauen, starten und beobachten.
+**Ergebnis 0.4:** ETL-Fälle mit CSV, JSON und Datenbanken per CLI und im Editor.
 
 ---
 
-## Phase 0.4 – Betrieb
+## Phase 0.5 – Betrieb
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
@@ -106,11 +125,11 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | Tests der Rangfolge |
 | S43 | Wartung & Monitoring | Retention, Error-Workflow, `/health`, optional `/metrics` | Tests |
 
-**Ergebnis 0.4:** Dauerbetrieb auf einem Windows-Server.
+**Ergebnis 0.5:** Dauerbetrieb auf einem Windows-Server.
 
 ---
 
-## Phase 0.5 – Komfort
+## Phase 0.6 – Komfort
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
@@ -122,7 +141,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 ---
 
-## Phase 0.6 – Erweiterbarkeit
+## Phase 0.7 – Erweiterbarkeit
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|

@@ -152,9 +152,9 @@ Technisch: `POST /api/v1/runs` mit `startAt: "<action-id>"` bzw. `only: "<action
 
 | Phase | Inhalt |
 |---|---|
-| 0.2 – Pipelines | Executor-Transforms, `forEachRow`, `core.to-result`/`core.from-result`, dynamische Ziele |
-| 0.3 – Server & Editor | Teilausführung im Editor |
-| 0.4 – Betrieb | Run-Konfigurationen (`local`), Trigger für Pipelines |
+| 0.4 – Pipelines | Executor-Transforms, `forEachRow`, `core.to-result`/`core.from-result`, dynamische Ziele |
+| 0.3 – Workflow-Ausbau | Teilausführung im Editor |
+| 0.5 – Betrieb | Run-Konfigurationen (`local`), Trigger für Pipelines |
 | später | Mappings, `RunConfig type: remote` |
 
 ## Konsequenzen
