@@ -32,12 +32,14 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S03 ✅ | Workflow-Validierung | Start vorhanden, IDs eindeutig, Links zeigen auf existierende Actions, unerreichbare Knoten, Rückwärts-Links nur als Schleifen-Link; `runnel validate` | `runnel validate examples/…` mit Fehlerbeispielen |
 | S04 ✅ | Projekt & Variablen | `project.yaml`, `environments/*.yaml`, Auflösung von `${VAR}` und `${env:…}` in fester Rangfolge; `--env`, `--param` | Unit-Tests der Rangfolge |
 | S05 ✅ | Engine: sequenziell | Ausführung entlang von Erfolgs-/Fehler-/Immer-Links (zunächst max. ein eingehender Link pro Action); Actions `core.start`, `core.success`, `core.abort`, `core.log`, `core.wait`; `runnel run`, Exit-Code, Konsolen-Log | Beispiel-Workflow läuft, Exit-Code 0/1 |
+| S05a | Typisierte Parameter & Workflow-Outputs | Parameter mit `type` (string, integer, number, boolean, json), `enum`, `description`; `outputs` mit `value`, ausgewertet bei erfolgreichem Ende; Prüfung in `validate`, Umwandlung und Prüfung von `--param`, Ausgabe der Outputs bei `runnel run` ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Golden-Tests; `runnel run` zeigt Outputs |
 | S06 | Engine: parallel & Join | Parallele Zweige, `join: all/first/each`, Dead-Path-Elimination, Status `skipped` ([ADR 0003](adr/0003-join-semantik.md)) | Tests mit `-race`; Beispiel mit Fehler-Sammelpfad |
 | S07 | Retry, Timeout, Abbruch | `retry`, `timeout`, `continueOnError`, Workflow-Timeout, Abbruch per Strg+C (sauberes Beenden) | Tests; Strg+C während `core.wait` |
-| S08 | Ausdrücke | `expr-lang` für `{{ … }}`, Kontext `vars`/`params`/`env`/`run`/`result`/`results`, Bedingungs-Links, Funktionsbibliothek Teil 1 (Datum, Text, Null) ([ADR 0006](adr/0006-ausdruckssprache.md)) | Unit-Tests je Funktion; Beispiel mit Bedingungs-Link |
+| S08 | Ausdrücke | `expr-lang` für `{{ … }}`, Kontext `vars`/`params`/`env`/`run`/`result`/`results`, Bedingungs-Links, Funktionsbibliothek Teil 1 (Datum, Text, Null) ([ADR 0006](adr/0006-ausdruckssprache.md)); **Ausgabedaten von Actions** (`result.output`) für nachfolgende Actions; Ausdrücke in `outputs` | Unit-Tests je Funktion; Beispiel mit Bedingungs-Link |
 | S09 | Datei-Actions | `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list` (Ergebnis = Dateiliste) | Tests mit temporären Ordnern; UNC-Pfad manuell unter Windows |
 | S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis) | Tests gegen lokalen Testserver |
-| S11 | Sub-Workflows | `core.run-workflow` mit Parametern und Ergebnisrückgabe | Beispiel Eltern-/Kind-Workflow |
+| S11 | Sub-Workflows | `core.run-workflow` mit Parametern und Ergebnisrückgabe über `outputs` | Beispiel Eltern-/Kind-Workflow |
+| S11a | MCP-Server | `runnel mcp` (stdio): Workflows eines Projekts als MCP-Tools; Eingabe-Schema aus `parameters`, Ergebnis aus `outputs`, Log als Fortschrittsmeldungen ([ADR 0012](adr/0012-ki-faehigkeit.md)) | MCP Inspector; Claude Desktop/Claude Code ruft `examples/hello` auf |
 
 **Ergebnis 0.1:** Workflows mit Datei- und HTTP-Schritten laufen per CLI bzw. Windows-Aufgabenplanung.
 
@@ -73,7 +75,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S26 | Run-Historie | SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | Unit-Tests; CLI-Ausgabe |
 | S27 | Server & Datei-API | `runnel serve` (nur `127.0.0.1`), `/files` mit ETag, `/catalog`, `/validate` | Tests mit `httptest`; `curl` |
 | S28 | Run-API & Live-Events | `POST /runs`, Abbrechen, WebSocket-Events (Status, Metriken, Logs), Log-Stream per SSE | Tests; `curl`/`websocat` |
-| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`) | Test: Fehler beheben, fortsetzen |
+| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | Test: Fehler beheben, fortsetzen |
 | S30 | Editor-Gerüst | Vite + React + TypeScript, in exe eingebettet, Projekt-Explorer, Datei als YAML anzeigen; SBOM um npm-Pakete ergänzen (`cyclonedx-npm`, mit Go-SBOM zusammenführen) | Browser öffnen, Dateien durchklicken |
 | S31 | Canvas (nur lesen) | Workflow/Pipeline mit React Flow darstellen, Layout aus Datei, Auto-Layout falls fehlend | Beispiele werden korrekt angezeigt |
 | S32 | Canvas bearbeiten | Knoten verschieben/anlegen/löschen, Links ziehen und Typ umschalten, Palette aus `/catalog`, Speichern mit ETag-Konfliktdialog, Undo/Redo | Playwright-Test; zwei Browser gleichzeitig |
@@ -138,5 +140,6 @@ Werden bei Bedarf als eigener Schritt (je ein PR) eingeplant. Reihenfolge ist of
 | Netzwerk-Transforms | REST-Eingabe mit Paging, HTTP-Lookup, REST-Ausgabe |
 | Datenbanken | Treiber MySQL/MariaDB, Oracle, ODBC |
 | Transforms | Pivot/Unpivot, Feld teilen, Wertzuordnung, String-/Datum-Funktionen als eigene Transforms, Sequenz, externes Sortieren (große Datenmengen) |
+| KI ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Connections für Modell-Anbieter (Anthropic, OpenAI-kompatibel, Ollama); `ai.chat` (inkl. strukturierter Ausgabe per JSON Schema); `ai.agent` mit Werkzeugen (Workflows, Actions, MCP-Tools) und Positivliste; `mcp.call-tool` und MCP-Server als Plugin-Quelle; `core.approval` (Freigabe abwarten); Chat-Trigger mit Streaming und Gesprächsgedächtnis; Transforms `ai.chunk`, `ai.embed`, Vektor-Ausgabe (pgvector, Qdrant); MCP über HTTP (Token, später OAuth); Token-/Kosten-Erfassung und Rate-Limit je Connection; Link-Typ `tool` im Editor |
 | Plugin-SDKs | Python, C#/.NET, Node |
 | Später (Konzept) | Mappings, Remote-Runner (`RunConfig type: remote`), Git-Integration im Editor, Breakpoints, Import aus Apache Hop, Tray-Icon, `runnel update`, `winget`, Code-Signing |
