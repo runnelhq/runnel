@@ -41,6 +41,13 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E7 | Parameter und Outputs des Workflows in E7 nur anzeigen; Bearbeiten wird ein eigener Roadmap-Schritt |
 | E7 | Mehrzeilige Texte über das neue Schema-Format `runnel-text` (Ergänzung zu ADR 0014): wachsendes Textfeld, alle anderen Felder einzeilig |
 | E7 | Umsetzung in zwei Schritten: E7a Panel für Actions mit Prüfung am Feld, E7b Link- und Workflow-Eigenschaften und die Leiste „Problems“ |
+| E8 | **Run** startet mit den je Workflow gemerkten Werten (im Browser); der Dialog öffnet sich beim ersten Lauf eines Workflows mit Parametern oder mehreren Environments, sonst über ▾ |
+| E8 | Environment je Lauf im Dialog, nicht in der Kopfzeile; eine globale Auswahl bei Bedarf später |
+| E8 | Ungespeicherte Änderungen: Rückfrage (Save and run / Run saved version / Cancel), kein automatisches Speichern |
+| E8 | Der Laufstatus bleibt bis zum nächsten Lauf; Verschieben behält ihn, Änderungen an Actions oder Links blenden ihn aus |
+| E8 | Debug-Zeilen im Log standardmäßig an; der Schalter wird im Browser gemerkt |
+| E8 | Das Log zeigt den letzten Lauf der Datei seit dem Start des Servers; frühere Läufe mit der Lauf-Historie (S26) |
+| E8 | Umsetzung in zwei Schritten: E8a Run (Button, Dialog, Rückfrage, Cancel) mit Live-Status auf dem Canvas, E8b Log-Tab und Ergebnis im Panel |
 
 ## Screenshots erzeugen
 
