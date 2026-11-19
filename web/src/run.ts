@@ -4,7 +4,7 @@ import { APIError } from "./files";
 import type { Problem, Workflow } from "./workflow";
 
 /** Status of an action in a run (GET /runs/{id}, docs/dev/API.md). */
-export type ActionStatus = "pending" | "running" | "succeeded" | "failed" | "skipped" | "cancelled";
+export type ActionStatus = "pending" | "waiting" | "running" | "succeeded" | "failed" | "skipped" | "cancelled";
 export type RunStatus = "running" | "succeeded" | "failed" | "cancelled";
 
 export interface ActionRun {
@@ -15,15 +15,28 @@ export interface ActionRun {
   error?: string;
 }
 
+/** A line of the run log (mockup E8), worded like "runnel run -v". */
+export interface LogLine {
+  time: string;
+  level: "debug" | "info" | "warn" | "error";
+  actionId?: string;
+  message: string;
+}
+
+/** Lines kept per run in the browser (like the server, docs/dev/API.md). */
+export const maxLogLines = 5000;
+
 /** A run of the open workflow as the canvas shows it (mockup E8). */
 export interface RunView {
   id: string;
+  workflow: string;
   environment: string;
   status: RunStatus;
   started: number;
   durationMs?: number;
   error?: string;
   actions: Record<string, ActionRun>;
+  log: LogLine[];
   /** Actions and links when the run started; the status is hidden once they change (decision for mockup E8). */
   signature: string;
 }
@@ -33,9 +46,45 @@ interface RunEvent {
   kind: string;
   time: string;
   actionId?: string;
+  actionType?: string;
+  level?: LogLine["level"];
+  message?: string;
   status?: string;
   durationMs?: number;
   error?: string;
+  outputs?: Record<string, unknown>;
+}
+
+/** The log lines of an event, worded like the CLI (internal/cli/run.go). */
+function logLines(ev: RunEvent, run: RunView): LogLine[] {
+  const at = (level: LogLine["level"], message: string, actionId = ev.actionId): LogLine => ({ time: ev.time, level, actionId, message });
+  const took = formatDuration(ev.durationMs ?? 0);
+  switch (ev.kind) {
+    case "run.started":
+      return [at("info", `workflow "${run.workflow}" started${run.environment ? ` (environment ${run.environment})` : ""}`)];
+    case "action.started":
+      return [at("debug", `started (${ev.actionType ?? ""})`)];
+    case "action.waiting":
+      return [at("debug", ev.message ?? "waiting")];
+    case "action.skipped":
+      return [at("debug", "skipped (no incoming link applies)")];
+    case "log":
+      return [at(ev.level ?? "info", ev.message ?? "")];
+    case "action.finished":
+      if (ev.status === "cancelled") return [at("warn", `cancelled after ${took}`)];
+      if (ev.error) return [at("error", `failed after ${took}: ${ev.error}`)];
+      return [at("debug", `${ev.status ?? "succeeded"} in ${took}`)];
+    case "run.finished": {
+      const outputs = Object.entries(ev.outputs ?? {}).map(([k, v]) =>
+        at("info", `output ${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`, undefined),
+      );
+      const name = `workflow "${run.workflow}"`;
+      if (ev.status === "cancelled") return [...outputs, at("warn", `${name} cancelled after ${took}`, undefined)];
+      if (ev.status === "failed") return [...outputs, at("error", `${name} failed after ${took}: ${ev.error ?? ""}`, undefined)];
+      return [...outputs, at("info", `${name} succeeded in ${took}`, undefined)];
+    }
+  }
+  return [];
 }
 
 /** The parts of a workflow a run status belongs to: actions and links, not their positions. */
@@ -108,6 +157,8 @@ export function useRun(path: string) {
       for (const a of workflow.actions ?? []) actions[a.id] = { status: "pending" };
       setRun({
         id,
+        workflow: workflow.name,
+        log: [],
         environment: body.environment ?? settings.environment,
         status: "running",
         started: Date.now(),
@@ -118,11 +169,21 @@ export function useRun(path: string) {
       source.current?.close();
       const es = new EventSource(`${apiBase}/events?run=${encodeURIComponent(id)}&since=0`);
       source.current = es;
-      const update = (f: (r: RunView) => RunView) => setRun((r) => (r && r.id === id ? f(r) : r));
+      // Every event adds its lines to the log (oldest lines are dropped beyond maxLogLines).
+      const update = (ev: RunEvent, f: (r: RunView) => RunView) =>
+        setRun((r) => {
+          if (!r || r.id !== id) return r;
+          const next = f(r);
+          const log = [...next.log, ...logLines(ev, next)];
+          return { ...next, log: log.length > maxLogLines ? log.slice(-maxLogLines) : log };
+        });
       const action = (ev: RunEvent, a: Partial<ActionRun>) =>
-        update((r) => ({ ...r, actions: { ...r.actions, [ev.actionId!]: { ...r.actions[ev.actionId!], ...a } as ActionRun } }));
+        update(ev, (r) => ({ ...r, actions: { ...r.actions, [ev.actionId!]: { ...r.actions[ev.actionId!], ...a } as ActionRun } }));
       const on = (kind: string, f: (ev: RunEvent) => void) =>
         es.addEventListener(kind, (e) => f(JSON.parse((e as MessageEvent).data as string) as RunEvent));
+      on("run.started", (ev) => update(ev, (r) => r));
+      on("log", (ev) => update(ev, (r) => r));
+      on("action.waiting", (ev) => action(ev, { status: "waiting" }));
       on("action.started", (ev) => action(ev, { status: "running", started: Date.parse(ev.time), durationMs: undefined, error: undefined }));
       on("action.finished", (ev) =>
         action(ev, { status: (ev.status as ActionStatus) ?? "succeeded", durationMs: ev.durationMs ?? 0, error: ev.error }),
@@ -130,14 +191,19 @@ export function useRun(path: string) {
       on("action.skipped", (ev) => action(ev, { status: "skipped" }));
       on("run.finished", (ev) => {
         es.close();
-        update((r) => ({
+        update(ev, (r) => ({
           ...r,
           status: (ev.status as RunStatus) ?? "succeeded",
           durationMs: ev.durationMs,
           error: ev.error,
           // Actions that never started were skipped.
           actions: Object.fromEntries(
-            Object.entries(r.actions).map(([k, a]) => [k, a.status === "pending" || a.status === "running" ? { ...a, status: a.status === "running" ? "cancelled" : "skipped" } : a]),
+            Object.entries(r.actions).map(([k, a]) => [
+              k,
+              a.status === "pending" || a.status === "waiting" || a.status === "running"
+                ? { ...a, status: a.status === "running" ? "cancelled" : "skipped" }
+                : a,
+            ]),
           ),
         }));
       });

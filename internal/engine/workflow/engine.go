@@ -53,6 +53,8 @@ const (
 	Skipped Status = "skipped"
 	// Cancelled: the run was stopped from outside (e.g. Ctrl+C).
 	Cancelled Status = "cancelled"
+	// Waiting: the action waits for further incoming links (join all); not a final state.
+	Waiting Status = "waiting"
 )
 
 // Result is the outcome of a run.
@@ -75,7 +77,10 @@ const (
 	ActionStarted  EventKind = "action.started"
 	ActionFinished EventKind = "action.finished"
 	ActionSkipped  EventKind = "action.skipped"
-	Log            EventKind = "log"
+	// ActionWaiting: an incoming link of an action with join all has fired, but others are
+	// still pending; Message says how many (sent again for every further link that fires).
+	ActionWaiting EventKind = "action.waiting"
+	Log           EventKind = "log"
 )
 
 // Event is something that happened during a run.

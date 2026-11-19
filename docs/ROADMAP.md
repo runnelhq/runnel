@@ -74,7 +74,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | E7b ✅ | Links, Workflow, Meldungen | Mockup wie E7a. Eigenschaften eines Links (Bedingung, Loop, Disabled) und des Workflows (Name, Description, Settings; Parameter und Outputs nur anzeigen); Leiste „Problems“ unter dem Canvas mit Sprung zum Feld | Playwright |
 | E7c | Parameter und Outputs | Parameter und Outputs des Workflows im Panel anlegen, ändern und löschen (Entscheidung zum Mockup E7); vorher Mockup | Playwright |
 | E8a ✅ | Ausführen im Editor | Mockup: [`design/mockups/e8-run.html`](../design/mockups/e8-run.html). Run (F5) mit gemerkten Werten, Dialog für Environment und Parameter (▾, Shift+F5), Rückfrage bei ungespeicherten Änderungen, Abbrechen (Ctrl+.), Live-Status an Actions und Links, Ergebnis in der Statusleiste | Manuell; Playwright |
-| E8b | Log und Ergebnis | Mockup wie E8a. Tab „Log“ unter dem Canvas (folgt dem Lauf, Schalter „Debug“), Ergebnis der gewählten Action im Panel mit Sprung ins Log; Zustand „wartet“ (Join) am Knoten, sofern die Engine ihn meldet | Playwright |
+| E8b ✅ | Log und Ergebnis | Mockup wie E8a. Tab „Log“ unter dem Canvas (folgt dem Lauf, Schalter „Debug“), Ergebnis der gewählten Action im Panel mit Sprung ins Log; Zustand „wartet“ (Join) am Knoten über das neue Ereignis `action.waiting` der Engine | Go-Test der Engine; Playwright |
 
 **Ergebnis 0.2:** Workflows unter `http://localhost:7300` visuell bauen, prüfen, starten und beobachten – auf denselben YAML-Dateien wie die CLI.
 

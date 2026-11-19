@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
 import { editWorkflow, problemTarget, validate, type Link, type Problem, type Validation, type WorkflowEdit } from "../workflow";
 import { Canvas, type Selection } from "./Canvas";
-import { ProblemsBar } from "./ProblemsBar";
+import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { RunDialog } from "./RunDialog";
 import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
@@ -84,7 +84,8 @@ export function FileView(props: {
   const [editError, setEditError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection>({ actions: [], links: [] });
-  const [problemsOpen, setProblemsOpen] = useState(false);
+  const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
+  const [logFocus, setLogFocus] = useState<{ actionId: string; seq: number } | null>(null);
   // A field of the properties panel to show and focus, e.g. after clicking a problem.
   const [focusField, setFocusField] = useState<{ key: string; seq: number } | null>(null);
   const [panel, setPanel] = useState(true);
@@ -318,11 +319,12 @@ export function FileView(props: {
       if (!wf) return;
       try {
         await startRun(settings, wf);
+        setBottomTab("log"); // the log opens when a run starts and follows it (mockup E8)
         setEditError(null);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setEditError(`Could not start the run: ${msg}`);
-        if (err instanceof StartError && err.problems.length > 0) setProblemsOpen(true);
+        if (err instanceof StartError && err.problems.length > 0) setBottomTab("problems");
       }
     },
     [validation, startRun],
@@ -468,7 +470,7 @@ export function FileView(props: {
             testId="error-count"
             tone="error"
             title={problemList(validation, "error")}
-            onClick={editable && view === "canvas" ? () => setProblemsOpen(true) : undefined}
+            onClick={editable && view === "canvas" ? () => setBottomTab("problems") : undefined}
           >
             ✖ {validation.errors}
           </Badge>
@@ -478,7 +480,7 @@ export function FileView(props: {
             testId="warning-count"
             tone="warning"
             title={problemList(validation, "warning")}
-            onClick={editable && view === "canvas" ? () => setProblemsOpen(true) : undefined}
+            onClick={editable && view === "canvas" ? () => setBottomTab("problems") : undefined}
           >
             ⚠ {validation.warnings}
           </Badge>
@@ -587,12 +589,18 @@ export function FileView(props: {
           <div className="runnel-canvas flex-1" aria-busy="true" />
         )}
         {editable && view === "canvas" && validation?.workflow && (
-          <ProblemsBar
+          <BottomPanel
             workflow={validation.workflow}
             problems={validation.problems}
-            open={problemsOpen}
-            onToggle={() => setProblemsOpen(!problemsOpen)}
+            tab={bottomTab}
+            onTab={setBottomTab}
             onOpen={openProblem}
+            run={run}
+            logFocus={logFocus}
+            onSelectAction={(id) => {
+              setSelection({ actions: [id], links: [] });
+              setPanel(true);
+            }}
           />
         )}
         {toast && (
@@ -619,6 +627,11 @@ export function FileView(props: {
           selected={selection}
           problems={validation.problems}
           focus={focusField}
+          run={shownRun}
+          onShowInLog={(actionId) => {
+            setBottomTab("log");
+            setLogFocus((f) => ({ actionId, seq: (f?.seq ?? 0) + 1 }));
+          }}
           onSet={onSet}
           onSetWorkflow={onSetWorkflow}
           onLinkChange={onLinkChange}

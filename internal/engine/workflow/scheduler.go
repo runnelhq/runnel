@@ -259,6 +259,16 @@ func (s *scheduler) evaluate(id string, justFired bool) {
 		case s.activated[id]:
 		case nPending > 0:
 			if nFired > 0 {
+				if justFired {
+					a := s.r.actions[id]
+					links := "links"
+					if nPending == 1 {
+						links = "link"
+					}
+					msg := fmt.Sprintf("waiting for %d more incoming %s (join: all)", nPending, links)
+					s.r.emit(Event{Time: s.r.opts.Now(), Kind: ActionWaiting, RunID: s.runID, ActionID: id, ActionType: a.Type,
+						Status: Waiting, Message: msg})
+				}
 				s.startJoinTimer(id)
 			}
 		case nFired > 0:

@@ -283,3 +283,45 @@ links:
 		t.Errorf("status %s (%v), starts %v; want try 3x, pause 2x, report 1x", res.Status, res.Err, starts)
 	}
 }
+
+func TestJoinAllReportsWaiting(t *testing.T) {
+	// start → a, b, c → target (join all): target waits after the first and the second branch.
+	w := parse(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: test.ok }
+  - { id: b, type: test.ok }
+  - { id: c, type: test.ok }
+  - { id: target, type: test.ok }
+links:
+  - { from: start, to: a }
+  - { from: start, to: b }
+  - { from: start, to: c }
+  - { from: a, to: target }
+  - { from: b, to: target }
+  - { from: c, to: target }
+`)
+	var mu sync.Mutex
+	var waiting []string
+	opts := Options{Registry: testRegistry(t), Observer: func(e Event) {
+		if e.Kind == ActionWaiting {
+			mu.Lock()
+			defer mu.Unlock()
+			waiting = append(waiting, e.ActionID+": "+e.Message)
+		}
+	}}
+	r, err := Prepare(w, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res := r.Run(context.Background()); res.Status != Succeeded {
+		t.Fatalf("status %s: %v", res.Status, res.Err)
+	}
+	want := []string{
+		"target: waiting for 2 more incoming links (join: all)",
+		"target: waiting for 1 more incoming link (join: all)",
+	}
+	if !slices.Equal(waiting, want) {
+		t.Errorf("waiting events %q, want %q", waiting, want)
+	}
+}

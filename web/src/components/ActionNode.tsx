@@ -32,6 +32,7 @@ const severityRank = (ps: Problem[]) =>
 /** Run status: bar colour, symbol (design/README.md 3.2, 6.1). */
 const runLook: Record<string, { bar: string; marker: string; symbol: string; label: string }> = {
   running: { bar: "bg-status-running", marker: "bg-status-running", symbol: "", label: "Running" },
+  waiting: { bar: "bg-status-waiting", marker: "bg-status-waiting", symbol: "⧗", label: "Waiting for further incoming links" },
   succeeded: { bar: "bg-status-success", marker: "bg-status-success", symbol: "✔", label: "Succeeded" },
   failed: { bar: "bg-status-failed", marker: "bg-status-failed", symbol: "✖", label: "Failed" },
   cancelled: { bar: "bg-status-skipped", marker: "bg-status-skipped", symbol: "■", label: "Cancelled" },
