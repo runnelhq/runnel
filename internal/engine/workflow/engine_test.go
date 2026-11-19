@@ -346,7 +346,7 @@ links:
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	res := r.Run(ctx)
-	if res.Status != Failed || !errors.Is(res.Err, context.DeadlineExceeded) {
+	if res.Status != Cancelled || !errors.Is(res.Err, context.DeadlineExceeded) {
 		t.Errorf("result = %+v", res)
 	}
 }
@@ -374,11 +374,8 @@ links:
 		t.Fatalf("want model.Errors, got %v", err)
 	}
 	for _, want := range []string{
-		"test.workflow.yaml:6:12: a workflow timeout is not supported",
 		`9:20: action "a": unknown action type "file.copy" (available: [core.abort core.log core.start core.success core.wait test.fail test.flaky test.ok])`,
 		`10:38: action "b" (core.log): unknown field "mesage"`,
-		`11:38: action "c": timeout is not supported`,
-		`11:51: action "c": retry is not supported`,
 		`15:29: link #2: an expression condition is not supported`,
 	} {
 		if !strings.Contains(err.Error(), want) {

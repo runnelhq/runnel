@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 // timestamps and run ids vary between runs; replace them for comparisons.
@@ -151,5 +154,36 @@ func TestRunUndeclaredParamWarning(t *testing.T) {
 	code, _, errOut := run(t, "run", "--param", "EXTRA=1", file)
 	if code != 0 || !strings.Contains(errOut, `warning: parameter "EXTRA" is not declared`) {
 		t.Errorf("exit code %d, stderr %q", code, errOut)
+	}
+}
+
+func TestRunCancelled(t *testing.T) {
+	file := writeWorkflow(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: wait, type: core.wait, with: { duration: 1h } }
+links:
+  - { from: start, to: wait }
+`)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	var out, errOut bytes.Buffer
+	code := ExecuteContext(ctx, []string{"run", file}, &out, &errOut)
+	if code != ExitCancelled || !strings.Contains(out.String(), `workflow "test" cancelled after`) {
+		t.Errorf("exit code %d, output:\n%s%s", code, out.String(), errOut.String())
+	}
+}
+
+func TestRunActionTimeout(t *testing.T) {
+	file := writeWorkflow(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: wait, type: core.wait, timeout: 50ms, with: { duration: 1h } }
+links:
+  - { from: start, to: wait }
+`)
+	code, out, _ := run(t, "run", file)
+	if code != exitRunFailed || !strings.Contains(out, "[wait] failed after") || !strings.Contains(out, "timed out after 50ms") {
+		t.Errorf("exit code %d, output:\n%s", code, out)
 	}
 }

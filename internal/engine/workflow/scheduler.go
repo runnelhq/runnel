@@ -42,6 +42,12 @@ type scheduler struct {
 	running   int
 	done      chan completion
 
+	// Join timeouts (ADR 0003): one timer per waiting action; the generation
+	// distinguishes timers of earlier loop iterations.
+	joinTimers map[string]*time.Timer
+	joinGen    map[string]int
+	timeouts   chan joinTimeout
+
 	unhandled []error // failures not followed by any link
 	ended     bool    // core.success/core.abort, run limit or cancellation ended the run
 	endStatus Status
@@ -51,25 +57,43 @@ type scheduler struct {
 func newScheduler(ctx context.Context, r *Runner, runID string) *scheduler {
 	ctx, cancel := context.WithCancel(ctx)
 	return &scheduler{
-		r:         r,
-		ctx:       ctx,
-		cancel:    cancel,
-		runID:     runID,
-		links:     make([]linkState, len(r.w.Links)),
-		activated: map[string]bool{},
-		runs:      map[string]int{},
-		done:      make(chan completion),
+		r:          r,
+		ctx:        ctx,
+		cancel:     cancel,
+		runID:      runID,
+		links:      make([]linkState, len(r.w.Links)),
+		activated:  map[string]bool{},
+		runs:       map[string]int{},
+		done:       make(chan completion),
+		joinTimers: map[string]*time.Timer{},
+		joinGen:    map[string]int{},
+		timeouts:   make(chan joinTimeout),
 	}
+}
+
+type joinTimeout struct {
+	actionID string
+	gen      int
+	after    time.Duration
 }
 
 // run executes the workflow until no action is running and none can start any more.
 func (s *scheduler) run() (Status, error) {
 	defer s.cancel()
+	defer func() {
+		for _, t := range s.joinTimers {
+			t.Stop()
+		}
+	}()
 	s.activate(s.r.start)
 	for s.running > 0 {
-		c := <-s.done
-		s.running--
-		s.finished(c)
+		select {
+		case c := <-s.done:
+			s.running--
+			s.finished(c)
+		case jt := <-s.timeouts:
+			s.joinTimedOut(jt)
+		}
 	}
 	switch {
 	case s.ended:
@@ -119,7 +143,10 @@ func (s *scheduler) activate(id string) {
 func (s *scheduler) finished(c completion) {
 	a := s.r.actions[c.actionID]
 	status := Succeeded
-	if c.err != nil || c.res.End == action.EndFailure {
+	switch {
+	case c.err != nil && s.ctx.Err() != nil && errors.Is(c.err, s.ctx.Err()):
+		status = Cancelled // stopped because the run ended, timed out or was cancelled
+	case c.err != nil || c.res.End == action.EndFailure:
 		status = Failed
 	}
 	end := s.r.opts.Now()
@@ -229,7 +256,11 @@ func (s *scheduler) evaluate(id string, justFired bool) {
 		}
 	default: // all
 		switch {
-		case s.activated[id] || nPending > 0:
+		case s.activated[id]:
+		case nPending > 0:
+			if nFired > 0 {
+				s.startJoinTimer(id)
+			}
 		case nFired > 0:
 			s.activated[id] = true
 			s.activate(id)
@@ -281,5 +312,48 @@ func (s *scheduler) resetIteration(id string) {
 	}
 	for a := range region {
 		delete(s.activated, a)
+		s.stopJoinTimer(a)
 	}
+}
+
+// startJoinTimer starts the joinTimeout of an action once its first incoming link has fired.
+func (s *scheduler) startJoinTimer(id string) {
+	d, _ := s.r.actions[id].JoinTimeout.Value()
+	if d <= 0 || s.joinTimers[id] != nil {
+		return
+	}
+	jt := joinTimeout{actionID: id, gen: s.joinGen[id], after: d}
+	s.joinTimers[id] = time.AfterFunc(d, func() {
+		select {
+		case s.timeouts <- jt:
+		case <-s.ctx.Done():
+		}
+	})
+}
+
+func (s *scheduler) stopJoinTimer(id string) {
+	if t := s.joinTimers[id]; t != nil {
+		t.Stop()
+		delete(s.joinTimers, id)
+	}
+	s.joinGen[id]++
+}
+
+// joinTimedOut fails an action whose join waited longer than its joinTimeout.
+// The action does not run; its failure links are followed.
+func (s *scheduler) joinTimedOut(jt joinTimeout) {
+	id := jt.actionID
+	if s.ended || s.activated[id] || jt.gen != s.joinGen[id] {
+		return
+	}
+	s.activated[id] = true
+	delete(s.joinTimers, id)
+	var waiting []string
+	for _, li := range s.r.in[id] {
+		if s.links[li] == pending {
+			waiting = append(waiting, s.r.w.Links[li].From)
+		}
+	}
+	s.finished(completion{actionID: id, start: s.r.opts.Now(),
+		err: fmt.Errorf("join timeout: still waiting for %v after %s", waiting, jt.after)})
 }
