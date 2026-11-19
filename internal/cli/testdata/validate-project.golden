@@ -21,8 +21,9 @@ internal/model/testdata/project/invalid/environments/dev.yaml:3:7: error: enviro
 internal/model/testdata/project/invalid/environments/dev.yaml:5:7: error: invalid variable name "1X" (letters, digits and _, not starting with a digit)
 internal/model/testdata/project/invalid/environments/test.yaml:4:12: error: sequence was used where mapping is expected
 internal/model/testdata/project/invalid/project.yaml:4:21: error: default environment "staging" not found (expected internal/model/testdata/project/invalid/environments/staging.yaml)
-internal/model/testdata/project/invalid/project.yaml:7:13: error: invalid variable name "bad-name" (letters, digits and _, not starting with a digit)
-internal/model/testdata/project/invalid/project.yaml:8:11: error: unclosed "${" at position 1
-1 workflow file checked: 6 errors, 0 warnings
+internal/model/testdata/project/invalid/project.yaml:6:16: error: invalid defaultJoin "any" (expected all, first or each)
+internal/model/testdata/project/invalid/project.yaml:9:13: error: invalid variable name "bad-name" (letters, digits and _, not starting with a digit)
+internal/model/testdata/project/invalid/project.yaml:10:11: error: unclosed "${" at position 1
+1 workflow file checked: 7 errors, 0 warnings
 exit code 1
 

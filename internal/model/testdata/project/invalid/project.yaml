@@ -2,6 +2,8 @@ kind: Project
 apiVersion: runnel/v1
 name: invalid
 defaultEnvironment: staging
+workflow:
+  defaultJoin: any
 variables:
   GOOD: ok
   bad-name: x

@@ -136,10 +136,15 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	}
 
 	logger := &runLogger{out: out, verbose: opts.verbose, workflow: w.Name, env: env}
+	var defaultJoin model.JoinMode
+	if p != nil {
+		defaultJoin = p.Workflow.DefaultJoin
+	}
 	runner, err := workflow.Prepare(w, workflow.Options{
-		Registry: newRegistry(),
-		Scope:    model.Scope(w, p, env, params),
-		Observer: logger.event,
+		Registry:    newRegistry(),
+		DefaultJoin: defaultJoin,
+		Scope:       model.Scope(w, p, env, params),
+		Observer:    logger.event,
 	})
 	if err != nil {
 		var diags model.Errors
@@ -213,6 +218,10 @@ func (l *runLogger) event(e workflow.Event) {
 	case workflow.Log:
 		if e.Level >= slog.LevelInfo || l.verbose {
 			l.line(e.Time, e.Level, e.ActionID, e.Message)
+		}
+	case workflow.ActionSkipped:
+		if l.verbose {
+			l.line(e.Time, slog.LevelDebug, e.ActionID, "skipped (no incoming link applies)")
 		}
 	case workflow.ActionFinished:
 		switch {

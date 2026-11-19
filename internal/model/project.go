@@ -26,6 +26,8 @@ type Project struct {
 	Description        string            `yaml:"description,omitempty" json:"description,omitempty"`
 	DefaultEnvironment string            `yaml:"defaultEnvironment,omitempty" json:"defaultEnvironment,omitempty"`
 	Variables          map[string]string `yaml:"variables,omitempty" json:"variables,omitempty"`
+	// Workflow holds project-wide defaults for workflows.
+	Workflow ProjectWorkflowSettings `yaml:"workflow,omitempty" json:"workflow,omitzero"`
 
 	// Dir is the project directory as passed to LoadProject.
 	Dir string `yaml:"-" json:"-"`
@@ -33,6 +35,12 @@ type Project struct {
 	Environments map[string]*Environment `yaml:"-" json:"environments,omitempty"`
 
 	src *source
+}
+
+// ProjectWorkflowSettings are project-wide defaults for workflows.
+type ProjectWorkflowSettings struct {
+	// DefaultJoin applies to actions without "join" (ADR 0003); empty means all.
+	DefaultJoin JoinMode `yaml:"defaultJoin,omitempty" json:"defaultJoin,omitempty"`
 }
 
 // Environment is the content of environments/<name>.yaml: variables for one target system.
@@ -167,6 +175,11 @@ func loadEnvironment(path string) (*Environment, error) {
 
 func (p *Project) validate() Errors {
 	errs := checkHeader(p.src, p.Kind, KindProject, p.APIVersion, p.Name)
+	switch p.Workflow.DefaultJoin {
+	case "", JoinAll, JoinFirst, JoinEach:
+	default:
+		errs = append(errs, p.src.errorf("$.workflow.defaultJoin", "invalid defaultJoin %q (expected all, first or each)", p.Workflow.DefaultJoin))
+	}
 	errs = append(errs, checkVariables(p.src, p.Variables)...)
 	errs = append(errs, checkReferenceSyntax(p.src)...)
 	return errs

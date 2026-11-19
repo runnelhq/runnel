@@ -231,7 +231,7 @@ links:
 			wantTrace:  "start,try,pause,try,pause,try,done",
 		},
 		{
-			name: "two links apply: parallel branches are not supported yet",
+			name: "two links apply: both branches run",
 			yaml: `
 actions:
   - { id: start, type: core.start }
@@ -241,9 +241,8 @@ links:
   - { from: start, to: a }
   - { from: start, to: b }
 `,
-			wantStatus: Failed,
-			wantErr:    "parallel branches are not supported",
-			wantTrace:  "start",
+			wantStatus: Succeeded,
+			wantTrace:  "start,a,b",
 		},
 		{
 			name: "disabled links are ignored",
@@ -380,7 +379,6 @@ links:
 		`10:38: action "b" (core.log): unknown field "mesage"`,
 		`11:38: action "c": timeout is not supported`,
 		`11:51: action "c": retry is not supported`,
-		`12:11: action "d": more than one incoming link (joining branches) is not supported`,
 		`15:29: link #2: an expression condition is not supported`,
 	} {
 		if !strings.Contains(err.Error(), want) {
