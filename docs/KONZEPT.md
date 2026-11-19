@@ -805,7 +805,7 @@ Die Oberfläche ist englisch ([ADR 0015](adr/0015-sprache-oberflaeche.md)).
 Kernfunktionen:
 - Drag & Drop aus der Palette, Links per Ziehen zwischen Ports, Link-Typ per Klick umschalten (✔/✖/∞/ƒ)
 - Live-Status auf dem Canvas (Knotenfarbe, Zeilenzähler an Links)
-- Inline-Validierung (rote Markierung + Tab „Problems“)
+- Inline-Validierung (rote Markierung am Knoten und am Feld im Panel „Properties“ + Tab „Problems“)
 - Feld-Autovervollständigung: Der Editor kennt das Ausgabeschema jedes Transforms (aus `Init`) und schlägt Feldnamen vor
 - Copy/Paste von Knoten als YAML (zwischen Instanzen und in Tickets/Chats teilbar)
 - Tastatur-Shortcuts, Undo/Redo, Auto-Layout, Gruppierung/Notizen auf dem Canvas

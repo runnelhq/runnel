@@ -11,6 +11,8 @@ export interface ActionNodeData extends Record<string, unknown> {
   color?: string;
   problems: Problem[];
   onShowInYAML: (line: number) => void;
+  /** The properties panel shows the problems; the popover at the node is then not needed. */
+  problemsInPanel?: boolean;
   /** Ports accept new links (editable canvas). */
   connectable?: boolean;
   /** Starts editing the id (double-click on it). */
@@ -83,7 +85,7 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
           {severity === "error" ? "✖" : "⚠"}
         </span>
       )}
-      <NodeToolbar isVisible={selected && data.problems.length > 0 && !data.rename} position={Position.Bottom} offset={12}>
+      <NodeToolbar isVisible={selected && data.problems.length > 0 && !data.rename && !data.problemsInPanel} position={Position.Bottom} offset={12}>
         <div
           role="dialog"
           aria-label={`Problems of ${data.id}`}

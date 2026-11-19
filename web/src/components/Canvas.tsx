@@ -38,6 +38,9 @@ const edgeTypes: EdgeTypes = { link: LinkEdge };
 
 /** Grid the nodes snap to when moved (decision for mockup E6a). */
 export const snapGrid: [number, number] = [8, 8];
+// Stable key lists: React Flow re-registers its key handlers whenever these change.
+const deleteKeys = ["Delete", "Backspace"];
+const multiSelectionKeys = ["Control", "Meta"];
 const snap = (v: number) => Math.round(v / snapGrid[0]) * snapGrid[0];
 
 type Positions = Record<string, { x: number; y: number }>;
@@ -58,6 +61,12 @@ export interface CanvasProps {
   onConnect?: (link: Link) => void;
   /** Called when the kind of a link was chosen in the link menu. */
   onLinkKind?: (index: number, when: SettableKind) => void;
+  /** Called with the ids of the selected actions. */
+  onSelect?: (ids: string[]) => void;
+  /** Selects these actions, e.g. after renaming one in the properties panel. */
+  selection?: string[];
+  /** The properties panel is shown and lists the problems of the selected action. */
+  problemsInPanel?: boolean;
   /** Id of the action whose id is being edited. */
   renaming?: string | null;
   onRenaming?: (id: string | null) => void;
@@ -79,14 +88,15 @@ export function Canvas(props: CanvasProps) {
 }
 
 function Graph(props: CanvasProps) {
-  const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming } =
+  const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel } =
     props;
   const catalog = useCatalog();
   const editable = onMove !== undefined;
   const { screenToFlowPosition } = useReactFlow();
   const [menu, setMenu] = useState<string | null>(null);
   const [ghost, setGhost] = useState<{ type: string; x: number; y: number } | null>(null);
-  const selectedRef = useRef(new Set<string>());
+  // Starts with the selection of the file view, e.g. when switching back from the YAML view.
+  const selectedRef = useRef(new Set<string>(props.selection ?? []));
 
   const finishRename = useCallback(
     (from: string, to: string | null) => {
@@ -103,7 +113,9 @@ function Graph(props: CanvasProps) {
     const { positions, auto } = place(workflow);
     const byAction = problemsByAction(workflow, problems);
     const ids = new Set((workflow.actions ?? []).map((a) => a.id));
-    const computed: ActionNodeType[] = (workflow.actions ?? []).map((a) => {
+    // A file with duplicate ids is shown with the first of them only (the problem is reported).
+    const unique = (workflow.actions ?? []).filter((a, i, all) => a.id && all.findIndex((b) => b.id === a.id) === i);
+    const computed: ActionNodeType[] = unique.map((a) => {
       const d = catalog.get(a.type);
       return {
         id: a.id,
@@ -116,6 +128,7 @@ function Graph(props: CanvasProps) {
           color: d ? (categoryColor[d.category] ?? categoryColor.general) : catalog.size === 0 ? categoryColor.general : undefined,
           problems: byAction.get(a.id) ?? [],
           onShowInYAML,
+          problemsInPanel,
           connectable: editable,
           onStartRename: editable ? () => onRenaming?.(a.id) : undefined,
           rename: renaming === a.id ? { taken: ids, onDone: (to: string | null) => finishRename(a.id, to) } : undefined,
@@ -134,23 +147,40 @@ function Graph(props: CanvasProps) {
         data: { kind: linkKind(l.when), when: l.when, loop: l.loop, disabled: l.disabled },
       }));
     return { computed, computedEdges, auto };
-  }, [workflow, problems, catalog, onShowInYAML, editable, renaming, onRenaming, finishRename]);
+  }, [workflow, problems, catalog, onShowInYAML, problemsInPanel, editable, renaming, onRenaming, finishRename]);
 
   // Local node and edge state for dragging and selection; it follows the workflow and keeps the selection.
-  const [nodes, setNodes, onNodesChange] = useNodesState<ActionNodeType>(computed);
+  // The nodes start with the current selection, so that React Flow does not report an empty one first.
+  const [nodes, setNodes, onNodesChange] = useNodesState<ActionNodeType>(
+    computed.map((n) => ({ ...n, selected: selectedRef.current.has(n.id) })),
+  );
   const [edges, setEdges, onEdgesChange] = useEdgesState<LinkEdgeType>(computedEdges);
   useEffect(() => {
     if (renaming) selectedRef.current = new Set([renaming]);
     setNodes(computed.map((n) => ({ ...n, selected: selectedRef.current.has(n.id) })));
   }, [computed, renaming, setNodes]);
   useEffect(() => {
+    if (!selection) return;
+    const same = selection.length === selectedRef.current.size && selection.every((id) => selectedRef.current.has(id));
+    // A renamed action is selected once the workflow with its new id has arrived.
+    if (same || !selection.every((id) => computed.some((n) => n.id === id))) return;
+    selectedRef.current = new Set(selection);
+    setNodes((ns) => ns.map((n) => ({ ...n, selected: selectedRef.current.has(n.id) })));
+  }, [selection, computed, setNodes]);
+  useEffect(() => {
     setEdges(computedEdges);
     setMenu(null);
   }, [computedEdges, setEdges]);
 
-  const onSelectionChange = useCallback(({ nodes }: { nodes: { id: string }[] }) => {
-    selectedRef.current = new Set(nodes.map((n) => n.id));
-  }, []);
+  const onSelectionChange = useCallback(
+    ({ nodes }: { nodes: { id: string }[] }) => {
+      const ids = nodes.map((n) => n.id);
+      const same = ids.length === selectedRef.current.size && ids.every((id) => selectedRef.current.has(id));
+      selectedRef.current = new Set(ids);
+      if (!same) onSelect?.(ids);
+    },
+    [onSelect],
+  );
 
   /** Positions to write with a change: only the given ones, or all if the file has no complete layout. */
   const withLayout = useCallback(
@@ -284,8 +314,8 @@ function Graph(props: CanvasProps) {
         elementsSelectable
         snapToGrid
         snapGrid={snapGrid}
-        deleteKeyCode={editable ? ["Delete", "Backspace"] : null}
-        multiSelectionKeyCode={["Control", "Meta"]}
+        deleteKeyCode={editable ? deleteKeys : null}
+        multiSelectionKeyCode={multiSelectionKeys}
         selectionKeyCode="Shift"
         zoomOnDoubleClick={false}
         fitView

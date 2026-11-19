@@ -88,6 +88,7 @@ Regeln:
   | `schema:"enum=a\|b\|c"` | erlaubte Werte (der Editor bietet eine Auswahl an) |
   | `schema:"example=…"` | Beispielwert; für Pflichtfelder empfohlen, der Vertragstest verwendet ihn |
   | `schema:"format=runnel-duration"` | Zeitangabe wie `30s`, `5m`, `1h30m` |
+  | `schema:"format=runnel-text"` | mehrzeiliger Text (der Editor zeigt ein wachsendes Textfeld statt einer Zeile) |
 
   Optionen werden mit Komma getrennt (`schema:"required,example=30s"`); Werte dürfen daher kein Komma enthalten.
   Backslashes in Tags verdoppeln (`example=C:\\in`), sonst ist das ganze Tag ungültig.

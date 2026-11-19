@@ -33,6 +33,10 @@ const Draft = "https://json-schema.org/draft/2020-12/schema"
 // "1h30m". JSON Schema's own "duration" format means ISO 8601, so Runnel uses its own name.
 const FormatDuration = "runnel-duration"
 
+// FormatText marks a text that may span several lines (the editor shows a growing text
+// field instead of a single line, decision for mockup E7).
+const FormatText = "runnel-text"
+
 // Schema is a JSON Schema, limited to what configuration structs need.
 type Schema struct {
 	Schema      string     `json:"$schema,omitempty"`

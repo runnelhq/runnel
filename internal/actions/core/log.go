@@ -20,7 +20,7 @@ var logDefinition = action.Definition{
 }
 
 type logAction struct {
-	Message string `json:"message" doc:"Text to write; may span several lines" schema:"required,example=Import finished"`
+	Message string `json:"message" doc:"Text to write; may span several lines" schema:"required,format=runnel-text,example=Import finished"`
 	Level   string `json:"level" doc:"Log level of the message" schema:"enum=debug|info|warn|error,default=info"`
 }
 

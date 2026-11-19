@@ -93,15 +93,16 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 
 // validate returns the parsed workflow (nil if it cannot be parsed) and all problems.
 func (s *Server) validate(name string, data []byte) (*model.Workflow, model.Errors, error) {
-	wf, err := model.ParseWorkflow(name, data)
-	if err != nil {
-		var diags model.Errors
-		if errors.As(err, &diags) {
-			return nil, diags, nil
-		}
+	// Workflows with field errors are returned as well, so that the editor can show them.
+	wf, err := model.ReadWorkflow(name, data)
+	var diags model.Errors
+	if err != nil && !errors.As(err, &diags) {
 		return nil, nil, err
 	}
-	diags := wf.Validate()
+	if wf == nil {
+		return nil, diags, nil
+	}
+	diags = append(diags, wf.Validate()...)
 
 	p, err := model.LoadProject(s.dir)
 	var projectDiags model.Errors

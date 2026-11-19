@@ -214,6 +214,23 @@ func ParseWorkflow(name string, data []byte) (*Workflow, error) {
 	return w, nil
 }
 
+// ReadWorkflow parses a workflow like ParseWorkflow, but also returns it when only
+// fields are invalid (e.g. an unknown join mode or an invalid duration): the editor can
+// then still show the workflow and the errors at their fields. The workflow is nil if
+// the file cannot be read at all (syntax error, wrong types, unknown fields); the
+// returned error lists the problems in both cases.
+func ReadWorkflow(name string, data []byte) (*Workflow, error) {
+	src, err := parseSource(name, data)
+	if err != nil {
+		return nil, err
+	}
+	w := &Workflow{src: src}
+	if err := src.decode(w); err != nil {
+		return nil, err
+	}
+	return w, w.validate()
+}
+
 var (
 	idPattern         = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
 	actionTypePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$`)

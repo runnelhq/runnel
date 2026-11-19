@@ -83,6 +83,9 @@ type wait struct {
 | `doc` | Beschreibung für Editor und Werkzeuge (Pflicht, prüft der Vertragstest) |
 | `schema` | `required`, `default=…`, `enum=a\|b\|c`, `example=…`, `format=…` |
 
+Eigene Formate (`format`): `runnel-duration` (Zeitangabe wie `30s`, `5m`, `1h30m`) und – ergänzt mit E7a –
+`runnel-text` (mehrzeiliger Text; der Editor zeigt ein wachsendes Textfeld, alle anderen Texte sind einzeilig).
+
 - **Pflichtfelder** prüft `DecodeConfig` anhand von `schema:"required"`. Actions schreiben keine eigenen Prüfungen
   auf fehlende Felder mehr; Schema und Verhalten können so nicht voneinander abweichen.
 - **Typen:** Text → `string`, Ganzzahl → `integer`, Kommazahl → `number`, `bool` → `boolean`, Slices → `array`,

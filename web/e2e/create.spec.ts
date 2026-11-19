@@ -7,7 +7,8 @@ import { expect, test, type Page } from "@playwright/test";
 test.use({ baseURL: "http://127.0.0.1:7398" });
 test.describe.configure({ mode: "serial" });
 
-const path = "workflows/parallel.workflow.yaml";
+// Its own copy of parallel.workflow.yaml: the spec files run in parallel workers on the same server.
+const path = "workflows/create.workflow.yaml";
 const fileURL = `/api/v1/files/${path}`;
 const original = readFileSync(new URL("../../examples/hello/workflows/parallel.workflow.yaml", import.meta.url), "utf8");
 
@@ -17,7 +18,7 @@ test.beforeEach(async ({ request }) => {
 
 async function open(page: Page) {
   await page.goto("/");
-  await page.getByRole("tree").getByText("parallel.workflow.yaml", { exact: true }).click();
+  await page.getByRole("tree").getByText("create.workflow.yaml", { exact: true }).click();
   await expect(page.getByTestId("node-fetch-b")).toBeVisible();
 }
 
@@ -30,11 +31,11 @@ async function yaml(page: Page) {
   return text;
 }
 
-/** Drops an action from the palette right of report-error. */
+/** Drops an action from the palette below start, where the canvas is free. */
 async function drop(page: Page, type: string) {
-  const target = (await page.getByTestId("node-report-error").boundingBox())!;
+  const target = (await page.getByTestId("node-start").boundingBox())!;
   await page.getByTestId(`palette-${type}`).dragTo(page.getByTestId("canvas"), {
-    targetPosition: await canvasPoint(page, target.x + target.width + 160, target.y + target.height / 2),
+    targetPosition: await canvasPoint(page, target.x + target.width / 2, target.y + 200),
   });
 }
 
@@ -106,7 +107,8 @@ test("drops an action from the palette and renames it", async ({ page }) => {
   const [, x, y] = text.match(/notify: \{ x: (\d+), y: (\d+) \}/)!.map(Number);
   expect(x % 8).toBe(0);
   expect(y % 8).toBe(0);
-  expect(x).toBeGreaterThan(520);
+  expect(x).toBeLessThan(280); // below start, left of fetch-b
+  expect(y).toBeGreaterThan(300);
 
   // Undo takes back the rename, then the new action.
   await page.keyboard.press("Control+z");

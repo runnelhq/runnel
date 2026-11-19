@@ -284,6 +284,9 @@ links:
   - { from: greet, to: copy }
 `})},
 		{"validate-syntax.golden.json", mustJSON(t, map[string]string{"path": "workflows/new.workflow.yaml", "content": "kind: Workflow\nactions: [\n"})},
+		// Invalid fields: the workflow is still returned, the errors point to the fields.
+		{"validate-fields.golden.json", mustJSON(t, map[string]string{"path": "workflows/import.workflow.yaml", "content": strings.Replace(workflowYAML,
+			"type: core.start }", "type: core.start, timeout: 5 mins, join: some }", 1)})},
 	}
 	for _, tt := range tests {
 		t.Run(tt.golden, func(t *testing.T) {
@@ -347,6 +350,12 @@ func TestEditWorkflow(t *testing.T) {
 	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `- id: log-1`) || !strings.Contains(rec.Body.String(), `{ from: greet, to: log-1, when: failure }`) {
 		t.Errorf("add: status %d: %s", rec.Code, rec.Body)
+	}
+	body = mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": "kind: Workflow\napiVersion: runnel/v1\nname: x\nactions:\n  - id: start\n    type: core.start\n    timeout: 5 mins\n",
+		"set": []map[string]any{{"id": "start", "field": "timeout", "value": "5m"}}})
+	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `timeout: 5m\n`) {
+		t.Errorf("set: status %d: %s", rec.Code, rec.Body)
 	}
 	body = mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML, "rename": map[string]string{"greet": "hello"}})
 	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
