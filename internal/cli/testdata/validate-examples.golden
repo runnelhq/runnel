@@ -4,4 +4,4 @@ examples/broken/graph.workflow.yaml:11:12: warning: variable "API_URL" is not de
 examples/broken/graph.workflow.yaml:14:9: warning: action "cleanup" is not reachable from the start action "start" and will never run
 examples/broken/graph.workflow.yaml:18:27: error: link #2 (download → imprt): unknown action "imprt" (did you mean "import"?)
 examples/broken/graph.workflow.yaml:19:7: error: link #3 (import → download) closes a cycle (download → import → download); mark the link back with loop: true if the repetition is intended
-3 workflow files checked: 4 errors, 2 warnings
+4 workflow files checked: 4 errors, 2 warnings

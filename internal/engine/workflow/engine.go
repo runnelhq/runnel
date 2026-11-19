@@ -1,16 +1,17 @@
 // Package workflow runs workflows: it follows the links from the start action,
 // executes each action and decides on the next one by the action's outcome.
 //
-// This version runs one action at a time. Parallel branches, join modes,
-// expression conditions, retries and timeouts follow in later steps of the roadmap.
+// Actions whose incoming links fire run in parallel; where branches meet, the join
+// mode of the action decides when it starts (ADR 0003). Expression conditions,
+// retries and timeouts follow in later steps of the roadmap.
 package workflow
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -31,6 +32,8 @@ type Options struct {
 	Observer func(Event)
 	// MaxActionRuns overrides DefaultMaxActionRuns if > 0.
 	MaxActionRuns int
+	// DefaultJoin applies to actions without "join"; empty means all (ADR 0003).
+	DefaultJoin model.JoinMode
 	// Now returns the current time; defaults to time.Now (replaceable in tests).
 	Now func() time.Time
 }
@@ -38,10 +41,12 @@ type Options struct {
 // Status is the final state of a run.
 type Status string
 
-// Run states.
+// Run and action states.
 const (
 	Succeeded Status = "succeeded"
 	Failed    Status = "failed"
+	// Skipped: the action was not run because none of its incoming links can fire (ADR 0003).
+	Skipped Status = "skipped"
 )
 
 // Result is the outcome of a run.
@@ -63,6 +68,7 @@ const (
 	RunFinished    EventKind = "run.finished"
 	ActionStarted  EventKind = "action.started"
 	ActionFinished EventKind = "action.finished"
+	ActionSkipped  EventKind = "action.skipped"
 	Log            EventKind = "log"
 )
 
@@ -86,8 +92,10 @@ type Runner struct {
 	w       *model.Workflow
 	opts    Options
 	actions map[string]*model.Action
-	out     map[string][]model.Link // enabled outgoing links per action id
+	out     map[string][]int // enabled outgoing links (indexes) per action id
+	in      map[string][]int // enabled incoming non-loop links (indexes) per action id
 	start   string
+	emitMu  sync.Mutex
 }
 
 // Prepare checks that the workflow can be run by this engine: all action types exist,
@@ -101,7 +109,7 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 	if opts.MaxActionRuns <= 0 {
 		opts.MaxActionRuns = DefaultMaxActionRuns
 	}
-	r := &Runner{w: w, opts: opts, actions: map[string]*model.Action{}, out: map[string][]model.Link{}}
+	r := &Runner{w: w, opts: opts, actions: map[string]*model.Action{}, out: map[string][]int{}, in: map[string][]int{}}
 	var errs model.Errors
 	unsupported := func(path, what string) {
 		errs = append(errs, w.ErrorAt(path, "%s is not supported by this version of Runnel yet", what))
@@ -135,9 +143,11 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 		if a.Retry != nil {
 			unsupported(path+".retry", fmt.Sprintf("action %q: retry", a.ID))
 		}
+		if a.JoinTimeout != "" {
+			unsupported(path+".joinTimeout", fmt.Sprintf("action %q: joinTimeout", a.ID))
+		}
 	}
 
-	incoming := map[string]int{}
 	for i, l := range w.Links {
 		if l.Disabled {
 			continue
@@ -145,15 +155,9 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 		if kind, _ := l.Condition(); kind == model.OnExpression {
 			unsupported(fmt.Sprintf("$.links[%d].when", i), fmt.Sprintf("link #%d: an expression condition", i+1))
 		}
-		r.out[l.From] = append(r.out[l.From], l)
+		r.out[l.From] = append(r.out[l.From], i)
 		if !l.Loop {
-			incoming[l.To]++
-		}
-	}
-	for i, a := range w.Actions {
-		if incoming[a.ID] > 1 {
-			unsupported(fmt.Sprintf("$.actions[%d].id", i),
-				fmt.Sprintf("action %q: more than one incoming link (joining branches)", a.ID))
+			r.in[l.To] = append(r.in[l.To], i)
 		}
 	}
 	if r.start == "" {
@@ -172,7 +176,7 @@ func (r *Runner) Run(ctx context.Context) Result {
 	runID := NewRunID(started)
 	r.emit(Event{Time: started, Kind: RunStarted, RunID: runID, Message: r.w.Name})
 
-	status, err := r.loop(ctx, runID)
+	status, err := newScheduler(ctx, r, runID).run()
 	var outputs map[string]any
 	if status == Succeeded {
 		if outputs, err = r.outputs(); err != nil {
@@ -209,84 +213,6 @@ func (r *Runner) outputs() (map[string]any, error) {
 	return out, nil
 }
 
-func (r *Runner) loop(ctx context.Context, runID string) (Status, error) {
-	runs := map[string]int{}
-	current := r.start
-	for {
-		if err := ctx.Err(); err != nil {
-			return Failed, err
-		}
-		runs[current]++
-		if runs[current] > r.opts.MaxActionRuns {
-			return Failed, fmt.Errorf("action %q ran more than %d times; stopping (endless loop?)", current, r.opts.MaxActionRuns)
-		}
-
-		a := r.actions[current]
-		res, actErr := r.execute(ctx, runID, a)
-		switch {
-		case actErr == nil && res.End == action.EndSuccess:
-			return Succeeded, nil
-		case actErr == nil && res.End == action.EndFailure:
-			return Failed, errors.New(res.Message)
-		}
-
-		ok := actErr == nil
-		if !ok && a.ContinueOnError {
-			r.log(runID, a, slog.LevelWarn, fmt.Sprintf("error ignored (continueOnError): %v", actErr))
-			ok = true
-		}
-
-		var next []model.Link
-		for _, l := range r.out[a.ID] {
-			if follows(l, ok) {
-				next = append(next, l)
-			}
-		}
-		switch len(next) {
-		case 0:
-			if ok {
-				return Succeeded, nil
-			}
-			return Failed, fmt.Errorf("action %q failed: %w", a.ID, actErr)
-		case 1:
-			current = next[0].To
-		default:
-			return Failed, fmt.Errorf("action %q: %d links apply (to %s and %s); parallel branches are not supported by this version of Runnel yet",
-				a.ID, len(next), next[0].To, next[1].To)
-		}
-	}
-}
-
-// follows reports whether a link is taken after an action with the given outcome.
-func follows(l model.Link, ok bool) bool {
-	switch kind, _ := l.Condition(); kind {
-	case model.OnSuccess:
-		return ok
-	case model.OnFailure:
-		return !ok
-	case model.Always:
-		return true
-	}
-	return false
-}
-
-// execute runs one action: resolves variables in its configuration, creates and executes it.
-func (r *Runner) execute(ctx context.Context, runID string, a *model.Action) (action.Result, error) {
-	start := r.opts.Now()
-	r.emit(Event{Time: start, Kind: ActionStarted, RunID: runID, ActionID: a.ID, ActionType: a.Type})
-
-	res, err := r.executeAction(ctx, runID, a)
-
-	status := Succeeded
-	if err != nil || res.End == action.EndFailure {
-		status = Failed
-	}
-	end := r.opts.Now()
-	r.emit(Event{Time: end, Kind: ActionFinished, RunID: runID, ActionID: a.ID, ActionType: a.Type,
-		Status: status, Err: err, Message: res.Message, Duration: end.Sub(start)})
-	return res, err
-}
-
 func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Action) (action.Result, error) {
 	with, err := expand(a.With, r.opts.Scope)
 	if err != nil {
@@ -309,8 +235,12 @@ func (r *Runner) log(runID string, a *model.Action, level slog.Level, msg string
 	r.emit(Event{Time: r.opts.Now(), Kind: Log, RunID: runID, ActionID: a.ID, ActionType: a.Type, Level: level, Message: msg})
 }
 
+// emit passes an event to the observer. Events come from the scheduler and from
+// running actions (log messages); the observer is called by one goroutine at a time.
 func (r *Runner) emit(e Event) {
 	if r.opts.Observer != nil {
+		r.emitMu.Lock()
+		defer r.emitMu.Unlock()
 		r.opts.Observer(e)
 	}
 }
