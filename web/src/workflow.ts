@@ -124,3 +124,21 @@ export function place(wf: Workflow): Placement {
   }
   return { positions, auto: missing.length === actions.length ? "all" : "some" };
 }
+
+/** Changes made on the canvas (see model.WorkflowEdit). */
+export interface WorkflowEdit {
+  move?: Record<string, { x: number; y: number }>;
+  delete?: string[];
+}
+
+/** Applies an edit to the text on the server and returns the new text (not saved). */
+export async function editWorkflow(path: string, content: string, edit: WorkflowEdit): Promise<string> {
+  const res = await fetch(`${apiBase}/workflows/edit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, content, ...edit }),
+  });
+  const body = (await res.json()) as { content?: string; error?: string };
+  if (!res.ok) throw new APIError(body.error ?? `${res.status} ${res.statusText}`, res.status);
+  return body.content ?? content;
+}

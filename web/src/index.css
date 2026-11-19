@@ -43,6 +43,9 @@
   font-size: var(--rn-text-sm);
   color: var(--foreground);
 }
+.runnel-canvas .react-flow__node.dragging > div {
+  box-shadow: var(--rn-shadow-md);
+}
 .runnel-canvas .react-flow__node.selected,
 .runnel-canvas .react-flow__node:focus-visible {
   outline: none;

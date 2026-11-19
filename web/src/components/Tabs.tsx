@@ -5,6 +5,8 @@ import { CloseIcon, KindIcon } from "./Icons";
 export function Tabs(props: {
   paths: string[];
   active: string | null;
+  /** Paths with unsaved changes: ● instead of ×, × on hover (mockup E6a). */
+  dirty?: Set<string>;
   onSelect: (path: string) => void;
   onClose: (path: string) => void;
 }) {
@@ -12,13 +14,15 @@ export function Tabs(props: {
     <div role="tablist" aria-label="Open files" className="flex h-9 shrink-0 overflow-x-auto border-b border-border bg-muted">
       {props.paths.map((path) => {
         const active = path === props.active;
+        const dirty = props.dirty?.has(path) ?? false;
         const name = path.slice(path.lastIndexOf("/") + 1);
         return (
           <div
             key={path}
             role="tab"
             aria-selected={active}
-            title={path}
+            title={dirty ? `${path} – unsaved changes` : path}
+            data-dirty={dirty || undefined}
             tabIndex={0}
             onClick={() => props.onSelect(path)}
             onAuxClick={(e) => e.button === 1 && props.onClose(path)}
@@ -40,9 +44,16 @@ export function Tabs(props: {
                 e.stopPropagation();
                 props.onClose(path);
               }}
-              className="grid size-[18px] cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="group grid size-[18px] cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
             >
-              <CloseIcon width={12} height={12} />
+              {dirty ? (
+                <>
+                  <span className="text-[10px] text-foreground group-hover:hidden">●</span>
+                  <CloseIcon width={12} height={12} className="hidden group-hover:block" />
+                </>
+              ) : (
+                <CloseIcon width={12} height={12} />
+              )}
             </button>
           </div>
         );

@@ -89,6 +89,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE "+APIPrefix+"/files/{path...}", s.handleDeleteFile)
 	mux.HandleFunc("GET "+APIPrefix+"/catalog", s.handleCatalog)
 	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
+	mux.HandleFunc("POST "+APIPrefix+"/workflows/edit", s.handleEditWorkflow)
 	mux.HandleFunc("POST "+APIPrefix+"/runs", s.handleStartRun)
 	mux.HandleFunc("GET "+APIPrefix+"/runs", s.handleListRuns)
 	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}", s.handleGetRun)

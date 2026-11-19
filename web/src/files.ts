@@ -99,3 +99,14 @@ export function fullPath(dir: string, path: string): string {
   const sep = dir.includes("\\") ? "\\" : "/";
   return dir.replace(/[\\/]+$/, "") + sep + path.split("/").join(sep);
 }
+
+/**
+ * Saves a file. etag is the ETag the text was loaded with ("*" overwrites without check).
+ * A file changed in the meantime fails with APIError status 412. Returns the new ETag.
+ */
+export async function saveFile(path: string, text: string, etag: string): Promise<string> {
+  const res = await check(
+    await fetch(fileURL(path), { method: "PUT", headers: { "If-Match": etag, "Content-Type": "application/octet-stream" }, body: text }),
+  );
+  return res.headers.get("ETag") ?? "*";
+}

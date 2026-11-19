@@ -319,3 +319,33 @@ func mustJSON(t *testing.T, v any) string {
 	}
 	return string(data)
 }
+
+func TestEditWorkflow(t *testing.T) {
+	_, s := newProject(t)
+	body := mustJSON(t, map[string]any{
+		"path":    "workflows/import.workflow.yaml",
+		"content": workflowYAML,
+		"move":    map[string]any{"greet": map[string]int{"x": 280, "y": 40}},
+	})
+	rec := do(t, s, "POST", "/api/v1/workflows/edit", body)
+	var res struct{ Content string }
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if want := workflowYAML + "layout:\n  greet: { x: 280, y: 40 }\n"; res.Content != want {
+		t.Errorf("content:\n%s\nwant:\n%s", res.Content, want)
+	}
+
+	body = mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML, "delete": []string{"greet"}})
+	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "greet") {
+		t.Errorf("delete: status %d: %s", rec.Code, rec.Body)
+	}
+
+	expect(t, do(t, s, "POST", "/api/v1/workflows/edit", mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML, "delete": []string{"nope"}})),
+		http.StatusBadRequest, `cannot delete action \"nope\"`)
+	expect(t, do(t, s, "POST", "/api/v1/workflows/edit", mustJSON(t, map[string]any{"path": "workflows/x.workflow.yaml", "content": "kind: [\n"})),
+		http.StatusUnprocessableEntity, "prevent editing")
+	expect(t, do(t, s, "POST", "/api/v1/workflows/edit", mustJSON(t, map[string]any{"path": "data/in.csv", "content": ""})),
+		http.StatusBadRequest, "only workflow files")
+}

@@ -108,6 +108,27 @@ export const CopyIcon = (p: P) => (
   </Icon>
 );
 
+export const UndoIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M9 14L4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+  </Icon>
+);
+
+export const RedoIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M15 14l5-5-5-5" />
+    <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+  </Icon>
+);
+
+export const SaveIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+    <path d="M7 3v5h8V3M7 21v-7h10v7" />
+  </Icon>
+);
+
 export const CodeIcon = (p: P) => (
   <Icon {...p}>
     <path d="M8 6l-5 6 5 6M16 6l5 6-5 6" />

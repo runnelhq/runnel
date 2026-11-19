@@ -33,6 +33,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | DELETE | `/files/{path}` | Datei löschen, `204` |
 | GET | `/catalog` | `{"actions": [Descriptor …]}` wie `runnel catalog --json` ([ADR 0014](../adr/0014-action-descriptor-schema.md)) |
 | POST | `/validate` | Workflow prüfen, siehe unten |
+| POST | `/workflows/edit` | Änderung vom Canvas auf den Text anwenden (nicht speichern), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
 | GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst |
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
@@ -156,3 +157,27 @@ data: {"seq":7,"kind":"log","time":"…","runId":"01M7…","actionId":"fetch-a",
   selbst) oder `?since=<seq>` folgen zuerst die verpassten; vorrätig sind die letzten 2.000.
 - `?run=<id>` liefert nur die Ereignisse eines Laufs.
 - Alle 15 s kommt ein Kommentar (`: ping`), damit Verbindungen offen bleiben. Beim Beenden des Servers endet der Strom.
+
+## Bearbeiten (`/workflows/edit`)
+
+Der Editor schickt den angezeigten Text und eine Änderung; der Server gibt den neuen Text zurück. Gespeichert wird erst
+mit `PUT /files/{path}` (ETag, siehe oben).
+
+```json
+POST /api/v1/workflows/edit
+{ "path": "workflows/parallel.workflow.yaml", "content": "kind: Workflow\n…",
+  "move": { "fetch-b": { "x": 360, "y": 320 } }, "delete": ["combine"] }
+
+→ 200 { "content": "kind: Workflow\n…" }
+```
+
+| Feld | Wirkung |
+|---|---|
+| `move` | setzt die Position (Pixel, linke obere Ecke) im `layout`-Block; fehlende Einträge werden angehängt, ein fehlender Block angelegt |
+| `delete` | entfernt die Actions, alle Links von und zu ihnen und ihre `layout`-Einträge |
+
+Geändert werden **nur die betroffenen Zeilen** (Positionen aus dem Syntaxbaum); Kommentare, Reihenfolge, Anführungszeichen,
+Flow- oder Block-Stil und Zeilenenden (LF/CRLF) aller anderen Zeilen bleiben erhalten – ein gespeicherter Stand ergibt
+einen kleinen Git-Diff. Antworten: `400` für unbekannte Action-IDs, `422` (Format wie `/validate`), wenn die Datei
+nicht als Workflow lesbar ist.
+

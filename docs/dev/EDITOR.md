@@ -4,7 +4,7 @@ Der Editor ist eine React-Anwendung in [`web/`](../../web). Sie wird gebaut, in 
 `runnel serve` unter `http://127.0.0.1:7300/` ausgeliefert. Mit dem Server spricht sie nur über die
 [API](API.md). Gestaltung: [Corporate Design](../../design/README.md), freigegebene [Mockups](../../design/mockups/README.md).
 
-> Stand: E5 – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Tabs, Datei nur lesend, Workflows als Canvas (nur lesen). Bearbeiten folgt mit E6.
+> Stand: E6a – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Tabs, Workflows als Canvas mit Verschieben, Löschen, Rückgängig und Speichern. Neue Knoten und Links folgen mit E6b.
 
 ## Voraussetzungen
 
@@ -21,7 +21,7 @@ Der Editor ist eine React-Anwendung in [`web/`](../../web). Sie wird gebaut, in 
 | Nur die exe bauen (bettet den letzten Editor-Build ein) | `make build-go` |
 | Entwickeln mit Live-Reload | `bin/runnel serve examples/hello`, dann in `web/`: `npm run dev` → `http://localhost:5173` (leitet `/api` an Port 7300 weiter) |
 | Typen prüfen | in `web/`: `npm run typecheck` |
-| End-to-End-Tests (Playwright) | `make e2e` (baut alles und startet `runnel serve examples/hello` auf Port 7399) |
+| End-to-End-Tests (Playwright) | `make e2e` (baut alles; startet `runnel serve examples/hello` auf Port 7399 und für Tests, die speichern, einen zweiten Server auf einer temporären Kopie auf Port 7398 – `web/e2e/serve-copy.mjs`) |
 
 Ohne Node baut `make build-go` eine exe ohne Editor; `runnel serve` zeigt dann unter `/` einen Hinweis. Die Go-Tests
 brauchen keinen Editor-Build.
@@ -71,6 +71,9 @@ design/fonts/           # Inter, JetBrains Mono (woff2, OFL) – lokal, kein Sch
 | Canvas | React Flow (`@xyflow/react`); Knoten `components/ActionNode.tsx`, Links `components/LinkEdge.tsx` (Symbol bei 35 % ab der Quelle). Das Modell kommt aus `/validate` (gesendet wird der angezeigte Text), nicht aus einem YAML-Parser im Browser |
 | Anordnung | `layout` der Datei (Pixel, linke obere Ecke, Karte 176 × 52 px); fehlen Positionen, ordnet dagre von links nach rechts an und ein Hinweis erscheint |
 | Meldungen | über den YAML-Pfad (`$.actions[i]…`) dem Knoten zugeordnet; Zähler in der Dateileiste; Klick auf den Knoten zeigt sie mit „Show in YAML ›“ |
+| Bearbeiten | Jede Änderung (verschieben mit 8-px-Raster, löschen) geht an `POST /workflows/edit`; der Server ändert den Text zeilengenau. Rückgängig/Wiederholen speichern Textstände (bis 100). Ungespeicherte Änderungen bleiben beim Tab-Wechsel erhalten; ein Neuladen nach Wiederverbindung überschreibt sie nie |
+| Speichern | `PUT /files/{path}` mit dem ETag des geladenen Stands; `412` öffnet den Konfliktdialog (Cancel, Reload, Overwrite = `If-Match: *`). Speichern wartet auf eine noch laufende Änderung. Gespeichert wird als UTF-8 – auch Dateien, die als UTF-16 oder Windows-1252 geöffnet wurden |
+| Schließen | Tab mit ungespeicherten Änderungen: Rückfrage Save / Don’t save / Cancel; beim Verlassen der Seite fragt der Browser |
 | Pfad kopieren | vollständiger Pfad mit dem Trennzeichen des Projektordners (`\` unter Windows) |
 
 ## Auslieferung

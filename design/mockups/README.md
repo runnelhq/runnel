@@ -8,7 +8,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 |---|---|---|---|
 | [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23, umgesetzt mit E4a/E4b |
 | [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | freigegeben mit PR #26, umgesetzt mit E5 |
-| [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28 |
+| [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28, umgesetzt mit E6a |
 
 ## Entscheidungen
 
