@@ -248,7 +248,8 @@ Canvas-Konventionen ([Konzept, Kap. 11](../docs/KONZEPT.md#11-editor--ux-konzept
 | Knoten | `--node`, 1 px `--node-border`, Radius lg, Schatten sm; links eine 28-px-Kachel in Kategoriefarbe mit weißem Icon |
 | Ausgewählt | 2 px Ring `--node-selected` |
 | Zustand | 3 px Statusleiste am unteren Knotenrand in `--status-*` + Symbol oben rechts |
-| Links | 2 px, Bézier wie in der Bildmarke; Farbe nach Typ (`--link-*`), Symbol ✔/✖/∞/ƒ in der Mitte; aktiv = „Strömung“ |
+| Meldungen | Rahmen in `--destructive` bzw. `--warning` + Symbol ✖/⚠ oben rechts; beim Ausführen hat das Laufstatus-Symbol Vorrang |
+| Links | 2 px, Bézier wie in der Bildmarke; Farbe nach Typ (`--link-*`), Symbol ✔/✖/∞/ƒ bei 35 % des Wegs ab der Quelle (damit sich kreuzende Links nicht überdecken); aktiv = „Strömung“ |
 | Zeilenzähler an Links | Monospace 11 px, `tabular-nums`, Pille auf `--card` |
 
 Der Editor zeigt das Logo nur einmal: App-Icon (20 px) + Wortmarke oben links. Favicon und Fenster-Icon (WebView2) = `favicon.svg` bzw. `runnel.ico`.
