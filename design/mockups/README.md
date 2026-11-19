@@ -7,6 +7,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | Mockup | Schritt | Zustände | Status |
 |---|---|---|---|
 | [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23, umgesetzt mit E4a/E4b |
+| [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | zur Freigabe |
 
 ## Entscheidungen
 
@@ -21,6 +22,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 
 ```bash
 node design/mockups/screenshots.cjs e4-editor-shell file,empty,offline,error
+node design/mockups/screenshots.cjs e5-canvas canvas,problems,invalid,auto
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
