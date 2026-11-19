@@ -132,7 +132,7 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft.
 5.000 Zeilen, ältere entfallen mit `logTruncated: true`).
 
 Läufe liegen **nur im Speicher**: die letzten 100, laufende werden nie verworfen. Beim Beenden des Servers (Strg+C)
-werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26, ohne dass sich diese API ändert.
+werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26 (zurückgestellt, siehe Backlog der Roadmap), ohne dass sich diese API ändert.
 
 ## Live-Ereignisse (`/events`)
 

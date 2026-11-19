@@ -8,6 +8,11 @@ Erledigte Schritte sind mit ✅ markiert.
 > Editor-Grundlage (E1–E8). Sie ersetzt die bisherigen Schritte S27, S28 und S30–S34. Ausdrücke, weitere Actions,
 > Historie und Resume sowie Pipelines folgen danach. Bestehende Schrittnummern bleiben erhalten, weil ADRs und PRs
 > darauf verweisen; nur die Phasen sind neu nummeriert.
+>
+> **Tiefe vor Breite (2026-11-19):** Damit der ganze Anwendungsfall früh bewertbar ist, werden die Phasen zuerst in der
+> Tiefe gebaut. Gute, aber nicht vorrangige Schritte stehen mit ihrer Nummer im [Backlog](#zurückgestellt-tiefe-vor-breite):
+> S10, S19, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48 sowie `core.calculate` (S16), `core.dedupe` (S22) und die
+> Aufbewahrung der Historie (S43). E7c ist ebenfalls zurückgestellt.
 
 ## Regeln für jeden Schritt
 
@@ -21,7 +26,7 @@ Erledigte Schritte sind mit ✅ markiert.
 - **Nur das Nötige:** Keine Vorab-Implementierung für spätere Schritte. Schnittstellen werden erweitert, wenn sie gebraucht werden.
 - **Doku im selben PR:** Betroffene Abschnitte in Konzept/ADRs werden mit angepasst.
 - **Oberflächen nach Corporate Design und freigegebenem Mockup:** Schritte mit sichtbarer Oberfläche (u. a. E4–E8,
-  S25a, S35, S44, S46, S47) beginnen mit einem Mockup-PR unter `design/mockups/`; die Umsetzung folgt erst nach dessen
+  S25a, S35, S44, S46, später E7c und S47) beginnen mit einem Mockup-PR unter `design/mockups/`; die Umsetzung folgt erst nach dessen
   Freigabe ([design/README.md, Kap. 9](../design/README.md#9-mockups)).
 - **Anleitungen aktuell halten:** Ändert ein Schritt den Vertrag einer Action (oder später eines Transforms bzw.
   Plugins), aktualisiert derselbe PR die Anleitung in [`docs/dev/`](dev/ACTIONS.md); ebenso [`AGENTS.md`](../AGENTS.md)
@@ -55,7 +60,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 ---
 
-## Phase 0.2 – Editor-Grundlage
+## Phase 0.2 – Editor-Grundlage ✅
 
 Ziel: Workflows im Browser entwerfen, prüfen, ausführen und beobachten. Die vorhandenen Core-Actions reichen dafür;
 neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsdialog.
@@ -72,7 +77,6 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | E6b ✅ | Knoten und Links anlegen | Mockup: [`design/mockups/e6b-create.html`](../design/mockups/e6b-create.html). Palette aus `/catalog` unter dem Explorer (nach Kategorie, Suche mit `/`), Knoten per Drag & Drop mit automatischer ID (`log-1` …) und sofortigem Umbenennen (auch per Doppelklick), Links zwischen Ports ziehen (Rückwärts-Links mit `loop: true`), Link-Menü für Typ (On success / On failure / Always) und Löschen | Playwright |
 | E7a ✅ | Eigenschaften einer Action | Mockup: [`design/mockups/e7-properties.html`](../design/mockups/e7-properties.html). Panel „Properties“ rechts: ID, Description, Konfiguration als Formular aus dem Schema (E1, neues Format `runnel-text` für mehrzeilige Texte), Timeout, Retry, Continue on error, Join; Änderungen nach kurzer Tipp-Pause, je Feld ein Rückgängig-Schritt; Meldungen am Feld; Workflows mit ungültigen Feldern bleiben auf dem Canvas | Playwright |
 | E7b ✅ | Links, Workflow, Meldungen | Mockup wie E7a. Eigenschaften eines Links (Bedingung, Loop, Disabled) und des Workflows (Name, Description, Settings; Parameter und Outputs nur anzeigen); Leiste „Problems“ unter dem Canvas mit Sprung zum Feld | Playwright |
-| E7c | Parameter und Outputs | Parameter und Outputs des Workflows im Panel anlegen, ändern und löschen (Entscheidung zum Mockup E7); vorher Mockup | Playwright |
 | E8a ✅ | Ausführen im Editor | Mockup: [`design/mockups/e8-run.html`](../design/mockups/e8-run.html). Run (F5) mit gemerkten Werten, Dialog für Environment und Parameter (▾, Shift+F5), Rückfrage bei ungespeicherten Änderungen, Abbrechen (Ctrl+.), Live-Status an Actions und Links, Ergebnis in der Statusleiste | Manuell; Playwright |
 | E8b ✅ | Log und Ergebnis | Mockup wie E8a. Tab „Log“ unter dem Canvas (folgt dem Lauf, Schalter „Debug“), Ergebnis der gewählten Action im Panel mit Sprung ins Log; Zustand „wartet“ (Join) am Knoten über das neue Ereignis `action.waiting` der Engine | Go-Test der Engine; Playwright |
 
@@ -86,14 +90,10 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 |---|---|---|---|
 | S08 | Ausdrücke | `expr-lang` für `{{ … }}`, Kontext `vars`/`params`/`env`/`run`/`result`/`results`, Bedingungs-Links, Funktionsbibliothek Teil 1 (Datum, Text, Null) ([ADR 0006](adr/0006-ausdruckssprache.md)); **Ausgabedaten von Actions** (`result.output`) für nachfolgende Actions; Ausdrücke in `outputs` | Unit-Tests je Funktion; Beispiel mit Bedingungs-Link |
 | S09 | Datei-Actions | `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list` (Ergebnis = Dateiliste) | Tests mit temporären Ordnern; UNC-Pfad manuell unter Windows |
-| S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis) | Tests gegen lokalen Testserver |
 | S11 | Sub-Workflows | `core.run-workflow` mit Parametern und Ergebnisrückgabe über `outputs` | Beispiel Eltern-/Kind-Workflow |
-| S26 | Run-Historie | Ersetzt den Speicher aus E3 ohne API-Änderung; SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | Unit-Tests; CLI-Ausgabe |
-| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | Test: Fehler beheben, fortsetzen |
 | S35 | Ausdruckseditor | Monaco mit Syntaxhervorhebung, Autovervollständigung (Kontext, Felder, Funktionen), Fehleranzeige | Playwright-Test |
-| S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | Manuell |
 
-**Ergebnis 0.3:** Workflows mit Ausdrücken, Datei- und HTTP-Schritten, Sub-Workflows, Historie und Resume – in CLI und Editor.
+**Ergebnis 0.3:** Workflows mit Ausdrücken, Datei-Schritten und Sub-Workflows – in CLI und Editor.
 
 ---
 
@@ -105,19 +105,14 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | S13 | Pipeline-Engine Kern | Transform = Goroutine, Link = gepufferter Channel, Batches, Backpressure, Ende-Signal, Abbruch; Testbausteine `core.generate-rows`, `core.dummy`, `core.log`; Zähler je Transform | Tests mit `-race`; 10 Mio. generierte Zeilen bei konstantem Speicher |
 | S14 | Record & Typsystem | Geordneter Record, Werttypen inkl. `decimal`, Schema-Ableitung über `Init`, Validator-Warnungen für unbekannte Felder ([ADR 0007](adr/0007-typsystem-pipelines.md)) | Unit-Tests |
 | S15 | CSV | `csv.input`, `csv.output`; Trennzeichen, Kopfzeile, Encoding (UTF-8, Windows-1252), Felddefinition mit Typ/Format | Golden-Tests: CSV rein → CSV raus |
-| S16 | Basis-Transforms | `core.filter`, `core.select-fields`, `core.calculate`, `core.constant`, `core.convert` | Golden-Tests |
+| S16 | Basis-Transforms | `core.filter`, `core.select-fields`, `core.constant`, `core.convert` (`core.calculate` zurückgestellt) | Golden-Tests |
 | S17 | Fehler-Links & Fluss | Fehler-Link, `maxErrors`, `core.switch`, Verteilmodus `copy`/`distribute`, `copies` (parallele Instanzen) | Golden-Tests mit fehlerhaften Zeilen |
 | S18 | Workflow ↔ Pipeline | `core.run-pipeline` mit Parametern, Zeilenzahlen im Ergebnis | Beispiel: Workflow ruft CSV-Pipeline |
-| S19 | JSON | `json.input`, `json.output` (JSON und NDJSON) | Golden-Tests |
-| S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | Tests gegen SQLite; SQL Server/Postgres manuell oder per CI-Container |
-| S21 | DB-Ausgabe | `db.table-output` (Insert, `commitSize`), `db.upsert` | Tests gegen SQLite |
-| S22 | Sortieren & Gruppieren | `core.sort`, `core.group-by`, `core.dedupe` (zunächst im Speicher) | Golden-Tests |
-| S23 | Lookups & Join | Info-Link, `core.stream-lookup`, `db.lookup`, `core.merge-join` | Golden-Tests |
+| S22 | Sortieren & Gruppieren | `core.sort`, `core.group-by` (zunächst im Speicher; `core.dedupe` zurückgestellt) | Golden-Tests |
 | S24 | Ergebnis-Datensätze | `core.to-result`, `core.from-result`, `forEachRow` an `core.run-pipeline`/`core.run-workflow` ([ADR 0008](adr/0008-ausfuehrungsvarianten.md)) | Beispiel: Dateiliste → Pipeline je Datei |
-| S25 | Executor & dynamische Ziele | `core.pipeline-executor`, `core.workflow-executor` (pro Datensatz/Gruppe), Pfade mit Variablen, `allowedTargets` | Beispiel: Pipeline je Kunde |
-| S25a | Pipeline-Canvas | Pipelines im Editor anzeigen und bearbeiten: Transform-Palette, Daten-/Fehler-/Info-Links, Eigenschaften aus dem Schema, Ausführen mit Metriken je Transform | Playwright; Beispiel-Pipeline im Editor |
+| S25a | Pipeline-Canvas | Pipelines im Editor anzeigen und bearbeiten: Transform-Palette, Daten- und Fehler-Links (Info-Links mit S23), Eigenschaften aus dem Schema, Ausführen mit Metriken je Transform | Playwright; Beispiel-Pipeline im Editor |
 
-**Ergebnis 0.4:** ETL-Fälle mit CSV, JSON und Datenbanken per CLI und im Editor.
+**Ergebnis 0.4:** ETL-Fälle mit CSV per CLI und im Editor, von Workflows gesteuert (auch je Datei bzw. Datensatz).
 
 ---
 
@@ -131,7 +126,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | S40 | Netzwerkbetrieb | `--listen`, TLS, gemeinsamer Zugangsschlüssel, Client-Infos im Protokoll ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)) | Zugriff von zweitem Rechner |
 | S41 | Windows-Dienst | `runnel service install/start/stop/uninstall`, Ereignisanzeige, Recovery-Optionen | Manuell auf Windows |
 | S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | Tests der Rangfolge |
-| S43 | Wartung & Monitoring | Retention, Error-Workflow, `/health`, optional `/metrics` | Tests |
+| S43 | Wartung & Monitoring | Error-Workflow, `/health`, optional `/metrics` (Retention der Historie mit S26) | Tests |
 
 **Ergebnis 0.5:** Dauerbetrieb auf einem Windows-Server.
 
@@ -142,10 +137,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
 | S44 | Datenvorschau | Pipeline bis Transform X mit Limit, Records je Link als Tabelle/JSON | Manuell im Editor |
-| S45 | Samples | Erste N Records pro Link je Lauf speichern, in Historie anzeigen | Manuell |
-| S46 | Felder ermitteln | „Felder ermitteln“ für CSV/JSON schreibt `fields:` in die Datei | Playwright-Test |
-| S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster | Manuell auf Windows |
-| S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | Installation auf frischem Windows |
+| S46 | Felder ermitteln | „Felder ermitteln“ für CSV (JSON mit S19) schreibt `fields:` in die Datei | Playwright-Test |
 
 ---
 
@@ -164,6 +156,32 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 ## Backlog
 
 Werden bei Bedarf als eigener Schritt (je ein PR) eingeplant. Reihenfolge ist offen.
+
+### Zurückgestellt (Tiefe vor Breite)
+
+Geplante Schritte, die vorerst hinter dem Ziel „erst in die Tiefe, dann in die Breite“ zurückstehen. Sie behalten ihre
+Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
+
+| Nr. | Schritt | Inhalt | Hängt ab von / Hinweis |
+|---|---|---|---|
+| E7c | Parameter und Outputs im Editor | Parameter und Outputs des Workflows im Panel anlegen, ändern und löschen (Entscheidung zum Mockup E7); vorher Mockup | bis dahin in der YAML-Ansicht |
+| S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis); Tests gegen lokalen Testserver | – |
+| S26 | Run-Historie | Ersetzt den Speicher aus E3 ohne API-Änderung; SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | bis dahin die letzten 100 Läufe im Speicher, nach einem Neustart weg |
+| S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | S26 |
+| S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | – |
+| S16 (Teil) | `core.calculate` | Felder per Ausdruck berechnen | S08 |
+| S19 | JSON | `json.input`, `json.output` (JSON und NDJSON) | danach S46 auch für JSON |
+| S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | – |
+| S21 | DB-Ausgabe | `db.table-output` (Insert, `commitSize`), `db.upsert` | S20 |
+| S22 (Teil) | `core.dedupe` | Duplikate entfernen (zunächst im Speicher) | – |
+| S23 | Lookups & Join | Info-Link, `core.stream-lookup`, `db.lookup`, `core.merge-join` | `db.lookup`: S20; danach Info-Links im Pipeline-Canvas |
+| S25 | Executor & dynamische Ziele | `core.pipeline-executor`, `core.workflow-executor` (pro Datensatz/Gruppe), Pfade mit Variablen, `allowedTargets` | S18, S24 |
+| S43 (Teil) | Retention | Aufbewahrung der Historie | S26 |
+| S45 | Samples | Erste N Records pro Link je Lauf speichern, in Historie anzeigen | S26 |
+| S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster; vorher Mockup | – |
+| S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | bis dahin ZIP |
+
+### Weitere Bausteine
 
 | Bereich | Bausteine |
 |---|---|

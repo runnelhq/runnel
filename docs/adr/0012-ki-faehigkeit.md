@@ -93,7 +93,7 @@ Da es keine Benutzerverwaltung gibt (ADR 0005), schützen technische Regeln:
 - **Positivliste:** Ein Agent darf nur die Werkzeuge aufrufen, die in seiner Konfiguration stehen – kein impliziter
   Zugriff auf Dateien, Shell oder andere Workflows.
 - **Freigabe:** Action `core.approval` pausiert einen Lauf, bis jemand mit Zugang zum Server zustimmt oder ablehnt
-  (mit Zeitlimit). Pausen über Stunden setzen voraus, dass Läufe einen Neustart überstehen (Resume, S29).
+  (mit Zeitlimit). Pausen über Stunden setzen voraus, dass Läufe einen Neustart überstehen (Resume, S29 – derzeit zurückgestellt).
 - **Nachvollziehbarkeit:** Jeder Modell- und Werkzeugaufruf erscheint in den Lauf-Ereignissen (Modell, Dauer, Token);
   Secrets werden in Prompts, Antworten und Logs maskiert.
 - **Begrenzung:** Höchstzahl an Agenten-Schritten je Aufruf, Rate-Limit je Connection, Token- und Kosten-Erfassung je Lauf.
