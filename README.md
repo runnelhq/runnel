@@ -16,7 +16,7 @@ inspiriert vom Modell von Apache Hop: Workflows und Pipelines aus Actions bzw. T
 - **Runner** – Ausführung per CLI, als Server mit Scheduler oder als Windows-Dienst
 - **Eine `runnel.exe`**, keine Runtime, keine externe Datenbank, Definitionen als YAML (Git-freundlich)
 
-Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Entscheidungen: [docs/adr](docs/adr/README.md) · Corporate Design: [design/](design/README.md)
+Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Testplan: [docs/TESTPLAN.md](docs/TESTPLAN.md) · Entscheidungen: [docs/adr](docs/adr/README.md) · Corporate Design: [design/](design/README.md)
 
 ## Verwendung
 
@@ -61,6 +61,7 @@ Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`). Für `make lint
 | Tests | `make test` (mit Race-Detector) | `go test ./...` |
 | Lint | `make lint` | `golangci-lint run ./...` |
 | Formatieren | `make fmt` | `golangci-lint fmt ./...` |
+| Fuzz-Tests (Parser, Variablen) | `make fuzz` | – |
 | Bekannte Sicherheitslücken prüfen | `make vulncheck` | `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` |
 | SBOMs erzeugen | `make sbom` | – |
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -96,6 +97,9 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 		}
 	}
 
+	if info, err := os.Stat(file); err == nil && info.IsDir() {
+		return nil, fmt.Errorf("%s is a directory; pass a workflow file (*%s)", file, workflowSuffix)
+	}
 	w, err := model.LoadWorkflow(file)
 	if err != nil {
 		var diags model.Errors

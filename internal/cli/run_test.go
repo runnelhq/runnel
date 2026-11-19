@@ -131,6 +131,7 @@ actions:
 `)}, `parameter N (integer): "many" is not an integer`},
 		{"unknown environment", []string{"run", "--env", "qa", "examples/hello/workflows/hello.workflow.yaml"}, `environment "qa" not found`},
 		{"env without project", []string{"run", "--env", "dev", writeWorkflow(t, "actions:\n  - { id: start, type: core.start }\n")}, "no project (project.yaml) found"},
+		{"directory instead of file", []string{"run", "examples/hello"}, "examples/hello is a directory; pass a workflow file"},
 		{"missing file", []string{"run", "does-not-exist.workflow.yaml"}, "does-not-exist.workflow.yaml"},
 	}
 	for _, tt := range tests {

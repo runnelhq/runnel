@@ -174,7 +174,9 @@ func (r *Runner) Run(ctx context.Context) Result {
 	}
 	status, err := newScheduler(runCtx, r, runID).run()
 	cancel()
+	// A cancellation or timeout that only happened after the run had succeeded does not count.
 	switch {
+	case status == Succeeded:
 	case ctx.Err() != nil:
 		status, err = Cancelled, fmt.Errorf("run cancelled: %w", context.Cause(ctx))
 	case timeout > 0 && errors.Is(runCtx.Err(), context.DeadlineExceeded):
