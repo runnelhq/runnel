@@ -8,7 +8,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 |---|---|---|---|
 | [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23, umgesetzt mit E4a/E4b |
 | [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | freigegeben mit PR #26, umgesetzt mit E5 |
-| [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | zur Freigabe |
+| [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28 |
 
 ## Entscheidungen
 
@@ -24,6 +24,10 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E5 | Kachelfarbe nach Kategorie (Core-Actions: `general`, grau), Unterscheidung über das Icon je Typ |
 | E5 | Keine Minimap; bei Bedarf später |
 | E5 | Abhängigkeiten: `@xyflow/react` (MIT) für den Canvas, `@dagrejs/dagre` (MIT) für das automatische Anordnen statt `elkjs` (EPL-2.0/GPL-3.0, nicht MIT-kompatibel) |
+| E6a | Verschieben rastet auf 8 px ein |
+| E6a | Löschen ohne Rückfrage, dafür mit Rückgängig (Hinweis „Deleted … · Undo“) |
+| E6a | Tab schließen oder Editor verlassen mit ungespeicherten Änderungen: Rückfrage (Save, Don’t save, Cancel) im Stil des Konfliktdialogs, ohne eigenes Mockup |
+| E6a | Kein automatisches Speichern; gespeichert wird bewusst (Save, Strg+S) |
 
 ## Screenshots erzeugen
 
