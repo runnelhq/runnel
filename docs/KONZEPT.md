@@ -611,7 +611,7 @@ Drei Stufen – von einfach bis mächtig:
 
 ### 7.1 Stufe 1: Skript-Actions/-Transforms (JavaScript, eingebettet)
 
-- `core.script` (Workflow) und `core.script-transform` (Pipeline) führen JS in **goja** aus. JavaScript gibt es nur hier; `{{ … }}`-Ausdrücke nutzen `expr-lang` ([ADR 0006](adr/0006-ausdruckssprache.md)).
+- Action `core.script` (Workflow) und Transform `core.script` (Pipeline) führen JS in **goja** aus. JavaScript gibt es nur hier; `{{ … }}`-Ausdrücke nutzen `expr-lang` ([ADR 0006](adr/0006-ausdruckssprache.md)).
 - Sandbox: kein Dateisystem-/Netzwerkzugriff außer über bereitgestellte APIs (`http`, `fs` – per Projekteinstellung freischaltbar), CPU-Zeitlimit.
 - Wiederverwendbare Skripte in `scripts/` werden über `require('./scripts/utils.js')` geladen.
 
@@ -619,13 +619,15 @@ Drei Stufen – von einfach bis mächtig:
 
 - `shell.powershell` mit Übergabe von Variablen als Parameter und Rückgabe von JSON (`ConvertTo-Json`) als Action-Ergebnis.
 - Bevorzugt `pwsh.exe` (PowerShell 7), Fallback `powershell.exe` (5.1).
-- In Pipelines: `shell.powershell-transform` – Records als NDJSON über stdin/stdout.
+- In Pipelines: Transform `shell.powershell` – Records als NDJSON über stdin/stdout.
 
 ### 7.3 Stufe 3: Externe Plugins (beliebige Sprache)
 
 Go-eigene Plugins (`plugin`-Paket) funktionieren unter Windows nicht – deshalb ein **prozessbasiertes Protokoll** (ähnlich LSP/HashiCorp go-plugin):
 
 - Plugin = ausführbare Datei + `plugin.yaml` im Ordner `plugins/<name>/`.
+- Jedes Plugin hat **einen eigenen Namensraum** (`namespace:`) und bietet nur Typen darin an; die Namensräume der
+  eingebauten Bausteine sind reserviert ([ADR 0013](adr/0013-typnamen-namensraeume.md)).
 - Kommunikation: **JSON-RPC 2.0 über stdin/stdout** (NDJSON), Logs über stderr.
 - Methoden:
   - `describe` → liefert Liste der Actions/Transforms inkl. JSON-Schema der Eigenschaften, Icon (SVG), Kategorie, Ports
@@ -638,10 +640,11 @@ Go-eigene Plugins (`plugin`-Paket) funktionieren unter Windows nicht – deshalb
 # plugins/sap-rfc/plugin.yaml
 name: sap-rfc
 version: 1.0.0
+namespace: sap
 executable: sap-rfc-plugin.exe
 provides:
-  - sap.rfc-call         # Action
-  - sap.table-input      # Transform
+  actions: [sap.rfc-call]
+  transforms: [sap.table-input]
 ```
 
 ### 7.4 Registry & UI-Integration
@@ -662,6 +665,11 @@ Alle Bausteine (eingebaut, JS, extern) beschreiben sich über denselben **Descri
 ```
 
 Der Editor rendert Palette und Eigenschaftsdialog **vollständig aus dem Descriptor** – neue Plugins brauchen keinen Frontend-Code.
+
+**Typnamen** haben die Form `<namensraum>.<name>`. Actions und Transforms haben getrennte Registries: Derselbe Name
+kann als Action (in Workflows) und als Transform (in Pipelines) existieren, z. B. `http.request`. Ein Namensraum gehört
+genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (`mcp-<connection>`)
+([ADR 0013](adr/0013-typnamen-namensraeume.md)).
 
 ---
 
@@ -796,6 +804,9 @@ Kernfunktionen:
 
 ## 12. Mitgelieferte Bausteine (Zielumfang)
 
+Actions und Transforms haben getrennte Typ-Namensräume ([ADR 0013](adr/0013-typnamen-namensraeume.md)); gleiche Namen
+in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
+
 ### 12.1 Workflow-Actions
 
 | Kategorie | Actions |
@@ -853,8 +864,11 @@ runnel/
 │  │  ├─ workflow/          # Workflow-Engine, Link-Auswertung, Retry, Resume
 │  │  └─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
 │  ├─ registry/             # Katalog aller Actions/Transforms
-│  ├─ actions/              # eingebaute Actions (je Paket: core, file, http, mail, sql, shell)
-│  ├─ transforms/           # eingebaute Transforms (csv, excel, json, db, core …)
+│  ├─ action/               # Schnittstelle Engine ↔ Actions, Registry
+│  ├─ actions/              # eingebaute Actions: actions.go (Builtin, Vertragstest), je Namensraum ein Paket
+│  │  ├─ core/              #   register.go + eine Datei je Action (start.go, log.go …) mit Test daneben
+│  │  └─ actiontest/        #   Test-Hilfen
+│  ├─ transforms/           # eingebaute Transforms, gleicher Aufbau (csv, json, db, core …)
 │  ├─ connections/          # DB-/HTTP-/SMTP-Verbindungen, Pooling
 │  ├─ secrets/              # Secret-Store, DPAPI, Maskierung
 │  ├─ store/                # SQLite-Zugriff, Migrationen

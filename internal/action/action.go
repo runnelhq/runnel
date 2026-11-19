@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+
+	"github.com/runnelhq/runnel/internal/model"
 )
 
 // Action is one configured step, ready to run.
@@ -67,7 +69,8 @@ type Definition struct {
 	New func(with map[string]any) (Action, error)
 }
 
-// Registry holds the available action types.
+// Registry holds the available action types. Transforms have a registry of their own,
+// so that the same type name may exist as action and as transform (ADR 0013).
 type Registry struct {
 	defs map[string]Definition
 }
@@ -77,8 +80,12 @@ func NewRegistry() *Registry {
 	return &Registry{defs: map[string]Definition{}}
 }
 
-// Register adds an action type. It panics on duplicates, which are programming errors.
+// Register adds an action type. It panics on invalid type names and duplicates,
+// which are programming errors.
 func (r *Registry) Register(d Definition) {
+	if !model.ValidTypeName(d.Type) {
+		panic(fmt.Sprintf("invalid action type name %q (expected \"<namespace>.<name>\")", d.Type))
+	}
 	if _, dup := r.defs[d.Type]; dup {
 		panic("action type registered twice: " + d.Type)
 	}

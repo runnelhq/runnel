@@ -79,7 +79,7 @@ Das ist Bestandteil von Roadmap-Schritt S08.
 |---|---|
 | **Server** | `runnel mcp` stellt die Workflows eines Projekts als MCP-Tools bereit – zuerst über stdio (z. B. für Claude Desktop, Claude Code), später über HTTP mit Token; OAuth bei Bedarf |
 | **Client** | Action `mcp.call-tool`; MCP-Server werden als Connection hinterlegt (stdio-Prozess oder HTTP) |
-| **Plugin-Quelle** | Die Werkzeuge eines eingebundenen MCP-Servers erscheinen als Actions in der Palette |
+| **Plugin-Quelle** | Die Werkzeuge eines eingebundenen MCP-Servers erscheinen als Actions in der Palette, im Namensraum `mcp-<connection>` (ADR 0013) |
 
 ### 5. Werkzeuge eines Agenten
 
