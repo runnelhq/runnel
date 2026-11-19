@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/runnelhq/runnel/internal/actions"
 )
@@ -44,7 +45,8 @@ func newProject(t *testing.T) (string, *Server) {
 	for name, content := range files {
 		writeFile(t, filepath.Join(dir, name), content)
 	}
-	s, err := New(Options{Dir: dir, Registry: actions.Builtin()})
+	// An empty UI: tests must not depend on whether the editor was built.
+	s, err := New(Options{Dir: dir, Registry: actions.Builtin(), UI: fstest.MapFS{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +121,7 @@ func TestGuard(t *testing.T) {
 func TestUnknownEndpoint(t *testing.T) {
 	_, s := newProject(t)
 	expect(t, do(t, s, "GET", "/api/v1/nothing", ""), http.StatusNotFound, "unknown endpoint GET /api/v1/nothing")
-	expect(t, do(t, s, "GET", "/", ""), http.StatusOK, "Runnel server")
+	expect(t, do(t, s, "GET", "/", ""), http.StatusOK, "does not include the editor")
 }
 
 func TestProject(t *testing.T) {

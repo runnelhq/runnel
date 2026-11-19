@@ -13,15 +13,16 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 
 | Zweck | Befehl |
 |---|---|
-| Bauen | `make build` → `bin/runnel` |
+| Bauen | `make build` → `bin/runnel` (mit Editor; Node 22 nötig) · `make build-go` (nur Go) |
 | Tests (mit Race-Detector) | `make test` |
 | Lint (golangci-lint v2.15.0) | `make lint` |
 | Formatieren | `make fmt` (oder `gofmt -w`) |
 | Fuzzing | `make fuzz FUZZTIME=1m` |
+| Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – danach Diff prüfen |
 | Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel catalog core.log` · `bin/runnel serve examples/hello` |
 
-Vor jedem Commit: `make lint` und `make test` müssen grün sein.
+Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderungen am Editor zusätzlich `make e2e`.
 
 ## Struktur
 
@@ -35,8 +36,10 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
 | `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Läufe und Ereignisse im Speicher |
+| `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
+| `web/` | Editor (React, Vite, TypeScript, Tailwind); Anleitung `docs/dev/EDITOR.md` |
 | `examples/` | Beispiele, in Tests mitgeprüft |
 | `docs/` | Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (`docs/dev/`) |
 

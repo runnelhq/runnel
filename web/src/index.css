@@ -1,0 +1,46 @@
+@import "tailwindcss";
+@import "../../design/tokens/tailwind.css";
+@import "../../design/fonts/fonts.css";
+
+/* Text sizes of the tokens instead of Tailwind's defaults (text-2xs … text-xl). */
+@theme inline {
+  --text-2xs: var(--rn-text-2xs);
+  --text-xs: var(--rn-text-xs);
+  --text-sm: var(--rn-text-sm);
+  --text-base: var(--rn-text-base);
+  --text-md: var(--rn-text-md);
+  --text-lg: var(--rn-text-lg);
+  --text-xl: var(--rn-text-xl);
+}
+
+/* Base styles of the editor: 13 px base size like an IDE (design/README.md, chapter 4.1). */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    font-family: var(--rn-font-sans);
+    font-size: var(--rn-text-sm);
+    line-height: 1.5;
+    color: var(--foreground);
+    background: var(--background);
+    -webkit-font-smoothing: antialiased;
+  }
+  code,
+  kbd,
+  pre {
+    font-family: var(--rn-font-mono);
+  }
+}
+
+/* Small uppercase panel titles ("Explorer", "Project"). */
+@utility label-caps {
+  font-size: var(--rn-text-2xs);
+  font-weight: var(--rn-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}

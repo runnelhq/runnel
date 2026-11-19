@@ -5,3 +5,12 @@
 # Test output
 *.out
 *.test
+
+# Editor build (embedded into the binary; only the placeholder is committed)
+/internal/webui/dist/*
+!/internal/webui/dist/.gitkeep
+
+# Frontend dependencies and test output
+/web/node_modules/
+/web/test-results/
+/web/playwright-report/

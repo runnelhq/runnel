@@ -53,8 +53,8 @@ Exit-Code 1 (mit `--strict` auch bei Warnungen). Beispiele liegen unter [`exampl
 runnel serve examples/hello
 ```
 
-`runnel serve [projektordner]` startet den Server für ein Projekt unter `http://127.0.0.1:7300` (anderer Port mit
-`--port`). Er ist nur vom eigenen Rechner aus erreichbar und bietet die API für den Editor: Projektbaum, Dateien lesen
+`runnel serve [projektordner]` startet den Server für ein Projekt; der Editor öffnet sich im Browser unter
+`http://127.0.0.1:7300` (anderer Port mit `--port`). Er ist nur vom eigenen Rechner aus erreichbar und bietet die API für den Editor: Projektbaum, Dateien lesen
 und speichern mit Konfliktschutz, Katalog der Actions, Prüfung von Workflows sowie Läufe starten, abbrechen und live
 verfolgen – beschrieben in [docs/dev/API.md](docs/dev/API.md). Der Editor selbst folgt mit den nächsten Schritten.
 
@@ -68,12 +68,15 @@ JSON Schema aus – dieselben Daten, aus denen der Editor Palette und Eigenschaf
 
 ## Entwicklung
 
-Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`). Für `make lint` zusätzlich
-[golangci-lint](https://golangci-lint.run/) v2.
+Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`) und für den Editor [Node.js](https://nodejs.org/)
+22 LTS. Für `make lint` zusätzlich [golangci-lint](https://golangci-lint.run/) v2. Details zum Editor:
+[docs/dev/EDITOR.md](docs/dev/EDITOR.md).
 
 | Aufgabe | Mit `make` | Ohne `make` (z. B. Windows/PowerShell) |
 |---|---|---|
-| Bauen | `make build` → `bin/runnel` | `go build -o bin/runnel.exe ./cmd/runnel` |
+| Bauen (mit Editor) | `make build` → `bin/runnel` | `cd web; npm ci; npm run build; cd ..; go build -o bin/runnel.exe ./cmd/runnel` |
+| Nur Go (ohne Editor-Build) | `make build-go` | `go build -o bin/runnel.exe ./cmd/runnel` |
+| Editor-Tests (Playwright) | `make e2e` | – |
 | Windows-/Linux-Binaries | `make dist` | `$env:GOOS="windows"; go build -o bin/runnel-windows-amd64.exe ./cmd/runnel` |
 | Tests | `make test` (mit Race-Detector) | `go test ./...` |
 | Lint | `make lint` | `golangci-lint run ./...` |
