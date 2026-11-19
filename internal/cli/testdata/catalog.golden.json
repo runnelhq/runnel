@@ -1,0 +1,124 @@
+{
+  "actions": [
+    {
+      "type": "core.abort",
+      "kind": "action",
+      "category": "general",
+      "label": "Abort",
+      "description": "Ends the workflow as failed",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Reason for the run log; if empty, a default text names the action"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.dummy",
+      "kind": "action",
+      "category": "general",
+      "label": "Dummy",
+      "description": "Does nothing; collects branches into one point",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.log",
+      "kind": "action",
+      "category": "general",
+      "label": "Log",
+      "description": "Writes a message to the run log",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Text to write; may span several lines",
+            "examples": [
+              "Import finished"
+            ]
+          },
+          "level": {
+            "type": "string",
+            "description": "Log level of the message",
+            "enum": [
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
+            "default": "info"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.start",
+      "kind": "action",
+      "category": "general",
+      "label": "Start",
+      "description": "Entry point of the workflow",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.success",
+      "kind": "action",
+      "category": "general",
+      "label": "Success",
+      "description": "Ends the workflow successfully",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Message for the run log"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.wait",
+      "kind": "action",
+      "category": "general",
+      "label": "Wait",
+      "description": "Waits for a given time",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "duration": {
+            "type": "string",
+            "description": "How long to wait, e.g. 30s, 5m or 1h30m",
+            "format": "runnel-duration",
+            "examples": [
+              "30s"
+            ]
+          }
+        },
+        "required": [
+          "duration"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

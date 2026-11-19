@@ -10,6 +10,8 @@ import (
 // core.start: entry point of every workflow; it has no configuration and always succeeds.
 var startDefinition = action.Definition{
 	Type:        "core.start",
+	Category:    action.CategoryGeneral,
+	Label:       "Start",
 	Description: "Entry point of the workflow",
 	New:         newStart,
 }

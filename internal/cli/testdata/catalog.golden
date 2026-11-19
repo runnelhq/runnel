@@ -1,0 +1,7 @@
+general
+  core.abort    Abort    Ends the workflow as failed
+  core.dummy    Dummy    Does nothing; collects branches into one point
+  core.log      Log      Writes a message to the run log
+  core.start    Start    Entry point of the workflow
+  core.success  Success  Ends the workflow successfully
+  core.wait     Wait     Waits for a given time

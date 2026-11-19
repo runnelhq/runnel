@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -13,22 +12,22 @@ import (
 // core.log writes a message to the run log.
 var logDefinition = action.Definition{
 	Type:        "core.log",
+	Category:    action.CategoryGeneral,
+	Label:       "Log",
 	Description: "Writes a message to the run log",
+	Config:      logAction{},
 	New:         newLog,
 }
 
 type logAction struct {
-	Message string `json:"message"`
-	Level   string `json:"level"`
+	Message string `json:"message" doc:"Text to write; may span several lines" schema:"required,example=Import finished"`
+	Level   string `json:"level" doc:"Log level of the message" schema:"enum=debug|info|warn|error,default=info"`
 }
 
 func newLog(with map[string]any) (action.Action, error) {
 	a := &logAction{}
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
-	}
-	if _, ok := with["message"]; !ok {
-		return nil, errors.New(`missing required field "message"`)
 	}
 	return a, nil
 }

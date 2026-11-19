@@ -21,7 +21,7 @@ Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadma
 ## Verwendung
 
 Noch im Aufbau – Workflows lassen sich prüfen und mit den Basis-Actions (`core.start`, `core.log`, `core.wait`,
-`core.success`, `core.abort`) ausführen; weitere Actions folgen laut [Roadmap](docs/ROADMAP.md).
+`core.success`, `core.abort`, `core.dummy`) ausführen; weitere Actions folgen laut [Roadmap](docs/ROADMAP.md).
 
 ```bash
 runnel run --env prod examples/hello/workflows/hello.workflow.yaml
@@ -48,6 +48,14 @@ definierte Variablen. Das zugehörige Projekt (`project.yaml` im Ordner oder dar
 mitgeprüft; Variablen gegen jedes Environment oder nur gegen eines (`--env prod`). Mit `--param KEY=VALUE` lassen
 sich Startparameter angeben. Meldungen erscheinen als `datei:zeile:spalte: error|warning: text`; bei Fehlern ist der
 Exit-Code 1 (mit `--strict` auch bei Warnungen). Beispiele liegen unter [`examples/`](examples/).
+
+```bash
+runnel catalog core.wait
+```
+
+`runnel catalog` listet die verfügbaren Actions nach Kategorien, `runnel catalog <typ>` beschreibt eine Action mit
+ihren Feldern (Typ, Pflichtfeld, erlaubte Werte, Standardwert, Beispiel). `--json` gibt die Descriptors mit
+JSON Schema aus – dieselben Daten, aus denen der Editor Palette und Eigenschaftsdialog erzeugt.
 
 ## Entwicklung
 

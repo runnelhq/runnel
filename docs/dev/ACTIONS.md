@@ -4,6 +4,7 @@ Anleitung für eingebaute Actions (Bausteine in Workflows). Für Transforms (Pip
 S12/S13; für Plugins mit S49–S51.
 
 Grundlagen: [ADR 0013](../adr/0013-typnamen-namensraeume.md) (Typnamen, Namensräume, Code-Aufbau),
+[ADR 0014](../adr/0014-action-descriptor-schema.md) (Descriptor, Schema aus dem Konfigurations-Struct),
 [Konzept Kap. 6.1](../KONZEPT.md#61-workflow-engine) (Engine), [Kap. 12](../KONZEPT.md#12-mitgelieferte-bausteine-zielumfang)
 (Bausteinliste). Ein Teil der Regeln wird automatisch geprüft – vom **Vertragstest** in
 `internal/actions/actions_test.go`.
@@ -50,23 +51,23 @@ Mehrere eng verwandte Actions dürfen sich eine Datei teilen, wenn sie dieselbe 
 // file.copy copies files; it ends early when the run is cancelled.
 var copyDefinition = action.Definition{
 	Type:        "file.copy",
+	Category:    action.CategoryFiles,
+	Label:       "Copy Files",
 	Description: "Copies files or folders",
+	Config:      copyAction{},
 	New:         newCopy,
 }
 
 type copyAction struct {
-	Source    string `json:"source"`
-	Target    string `json:"target"`
-	Overwrite bool   `json:"overwrite"`
+	Source    string `json:"source" doc:"File or folder to copy; wildcards allowed" schema:"required,example=C:\\in\\*.csv"`
+	Target    string `json:"target" doc:"Target folder" schema:"required,example=D:\\archive"`
+	Overwrite bool   `json:"overwrite" doc:"Replace existing files" schema:"default=false"`
 }
 
 func newCopy(with map[string]any) (action.Action, error) {
 	a := &copyAction{}
 	if err := action.DecodeConfig(with, a); err != nil {
-		return nil, err // unknown fields, wrong types
-	}
-	if a.Source == "" {
-		return nil, errors.New(`missing required field "source"`)
+		return nil, err // unknown fields, missing required fields, wrong types
 	}
 	return a, nil
 }
@@ -75,13 +76,33 @@ func newCopy(with map[string]any) (action.Action, error) {
 Regeln:
 
 - **Felder** der Konfiguration (`with:`) als Struct mit `json`-Tags; Feldnamen in `camelCase`, wie im YAML.
-- **`DecodeConfig`** verwenden – es lehnt unbekannte Felder ab (Tippfehler im Workflow werden gemeldet; Vertragstest prüft das).
+- **`Config`** nennt dasselbe Struct, in das `New` einliest; daraus entsteht das JSON Schema für Editor, `/catalog` und
+  KI-Werkzeuge (ADR 0014). Ansehen mit `runnel catalog <typ>` bzw. `--json`.
+- **Tags je Feld:**
+
+  | Tag | Inhalt |
+  |---|---|
+  | `doc:"…"` | Beschreibung des Feldes, ein englischer Satz – **Pflicht** (Vertragstest) |
+  | `schema:"required"` | Pflichtfeld; `DecodeConfig` meldet `missing required field "…"` – keine eigene Prüfung schreiben |
+  | `schema:"default=…"` | Wert, den die Action verwendet, wenn das Feld fehlt (nur Anzeige – die Action muss ihn selbst anwenden) |
+  | `schema:"enum=a\|b\|c"` | erlaubte Werte (der Editor bietet eine Auswahl an) |
+  | `schema:"example=…"` | Beispielwert; für Pflichtfelder empfohlen, der Vertragstest verwendet ihn |
+  | `schema:"format=runnel-duration"` | Zeitangabe wie `30s`, `5m`, `1h30m` |
+
+  Optionen werden mit Komma getrennt (`schema:"required,example=30s"`); Werte dürfen daher kein Komma enthalten.
+  Backslashes in Tags verdoppeln (`example=C:\\in`), sonst ist das ganze Tag ungültig.
+- **Typen:** `string`, `bool`, Ganz- und Kommazahlen, Slices, `map[string]T`, verschachtelte Structs, `any`. Felder,
+  die `${…}` enthalten dürfen, als `string` anlegen – auch Zahlen und Zeitangaben.
+- **`DecodeConfig`** verwenden – es lehnt unbekannte Felder ab (Tippfehler im Workflow werden gemeldet; Vertragstest
+  prüft das) und prüft Pflichtfelder.
 - **`New` prüft nur die Struktur:** Pflichtfelder, Typen, unbekannte Felder. `New` wird zweimal aufgerufen: vor dem Lauf
   mit dem Text aus der Datei (Werte können noch `${…}` enthalten) und vor jeder Ausführung mit aufgelösten Variablen.
-  **Werte** wie Dauern, Zahlen in Textform oder Pfade werden daher erst in `Execute` geprüft.
+  **Werte** wie Dauern, Zahlen in Textform, leere Texte oder Pfade werden daher erst in `Execute` geprüft.
 - **Zeitangaben** als `string` übernehmen und in `Execute` mit `model.Duration(s).Value()` umwandeln.
-- **Actions ohne Konfiguration** lehnen jedes Feld ab (`len(with) > 0` → Fehler); Vorlage: `core/dummy.go`.
-- **Beschreibung** (`Description`): ein kurzer englischer Satz ohne Punkt; erscheint später in der Palette des Editors.
+- **Actions ohne Konfiguration** lassen `Config` weg und lehnen jedes Feld ab (`len(with) > 0` → Fehler); Vorlage: `core/dummy.go`.
+- **Kategorie** (`Category`): eine der Konstanten `action.Category…` (Gruppe in der Palette).
+- **Bezeichnung** (`Label`): kurzer englischer Anzeigename mit Großbuchstaben am Anfang, z. B. `Copy Files`.
+- **Beschreibung** (`Description`): ein kurzer englischer Satz ohne Punkt; erscheint in der Palette des Editors.
 - Kommentar über der Definition: was die Action tut, Besonderheiten.
 
 ## 5. Ausführen (`Execute`)
@@ -141,8 +162,11 @@ Pflicht:
 - **Konfigurationsfehler** (fehlende Pflichtfelder, falsche Werte) mit `actiontest.ConfigError`.
 - **Erfolgsfall** und die wichtigsten **Fehlerfälle** von `Execute`, inklusive Meldungstext.
 - **Abbruch** für Actions, die länger laufen können (`context.WithCancel` / `WithTimeout`).
-- **Vertragstest:** Braucht die Action Pflichtfelder, eine Beispielkonfiguration in `samples` von
-  `TestContractCancellation` (`internal/actions/actions_test.go`) ergänzen – der Test meldet sich sonst.
+- **Vertragstest** (`internal/actions/actions_test.go`) läuft automatisch für jede Action: Kategorie, Bezeichnung,
+  Beschreibungen aller Felder, Beispielkonfiguration aus dem Schema (Beispiele, Standardwerte, erlaubte Werte) wird von
+  `New` angenommen, Abbruch mit dieser Konfiguration. Pflichtfelder brauchen dafür ein realistisches `example`.
+- **Golden-Dateien** `internal/cli/testdata/catalog*.golden*` mit `go test ./internal/cli -update` neu erzeugen und den
+  Diff prüfen – er zeigt, wie die Action im Editor erscheint.
 - Nur `t.TempDir()` und lokale Testserver (`httptest`), keine Abhängigkeit von Netz oder Rechnernamen.
 - Tests dürfen nicht die **vollständige Liste** aller Action-Typen erwarten – sie wächst mit jeder neuen Action.
 - Tests müssen unter Linux und Windows laufen (CI prüft beides).
@@ -150,7 +174,8 @@ Pflicht:
 ## 8. Dokumentation und Beispiel im selben PR
 
 - Bausteinliste im [Konzept, Kap. 12](../KONZEPT.md#12-mitgelieferte-bausteine-zielumfang) bzw. Roadmap-Schritt als erledigt markieren.
-- Neue Konfigurationsfelder kurz im Kommentar der Definition beschreiben (später die Grundlage für das Schema im Editor).
+- Konfigurationsfelder über `doc`-Tags beschreiben (Grundlage für Eigenschaftsdialog und Werkzeugbeschreibung);
+  Besonderheiten zusätzlich im Kommentar der Definition.
 - Bei Bedarf ein Beispiel-Workflow unter `examples/`, der in `internal/cli/validate_test.go` mitgeprüft wird. Ein neues
   Beispiel ändert die Anzahl geprüfter Dateien: Erwartung in `TestValidateExamples` anpassen und
   `go test ./internal/cli -update` ausführen, danach den Diff der Golden-Datei prüfen.
@@ -159,9 +184,10 @@ Pflicht:
 
 - [ ] Typname im passenden, reservierten Namensraum; bei neuem Namensraum: `namespaces.go`, `register.go`, `actions.go`
 - [ ] Eine Datei je Action, Tests daneben, Eintrag in `register.go`
+- [ ] `Category`, `Label`, `Description`, `Config` gesetzt; jedes Feld mit `doc`, Pflichtfelder mit `required` und `example`
 - [ ] Konfiguration über `DecodeConfig`; `New` prüft nur Struktur, Werte werden in `Execute` geprüft
 - [ ] `ctx` wird beachtet (Abbruch, Timeout); keine Panics; keine Secrets im Log
 - [ ] Verständliche englische Fehlermeldungen
-- [ ] Tests: Konfiguration, Erfolg, Fehler, Abbruch; ggf. Beispielkonfiguration im Vertragstest
+- [ ] Tests: Konfiguration, Erfolg, Fehler, Abbruch; Golden-Dateien von `runnel catalog` aktualisiert und geprüft
 - [ ] `make lint` und `make test` grün
 - [ ] Doku und ggf. Beispiel aktualisiert

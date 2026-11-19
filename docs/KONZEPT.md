@@ -649,20 +649,26 @@ provides:
 
 ### 7.4 Registry & UI-Integration
 
-Alle Bausteine (eingebaut, JS, extern) beschreiben sich über denselben **Descriptor**:
+Alle Bausteine (eingebaut, JS, extern) beschreiben sich über denselben **Descriptor**
+([ADR 0014](adr/0014-action-descriptor-schema.md)):
 
 ```json
 {
   "type": "http.request",
   "kind": "transform",
-  "category": "Netzwerk",
-  "label": "HTTP-Request",
+  "category": "network",
+  "label": "HTTP Request",
+  "description": "Sends an HTTP request for each record",
+  "schema": { "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "...": {} } },
   "icon": "globe.svg",
   "ports": { "in": 1, "out": ["main", "error"] },
-  "properties": { "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "...": {} } },
   "uiHints": { "body": { "widget": "code", "language": "json" } }
 }
 ```
+
+`type` bis `schema` gibt es seit E1 (`runnel catalog --json`); `icon`, `ports` und `uiHints` folgen mit den Schritten,
+die sie brauchen. Eingebaute Bausteine erzeugen `schema` aus ihrem Konfigurations-Struct (Tags `json`, `doc`,
+`schema`), Plugins liefern es fertig mit.
 
 Der Editor rendert Palette und Eigenschaftsdialog **vollständig aus dem Descriptor** – neue Plugins brauchen keinen Frontend-Code.
 
@@ -857,14 +863,14 @@ runnel/
 ├─ cmd/runnel/              # main.go – CLI (cobra o. ä.): run, serve, desktop, service, validate
 ├─ internal/
 │  ├─ model/                # Workflow, Pipeline, Link, Trigger – Structs + YAML-(De)Serialisierung
-│  ├─ schema/               # JSON-Schemas für Dateien & Descriptors
+│  ├─ schema/               # JSON-Schema aus Konfigurations-Structs (ADR 0014); später Schemas für Dateien
 │  ├─ vars/                 # Variablen-Auflösung, Scopes
 │  ├─ expr/                 # expr-lang + goja, gemeinsame Funktionsbibliothek (now, formatDate …)
 │  ├─ engine/
 │  │  ├─ workflow/          # Workflow-Engine, Link-Auswertung, Retry, Resume
 │  │  └─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
 │  ├─ registry/             # Katalog aller Actions/Transforms
-│  ├─ action/               # Schnittstelle Engine ↔ Actions, Registry
+│  ├─ action/               # Schnittstelle Engine ↔ Actions, Registry, Descriptors
 │  ├─ actions/              # eingebaute Actions: actions.go (Builtin, Vertragstest), je Namensraum ein Paket
 │  │  ├─ core/              #   register.go + eine Datei je Action (start.go, log.go …) mit Test daneben
 │  │  └─ actiontest/        #   Test-Hilfen
