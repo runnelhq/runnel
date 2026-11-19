@@ -10,7 +10,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | freigegeben mit PR #26, umgesetzt mit E5 |
 | [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28, umgesetzt mit E6a |
 | [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | freigegeben mit PR #30, umgesetzt mit E6b |
-| [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | freigegeben mit PR #32; `action`, `wait` umgesetzt mit E7a, der Rest folgt mit E7b |
+| [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | freigegeben mit PR #32, umgesetzt mit E7a (`action`, `wait`) und E7b |
 
 ## Entscheidungen
 

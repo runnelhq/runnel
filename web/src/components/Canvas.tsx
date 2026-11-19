@@ -45,6 +45,14 @@ const snap = (v: number) => Math.round(v / snapGrid[0]) * snapGrid[0];
 
 type Positions = Record<string, { x: number; y: number }>;
 
+/** Selected actions (ids) and links (index in the list of links). */
+export interface Selection {
+  actions: string[];
+  links: number[];
+}
+
+const sameSet = (a: Set<string>, b: string[]) => a.size === b.length && b.every((x) => a.has(x));
+
 export interface CanvasProps {
   workflow: Workflow;
   problems: Problem[];
@@ -61,10 +69,10 @@ export interface CanvasProps {
   onConnect?: (link: Link) => void;
   /** Called when the kind of a link was chosen in the link menu. */
   onLinkKind?: (index: number, when: SettableKind) => void;
-  /** Called with the ids of the selected actions. */
-  onSelect?: (ids: string[]) => void;
-  /** Selects these actions, e.g. after renaming one in the properties panel. */
-  selection?: string[];
+  /** Called with the selected actions and links. */
+  onSelect?: (selection: Selection) => void;
+  /** Selects these actions and links, e.g. after renaming in the properties panel or from the problems. */
+  selection?: Selection;
   /** The properties panel is shown and lists the problems of the selected action. */
   problemsInPanel?: boolean;
   /** Id of the action whose id is being edited. */
@@ -96,7 +104,8 @@ function Graph(props: CanvasProps) {
   const [menu, setMenu] = useState<string | null>(null);
   const [ghost, setGhost] = useState<{ type: string; x: number; y: number } | null>(null);
   // Starts with the selection of the file view, e.g. when switching back from the YAML view.
-  const selectedRef = useRef(new Set<string>(props.selection ?? []));
+  const selectedRef = useRef(new Set<string>(props.selection?.actions ?? []));
+  const selectedLinksRef = useRef(new Set<string>((props.selection?.links ?? []).map(String)));
 
   const finishRename = useCallback(
     (from: string, to: string | null) => {
@@ -154,30 +163,47 @@ function Graph(props: CanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<ActionNodeType>(
     computed.map((n) => ({ ...n, selected: selectedRef.current.has(n.id) })),
   );
-  const [edges, setEdges, onEdgesChange] = useEdgesState<LinkEdgeType>(computedEdges);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<LinkEdgeType>(
+    computedEdges.map((e) => ({ ...e, selected: selectedLinksRef.current.has(e.id) })),
+  );
   useEffect(() => {
     if (renaming) selectedRef.current = new Set([renaming]);
     setNodes(computed.map((n) => ({ ...n, selected: selectedRef.current.has(n.id) })));
   }, [computed, renaming, setNodes]);
   useEffect(() => {
     if (!selection) return;
-    const same = selection.length === selectedRef.current.size && selection.every((id) => selectedRef.current.has(id));
+    const links = selection.links.map(String);
+    if (!sameSet(selectedLinksRef.current, links) && links.every((id) => computedEdges.some((e) => e.id === id))) {
+      selectedLinksRef.current = new Set(links);
+      setEdges((es) => es.map((e) => ({ ...e, selected: selectedLinksRef.current.has(e.id) })));
+    }
     // A renamed action is selected once the workflow with its new id has arrived.
-    if (same || !selection.every((id) => computed.some((n) => n.id === id))) return;
-    selectedRef.current = new Set(selection);
+    if (sameSet(selectedRef.current, selection.actions) || !selection.actions.every((id) => computed.some((n) => n.id === id))) return;
+    selectedRef.current = new Set(selection.actions);
     setNodes((ns) => ns.map((n) => ({ ...n, selected: selectedRef.current.has(n.id) })));
-  }, [selection, computed, setNodes]);
+  }, [selection, computed, computedEdges, setNodes, setEdges]);
+  // Links are identified by their index; a selected link stays selected while it connects the same actions.
+  const prevEdges = useRef(computedEdges);
   useEffect(() => {
-    setEdges(computedEdges);
+    const before = prevEdges.current;
+    prevEdges.current = computedEdges;
+    for (const id of [...selectedLinksRef.current]) {
+      const a = before.find((e) => e.id === id);
+      const b = computedEdges.find((e) => e.id === id);
+      if (!a || !b || a.source !== b.source || a.target !== b.target) selectedLinksRef.current.delete(id);
+    }
+    setEdges(computedEdges.map((e) => ({ ...e, selected: selectedLinksRef.current.has(e.id) })));
     setMenu(null);
   }, [computedEdges, setEdges]);
 
   const onSelectionChange = useCallback(
-    ({ nodes }: { nodes: { id: string }[] }) => {
+    ({ nodes, edges }: { nodes: { id: string }[]; edges: { id: string }[] }) => {
       const ids = nodes.map((n) => n.id);
-      const same = ids.length === selectedRef.current.size && ids.every((id) => selectedRef.current.has(id));
+      const links = edges.map((e) => e.id);
+      const same = sameSet(selectedRef.current, ids) && sameSet(selectedLinksRef.current, links);
       selectedRef.current = new Set(ids);
-      if (!same) onSelect?.(ids);
+      selectedLinksRef.current = new Set(links);
+      if (!same) onSelect?.({ actions: ids, links: links.map(Number) });
     },
     [onSelect],
   );

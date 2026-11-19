@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
-import { editWorkflow, validate, type Link, type Validation, type WorkflowEdit } from "../workflow";
-import { Canvas } from "./Canvas";
+import { editWorkflow, problemTarget, validate, type Link, type Problem, type Validation, type WorkflowEdit } from "../workflow";
+import { Canvas, type Selection } from "./Canvas";
+import { ProblemsBar } from "./ProblemsBar";
 import { CodeView } from "./CodeView";
 import { Dialog } from "./Dialog";
 import { PropertiesPanel, type FieldValue } from "./PropertiesPanel";
@@ -63,7 +64,10 @@ export function FileView(props: {
   const [conflict, setConflict] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [selection, setSelection] = useState<string[]>([]);
+  const [selection, setSelection] = useState<Selection>({ actions: [], links: [] });
+  const [problemsOpen, setProblemsOpen] = useState(false);
+  // A field of the properties panel to show and focus, e.g. after clicking a problem.
+  const [focusField, setFocusField] = useState<{ key: string; seq: number } | null>(null);
   const [panel, setPanel] = useState(true);
 
   const doc = state.status === "loaded" ? state.doc : null;
@@ -210,15 +214,30 @@ export function FileView(props: {
   const onConnect = useCallback((link: Link) => void applyEdit({ addLinks: [link] }), [applyEdit]);
   // While a rename from the panel is on its way, the canvas briefly has no selection; keep the new id.
   const renamedTo = useRef<string | null>(null);
-  const onSelect = useCallback((ids: string[]) => {
+  const onSelect = useCallback((next: Selection) => {
+    const ids = next.actions;
     const to = renamedTo.current;
     if (to && !ids.includes(to)) {
       if (ids.length === 0) return;
       renamedTo.current = null;
     }
     if (to && ids.includes(to)) renamedTo.current = null;
-    setSelection((s) => (s.length === ids.length && s.every((id, i) => id === ids[i]) ? s : ids));
+    setSelection((s) =>
+      s.actions.length === ids.length && s.actions.every((id, i) => id === ids[i]) &&
+      s.links.length === next.links.length && s.links.every((l, i) => l === next.links[i])
+        ? s
+        : next,
+    );
   }, []);
+  const onLinkChange = useCallback(
+    (index: number, change: { when?: SettableKind; loop?: boolean; disabled?: boolean }) =>
+      void applyEdit({ updateLinks: [{ index, ...change }] }),
+    [applyEdit],
+  );
+  const onSetWorkflow = useCallback(
+    (field: string, value: FieldValue) => void applyEdit({ setWorkflow: [{ field, value }] }, `workflow:${field}`),
+    [applyEdit],
+  );
   const onSet = useCallback(
     (id: string, field: string, value: FieldValue) => void applyEdit({ set: [{ id, field, value }] }, `${id}:${field}`),
     [applyEdit],
@@ -304,6 +323,22 @@ export function FileView(props: {
     setFocusLine(line);
   }, []);
 
+  // A click on a problem selects what it belongs to and shows the field in the properties panel.
+  const openProblem = useCallback(
+    (p: Problem) => {
+      const wf = validation?.workflow;
+      const target = wf ? problemTarget(wf, p) : null;
+      if (!target) {
+        if (p.line) showInYAML(p.line);
+        return;
+      }
+      setSelection({ actions: target.action ? [target.action] : [], links: target.link !== undefined ? [target.link] : [] });
+      setPanel(true);
+      if (target.field) setFocusField((f) => ({ key: target.field!, seq: (f?.seq ?? 0) + 1 }));
+    },
+    [validation, showInYAML],
+  );
+
   if (!active) return null;
 
   if (state.status === "error") {
@@ -348,12 +383,22 @@ export function FileView(props: {
           </Badge>
         )}
         {validation && validation.errors > 0 && (
-          <Badge testId="error-count" tone="error" title={problemList(validation, "error")}>
+          <Badge
+            testId="error-count"
+            tone="error"
+            title={problemList(validation, "error")}
+            onClick={editable && view === "canvas" ? () => setProblemsOpen(true) : undefined}
+          >
             ✖ {validation.errors}
           </Badge>
         )}
         {validation && validation.warnings > 0 && (
-          <Badge testId="warning-count" tone="warning" title={problemList(validation, "warning")}>
+          <Badge
+            testId="warning-count"
+            tone="warning"
+            title={problemList(validation, "warning")}
+            onClick={editable && view === "canvas" ? () => setProblemsOpen(true) : undefined}
+          >
             ⚠ {validation.warnings}
           </Badge>
         )}
@@ -424,6 +469,15 @@ export function FileView(props: {
         ) : (
           <div className="runnel-canvas flex-1" aria-busy="true" />
         )}
+        {editable && view === "canvas" && validation?.workflow && (
+          <ProblemsBar
+            workflow={validation.workflow}
+            problems={validation.problems}
+            open={problemsOpen}
+            onToggle={() => setProblemsOpen(!problemsOpen)}
+            onOpen={openProblem}
+          />
+        )}
         {toast && (
           <div
             role="status"
@@ -447,10 +501,14 @@ export function FileView(props: {
           workflow={validation.workflow}
           selected={selection}
           problems={validation.problems}
+          focus={focusField}
           onSet={onSet}
+          onSetWorkflow={onSetWorkflow}
+          onLinkChange={onLinkChange}
+          onDeleteLink={(index) => void onDelete([], [index])}
           onRename={(from, to) => {
             renamedTo.current = to;
-            setSelection([to]);
+            setSelection({ actions: [to], links: [] });
             onRename(from, to);
           }}
           onHide={() => setPanel(false)}
@@ -553,7 +611,13 @@ function NotAGraph(props: { path: string; validation: Validation; onShowYAML: ()
   );
 }
 
-function Badge(props: { children: React.ReactNode; title?: string; testId?: string; tone?: "error" | "warning" }) {
+function Badge(props: {
+  children: React.ReactNode;
+  title?: string;
+  testId?: string;
+  tone?: "error" | "warning";
+  onClick?: () => void;
+}) {
   const tone =
     props.tone === "error"
       ? "bg-danger-soft text-destructive"
@@ -564,7 +628,11 @@ function Badge(props: { children: React.ReactNode; title?: string; testId?: stri
     <span
       title={props.title}
       data-testid={props.testId}
-      className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs font-semibold whitespace-pre-line ${tone}`}
+      role={props.onClick ? "button" : undefined}
+      tabIndex={props.onClick ? 0 : undefined}
+      onClick={props.onClick}
+      onKeyDown={(e) => props.onClick && (e.key === "Enter" || e.key === " ") && props.onClick()}
+      className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs font-semibold whitespace-pre-line ${tone}${props.onClick ? " cursor-pointer" : ""}`}
     >
       {props.children}
     </span>

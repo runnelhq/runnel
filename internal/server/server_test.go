@@ -357,6 +357,13 @@ func TestEditWorkflow(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `timeout: 5m\n`) {
 		t.Errorf("set: status %d: %s", rec.Code, rec.Body)
 	}
+	body = mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML,
+		"setWorkflow": []map[string]any{{"field": "description", "value": "Imports"}}, "updateLinks": []map[string]any{{"index": 0, "disabled": true}}})
+	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `name: import\ndescription: Imports\n`) ||
+		!strings.Contains(rec.Body.String(), `{ from: start, to: greet, disabled: true }`) {
+		t.Errorf("setWorkflow/updateLinks: status %d: %s", rec.Code, rec.Body)
+	}
 	body = mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML, "rename": map[string]string{"greet": "hello"}})
 	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
 	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "greet") {

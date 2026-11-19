@@ -112,7 +112,7 @@ func TestEditWorkflowErrors(t *testing.T) {
 		{editSource, WorkflowEdit{AddLinks: []Link{{From: "wait", To: "nope"}}}, `action "nope" does not exist`},
 		{editSource, WorkflowEdit{AddLinks: []Link{{From: "wait", To: "done", When: "{{ x }}"}}}, "not supported here"},
 		{editSource, WorkflowEdit{DeleteLinks: []int{9}}, "cannot delete link #10"},
-		{editSource, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 0, When: "maybe"}}}, "not supported here"},
+		{editSource, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 0, When: ptr("maybe")}}}, "not supported here"},
 		{strings.Replace(editSource, "actions:\n", "links2: x\nactions:\n", 1), WorkflowEdit{}, "unknown field"},
 		{"kind: Workflow\napiVersion: runnel/v1\nname: x\nactions: [{ id: a, type: core.start }]\n", WorkflowEdit{Add: []NewAction{{ID: "b", Type: "core.log"}}}, "flow style"},
 		{editSource, WorkflowEdit{Set: []SetField{{ID: "nope", Field: "timeout", Value: "1s"}}}, `cannot change action "nope": it does not exist`},
@@ -167,7 +167,7 @@ func TestEditWorkflowAddCreatesLists(t *testing.T) {
 func TestEditWorkflowLinks(t *testing.T) {
 	got := edit(t, editSource, WorkflowEdit{
 		DeleteLinks: []int{0},
-		UpdateLinks: []LinkUpdate{{Index: 1, When: "always"}, {Index: 2, When: "failure"}},
+		UpdateLinks: []LinkUpdate{{Index: 1, When: ptr("always")}, {Index: 2, When: ptr("failure")}},
 	})
 	want := strings.Replace(editSource, "  - { from: start, to: wait }\n", "", 1)
 	want = strings.Replace(want, "  - from: wait\n    to: report\n", "  - from: wait\n    to: report\n    when: always\n", 1)
@@ -177,7 +177,7 @@ func TestEditWorkflowLinks(t *testing.T) {
 	}
 	// "success" is the default and removes the condition; a loop mark stays.
 	src := strings.Replace(editSource, "{ from: report, to: done }", "{ from: report, to: done, when: failure, loop: true }", 1)
-	got = edit(t, src, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 2, When: "success"}}})
+	got = edit(t, src, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 2, When: ptr("success")}}})
 	if !strings.Contains(got, "  - { from: report, to: done, loop: true }   # end\n") {
 		t.Errorf("got:\n%s", got)
 	}
@@ -265,6 +265,60 @@ func TestEditWorkflowWithFieldErrors(t *testing.T) {
 		t.Errorf("result does not parse: %v", err)
 	}
 }
+
+func TestEditWorkflowLinkFlags(t *testing.T) {
+	got := edit(t, editSource, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 2, Loop: ptr(true)}, {Index: 0, Disabled: ptr(true)}}})
+	want := strings.Replace(editSource, "  - { from: report, to: done }   # end\n", "  - { from: report, to: done, loop: true }   # end\n", 1)
+	want = strings.Replace(want, "  - { from: start, to: wait }\n", "  - { from: start, to: wait, disabled: true }\n", 1)
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+	got = edit(t, got, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 0, Disabled: ptr(false)}}})
+	if !strings.Contains(got, "  - { from: start, to: wait }\n") {
+		t.Errorf("got:\n%s", got)
+	}
+}
+
+func TestEditWorkflowSetWorkflow(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		field    WorkflowField
+		old, new string
+	}{
+		{"rename", WorkflowField{Field: "name", Value: "nightly"}, "name: edit\n", "name: nightly\n"},
+		{"description after the name", WorkflowField{Field: "description", Value: "Runs at night"},
+			"name: edit\n", "name: edit\ndescription: Runs at night\n"},
+		{"settings before the actions", WorkflowField{Field: "settings.maxConcurrentRuns", Value: float64(1)},
+			"name: edit\nactions:\n", "name: edit\nsettings:\n  maxConcurrentRuns: 1\nactions:\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := edit(t, editSource, WorkflowEdit{SetWorkflow: []WorkflowField{tt.field}})
+			if want := strings.Replace(editSource, tt.old, tt.new, 1); got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+	// Existing settings get a further entry; removing the description removes its lines.
+	src := strings.Replace(editSource, "name: edit\n", "name: edit\ndescription: |\n  two\n  lines\nsettings:\n  timeout: 2h\n", 1)
+	got := edit(t, src, WorkflowEdit{SetWorkflow: []WorkflowField{{Field: "settings.maxConcurrentRuns", Value: float64(2)}}})
+	if !strings.Contains(got, "settings:\n  timeout: 2h\n  maxConcurrentRuns: 2\nactions:") {
+		t.Errorf("got:\n%s", got)
+	}
+	got = edit(t, src, WorkflowEdit{SetWorkflow: []WorkflowField{{Field: "description"}}})
+	if got != strings.Replace(src, "description: |\n  two\n  lines\n", "", 1) {
+		t.Errorf("got:\n%s", got)
+	}
+	for _, e := range []WorkflowEdit{
+		{SetWorkflow: []WorkflowField{{Field: "kind", Value: "x"}}},
+		{SetWorkflow: []WorkflowField{{Field: "name", Value: "a"}, {Field: "description", Value: "b"}}},
+	} {
+		if _, err := EditWorkflow("x.workflow.yaml", []byte(editSource), e); err == nil {
+			t.Errorf("%+v: no error", e)
+		}
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
 
 func edit(t *testing.T, src string, e WorkflowEdit) string {
 	t.Helper()

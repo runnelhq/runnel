@@ -32,6 +32,8 @@ type WorkflowEdit struct {
 	UpdateLinks []LinkUpdate `json:"updateLinks,omitempty"`
 	// Set changes fields of actions (properties panel, E7a); at most one per action.
 	Set []SetField `json:"set,omitempty"`
+	// SetWorkflow changes a field of the workflow itself (E7b); at most one.
+	SetWorkflow []WorkflowField `json:"setWorkflow,omitempty"`
 }
 
 // SetField sets a field of an action to a value; a nil value removes the field.
@@ -58,11 +60,22 @@ type NewAction struct {
 	Type string `json:"type"`
 }
 
-// LinkUpdate sets the condition of the link with the given index.
+// LinkUpdate changes the link with the given index; fields that are not given stay as they are.
 type LinkUpdate struct {
 	Index int `json:"index"`
 	// When is "success", "failure" or "always"; "success" removes the field.
-	When string `json:"when"`
+	When *string `json:"when,omitempty"`
+	// Loop marks a link back to an earlier action.
+	Loop *bool `json:"loop,omitempty"`
+	// Disabled keeps the link in the file but never follows it.
+	Disabled *bool `json:"disabled,omitempty"`
+}
+
+// WorkflowField sets a field of the workflow itself; a nil value removes it.
+type WorkflowField struct {
+	// Field is one of name, description, settings.timeout or settings.maxConcurrentRuns.
+	Field string `json:"field"`
+	Value any    `json:"value"`
 }
 
 // EditWorkflow applies an edit to the text of a workflow file and returns the new text.
@@ -129,7 +142,7 @@ type editor struct {
 func (e *editor) check() error {
 	edit := e.edit
 	if len(edit.Rename) > 0 && (len(edit.Move) > 0 || len(edit.Delete) > 0 || len(edit.Add) > 0 ||
-		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0) {
+		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0 || len(edit.SetWorkflow) > 0) {
 		return errors.New("renaming cannot be combined with other changes")
 	}
 	e.ids = map[string]bool{}
@@ -212,12 +225,27 @@ func (e *editor) check() error {
 		if u.Index < 0 || u.Index >= len(e.w.Links) || links[u.Index] {
 			return fmt.Errorf("cannot change link #%d: it does not exist", u.Index+1)
 		}
-		if err := checkWhen(u.When); err != nil {
-			return fmt.Errorf("cannot change link #%d: %w", u.Index+1, err)
+		if u.When != nil {
+			if err := checkWhen(*u.When); err != nil {
+				return fmt.Errorf("cannot change link #%d: %w", u.Index+1, err)
+			}
+		}
+	}
+	if len(edit.SetWorkflow) > 1 {
+		return errors.New("only one field of the workflow can be changed at a time")
+	}
+	for _, f := range edit.SetWorkflow {
+		if !workflowFields[f.Field] {
+			return fmt.Errorf("field %q of the workflow cannot be changed here", f.Field)
+		}
+		if err := checkSetField(SetField{Field: "with.x", Value: f.Value}); err != nil {
+			return fmt.Errorf("%s: only a text, a number or true/false can be set here", f.Field)
 		}
 	}
 	return nil
 }
+
+var workflowFields = map[string]bool{"name": true, "description": true, "settings.timeout": true, "settings.maxConcurrentRuns": true}
 
 func checkID(id string) error {
 	if !idPattern.MatchString(id) {
@@ -296,9 +324,17 @@ func (e *editor) apply() error {
 				continue
 			}
 			l := e.w.Links[u.Index]
-			l.When = u.When
+			if u.When != nil {
+				l.When = *u.When
+			}
 			if l.When == "success" {
 				l.When = ""
+			}
+			if u.Loop != nil {
+				l.Loop = *u.Loop
+			}
+			if u.Disabled != nil {
+				l.Disabled = *u.Disabled
 			}
 			if err := e.rewriteLink(seq.Values[u.Index], l); err != nil {
 				return err
@@ -323,6 +359,11 @@ func (e *editor) apply() error {
 			return fmt.Errorf("cannot change action %q: %w", f.ID, err)
 		}
 	}
+	for _, f := range edit.SetWorkflow {
+		if err := e.setWorkflow(f); err != nil {
+			return fmt.Errorf("cannot change the workflow: %w", err)
+		}
+	}
 
 	e.layout()
 	return nil
@@ -341,21 +382,27 @@ func (e *editor) set(f SetField) error {
 		return errors.New("the action is written in flow style ({ … }); write it as a block to edit it in the properties")
 	}
 	indent := strings.Repeat(" ", itemEntries[0].Key.GetToken().Position.Column-1)
-	parent, child, nested := strings.Cut(f.Field, ".")
+	return e.setField(itemEntries, maxLine(item), indent, f.Field, f.Value)
+}
+
+// setField sets "field" or "parent.child" in a block mapping with the given entries and
+// indentation; a missing entry is inserted after the line after.
+func (e *editor) setField(es []*ast.MappingValueNode, after int, indent, field string, value any) error {
+	parent, child, nested := strings.Cut(field, ".")
 	if !nested {
-		return e.setEntry(keyOf(itemEntries, parent), maxLine(item), indent, parent, f.Value)
+		return e.setEntry(keyOf(es, parent), after, indent, parent, value)
 	}
 
-	pe := keyOf(itemEntries, parent)
+	pe := keyOf(es, parent)
 	if pe == nil {
-		if f.Value == nil {
+		if value == nil {
 			return nil
 		}
-		lines, err := entryLines(indent+"  ", child, f.Value)
+		lines, err := entryLines(indent+"  ", child, value)
 		if err != nil {
 			return err
 		}
-		e.insert(maxLine(item)+1, append([]string{indent + parent + ":"}, lines...)...)
+		e.insert(after+1, append([]string{indent + parent + ":"}, lines...)...)
 		return nil
 	}
 	children := entries(pe.Value)
@@ -364,7 +411,7 @@ func (e *editor) set(f SetField) error {
 	}
 	if len(children) == 0 {
 		// "with:" without entries (or "with: {}"): replace the line.
-		if f.Value == nil {
+		if value == nil {
 			return nil
 		}
 		line := minLine(pe)
@@ -375,7 +422,7 @@ func (e *editor) set(f SetField) error {
 		if err != nil {
 			return err
 		}
-		lines, err := entryLines(indent+"  ", child, f.Value)
+		lines, err := entryLines(indent+"  ", child, value)
 		if err != nil {
 			return err
 		}
@@ -383,11 +430,32 @@ func (e *editor) set(f SetField) error {
 		return nil
 	}
 	ce := keyOf(children, child)
-	if f.Value == nil && ce != nil && len(children) == 1 {
+	if value == nil && ce != nil && len(children) == 1 {
 		return e.setEntry(pe, 0, "", parent, nil) // the last entry: remove the parent as well
 	}
 	childIndent := strings.Repeat(" ", children[0].Key.GetToken().Position.Column-1)
-	return e.setEntry(ce, maxLine(pe.Value), childIndent, child, f.Value)
+	return e.setEntry(ce, maxLine(pe.Value), childIndent, child, value)
+}
+
+// setWorkflow sets a field of the workflow itself. A missing description is added
+// after the name, missing settings before the actions.
+func (e *editor) setWorkflow(f WorkflowField) error {
+	after := len(e.lines)
+	switch {
+	case f.Field == "description" && keyOf(e.top, "name") != nil:
+		after = maxLine(keyOf(e.top, "name"))
+	default:
+		for _, k := range []string{"actions", "links", "layout"} {
+			if next := keyOf(e.top, k); next != nil {
+				after = minLine(next) - 1
+				break
+			}
+		}
+	}
+	if after == len(e.lines) {
+		e.atEnd = true
+	}
+	return e.setField(e.top, after, "", f.Field, f.Value)
 }
 
 // setEntry replaces, removes (nil value) or – if entry is nil – inserts "key: value" after the given line.
