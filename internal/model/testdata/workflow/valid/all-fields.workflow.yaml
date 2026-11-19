@@ -25,6 +25,7 @@ actions:
     retry:
       attempts: 5
       backoff: 2s
+      strategy: exponential
     with:
       method: GET
       url: https://example.com/health

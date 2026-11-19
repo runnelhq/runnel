@@ -115,4 +115,6 @@ Ergänzende Festlegungen aus der Implementierung (`internal/engine/workflow/sche
   der Wiederholung) wirken dabei schon auf Joins außerhalb der Schleife. Für reine Wiederholungen ist `retry` (S07)
   der einfachere Weg.
 - **Projektstandard:** `workflow.defaultJoin` in `project.yaml`.
-- **`joinTimeout`** wird mit den übrigen Zeitlimits in S07 umgesetzt.
+- **`joinTimeout`** (S07): Die Wartezeit beginnt, sobald der erste eingehende Link gefeuert hat. Läuft sie ab, startet
+  die Action nicht, sondern gilt als fehlgeschlagen ("join timeout: still waiting for …"); ihre Fehler-Links werden
+  verfolgt, später eintreffende Links ignoriert.

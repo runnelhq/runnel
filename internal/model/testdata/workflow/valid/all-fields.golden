@@ -37,7 +37,8 @@
       "timeout": "10s",
       "retry": {
         "attempts": 5,
-        "backoff": "2s"
+        "backoff": "2s",
+        "strategy": "exponential"
       },
       "continueOnError": true
     },

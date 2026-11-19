@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/runnelhq/runnel/internal/vars"
 )
@@ -101,8 +102,32 @@ type Action struct {
 
 // Retry configures repeated attempts of a failed action.
 type Retry struct {
-	Attempts int      `yaml:"attempts" json:"attempts"`
-	Backoff  Duration `yaml:"backoff,omitempty" json:"backoff,omitempty"`
+	// Attempts is the total number of attempts, including the first one.
+	Attempts int `yaml:"attempts" json:"attempts"`
+	// Backoff is the wait before the second attempt.
+	Backoff Duration `yaml:"backoff,omitempty" json:"backoff,omitempty"`
+	// Strategy is "fixed" (default: always Backoff) or "exponential" (Backoff doubles after each attempt).
+	Strategy RetryStrategy `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+}
+
+// RetryStrategy defines how the wait between attempts develops.
+type RetryStrategy string
+
+// Retry strategies.
+const (
+	RetryFixed       RetryStrategy = "fixed"
+	RetryExponential RetryStrategy = "exponential"
+)
+
+// Wait returns the wait before the given attempt (2 = first retry).
+func (r Retry) Wait(attempt int) time.Duration {
+	d, _ := r.Backoff.Value()
+	if r.Strategy == RetryExponential {
+		for i := 2; i < attempt && d < 24*time.Hour; i++ {
+			d *= 2
+		}
+	}
+	return d
 }
 
 // JoinMode defines when an action with several incoming links starts (see ADR 0003).
@@ -297,6 +322,11 @@ func (w *Workflow) validate() error {
 				add(path+".retry.attempts", "%s: retry attempts must be at least 1", label)
 			}
 			duration(path+".retry.backoff", label+" retry backoff", a.Retry.Backoff)
+			switch a.Retry.Strategy {
+			case "", RetryFixed, RetryExponential:
+			default:
+				add(path+".retry.strategy", "%s: invalid retry strategy %q (expected fixed or exponential)", label, a.Retry.Strategy)
+			}
 		}
 	}
 

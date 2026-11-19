@@ -35,7 +35,8 @@ runnel run --env prod examples/hello/workflows/hello.workflow.yaml
 
 `runnel run <datei>` führt einen Workflow aus: `--env` wählt das Environment des Projekts, `--param KEY=VALUE` setzt
 Parameter, `-v` zeigt zusätzlich Debug-Meldungen und jeden Action-Start. Exit-Code: `0` erfolgreich, `1` fehlgeschlagen,
-`2` nicht gestartet (ungültiger Workflow oder Aufruf) – passend für die Windows-Aufgabenplanung.
+`2` nicht gestartet (ungültiger Workflow oder Aufruf), `130` abgebrochen – passend für die Windows-Aufgabenplanung.
+Strg+C bricht einen Lauf sauber ab (laufende Actions werden gestoppt); ein zweites Strg+C beendet sofort.
 
 ```bash
 runnel validate examples/hello

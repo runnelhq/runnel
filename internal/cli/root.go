@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,9 +30,14 @@ func NewRootCommand(out, errOut io.Writer) *cobra.Command {
 
 // Execute runs the CLI with the given arguments and returns the process exit code.
 func Execute(args []string, out, errOut io.Writer) int {
+	return ExecuteContext(context.Background(), args, out, errOut)
+}
+
+// ExecuteContext is Execute with a context; cancelling it stops a running workflow.
+func ExecuteContext(ctx context.Context, args []string, out, errOut io.Writer) int {
 	root := NewRootCommand(out, errOut)
 	root.SetArgs(args)
-	if err := root.Execute(); err != nil {
+	if err := root.ExecuteContext(ctx); err != nil {
 		var exit errExitCode
 		if errors.As(err, &exit) {
 			return int(exit)

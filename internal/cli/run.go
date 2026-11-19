@@ -24,6 +24,8 @@ import (
 const (
 	exitRunFailed = 1 // the workflow ran and failed
 	exitNotRun    = 2 // the workflow could not be started (invalid file, flags, …)
+	// ExitCancelled: the run was cancelled (Ctrl+C), as is customary for SIGINT.
+	ExitCancelled = 130
 )
 
 // newRegistry returns all action types built into this binary.
@@ -48,7 +50,8 @@ func newRunCommand() *cobra.Command {
 			"Variables come from the workflow parameters, the project (project.yaml in the\n" +
 			"workflow's directory or above), the environment (--env, default: defaultEnvironment\n" +
 			"of the project) and --param, in this order of precedence (last wins).\n\n" +
-			"Exit codes: 0 succeeded, 1 failed, 2 not started (invalid workflow or arguments).",
+			"Ctrl+C cancels the run cleanly (running actions are stopped); press it twice to exit at once.\n\n" +
+			"Exit codes: 0 succeeded, 1 failed, 2 not started (invalid workflow or arguments), 130 cancelled.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runWorkflow(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), args[0], opts)
@@ -70,10 +73,13 @@ func runWorkflow(ctx context.Context, out, errOut io.Writer, file string, opts r
 		return errExitCode(exitNotRun)
 	}
 	res := runner.Run(ctx)
-	if res.Status != workflow.Succeeded {
-		return errExitCode(exitRunFailed)
+	switch res.Status {
+	case workflow.Succeeded:
+		return nil
+	case workflow.Cancelled:
+		return errExitCode(ExitCancelled)
 	}
-	return nil
+	return errExitCode(exitRunFailed)
 }
 
 // prepareRun loads and checks everything needed for a run. Problems in files are
@@ -225,6 +231,8 @@ func (l *runLogger) event(e workflow.Event) {
 		}
 	case workflow.ActionFinished:
 		switch {
+		case e.Status == workflow.Cancelled:
+			l.line(e.Time, slog.LevelWarn, e.ActionID, fmt.Sprintf("cancelled after %s", round(e.Duration)))
 		case e.Err != nil:
 			l.line(e.Time, slog.LevelError, e.ActionID, fmt.Sprintf("failed after %s: %v", round(e.Duration), e.Err))
 		case l.verbose:
@@ -234,9 +242,12 @@ func (l *runLogger) event(e workflow.Event) {
 		for _, name := range sortedKeys(e.Outputs) {
 			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("output %s = %s", name, formatValue(e.Outputs[name])))
 		}
-		if e.Status == workflow.Succeeded {
+		switch e.Status {
+		case workflow.Succeeded:
 			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("workflow %q succeeded in %s", l.workflow, round(e.Duration)))
-		} else {
+		case workflow.Cancelled:
+			l.line(e.Time, slog.LevelWarn, "", fmt.Sprintf("workflow %q cancelled after %s", l.workflow, round(e.Duration)))
+		default:
 			l.line(e.Time, slog.LevelError, "", fmt.Sprintf("workflow %q failed after %s: %v", l.workflow, round(e.Duration), e.Err))
 		}
 	}

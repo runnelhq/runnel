@@ -11,7 +11,8 @@ field-values.workflow.yaml:21:11: action "bad-values": invalid join "any" (expec
 field-values.workflow.yaml:22:18: action "bad-values" joinTimeout: duration "-5m" must not be negative
 field-values.workflow.yaml:24:17: action "bad-values": retry attempts must be at least 1
 field-values.workflow.yaml:25:16: action "bad-values" retry backoff: invalid duration "soon" (examples: 30s, 5m, 2h, 1h30m)
-field-values.workflow.yaml:27:7: link #1: missing required field "from"
-field-values.workflow.yaml:28:7: link #2: missing required field "to"
-field-values.workflow.yaml:29:45: link #3: invalid condition "sucess" (expected success, failure, always or an expression "{{ … }}")
-field-values.workflow.yaml:30:45: link #4: invalid condition "{{ }}" (expected success, failure, always or an expression "{{ … }}")
+field-values.workflow.yaml:26:17: action "bad-values": invalid retry strategy "linear" (expected fixed or exponential)
+field-values.workflow.yaml:28:7: link #1: missing required field "from"
+field-values.workflow.yaml:29:7: link #2: missing required field "to"
+field-values.workflow.yaml:30:45: link #3: invalid condition "sucess" (expected success, failure, always or an expression "{{ … }}")
+field-values.workflow.yaml:31:45: link #4: invalid condition "{{ }}" (expected success, failure, always or an expression "{{ … }}")

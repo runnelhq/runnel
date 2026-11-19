@@ -23,6 +23,7 @@ actions:
     retry:
       attempts: 0
       backoff: soon
+      strategy: linear
 links:
   - { to: no-type }
   - { from: bad-type }

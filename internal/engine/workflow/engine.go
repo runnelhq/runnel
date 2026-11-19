@@ -8,6 +8,7 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -47,6 +48,8 @@ const (
 	Failed    Status = "failed"
 	// Skipped: the action was not run because none of its incoming links can fire (ADR 0003).
 	Skipped Status = "skipped"
+	// Cancelled: the run was stopped from outside (e.g. Ctrl+C).
+	Cancelled Status = "cancelled"
 )
 
 // Result is the outcome of a run.
@@ -115,9 +118,6 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 		errs = append(errs, w.ErrorAt(path, "%s is not supported by this version of Runnel yet", what))
 	}
 
-	if w.Settings.Timeout != "" {
-		unsupported("$.settings.timeout", "a workflow timeout")
-	}
 	for i, o := range w.Outputs {
 		if strings.Contains(o.Value, "{{") {
 			unsupported(fmt.Sprintf("$.outputs[%d].value", i), fmt.Sprintf("output %q: an expression", o.Name))
@@ -136,15 +136,6 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 				a.ID, a.Type, opts.Registry.Types()))
 		} else if _, err := def.New(a.With); err != nil {
 			errs = append(errs, w.ErrorAt(path+".with", "action %q (%s): %v", a.ID, a.Type, err))
-		}
-		if a.Timeout != "" {
-			unsupported(path+".timeout", fmt.Sprintf("action %q: timeout", a.ID))
-		}
-		if a.Retry != nil {
-			unsupported(path+".retry", fmt.Sprintf("action %q: retry", a.ID))
-		}
-		if a.JoinTimeout != "" {
-			unsupported(path+".joinTimeout", fmt.Sprintf("action %q: joinTimeout", a.ID))
 		}
 	}
 
@@ -176,7 +167,20 @@ func (r *Runner) Run(ctx context.Context) Result {
 	runID := NewRunID(started)
 	r.emit(Event{Time: started, Kind: RunStarted, RunID: runID, Message: r.w.Name})
 
-	status, err := newScheduler(ctx, r, runID).run()
+	runCtx, cancel := ctx, context.CancelFunc(func() {})
+	timeout, _ := r.w.Settings.Timeout.Value()
+	if timeout > 0 {
+		runCtx, cancel = context.WithTimeout(ctx, timeout)
+	}
+	status, err := newScheduler(runCtx, r, runID).run()
+	cancel()
+	switch {
+	case ctx.Err() != nil:
+		status, err = Cancelled, fmt.Errorf("run cancelled: %w", context.Cause(ctx))
+	case timeout > 0 && errors.Is(runCtx.Err(), context.DeadlineExceeded):
+		status, err = Failed, fmt.Errorf("workflow timed out after %s", timeout)
+	}
+
 	var outputs map[string]any
 	if status == Succeeded {
 		if outputs, err = r.outputs(); err != nil {
@@ -213,7 +217,36 @@ func (r *Runner) outputs() (map[string]any, error) {
 	return out, nil
 }
 
+// executeAction runs an action including retries and per-attempt timeouts.
 func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Action) (action.Result, error) {
+	attempts := 1
+	var retry model.Retry
+	if a.Retry != nil {
+		retry = *a.Retry
+		attempts = max(retry.Attempts, 1)
+	}
+	for attempt := 1; ; attempt++ {
+		res, err := r.attempt(ctx, runID, a)
+		if err == nil || attempt >= attempts || ctx.Err() != nil {
+			return res, err
+		}
+		wait := retry.Wait(attempt + 1)
+		r.log(runID, a, slog.LevelWarn, fmt.Sprintf("attempt %d of %d failed: %v; retrying in %s", attempt, attempts, err, wait))
+		if !sleep(ctx, wait) {
+			return res, err
+		}
+	}
+}
+
+// attempt runs an action once: resolves variables, creates and executes it within its timeout.
+func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action) (action.Result, error) {
+	timeout, _ := a.Timeout.Value()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeoutCause(ctx, timeout, errActionTimeout)
+		defer cancel()
+	}
+
 	with, err := expand(a.With, r.opts.Scope)
 	if err != nil {
 		return action.Result{}, err
@@ -228,7 +261,29 @@ func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Actio
 		ActionID: a.ID,
 		Log:      func(level slog.Level, msg string) { r.log(runID, a, level, msg) },
 	}
-	return act.Execute(ctx, ec)
+	res, err := act.Execute(ctx, ec)
+	if err != nil && errors.Is(context.Cause(ctx), errActionTimeout) {
+		err = fmt.Errorf("timed out after %s", timeout)
+	}
+	return res, err
+}
+
+// errActionTimeout marks the cancellation of an action by its own timeout.
+var errActionTimeout = errors.New("action timeout")
+
+// sleep waits for d or until ctx is done; it reports whether the full time passed.
+func sleep(ctx context.Context, d time.Duration) bool {
+	if d <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func (r *Runner) log(runID string, a *model.Action, level slog.Level, msg string) {
