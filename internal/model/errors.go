@@ -105,3 +105,8 @@ func (es Errors) errOrNil() error {
 	es.Sort()
 	return es
 }
+
+// Err returns the list sorted as an error, or nil if it is empty.
+func (es Errors) Err() error {
+	return es.errOrNil()
+}

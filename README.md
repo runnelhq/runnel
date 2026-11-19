@@ -20,7 +20,22 @@ Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadma
 
 ## Verwendung
 
-Noch im Aufbau – bisher können Workflows geprüft, aber noch nicht ausgeführt werden.
+Noch im Aufbau – Workflows lassen sich prüfen und mit den Basis-Actions (`core.start`, `core.log`, `core.wait`,
+`core.success`, `core.abort`) ausführen; weitere Actions folgen laut [Roadmap](docs/ROADMAP.md).
+
+```bash
+runnel run --env prod examples/hello/workflows/hello.workflow.yaml
+```
+
+```
+23:28:01.493 INFO  workflow "hello" started (environment prod), run 01M7RFT6ENA57HPBJSHRWN0YV6
+23:28:01.493 INFO  [greet] Hello, Production! (production on SRV01, files in \\fileserver\exchange\runnel-hello)
+23:28:02.494 INFO  workflow "hello" succeeded in 1s
+```
+
+`runnel run <datei>` führt einen Workflow aus: `--env` wählt das Environment des Projekts, `--param KEY=VALUE` setzt
+Parameter, `-v` zeigt zusätzlich Debug-Meldungen und jeden Action-Start. Exit-Code: `0` erfolgreich, `1` fehlgeschlagen,
+`2` nicht gestartet (ungültiger Workflow oder Aufruf) – passend für die Windows-Aufgabenplanung.
 
 ```bash
 runnel validate examples/hello

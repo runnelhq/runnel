@@ -259,3 +259,12 @@ func (w *Workflow) validate() error {
 
 	return errs.errOrNil()
 }
+
+// ErrorAt creates an error located at a YAML path of the workflow file, e.g. "$.actions[2].type".
+// It is meant for checks outside this package, e.g. by the engine before a run.
+func (w *Workflow) ErrorAt(path, format string, args ...any) *Error {
+	if w.src == nil {
+		return &Error{Msg: fmt.Sprintf(format, args...)}
+	}
+	return w.src.errorf(path, format, args...)
+}
