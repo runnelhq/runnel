@@ -43,6 +43,7 @@ daneben legen.
 | W15 | Herkunft prüfen: `gh attestation verify runnel_0.1.0-alpha.2_windows_amd64.zip --repo runnelhq/runnel` | „Verification succeeded“ |
 | W16 | ab dem ersten Release nach E1: `.\runnel.exe catalog`, dann `.\runnel.exe catalog core.log` und `.\runnel.exe catalog --json > catalog.json` | Liste der Core-Actions unter `general`; Felder `message` (required) und `level` (debug\|info\|warn\|error, default info); gültiges JSON, Umlaute/Gedankenstrich korrekt dargestellt |
 | W17 | ab dem ersten Release nach E2: `.\runnel.exe serve examples\hello`, im Browser `http://localhost:7300/api/v1/projects/current/tree` und `…/api/v1/files/workflows/hello.workflow.yaml` öffnen; Windows-Firewall-Abfrage beobachten; Strg+C | Baum und Datei werden angezeigt; **keine** Firewall-Abfrage (nur lokal); `Server stopped` |
+| W18 | ab dem ersten Release nach E3: Server wie W17 starten; in einer zweiten PowerShell `curl.exe -N http://localhost:7300/api/v1/events`, in einer dritten `curl.exe -X POST http://localhost:7300/api/v1/runs -d '{\"path\":\"workflows/parallel.workflow.yaml\"}'`; danach Strg+C im Server während eines Laufs mit `DELAY_B=1h` | Ereignisse erscheinen live im zweiten Fenster; `GET /api/v1/runs` zeigt den Lauf; beim Beenden wird der Lauf abgebrochen, `Server stopped` |
 
 Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe festhalten.
 

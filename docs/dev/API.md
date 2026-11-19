@@ -1,7 +1,7 @@
 # Server-API (`runnel serve`)
 
-Stand: E2. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
-([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)). Weitere Endpunkte (Läufe, Live-Events) folgen mit E3.
+Stand: E3. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)).
 
 ```bash
 runnel serve examples/hello            # Projekt im Ordner oder darüber, Port 7300
@@ -30,6 +30,11 @@ runnel serve --port 0 .                 # freier Port; die Ausgabe nennt die Adr
 | DELETE | `/files/{path}` | Datei löschen, `204` |
 | GET | `/catalog` | `{"actions": [Descriptor …]}` wie `runnel catalog --json` ([ADR 0014](../adr/0014-action-descriptor-schema.md)) |
 | POST | `/validate` | Workflow prüfen, siehe unten |
+| POST | `/runs` | Lauf starten, siehe unten |
+| GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst |
+| GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
+| POST | `/runs/{id}/cancel` | Lauf abbrechen: `202`; bereits beendet `409` |
+| GET | `/events` | Live-Ereignisse (Server-Sent Events), siehe unten |
 
 ## Konfliktschutz (ETag)
 
@@ -76,3 +81,70 @@ Workflow-Dateien.
 
 `path` (YAML-Pfad, sofern bekannt) ordnet die Meldung einem Knoten zu: `$.actions[2]…` ist die dritte Action,
 `$.links[0]…` der erste Link.
+
+## Läufe
+
+```json
+POST /api/v1/runs
+{ "path": "workflows/hello.workflow.yaml", "environment": "prod", "params": { "GREETING": "Moin" } }
+```
+
+`environment` und `params` sind optional (ohne `environment` gilt das Standard-Environment des Projekts). Gestartet wird
+die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft.
+
+| Antwort | Bedeutung |
+|---|---|
+| `201` + `Run`, Header `Location` | Lauf gestartet; er läuft im Hintergrund weiter |
+| `422` + `{error, errors, warnings, problems}` | Fehler in Workflow oder Projektdateien (Format wie `/validate`) |
+| `400` | unbekanntes Environment, Parameter fehlen oder passen nicht zum Typ |
+| `404` | Datei nicht gefunden |
+| `503` | Server wird beendet |
+
+```json
+{
+  "id": "01M7T2X0AHHW9G9ZAV04RRCXJC",
+  "path": "workflows/parallel.workflow.yaml",
+  "workflow": "parallel",
+  "environment": "dev",
+  "status": "running",
+  "started": "2026-11-19T14:20:50.898Z",
+  "finished": "2026-11-19T14:20:52.899Z",
+  "durationMs": 2001,
+  "error": "…",
+  "outputs": { "MESSAGE": "Hello" }
+}
+```
+
+`status` eines Laufs: `running`, `succeeded`, `failed`, `cancelled`. `GET /runs/{id}` ergänzt `actions` – je Action
+`id`, `type`, `status` (`pending`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), Zeiten, `durationMs`,
+`error` und `runs` (Anzahl Ausführungen bei Schleifen) – und `log` (`time`, `level`, `actionId`, `message`; höchstens
+5.000 Zeilen, ältere entfallen mit `logTruncated: true`).
+
+Läufe liegen **nur im Speicher**: die letzten 100, laufende werden nie verworfen. Beim Beenden des Servers (Strg+C)
+werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26, ohne dass sich diese API ändert.
+
+## Live-Ereignisse (`/events`)
+
+Server-Sent Events ([ADR 0016](../adr/0016-live-events-sse.md)); im Browser mit `EventSource`, auf der Konsole mit
+`curl -N http://127.0.0.1:7300/api/v1/events`.
+
+```
+id: 7
+event: log
+data: {"seq":7,"kind":"log","time":"…","runId":"01M7…","actionId":"fetch-a","actionType":"core.wait","level":"debug","message":"waiting 2s"}
+```
+
+| Ereignis | Zusätzliche Felder |
+|---|---|
+| `run.started` | `message` (Workflow-Name) |
+| `action.started` | `actionId`, `actionType` |
+| `log` | `actionId`, `level` (`debug`, `info`, `warn`, `error`), `message` |
+| `action.finished` | `status`, `durationMs`, `error` |
+| `action.skipped` | `status: skipped` |
+| `run.finished` | `status`, `durationMs`, `error`, `outputs` |
+| `reset` | – verpasste Ereignisse sind nicht mehr vorrätig; Zustand über `GET /runs` neu laden |
+
+- Ohne Angabe liefert der Strom nur **neue** Ereignisse. Mit `Last-Event-ID` (setzt `EventSource` beim Neuverbinden
+  selbst) oder `?since=<seq>` folgen zuerst die verpassten; vorrätig sind die letzten 2.000.
+- `?run=<id>` liefert nur die Ereignisse eines Laufs.
+- Alle 15 s kommt ein Kommentar (`: ping`), damit Verbindungen offen bleiben. Beim Beenden des Servers endet der Strom.

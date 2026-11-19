@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,6 +17,7 @@ import (
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/runs"
 )
 
 // Exit codes of "runnel run".
@@ -83,118 +83,59 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	if err != nil {
 		return nil, err
 	}
-	printDiags := func(diags model.Errors) {
-		for _, d := range diags {
-			_, _ = fmt.Fprintln(errOut, formatDiagnostic(d))
-		}
-	}
-
 	if info, err := os.Stat(file); err == nil && info.IsDir() {
 		return nil, fmt.Errorf("%s is a directory; pass a workflow file (*%s)", file, workflowSuffix)
 	}
-	w, err := model.LoadWorkflow(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
-		var diags model.Errors
-		if errors.As(err, &diags) {
-			printDiags(diags)
-			return nil, errExitCode(exitNotRun)
-		}
 		return nil, err
 	}
-	diags := w.Validate()
-	printDiags(diags)
-	if diags.HasErrors() {
-		return nil, errExitCode(exitNotRun)
-	}
-
-	var (
-		p   *model.Project
-		env *model.Environment
-	)
 	root, found, err := model.FindProjectDir(filepath.Dir(file))
 	if err != nil {
 		return nil, err
 	}
+	projectDir := ""
 	switch {
 	case found:
-		p, err = model.LoadProject(displayPath(root))
-		if err != nil {
-			var diags model.Errors
-			if errors.As(err, &diags) {
-				printDiags(diags)
-				return nil, errExitCode(exitNotRun)
-			}
-			return nil, err
-		}
-		if env, err = p.SelectEnvironment(opts.env); err != nil {
-			return nil, err
-		}
+		projectDir = displayPath(root)
 	case opts.env != "":
 		return nil, fmt.Errorf("--env %s: no project (%s) found for %s", opts.env, model.ProjectFile, file)
 	}
 
-	if err := checkParams(errOut, w, params); err != nil {
-		return nil, err
-	}
-
-	logger := &runLogger{out: out, verbose: opts.verbose, workflow: w.Name, env: env}
-	var defaultJoin model.JoinMode
-	if p != nil {
-		defaultJoin = p.Workflow.DefaultJoin
-	}
-	runner, err := workflow.Prepare(w, workflow.Options{
-		Registry:    actions.Builtin(),
-		DefaultJoin: defaultJoin,
-		Scope:       model.Scope(w, p, env, params),
-		Observer:    logger.event,
+	var logger *runLogger
+	p, err := runs.Prepare(runs.Spec{
+		Name:       filepath.ToSlash(file),
+		Data:       data,
+		ProjectDir: projectDir,
+		Env:        opts.env,
+		Params:     params,
+		Registry:   actions.Builtin(),
+		Observer:   func(e workflow.Event) { logger.event(e) },
 	})
+	printDiags(errOut, p.Warnings)
 	if err != nil {
 		var diags model.Errors
 		if errors.As(err, &diags) {
-			printDiags(diags)
+			printDiags(errOut, diags)
 			return nil, errExitCode(exitNotRun)
+		}
+		if errors.Is(err, runs.ErrMissingParameters) {
+			err = fmt.Errorf("%w (set with --param NAME=VALUE)", err)
 		}
 		return nil, err
 	}
-	return runner, nil
+	for _, name := range p.Undeclared {
+		_, _ = fmt.Fprintf(errOut, "warning: parameter %q is not declared in workflow %q; it is available as variable ${%s}\n",
+			name, p.Workflow.Name, name)
+	}
+	logger = &runLogger{out: out, verbose: opts.verbose, workflow: p.Workflow.Name, env: p.Env}
+	return p.Runner, nil
 }
 
-// checkParams fails for missing required parameters and values that do not match
-// the declared type or allowed values, and warns about undeclared parameters.
-func checkParams(errOut io.Writer, w *model.Workflow, params map[string]string) error {
-	declared := map[string]bool{}
-	var problems, missing []string
-	for _, p := range w.Parameters {
-		declared[p.Name] = true
-		value, given := params[p.Name]
-		if !given {
-			if p.Required && p.Default == "" {
-				missing = append(missing, p.Name)
-			}
-			continue
-		}
-		if _, err := p.CheckValue(value); err != nil {
-			problems = append(problems, fmt.Sprintf("parameter %s (%s): %v", p.Name, p.Type.OrString(), err))
-		}
+func printDiags(errOut io.Writer, diags model.Errors) {
+	for _, d := range diags {
+		_, _ = fmt.Fprintln(errOut, formatDiagnostic(d))
 	}
-	if len(missing) > 0 {
-		problems = append(problems, fmt.Sprintf("missing required parameter(s) %v (set with --param NAME=VALUE)", missing))
-	}
-	if len(problems) > 0 {
-		return errors.New(strings.Join(problems, "; "))
-	}
-	var unknown []string
-	for name := range params {
-		if !declared[name] {
-			unknown = append(unknown, name)
-		}
-	}
-	slices.Sort(unknown)
-	for _, name := range unknown {
-		_, _ = fmt.Fprintf(errOut, "warning: parameter %q is not declared in workflow %q; it is available as variable ${%s}\n",
-			name, w.Name, name)
-	}
-	return nil
 }
 
 // runLogger prints the events of a run as log lines.

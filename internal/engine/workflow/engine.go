@@ -37,6 +37,9 @@ type Options struct {
 	DefaultJoin model.JoinMode
 	// Now returns the current time; defaults to time.Now (replaceable in tests).
 	Now func() time.Time
+	// RunID is the id of the run; if empty, Run creates one (NewRunID). The server
+	// sets it to return the id before the run starts.
+	RunID string
 }
 
 // Status is the final state of a run.
@@ -180,7 +183,10 @@ func Check(w *model.Workflow, opts Options) model.Errors {
 func (r *Runner) Run(ctx context.Context) Result {
 	now := r.opts.Now
 	started := now()
-	runID := NewRunID(started)
+	runID := r.opts.RunID
+	if runID == "" {
+		runID = NewRunID(started)
+	}
 	r.emit(Event{Time: started, Kind: RunStarted, RunID: runID, Message: r.w.Name})
 
 	runCtx, cancel := ctx, context.CancelFunc(func() {})

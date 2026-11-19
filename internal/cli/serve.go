@@ -26,7 +26,8 @@ func newServeCommand() *cobra.Command {
 		Short: "Start the server for a project (API for the editor)",
 		Long: "Starts the server for the project in project-dir (or the current directory), found by its\n" +
 			"project.yaml in that directory or above. The server listens on 127.0.0.1 only and serves the\n" +
-			"API under " + server.APIPrefix + " (files, catalog, validation). Stop it with Ctrl+C.",
+			"API under " + server.APIPrefix + " (files, catalog, validation, runs, live events).\n" +
+			"Stop it with Ctrl+C; running workflows are cancelled.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
@@ -68,8 +69,12 @@ func serve(cmd *cobra.Command, dir string, port int) error {
 	go func() {
 		defer close(stopped)
 		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		// First cancel the runs and end the event streams, then stop the HTTP server.
+		if err := srv.Shutdown(shutdown); err != nil {
+			cmd.PrintErrln("warning: not all runs ended in time")
+		}
 		_ = hs.Shutdown(shutdown)
 	}()
 
