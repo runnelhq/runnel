@@ -46,7 +46,6 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S09 | Datei-Actions | `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list` (Ergebnis = Dateiliste) | Tests mit temporären Ordnern; UNC-Pfad manuell unter Windows |
 | S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis) | Tests gegen lokalen Testserver |
 | S11 | Sub-Workflows | `core.run-workflow` mit Parametern und Ergebnisrückgabe über `outputs` | Beispiel Eltern-/Kind-Workflow |
-| S11a | MCP-Server | `runnel mcp` (stdio): Workflows eines Projekts als MCP-Tools; Eingabe-Schema aus `parameters`, Ergebnis aus `outputs`, Log als Fortschrittsmeldungen ([ADR 0012](adr/0012-ki-faehigkeit.md)) | MCP Inspector; Claude Desktop/Claude Code ruft `examples/hello` auf |
 
 **Ergebnis 0.1:** Workflows mit Datei- und HTTP-Schritten laufen per CLI bzw. Windows-Aufgabenplanung.
 
@@ -131,6 +130,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 | S50 | Plugin-Transforms | `transform.open/batch/close` (Streaming) | Beispiel-Plugin |
 | S51 | Go-SDK | `pkg/sdk` mit Beispielen | Beispiel-Plugin baut nur mit SDK |
 | S52 | Plugin-Verwaltung | Plugins im Editor anzeigen, Fehler beim Laden sichtbar | Manuell |
+| S53 | MCP-Server (vormals S11a) | `runnel mcp` (stdio): Workflows eines Projekts als MCP-Tools; Eingabe-Schema aus `parameters`, Ergebnis aus `outputs`, Log als Fortschrittsmeldungen ([ADR 0012](adr/0012-ki-faehigkeit.md)) | MCP Inspector; Claude Desktop/Claude Code ruft `examples/hello` auf |
 
 ---
 
