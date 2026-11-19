@@ -23,6 +23,38 @@
   --code-gutter: var(--rn-tiefe-600);
 }
 
+/* Canvas (React Flow) after design/README.md 6.1 and mockup E5. */
+.runnel-canvas {
+  background: var(--canvas);
+}
+.runnel-canvas .react-flow__background circle {
+  fill: var(--canvas-grid);
+}
+.runnel-canvas .react-flow__handle.runnel-port {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 50%;
+  background: var(--node);
+  border: 1.5px solid var(--node-border);
+}
+.runnel-canvas .react-flow__node {
+  font-size: var(--rn-text-sm);
+  color: var(--foreground);
+}
+.runnel-canvas .react-flow__node.selected,
+.runnel-canvas .react-flow__node:focus-visible {
+  outline: none;
+}
+.runnel-canvas .react-flow__attribution {
+  background: transparent;
+  font-size: var(--rn-text-2xs);
+}
+.runnel-canvas .react-flow__attribution a {
+  color: var(--muted-foreground);
+}
+
 /* Base styles of the editor: 13 px base size like an IDE (design/README.md, chapter 4.1). */
 @layer base {
   html,

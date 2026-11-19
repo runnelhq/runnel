@@ -41,8 +41,8 @@ links:
   - { from: fetch-a, to: report-error, when: failure }
   - { from: fetch-b, to: report-error, when: failure }
 layout:
-  start:        { x: 40,  y: 160 }
-  fetch-a:      { x: 200, y: 80 }
-  fetch-b:      { x: 200, y: 240 }
-  combine:      { x: 380, y: 160 }
-  report-error: { x: 380, y: 320 }
+  start:        { x: 40, y: 200 }
+  fetch-a:      { x: 280, y: 100 }
+  fetch-b:      { x: 280, y: 300 }
+  combine:      { x: 520, y: 200 }
+  report-error: { x: 520, y: 400 }

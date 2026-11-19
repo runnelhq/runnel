@@ -83,7 +83,12 @@ Workflow-Dateien.
 ```
 
 `path` (YAML-Pfad, sofern bekannt) ordnet die Meldung einem Knoten zu: `$.actions[2]…` ist die dritte Action,
-`$.links[0]…` der erste Link.
+`$.links[0]…` der erste Link. Auch Meldungen zu Variablen tragen den Pfad des Werts, z. B. `$.actions[3].with.message`.
+
+Lässt sich die Datei als Workflow lesen (keine Syntax- oder Feldfehler), enthält die Antwort zusätzlich `workflow`: das
+geparste Modell mit `name`, `actions` (`id`, `type`, `join`, `with` …), `links` (`from`, `to`, `when`, `loop`,
+`disabled`) und `layout` (Koordinaten je Action-ID in Pixeln, linke obere Ecke). Der Canvas des Editors baut darauf
+auf; der Editor braucht so keinen eigenen YAML-Parser.
 
 ## Läufe
 

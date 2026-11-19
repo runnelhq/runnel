@@ -108,6 +108,82 @@ export const CopyIcon = (p: P) => (
   </Icon>
 );
 
+export const CodeIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M8 6l-5 6 5 6M16 6l5 6-5 6" />
+  </Icon>
+);
+
+export const PlusIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+
+export const MinusIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M5 12h14" />
+  </Icon>
+);
+
+export const FitIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Icon>
+);
+
+export const LayoutIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 6h16M4 12h10M4 18h6" />
+  </Icon>
+);
+
+// Icons of the built-in action types (white on the category tile of a node).
+const actionIcons: Record<string, ReactNode> = {
+  "core.start": <path d="M8 5l11 7-11 7z" fill="currentColor" />,
+  "core.wait": (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4l3 2" />
+    </>
+  ),
+  "core.log": <path d="M5 6h14M5 12h14M5 18h9" />,
+  "core.dummy": <path d="M4 6h5l4 6-4 6H4M13 12h7" />,
+  "core.success": (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M8.5 12.5l2.5 2.5 4.5-5" />
+    </>
+  ),
+  "core.abort": (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M9 9l6 6M15 9l-6 6" />
+    </>
+  ),
+};
+
+/** Icon of an action type; known types without an own icon get a generic one, unknown types "?". */
+export function ActionIcon({ type, known, ...p }: P & { type: string; known: boolean }) {
+  if (!known) {
+    return (
+      <Icon {...p}>
+        <path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 1-1 1.7M12 17h.01" />
+      </Icon>
+    );
+  }
+  return (
+    <Icon {...p}>
+      {actionIcons[type] ?? (
+        <>
+          <rect x="5" y="5" width="14" height="14" rx="3" />
+          <path d="M9 12h6" />
+        </>
+      )}
+    </Icon>
+  );
+}
+
 /** Icon of a file by its kind (workflow, environment, project …). */
 export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
   switch (kind) {

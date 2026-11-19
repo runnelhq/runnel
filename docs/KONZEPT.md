@@ -394,13 +394,13 @@ links:
   - { from: load,      to: notify-error, when: failure }
   - { from: notify-error, to: abort }
 
-layout:
+layout:                 # Pixel, linke obere Ecke des Knotens (Karte 176 × 52 px)
   start:        { x: 40,  y: 120 }
-  wait-file:    { x: 200, y: 120 }
-  load:         { x: 380, y: 120 }
-  archive:      { x: 560, y: 120 }
-  notify-error: { x: 380, y: 280 }
-  abort:        { x: 560, y: 280 }
+  wait-file:    { x: 280, y: 120 }
+  load:         { x: 520, y: 120 }
+  archive:      { x: 760, y: 120 }
+  notify-error: { x: 520, y: 280 }
+  abort:        { x: 760, y: 280 }
 ```
 
 Regeln des Workflow-Formats (umgesetzt in `internal/model`):

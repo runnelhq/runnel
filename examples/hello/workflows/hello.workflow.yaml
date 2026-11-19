@@ -33,8 +33,8 @@ links:
   - { from: pause, to: done }
   - { from: pause, to: failed, when: failure }
 layout:
-  start:  { x: 40,  y: 120 }
-  greet:  { x: 200, y: 120 }
-  pause:  { x: 360, y: 120 }
-  done:   { x: 520, y: 120 }
-  failed: { x: 520, y: 260 }
+  start:  { x: 40, y: 120 }
+  greet:  { x: 280, y: 120 }
+  pause:  { x: 520, y: 120 }
+  done:   { x: 760, y: 120 }
+  failed: { x: 760, y: 260 }
