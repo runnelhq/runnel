@@ -763,6 +763,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/projects/current` · `/projects/current/tree` | Projekt (Name, Ordner) · Dateibaum des Projekts |
 | GET/PUT/DELETE | `/files/{path}` | Workflow/Pipeline/Trigger lesen, speichern (mit ETag gegen Überschreiben) |
 | POST | `/validate` | Definition prüfen (auch ungespeicherten Inhalt), Fehler mit Zeilen- und Knotenbezug (YAML-Pfad) |
+| POST | `/workflows/edit` | Änderung vom Canvas zeilengenau auf den YAML-Text anwenden, Kommentare bleiben erhalten (seit E6a) |
 | GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
 | POST | `/runs` | Run starten `{ path, environment, params, runConfig, startAt?, only?, reuseResultsFrom? }` |
 | GET | `/runs?status=&path=` | Historie (seit E3 im Speicher, Filter folgen mit S26) |

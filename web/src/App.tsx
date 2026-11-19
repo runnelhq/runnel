@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import mark from "../../design/logo/runnel-mark.svg";
 import { fetchProject, fetchVersion, useConnection, type ProjectInfo } from "./api";
 import { Explorer } from "./components/Explorer";
-import { FileView } from "./components/FileView";
+import { Dialog } from "./components/Dialog";
+import { FileView, type FileHandle } from "./components/FileView";
 import { Header } from "./components/Header";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
 import { fetchTree, type Entry } from "./files";
 import { useTheme } from "./theme";
 
-// Editor shell after the approved mockup design/mockups/e4-editor-shell.html:
-// header, explorer, tabs with read-only file views, status bar.
+// Editor shell after the approved mockups E4–E6a (design/mockups/): header, explorer,
+// tabs with file views (workflows editable on the canvas), status bar.
 export function App() {
   const [theme, setTheme] = useTheme();
   const { state, epoch } = useConnection();
@@ -21,6 +22,31 @@ export function App() {
   const [tabs, setTabs] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const [closing, setClosing] = useState<string | null>(null);
+  const handles = useRef(new Map<string, FileHandle>());
+
+  const onDirty = useCallback((path: string, isDirty: boolean) => {
+    setDirty((d) => {
+      if (d.has(path) === isDirty) return d;
+      const next = new Set(d);
+      if (isDirty) next.add(path);
+      else next.delete(path);
+      return next;
+    });
+  }, []);
+  const onRegister = useCallback((path: string, handle: FileHandle | null) => {
+    if (handle) handles.current.set(path, handle);
+    else handles.current.delete(path);
+  }, []);
+
+  // The browser asks before leaving the page while changes are unsaved.
+  useEffect(() => {
+    if (dirty.size === 0) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
 
   const loadTree = useCallback(() => {
     fetchTree().then(
@@ -44,12 +70,15 @@ export function App() {
     setTabs((t) => (t.includes(path) ? t : [...t, path]));
     setActive(path);
   };
-  const close = (path: string) => {
+  const closeNow = (path: string) => {
     const i = tabs.indexOf(path);
     const rest = tabs.filter((p) => p !== path);
     setTabs(rest);
+    onDirty(path, false);
     if (active === path) setActive(rest[Math.min(i, rest.length - 1)] ?? null);
   };
+  // Closing a tab with unsaved changes asks first (decision for mockup E6a).
+  const close = (path: string) => (dirty.has(path) ? setClosing(path) : closeNow(path));
 
   return (
     <div className="grid h-full grid-rows-[48px_1fr_24px]">
@@ -70,15 +99,20 @@ export function App() {
           )}
           {active ? (
             <>
-              <Tabs paths={tabs} active={active} onSelect={setActive} onClose={close} />
-              <FileView
-                key={active}
-                path={active}
-                projectDir={project?.dir ?? null}
-                epoch={epoch}
-                onSummary={setSummary}
-                onReloadExplorer={loadTree}
-              />
+              <Tabs paths={tabs} active={active} dirty={dirty} onSelect={setActive} onClose={close} />
+              {tabs.map((path) => (
+                <FileView
+                  key={path}
+                  path={path}
+                  active={path === active}
+                  projectDir={project?.dir ?? null}
+                  epoch={epoch}
+                  onSummary={setSummary}
+                  onDirty={onDirty}
+                  onRegister={onRegister}
+                  onReloadExplorer={loadTree}
+                />
+              ))}
             </>
           ) : (
             <div className="grid flex-1 place-items-center p-8">
@@ -91,7 +125,42 @@ export function App() {
           )}
         </main>
       </div>
-      <StatusBar connection={state} version={version} summary={active ? summary : null} />
+      <StatusBar
+        connection={state}
+        version={version}
+        summary={active ? summary : null}
+        dirty={active !== null && dirty.has(active)}
+      />
+      {closing && (
+        <Dialog
+          title="Save changes?"
+          onCancel={() => setClosing(null)}
+          actions={[
+            { label: "Cancel", onClick: () => setClosing(null) },
+            {
+              label: "Don’t save",
+              onClick: () => {
+                closeNow(closing);
+                setClosing(null);
+              },
+            },
+            {
+              label: "Save",
+              tone: "primary",
+              onClick: async () => {
+                const path = closing;
+                setClosing(null);
+                if (await handles.current.get(path)?.save()) closeNow(path);
+              },
+            },
+          ]}
+        >
+          <p>
+            <code className="text-xs">{closing}</code> has unsaved changes. They are lost if you close the file without
+            saving.
+          </p>
+        </Dialog>
+      )}
     </div>
   );
 }

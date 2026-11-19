@@ -25,7 +25,8 @@ test("opens files in tabs and shows them as highlighted YAML", async ({ page }) 
   await expect(page.getByRole("tab", { name: /hello\.workflow\.yaml/ })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("crumbs")).toHaveText("workflows / hello.workflow.yaml");
   await expect(page.getByTestId("kind")).toHaveText("Workflow");
-  await expect(page.getByText("Read-only")).toBeVisible();
+  // Workflows are editable (E6a); other files are read-only.
+  await expect(page.getByText("Read-only")).toHaveCount(0);
 
   const code = page.getByTestId("code");
   await expect(code).toContainText("apiVersion: runnel/v1");
@@ -39,6 +40,7 @@ test("opens files in tabs and shows them as highlighted YAML", async ({ page }) 
   await expect(page.getByRole("tab")).toHaveCount(2);
   await expect(page.getByTestId("crumbs")).toHaveText("environments / dev.yaml");
   await expect(page.getByTestId("kind")).toHaveText("Environment");
+  await expect(page.getByText("Read-only")).toBeVisible();
   await expect(page.getByRole("treeitem", { name: "dev.yaml" })).toHaveAttribute("aria-selected", "true");
 
   // Opening an open file again only switches tabs.

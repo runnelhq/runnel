@@ -1,47 +1,80 @@
-import { useCallback, useEffect, useState } from "react";
-import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, type FileContent } from "../files";
-import { validate, type Validation } from "../workflow";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
+import { editWorkflow, validate, type Validation, type WorkflowEdit } from "../workflow";
 import { Canvas } from "./Canvas";
 import { CodeView } from "./CodeView";
-import { CodeIcon, CopyIcon, LockIcon, ReloadIcon, WorkflowIcon } from "./Icons";
+import { Dialog } from "./Dialog";
+import { CodeIcon, CopyIcon, LockIcon, RedoIcon, ReloadIcon, SaveIcon, UndoIcon, WorkflowIcon } from "./Icons";
 
 type View = "canvas" | "yaml";
 
-type State =
-  | { status: "loading" }
-  | { status: "loaded"; file: FileContent }
-  | { status: "error"; notFound: boolean; message: string };
-
-/** Summary of the shown file for the status bar, e.g. "YAML · UTF-8 · 40 lines". */
-export function fileSummary(path: string, file: FileContent): string {
-  const lines = file.text.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n").length;
-  return [isYAML(path) ? "YAML" : "Text", file.encoding, `${lines} ${lines === 1 ? "line" : "lines"}`].join(" · ");
+/** A loaded file: the text shown (possibly changed), the saved text and its ETag. */
+interface Doc {
+  text: string;
+  saved: string;
+  etag: string;
+  encoding: string;
 }
 
+type State = { status: "loading" } | { status: "loaded"; doc: Doc } | { status: "error"; notFound: boolean; message: string };
+
+/** Functions of a file view that the app calls, e.g. to save before closing a tab. */
+export interface FileHandle {
+  save: () => Promise<boolean>;
+}
+
+/** Summary of the shown file for the status bar, e.g. "YAML · UTF-8 · 40 lines". */
+export function fileSummary(path: string, text: string, encoding: string): string {
+  const lines = text.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n").length;
+  return [isYAML(path) ? "YAML" : "Text", encoding, `${lines} ${lines === 1 ? "line" : "lines"}`].join(" · ");
+}
+
+const historyLimit = 100;
+
 /**
- * Shows one file read-only (editing follows with the canvas). It reloads when epoch
- * changes, i.e. after a reconnect.
+ * Shows one file. Workflows open as canvas and can be edited there (E6a): every change
+ * is applied to the text by the server; undo/redo keep text versions; saving uses the
+ * ETag and asks what to do when the file was changed elsewhere. Other files are read-only.
+ * The view stays mounted while its tab is open, so that unsaved changes survive tab switches.
  */
 export function FileView(props: {
   path: string;
+  active: boolean;
   projectDir: string | null;
   epoch: number;
   onSummary: (summary: string | null) => void;
+  onDirty: (path: string, dirty: boolean) => void;
+  onRegister: (path: string, handle: FileHandle | null) => void;
   onReloadExplorer: () => void;
 }) {
-  const { path, epoch, onSummary } = props;
+  const { path, active, epoch, onSummary, onDirty, onRegister } = props;
   const [state, setState] = useState<State>({ status: "loading" });
   const isWorkflow = kindOf(path) === "workflow";
-  // Workflows open as canvas (mockup E5); other files as YAML.
   const [view, setView] = useState<View>(isWorkflow ? "canvas" : "yaml");
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
+  const [undo, setUndo] = useState<string[]>([]);
+  const [redo, setRedo] = useState<string[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const doc = state.status === "loaded" ? state.doc : null;
+  const dirty = doc !== null && doc.text !== doc.saved;
+
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+
+  const load = useCallback((force = false) => {
     let cancelled = false;
-    setState({ status: "loading" });
     fetchFile(path).then(
-      (file) => !cancelled && setState({ status: "loaded", file }),
+      (f) => {
+        // A reload must never replace changes made while it was on its way.
+        if (cancelled || (dirtyRef.current && !force)) return;
+        setState({ status: "loaded", doc: { text: f.text, saved: f.text, etag: f.etag ?? "*", encoding: f.encoding } });
+        setUndo([]);
+        setRedo([]);
+      },
       (err: unknown) =>
         !cancelled &&
         setState({
@@ -53,35 +86,161 @@ export function FileView(props: {
     return () => {
       cancelled = true;
     };
-  }, [path, epoch]);
+  }, [path]);
 
-  // Workflows are checked by the server, which also returns the parsed workflow for the canvas.
+  // Load at start and after a reconnect – unless there are unsaved changes, which are kept.
   useEffect(() => {
-    if (!isWorkflow || state.status !== "loaded") return;
+    if (dirtyRef.current) return;
+    return load();
+  }, [load, epoch]);
+
+  useEffect(() => onDirty(path, dirty), [path, dirty, onDirty]);
+
+  // The server checks the text shown and returns the parsed workflow for the canvas.
+  const text = doc?.text;
+  useEffect(() => {
+    if (!isWorkflow || text === undefined) return;
     let cancelled = false;
-    validate(path, state.file.text).then(
+    validate(path, text).then(
       (v) => !cancelled && setValidation(v),
       () => !cancelled && setValidation(null),
     );
     return () => {
       cancelled = true;
     };
-  }, [isWorkflow, path, state]);
+  }, [isWorkflow, path, text]);
 
   useEffect(() => {
-    if (state.status !== "loaded") return onSummary(null);
+    if (!active) return;
+    if (!doc) return onSummary(null);
     const wf = validation?.workflow;
     onSummary(
       view === "canvas" && wf
         ? `Workflow · ${wf.actions?.length ?? 0} actions · ${wf.links?.length ?? 0} links`
-        : fileSummary(path, state.file),
+        : fileSummary(path, doc.text, doc.encoding),
     );
-  }, [state, path, view, validation, onSummary]);
+  }, [active, doc, path, view, validation, onSummary]);
+
+  const docRef = useRef<Doc | null>(null);
+  docRef.current = doc;
+  const setText = useCallback((next: string, history: "push" | "undo" | "redo") => {
+    const current = docRef.current;
+    if (!current || current.text === next) return;
+    const prev = current.text;
+    if (history === "push") {
+      setUndo((u) => [...u.slice(-historyLimit + 1), prev]);
+      setRedo([]);
+    } else if (history === "undo") {
+      setUndo((u) => u.slice(0, -1));
+      setRedo((r) => [...r, prev]);
+    } else {
+      setRedo((r) => r.slice(0, -1));
+      setUndo((u) => [...u, prev]);
+    }
+    docRef.current = { ...current, text: next }; // visible to a save right away, before the next render
+    setState((s) => (s.status === "loaded" ? { status: "loaded", doc: { ...s.doc, text: next } } : s));
+  }, []);
+
+  // The edit on its way to the server; saving waits for it.
+  const pending = useRef<Promise<unknown> | null>(null);
+  const applyEdit = useCallback(
+    async (edit: WorkflowEdit) => {
+      if (!doc) return null;
+      try {
+        const request = editWorkflow(path, doc.text, edit);
+        pending.current = request;
+        const next = await request;
+        setText(next, "push");
+        setEditError(null);
+        return next;
+      } catch (err) {
+        setEditError(err instanceof Error ? err.message : String(err));
+        return null;
+      }
+    },
+    [doc, path, setText],
+  );
+
+  const onMove = useCallback((positions: Record<string, { x: number; y: number }>) => void applyEdit({ move: positions }), [applyEdit]);
+  const onDelete = useCallback(
+    async (ids: string[]) => {
+      const before = validation?.workflow?.links?.length ?? 0;
+      const next = await applyEdit({ delete: ids });
+      if (next === null) return;
+      const v = await validate(path, next).catch(() => null);
+      const removed = v?.workflow ? before - (v.workflow.links?.length ?? 0) : 0;
+      const what = ids.length === 1 ? ids[0] : `${ids.length} actions`;
+      setToast(`Deleted ${what}${removed > 0 ? ` and ${removed} ${removed === 1 ? "link" : "links"}` : ""}`);
+    },
+    [applyEdit, validation, path],
+  );
+
+  const doUndo = useCallback(() => {
+    if (undo.length > 0) setText(undo[undo.length - 1], "undo");
+  }, [undo, setText]);
+  const doRedo = useCallback(() => {
+    if (redo.length > 0) setText(redo[redo.length - 1], "redo");
+  }, [redo, setText]);
+
+  // Saving: with the ETag of the loaded text; a 412 means the file was changed elsewhere.
+  const save = useCallback(
+    async (overwrite = false): Promise<boolean> => {
+      await pending.current?.catch(() => undefined);
+      const current = docRef.current;
+      if (!current) return false;
+      if (current.text === current.saved && !overwrite) return true;
+      try {
+        const etag = await saveFile(path, current.text, overwrite ? "*" : current.etag);
+        setState((s) => (s.status === "loaded" ? { status: "loaded", doc: { ...s.doc, saved: current.text, etag } } : s));
+        setConflict(false);
+        return true;
+      } catch (err) {
+        if (err instanceof APIError && err.status === 412) setConflict(true);
+        else setEditError(`Could not save: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
+      }
+    },
+    [path],
+  );
+
+  useEffect(() => {
+    onRegister(path, { save: () => save() });
+    return () => onRegister(path, null);
+  }, [path, save, onRegister]);
+
+  // Keyboard shortcuts of the active tab: Ctrl+S, Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z.
+  useEffect(() => {
+    if (!active || !isWorkflow) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "s") {
+        e.preventDefault();
+        void save();
+      } else if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        doUndo();
+      } else if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        doRedo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, isWorkflow, save, doUndo, doRedo]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const showInYAML = useCallback((line: number) => {
     setView("yaml");
     setFocusLine(line);
   }, []);
+
+  if (!active) return null;
 
   if (state.status === "error") {
     return (
@@ -107,6 +266,7 @@ export function FileView(props: {
   }
 
   const slash = path.lastIndexOf("/");
+  const editable = isWorkflow && !!validation?.workflow;
   return (
     <>
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-4">
@@ -115,10 +275,12 @@ export function FileView(props: {
           <b className="font-medium text-foreground">{path.slice(slash + 1)}</b>
         </span>
         <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
-        <Badge title="Editing follows in a later version">
-          <LockIcon width={12} height={12} />
-          Read-only
-        </Badge>
+        {!isWorkflow && (
+          <Badge title="Only workflows can be edited in this version">
+            <LockIcon width={12} height={12} />
+            Read-only
+          </Badge>
+        )}
         {validation && validation.errors > 0 && (
           <Badge testId="error-count" tone="error" title={problemList(validation, "error")}>
             ✖ {validation.errors}
@@ -130,19 +292,109 @@ export function FileView(props: {
           </Badge>
         )}
         <span className="flex-1" />
-        {isWorkflow && <ViewSwitch view={view} onView={setView} />}
+        {isWorkflow && (
+          <>
+            <div className="inline-flex gap-1">
+              <IconButton title="Undo (Ctrl+Z)" disabled={undo.length === 0} onClick={doUndo}>
+                <UndoIcon width={14} height={14} />
+              </IconButton>
+              <IconButton title="Redo (Ctrl+Y)" disabled={redo.length === 0} onClick={doRedo}>
+                <RedoIcon width={14} height={14} />
+              </IconButton>
+            </div>
+            <button
+              type="button"
+              title="Save (Ctrl+S)"
+              disabled={!dirty}
+              onClick={() => void save()}
+              className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 text-xs font-medium text-primary-foreground disabled:cursor-default disabled:opacity-50"
+            >
+              <SaveIcon width={14} height={14} />
+              Save <kbd className="font-mono text-[10px] opacity-75">Ctrl+S</kbd>
+            </button>
+            <ViewSwitch view={view} onView={setView} />
+          </>
+        )}
         <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} />
       </div>
-      {state.status !== "loaded" ? (
-        <div className="flex-1" aria-busy="true" />
-      ) : view === "yaml" ? (
-        <CodeView text={state.file.text} yaml={isYAML(path)} focusLine={focusLine} />
-      ) : validation?.workflow ? (
-        <Canvas workflow={validation.workflow} problems={validation.problems} onShowInYAML={showInYAML} />
-      ) : validation ? (
-        <NotAGraph path={path} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
-      ) : (
-        <div className="runnel-canvas flex-1" aria-busy="true" />
+      {editError && (
+        <div role="alert" className="flex shrink-0 items-center gap-3 border-b border-border bg-danger-soft px-4 py-1.5 text-xs text-destructive">
+          ✖ {editError}
+          <button type="button" className="ml-auto cursor-pointer border-0 bg-transparent text-xs text-muted-foreground" onClick={() => setEditError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {!doc ? (
+          <div className="flex-1" aria-busy="true" />
+        ) : view === "yaml" ? (
+          <CodeView text={doc.text} yaml={isYAML(path)} focusLine={focusLine} />
+        ) : validation?.workflow ? (
+          <Canvas
+            workflow={validation.workflow}
+            problems={validation.problems}
+            onShowInYAML={showInYAML}
+            onMove={editable ? onMove : undefined}
+            onDelete={editable ? onDelete : undefined}
+          />
+        ) : validation ? (
+          <NotAGraph path={path} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
+        ) : (
+          <div className="runnel-canvas flex-1" aria-busy="true" />
+        )}
+        {toast && (
+          <div
+            role="status"
+            className="absolute bottom-5 left-1/2 inline-flex h-9 -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-card py-0 pr-1.5 pl-3.5 shadow-md"
+          >
+            <span>{toast}</span>
+            <SmallButton
+              onClick={() => {
+                doUndo();
+                setToast(null);
+              }}
+            >
+              <UndoIcon width={14} height={14} />
+              Undo
+            </SmallButton>
+          </div>
+        )}
+      </div>
+      {conflict && (
+        <Dialog
+          title="File changed outside the editor"
+          onCancel={() => setConflict(false)}
+          actions={[
+            { label: "Cancel", onClick: () => setConflict(false) },
+            {
+              label: (
+                <>
+                  <ReloadIcon width={14} height={14} />
+                  Reload
+                </>
+              ),
+              onClick: () => {
+                setConflict(false);
+                load(true); // discards the unsaved changes on purpose
+              },
+            },
+            { label: "Overwrite", tone: "danger", onClick: () => void save(true) },
+          ]}
+        >
+          <p>
+            <code className="text-xs">{path}</code> was changed after you opened it – for example in another browser, a text
+            editor or by <code className="text-xs">git pull</code>. Your changes have not been saved yet.
+          </p>
+          <ul>
+            <li>
+              <b>Reload</b> shows the file as it is now; your unsaved changes are discarded.
+            </li>
+            <li>
+              <b>Overwrite</b> saves your version; the other changes are lost.
+            </li>
+          </ul>
+        </Dialog>
       )}
     </>
   );
@@ -187,9 +439,7 @@ function NotAGraph(props: { path: string; validation: Validation; onShowYAML: ()
           ✖
         </span>
         <h2 className="mt-3 mb-1 text-md font-semibold">This workflow can’t be shown as a graph</h2>
-        <p className="mt-0 mb-3 text-muted-foreground">
-          The file has errors. Fix them in the YAML view or in your text editor.
-        </p>
+        <p className="mt-0 mb-3 text-muted-foreground">The file has errors. Fix them in the YAML view or in your text editor.</p>
         {first && (
           <pre className="mt-0 mb-4 rounded-md bg-muted px-2.5 py-2 text-left text-xs whitespace-pre-wrap">
             {props.path}
@@ -222,6 +472,21 @@ function Badge(props: { children: React.ReactNode; title?: string; testId?: stri
     >
       {props.children}
     </span>
+  );
+}
+
+function IconButton(props: { children: React.ReactNode; title: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={props.title}
+      aria-label={props.title.replace(/ \(.*\)$/, "")}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className="grid size-7 cursor-pointer place-items-center rounded-md border border-input bg-background text-foreground hover:bg-muted disabled:cursor-default disabled:text-muted-foreground disabled:opacity-50 disabled:hover:bg-background"
+    >
+      {props.children}
+    </button>
   );
 }
 
