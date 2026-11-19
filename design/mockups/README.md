@@ -11,6 +11,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28, umgesetzt mit E6a |
 | [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | freigegeben mit PR #30, umgesetzt mit E6b |
 | [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | freigegeben mit PR #32, umgesetzt mit E7a (`action`, `wait`) und E7b |
+| [`e8-run.html`](e8-run.html) | E8 – Ausführen im Editor | `run`, `running`, `done`, `cancelled`, `unsaved` | zur Freigabe |
 
 ## Entscheidungen
 
@@ -40,6 +41,13 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E7 | Parameter und Outputs des Workflows in E7 nur anzeigen; Bearbeiten wird ein eigener Roadmap-Schritt |
 | E7 | Mehrzeilige Texte über das neue Schema-Format `runnel-text` (Ergänzung zu ADR 0014): wachsendes Textfeld, alle anderen Felder einzeilig |
 | E7 | Umsetzung in zwei Schritten: E7a Panel für Actions mit Prüfung am Feld, E7b Link- und Workflow-Eigenschaften und die Leiste „Problems“ |
+| E8 | **Run** startet mit den je Workflow gemerkten Werten (im Browser); der Dialog öffnet sich beim ersten Lauf eines Workflows mit Parametern oder mehreren Environments, sonst über ▾ |
+| E8 | Environment je Lauf im Dialog, nicht in der Kopfzeile; eine globale Auswahl bei Bedarf später |
+| E8 | Ungespeicherte Änderungen: Rückfrage (Save and run / Run saved version / Cancel), kein automatisches Speichern |
+| E8 | Der Laufstatus bleibt bis zum nächsten Lauf; Verschieben behält ihn, Änderungen an Actions oder Links blenden ihn aus |
+| E8 | Debug-Zeilen im Log standardmäßig an; der Schalter wird im Browser gemerkt |
+| E8 | Das Log zeigt den letzten Lauf der Datei seit dem Start des Servers; frühere Läufe mit der Lauf-Historie (S26) |
+| E8 | Umsetzung in zwei Schritten: E8a Run (Button, Dialog, Rückfrage, Cancel) mit Live-Status auf dem Canvas, E8b Log-Tab und Ergebnis im Panel |
 
 ## Screenshots erzeugen
 
@@ -49,6 +57,7 @@ node design/mockups/screenshots.cjs e5-canvas canvas,problems,invalid,auto
 node design/mockups/screenshots.cjs e6a-edit edit,deleted,conflict
 node design/mockups/screenshots.cjs e6b-create palette,rename,connect,linkmenu
 node design/mockups/screenshots.cjs e7-properties action,wait,link,workflow,problems
+node design/mockups/screenshots.cjs e8-run run,running,done,cancelled,unsaved
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
