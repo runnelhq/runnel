@@ -222,7 +222,7 @@ test("lists the problems below the canvas and jumps to the field", async ({ page
   await field(page, "timeout").getByRole("textbox").blur();
   await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
 
-  const bar = page.getByRole("region", { name: "Problems" });
+  const bar = page.getByRole("region", { name: "Problems and log" });
   await expect(bar.getByTestId("problem-count")).toHaveText("1");
   await expect(bar.getByRole("table")).toHaveCount(0);
   await page.getByTestId("error-count").click(); // the badge opens the list
@@ -242,6 +242,6 @@ test("lists the problems below the canvas and jumps to the field", async ({ page
   await rows.nth(1).click();
   await expect(field(page, "with.message").getByRole("textbox")).toBeFocused();
 
-  await bar.getByRole("button", { name: /Problems/ }).click();
+  await bar.getByRole("button", { name: /^Problems/ }).click();
   await expect(bar.getByRole("table")).toHaveCount(0);
 });

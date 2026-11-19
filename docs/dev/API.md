@@ -1,6 +1,6 @@
 # Server-API (`runnel serve`)
 
-Stand: E8a. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+Stand: E8b. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
 ([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)).
 
 ```bash
@@ -127,7 +127,7 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft.
 ```
 
 `status` eines Laufs: `running`, `succeeded`, `failed`, `cancelled`. `GET /runs/{id}` ergänzt `actions` – je Action
-`id`, `type`, `status` (`pending`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), Zeiten, `durationMs`,
+`id`, `type`, `status` (`pending`, `waiting`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), Zeiten, `durationMs`,
 `error` und `runs` (Anzahl Ausführungen bei Schleifen) – und `log` (`time`, `level`, `actionId`, `message`; höchstens
 5.000 Zeilen, ältere entfallen mit `logTruncated: true`).
 
@@ -152,6 +152,7 @@ data: {"seq":7,"kind":"log","time":"…","runId":"01M7…","actionId":"fetch-a",
 | `log` | `actionId`, `level` (`debug`, `info`, `warn`, `error`), `message` |
 | `action.finished` | `status`, `durationMs`, `error` |
 | `action.skipped` | `status: skipped` |
+| `action.waiting` | `status: waiting`, `message` (z. B. „waiting for 1 more incoming link (join: all)“) – eine Action mit `join: all` wartet nach einem eingehenden Link auf weitere (seit E8b) |
 | `run.finished` | `status`, `durationMs`, `error`, `outputs` |
 | `reset` | – verpasste Ereignisse sind nicht mehr vorrätig; Zustand über `GET /runs` neu laden |
 

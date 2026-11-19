@@ -203,6 +203,10 @@ func (m *Manager) record(id string, we workflow.Event) {
 			a.Status, a.Started, a.Finished, a.DurationMs, a.Error = StatusRunning, &t, nil, 0, ""
 			a.Runs++
 		}
+	case workflow.ActionWaiting:
+		if a != nil {
+			a.Status = workflow.Waiting
+		}
 	case workflow.ActionFinished, workflow.ActionSkipped:
 		if a != nil {
 			t := we.Time

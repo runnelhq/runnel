@@ -4,6 +4,7 @@ import { idPattern, linkKind, type Action, type Problem, type Workflow } from ".
 import type { Selection } from "./Canvas";
 import { ActionIcon, ChevronIcon, CloseIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import type { SettableKind } from "./LinkEdge";
+import { formatDuration, type RunView } from "../run";
 
 /** A value written to a field; null removes the field from the file. */
 export type FieldValue = string | number | boolean | null;
@@ -23,6 +24,9 @@ export interface PropertiesProps {
   onDeleteLink: (index: number) => void;
   onRename: (from: string, to: string) => void;
   onHide: () => void;
+  /** The current or last run, to show the result of the selected action (mockup E8). */
+  run?: RunView | null;
+  onShowInLog?: (actionId: string) => void;
 }
 
 /** Pause after typing before a change is applied (decision for mockup E7). */
@@ -197,6 +201,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
         {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in the YAML view."}
       </p>
+      <LastRun {...props} id={action.id} />
       {rest.length > 0 && (
         <ul className="mx-4 mt-0 mb-3 list-none rounded-md bg-danger-soft px-2.5 py-1.5 text-2xs text-destructive">
           {rest.map((p, i) => (
@@ -834,5 +839,43 @@ function ProblemList(props: { problems: Problem[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+const lastRunText: Record<string, string> = {
+  running: "Running",
+  waiting: "Waiting for further incoming links",
+  succeeded: "Succeeded in the last run",
+  failed: "Failed in the last run",
+  cancelled: "Cancelled in the last run",
+  skipped: "Skipped in the last run",
+};
+
+/** Result of the action in the current or last run, with a jump to its lines in the log (mockup E8). */
+function LastRun(props: PropertiesProps & { id: string }) {
+  const a = props.run?.actions[props.id];
+  if (!a || a.status === "pending") return null;
+  const failed = a.status === "failed";
+  return (
+    <div
+      data-testid="last-run"
+      className={"mx-4 mt-0 mb-2.5 rounded-md px-2.5 py-2 text-xs " + (failed ? "bg-danger-soft text-destructive" : "bg-muted text-foreground")}
+    >
+      <b>
+        {failed ? "✖ " : a.status === "succeeded" ? "✔ " : ""}
+        {lastRunText[a.status]}
+      </b>
+      {a.durationMs !== undefined && ` after ${formatDuration(a.durationMs)}`}
+      {a.error && <div className="mt-0.5">{a.error}</div>}
+      {props.onShowInLog && (
+        <button
+          type="button"
+          onClick={() => props.onShowInLog!(props.id)}
+          className="mt-1 block cursor-pointer border-0 bg-transparent p-0 font-mono text-2xs text-muted-foreground underline"
+        >
+          Show in log
+        </button>
+      )}
+    </div>
   );
 }

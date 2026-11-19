@@ -131,5 +131,51 @@ test("asks before running with unsaved changes and reports runs that cannot star
   await open(page);
   await page.keyboard.press("F5");
   await expect(page.getByRole("alert").filter({ hasText: "Could not start the run" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Problems" }).getByRole("table")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Problems and log" }).getByRole("table")).toBeVisible();
+});
+
+test("shows the log of the run, waiting actions and the result in the panel", async ({ page }) => {
+  await open(page);
+  await runButton(page).click();
+  await runWith(page, { DELAY_A: "2s", DELAY_B: "0s" });
+
+  // The log opens with the run; combine waits for fetch-a (join: all).
+  const log = page.getByRole("log", { name: "Run log" });
+  await expect(log).toBeVisible();
+  await expect(page.getByTestId("log-status")).toContainText("Running");
+  await expect(node(page, "combine")).toHaveAttribute("data-run", "waiting");
+  await expect(log).toContainText("waiting for 1 more incoming link (join: all)");
+  await expect(page.getByTestId("log-status")).toContainText("✔ Succeeded", { timeout: 10_000 });
+  await expect(log).toContainText('workflow "parallel" started (environment dev)');
+  await expect(log).toContainText("Both branches are done");
+  await expect(log).toContainText('workflow "parallel" succeeded in 2.');
+
+  // Debug lines can be hidden; the choice is remembered.
+  await expect(log.locator('[data-level="debug"]').first()).toBeVisible();
+  await page.getByRole("checkbox", { name: "Debug" }).uncheck();
+  await expect(log.locator('[data-level="debug"]')).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("tree").getByText("run.workflow.yaml", { exact: true }).click();
+  await page.getByRole("region", { name: "Problems and log" }).getByRole("button", { name: "Log" }).click();
+  await expect(page.getByText("No run yet.")).toBeVisible();
+
+  // A failed action: its result in the panel, with a jump to the log line.
+  await page.getByRole("button", { name: "Run with other values" }).click();
+  await runWith(page, { DELAY_A: "0s", DELAY_B: "oops" });
+  await expect(page.getByTestId("log-status")).toContainText("✔ Succeeded", { timeout: 10_000 });
+  await expect(page.getByRole("checkbox", { name: "Debug" })).not.toBeChecked();
+  const failed = log.locator('[data-level="error"]').filter({ hasText: "fetch-b" });
+  await expect(failed).toContainText('failed after 0 s: invalid duration "oops"');
+
+  await failed.getByRole("button", { name: "fetch-b" }).click(); // the action chip selects the action
+  const result = page.getByTestId("last-run");
+  await expect(result).toContainText("✖ Failed in the last run");
+  await expect(result).toContainText('invalid duration "oops"');
+  await log.evaluate((el) => (el.scrollTop = 0));
+  await result.getByRole("button", { name: "Show in log" }).click();
+  await expect(failed).toHaveClass(/outline-ring/);
+  await expect(failed).toBeInViewport();
+
+  await node(page, "combine").click();
+  await expect(page.getByTestId("last-run")).toContainText("✔ Succeeded in the last run");
 });

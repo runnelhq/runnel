@@ -162,6 +162,10 @@ func (l *runLogger) event(e workflow.Event) {
 		if e.Level >= slog.LevelInfo || l.verbose {
 			l.line(e.Time, e.Level, e.ActionID, e.Message)
 		}
+	case workflow.ActionWaiting:
+		if l.verbose {
+			l.line(e.Time, slog.LevelDebug, e.ActionID, e.Message)
+		}
 	case workflow.ActionSkipped:
 		if l.verbose {
 			l.line(e.Time, slog.LevelDebug, e.ActionID, "skipped (no incoming link applies)")
