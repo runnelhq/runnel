@@ -39,6 +39,20 @@
   background: var(--node);
   border: 1.5px solid var(--node-border);
 }
+/* Drawing a link (mockup E6b): the output in use and the target input are highlighted. */
+.runnel-canvas .react-flow__handle.runnel-port.connectable {
+  cursor: crosshair;
+}
+.runnel-canvas .react-flow__handle.runnel-port.connectingfrom {
+  border-color: var(--node-selected);
+  background: var(--node-selected);
+}
+.runnel-canvas .react-flow__handle.runnel-port.connectingto.valid {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--node-selected);
+  background: var(--accent);
+}
 .runnel-canvas .react-flow__node {
   font-size: var(--rn-text-sm);
   color: var(--foreground);

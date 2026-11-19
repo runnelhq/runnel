@@ -4,7 +4,7 @@ Der Editor ist eine React-Anwendung in [`web/`](../../web). Sie wird gebaut, in 
 `runnel serve` unter `http://127.0.0.1:7300/` ausgeliefert. Mit dem Server spricht sie nur über die
 [API](API.md). Gestaltung: [Corporate Design](../../design/README.md), freigegebene [Mockups](../../design/mockups/README.md).
 
-> Stand: E6a – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Tabs, Workflows als Canvas mit Verschieben, Löschen, Rückgängig und Speichern. Neue Knoten und Links folgen mit E6b.
+> Stand: E6b – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Palette, Tabs, Workflows als Canvas mit Anlegen, Umbenennen, Verbinden, Verschieben, Löschen, Rückgängig und Speichern. Der Eigenschaftsdialog folgt mit E7.
 
 ## Voraussetzungen
 
@@ -33,11 +33,11 @@ web/
   index.html            # Einstieg
   src/
     main.tsx            # React-Start
-    App.tsx             # Gerüst: Kopfzeile, Explorer, Tabs, Datei, Statusleiste
+    App.tsx             # Gerüst: Kopfzeile, Explorer und Palette, Tabs, Datei, Statusleiste
     api.ts              # API-Zugriff, Verbindung (Server-Sent Events)
     files.ts            # Projektbaum, Dateien laden, Kodierung erkennen
     workflow.ts         # /validate, Workflow-Modell, Link-Arten, Zuordnung der Meldungen, Anordnung (dagre)
-    catalog.ts          # Descriptors aus /catalog (Kategorie → Kachelfarbe)
+    catalog.ts          # Descriptors aus /catalog (Kategorie → Kachelfarbe, Namen der Kategorien)
     yaml.ts             # Hervorhebung für die Nur-lesen-Ansicht (zeilenweise, ohne Abhängigkeit)
     theme.ts            # Farbschema (System/Light/Dark, gespeichert im Browser)
     index.css           # Tailwind + Design-Tokens + Schriften
@@ -71,7 +71,11 @@ design/fonts/           # Inter, JetBrains Mono (woff2, OFL) – lokal, kein Sch
 | Canvas | React Flow (`@xyflow/react`); Knoten `components/ActionNode.tsx`, Links `components/LinkEdge.tsx` (Symbol bei 35 % ab der Quelle). Das Modell kommt aus `/validate` (gesendet wird der angezeigte Text), nicht aus einem YAML-Parser im Browser |
 | Anordnung | `layout` der Datei (Pixel, linke obere Ecke, Karte 176 × 52 px); fehlen Positionen, ordnet dagre von links nach rechts an und ein Hinweis erscheint |
 | Meldungen | über den YAML-Pfad (`$.actions[i]…`) dem Knoten zugeordnet; Zähler in der Dateileiste; Klick auf den Knoten zeigt sie mit „Show in YAML ›“ |
-| Bearbeiten | Jede Änderung (verschieben mit 8-px-Raster, löschen) geht an `POST /workflows/edit`; der Server ändert den Text zeilengenau. Rückgängig/Wiederholen speichern Textstände (bis 100). Ungespeicherte Änderungen bleiben beim Tab-Wechsel erhalten; ein Neuladen nach Wiederverbindung überschreibt sie nie |
+| Palette | `components/Palette.tsx` unter dem Explorer: Action-Typen aus `/catalog` nach Kategorie, Suche über Typ, Name und Beschreibung (`/` springt hinein, Esc leert). Ziehbar nur, wenn ein Workflow als Canvas offen ist; `core.start` ist gesperrt, wenn es schon eine Start-Action gibt |
+| Anlegen | Ablegen auf dem Canvas (HTML-Drag-and-drop, Vorschaukarte im 8-px-Raster); die ID ist der Typname mit der kleinsten freien Nummer (`log-1`). Danach ist die ID ein Eingabefeld: Enter benennt um, Esc behält die ID; später per Doppelklick auf die ID. Neue Actions haben noch keine Konfiguration (`with:`), Pflichtfelder erscheinen als Meldung bis zum Eigenschaftsdialog (E7) |
+| Verbinden | Vom Ausgang (rechts) zum Eingang (links) ziehen; neue Links sind „On success“. Würde der Link einen Zyklus schließen, erhält er `loop: true` (↻). Links auf sich selbst und doppelte Links werden nicht angelegt |
+| Link-Menü | Klick auf das Link-Symbol oder den Link: On success / On failure / Always, Delete link; ein gewählter Link wird auch mit Entf gelöscht. Ausdrücke (ƒ) folgen mit E7/S08 |
+| Bearbeiten | Jede Änderung (verschieben mit 8-px-Raster, löschen, anlegen, umbenennen, Links) geht an `POST /workflows/edit`, nacheinander; der Server ändert den Text zeilengenau. Rückgängig/Wiederholen speichern Textstände (bis 100). Ungespeicherte Änderungen bleiben beim Tab-Wechsel erhalten; ein Neuladen nach Wiederverbindung überschreibt sie nie |
 | Speichern | `PUT /files/{path}` mit dem ETag des geladenen Stands; `412` öffnet den Konfliktdialog (Cancel, Reload, Overwrite = `If-Match: *`). Speichern wartet auf eine noch laufende Änderung. Gespeichert wird als UTF-8 – auch Dateien, die als UTF-16 oder Windows-1252 geöffnet wurden |
 | Schließen | Tab mit ungespeicherten Änderungen: Rückfrage Save / Don’t save / Cancel; beim Verlassen der Seite fragt der Browser |
 | Pfad kopieren | vollständiger Pfad mit dem Trennzeichen des Projektordners (`\` unter Windows) |

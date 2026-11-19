@@ -9,7 +9,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23, umgesetzt mit E4a/E4b |
 | [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | freigegeben mit PR #26, umgesetzt mit E5 |
 | [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28, umgesetzt mit E6a |
-| [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | zur Freigabe |
+| [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | freigegeben mit PR #30, umgesetzt mit E6b |
 
 ## Entscheidungen
 
@@ -29,6 +29,10 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E6a | Löschen ohne Rückfrage, dafür mit Rückgängig (Hinweis „Deleted … · Undo“) |
 | E6a | Tab schließen oder Editor verlassen mit ungespeicherten Änderungen: Rückfrage (Save, Don’t save, Cancel) im Stil des Konfliktdialogs, ohne eigenes Mockup |
 | E6a | Kein automatisches Speichern; gespeichert wird bewusst (Save, Strg+S) |
+| E6b | Link-Typ über ein Menü (On success, On failure, Always, Delete link) statt Durchklicken |
+| E6b | Ausdrücke als Link-Bedingung (ƒ) erst mit dem Eigenschaftsdialog (E7) bzw. den Ausdrücken (S08) |
+| E6b | Palette in der Seitenleiste unter dem Explorer |
+| E6b | Ein gezogener Link, der sonst einen Zyklus schließen würde, erhält automatisch `loop: true` (↻) |
 
 ## Screenshots erzeugen
 

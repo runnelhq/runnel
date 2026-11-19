@@ -1,6 +1,6 @@
 # Server-API (`runnel serve`)
 
-Stand: E3. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+Stand: E6b. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
 ([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)).
 
 ```bash
@@ -168,6 +168,10 @@ POST /api/v1/workflows/edit
 { "path": "workflows/parallel.workflow.yaml", "content": "kind: Workflow\n…",
   "move": { "fetch-b": { "x": 360, "y": 320 } }, "delete": ["combine"] }
 
+{ "path": "…", "content": "…",
+  "add": [{ "id": "log-1", "type": "core.log" }], "move": { "log-1": { "x": 760, "y": 400 } },
+  "addLinks": [{ "from": "report-error", "to": "log-1", "when": "failure" }] }
+
 → 200 { "content": "kind: Workflow\n…" }
 ```
 
@@ -175,9 +179,18 @@ POST /api/v1/workflows/edit
 |---|---|
 | `move` | setzt die Position (Pixel, linke obere Ecke) im `layout`-Block; fehlende Einträge werden angehängt, ein fehlender Block angelegt |
 | `delete` | entfernt die Actions, alle Links von und zu ihnen und ihre `layout`-Einträge |
+| `add` | hängt Actions (`id`, `type`, ohne `with:`) an die Liste `actions` an; die Position kommt über `move` |
+| `rename` | ändert IDs (`{"alt": "neu"}`) in der Action, in `from`/`to` aller Links und im `layout`; nur allein, nicht zusammen mit anderen Änderungen |
+| `addLinks` | hängt Links an (`from`, `to`, optional `when`: `success`, `failure`, `always`, `loop`, `disabled`), im Flow-Stil `- { from: a, to: b }` |
+| `deleteLinks` | entfernt Links über ihre Nummer in der Liste (ab 0, wie `$.links[i]`) |
+| `updateLinks` | setzt die Bedingung (`[{"index": 2, "when": "failure"}]`); `success` entfernt `when:` |
+
+Fehlende Listen (`actions:`, `links:`, `layout:`) werden angelegt. Listen im Flow-Stil (`actions: [ … ]`) mit Einträgen
+lassen sich nicht ergänzen; die Fehlermeldung sagt, was im Text zu ändern ist. Geänderte Links schreibt der
+Server neu (einzeilige Links bleiben einzeilig, mit ihrem Kommentar).
 
 Geändert werden **nur die betroffenen Zeilen** (Positionen aus dem Syntaxbaum); Kommentare, Reihenfolge, Anführungszeichen,
 Flow- oder Block-Stil und Zeilenenden (LF/CRLF) aller anderen Zeilen bleiben erhalten – ein gespeicherter Stand ergibt
-einen kleinen Git-Diff. Antworten: `400` für unbekannte Action-IDs, `422` (Format wie `/validate`), wenn die Datei
-nicht als Workflow lesbar ist.
+einen kleinen Git-Diff. Antworten: `400` für unbekannte oder ungültige Action-IDs, unbekannte Links und nicht
+unterstützte Bedingungen, `422` (Format wie `/validate`), wenn die Datei nicht als Workflow lesbar ist.
 

@@ -5,13 +5,14 @@ import { Explorer } from "./components/Explorer";
 import { Dialog } from "./components/Dialog";
 import { FileView, type FileHandle } from "./components/FileView";
 import { Header } from "./components/Header";
+import { Palette, type PaletteTarget } from "./components/Palette";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
 import { fetchTree, type Entry } from "./files";
 import { useTheme } from "./theme";
 
-// Editor shell after the approved mockups E4–E6a (design/mockups/): header, explorer,
-// tabs with file views (workflows editable on the canvas), status bar.
+// Editor shell after the approved mockups E4–E6b (design/mockups/): header, explorer and
+// palette, tabs with file views (workflows editable on the canvas), status bar.
 export function App() {
   const [theme, setTheme] = useTheme();
   const { state, epoch } = useConnection();
@@ -22,6 +23,7 @@ export function App() {
   const [tabs, setTabs] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [paletteTarget, setPaletteTarget] = useState<PaletteTarget | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [closing, setClosing] = useState<string | null>(null);
   const handles = useRef(new Map<string, FileHandle>());
@@ -84,7 +86,10 @@ export function App() {
     <div className="grid h-full grid-rows-[48px_1fr_24px]">
       <Header project={project} theme={theme} onTheme={setTheme} />
       <div className="grid min-h-0 grid-cols-[248px_1fr]">
-        <Explorer tree={tree} error={treeError} selected={active} onOpen={open} onReload={loadTree} />
+        <aside className="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+          <Explorer tree={tree} error={treeError} selected={active} onOpen={open} onReload={loadTree} />
+          <Palette target={active ? paletteTarget : null} />
+        </aside>
         <main className="flex min-h-0 min-w-0 flex-col bg-background">
           {state === "disconnected" && (
             <div
@@ -108,6 +113,7 @@ export function App() {
                   projectDir={project?.dir ?? null}
                   epoch={epoch}
                   onSummary={setSummary}
+                  onPalette={setPaletteTarget}
                   onDirty={onDirty}
                   onRegister={onRegister}
                   onReloadExplorer={loadTree}

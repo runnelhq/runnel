@@ -342,6 +342,18 @@ func TestEditWorkflow(t *testing.T) {
 		t.Errorf("delete: status %d: %s", rec.Code, rec.Body)
 	}
 
+	body = mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML,
+		"add": []map[string]string{{"id": "log-1", "type": "core.log"}}, "addLinks": []map[string]string{{"from": "greet", "to": "log-1", "when": "failure"}}})
+	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `- id: log-1`) || !strings.Contains(rec.Body.String(), `{ from: greet, to: log-1, when: failure }`) {
+		t.Errorf("add: status %d: %s", rec.Code, rec.Body)
+	}
+	body = mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML, "rename": map[string]string{"greet": "hello"}})
+	rec = do(t, s, "POST", "/api/v1/workflows/edit", body)
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "greet") {
+		t.Errorf("rename: status %d: %s", rec.Code, rec.Body)
+	}
+
 	expect(t, do(t, s, "POST", "/api/v1/workflows/edit", mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": workflowYAML, "delete": []string{"nope"}})),
 		http.StatusBadRequest, `cannot delete action \"nope\"`)
 	expect(t, do(t, s, "POST", "/api/v1/workflows/edit", mustJSON(t, map[string]any{"path": "workflows/x.workflow.yaml", "content": "kind: [\n"})),

@@ -18,6 +18,25 @@ export const categoryColor: Record<string, string> = {
   database: "var(--rn-kategorie-datenbank)",
 };
 
+/** Names of the categories in the palette, in this order (ADR 0014). */
+export const categoryLabel: Record<string, string> = {
+  general: "General",
+  execution: "Execution",
+  files: "Files",
+  network: "Network",
+  database: "Database",
+};
+
+/**
+ * The action type being dragged from the palette. During a drag, the browser does not
+ * reveal the dragged data to the drop target, but the canvas needs the type to show
+ * the preview card.
+ */
+export const paletteDrag: { type: string | null } = { type: null };
+
+/** Data type of a palette entry in a drag-and-drop transfer. */
+export const paletteMime = "application/x-runnel-action";
+
 let cache: Promise<Map<string, Descriptor>> | null = null;
 
 function load(): Promise<Map<string, Descriptor>> {
