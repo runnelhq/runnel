@@ -405,3 +405,69 @@ func TestNewRunID(t *testing.T) {
 		t.Error("random part is not random")
 	}
 }
+
+func TestRunOutputs(t *testing.T) {
+	w := parse(t, `
+outputs:
+  - { name: GREETING, value: "Hello ${TARGET}" }
+  - { name: COUNT, type: integer, value: "${N}" }
+  - { name: DATA, type: json, value: '{"ok": true}' }
+actions:
+  - { id: start, type: core.start }
+`)
+	scope := vars.NewScope(vars.Layer{Name: "test", Values: map[string]string{"TARGET": "World", "N": "42"}})
+	var finished Event
+	r, err := Prepare(w, Options{Registry: testRegistry(t), Scope: scope, Observer: func(e Event) {
+		if e.Kind == RunFinished {
+			finished = e
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := r.Run(context.Background())
+	want := map[string]any{"GREETING": "Hello World", "COUNT": int64(42), "DATA": map[string]any{"ok": true}}
+	if res.Status != Succeeded || fmt.Sprint(res.Outputs) != fmt.Sprint(want) {
+		t.Errorf("result = %+v, want outputs %v", res, want)
+	}
+	if fmt.Sprint(finished.Outputs) != fmt.Sprint(want) {
+		t.Errorf("RunFinished outputs = %v", finished.Outputs)
+	}
+
+	// A value that does not match the declared type fails the run.
+	scope = vars.NewScope(vars.Layer{Name: "test", Values: map[string]string{"TARGET": "World", "N": "many"}})
+	r, _ = Prepare(w, Options{Registry: testRegistry(t), Scope: scope})
+	if res := r.Run(context.Background()); res.Status != Failed || res.Outputs != nil ||
+		!strings.Contains(res.Err.Error(), `output "COUNT": "many" is not an integer`) {
+		t.Errorf("type mismatch: %+v", res)
+	}
+}
+
+func TestRunOutputsNotEvaluatedOnFailure(t *testing.T) {
+	w := parse(t, `
+outputs:
+  - { name: X, value: "${UNDEFINED}" }
+actions:
+  - { id: start, type: core.start }
+  - { id: stop, type: core.abort }
+links:
+  - { from: start, to: stop }
+`)
+	res, _ := runWorkflow(t, w, nil)
+	if res.Status != Failed || res.Outputs != nil || strings.Contains(res.Err.Error(), "UNDEFINED") {
+		t.Errorf("result = %+v", res)
+	}
+}
+
+func TestPrepareOutputExpression(t *testing.T) {
+	w := parse(t, `
+outputs:
+  - { name: X, value: "{{ results.start }}" }
+actions:
+  - { id: start, type: core.start }
+`)
+	if _, err := Prepare(w, Options{Registry: testRegistry(t)}); err == nil ||
+		!strings.Contains(err.Error(), `output "X": an expression is not supported`) {
+		t.Errorf("error = %v", err)
+	}
+}

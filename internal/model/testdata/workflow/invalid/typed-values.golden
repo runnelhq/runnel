@@ -1,0 +1,10 @@
+typed-values.workflow.yaml:6:11: parameter "A": invalid type "text" (expected string, integer, number, boolean, json)
+typed-values.workflow.yaml:9:14: parameter "B": default value "many" is not an integer
+typed-values.workflow.yaml:12:14: parameter "C": default value "z" is not one of the allowed values x, y
+typed-values.workflow.yaml:15:18: parameter "D": allowed value "maybe" is not a boolean (expected true or false)
+typed-values.workflow.yaml:16:11: duplicate parameter "A"
+typed-values.workflow.yaml:20:12: output "OUT": value "1.5" is not an integer
+typed-values.workflow.yaml:21:11: duplicate output "OUT"
+typed-values.workflow.yaml:23:11: invalid output name "9X" (letters, digits and _, not starting with a digit)
+typed-values.workflow.yaml:25:5: output "EMPTY": missing required field "value"
+typed-values.workflow.yaml:27:11: output "BAD_TYPE": invalid type "list" (expected string, integer, number, boolean, json)

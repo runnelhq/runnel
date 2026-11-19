@@ -1,0 +1,30 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: typed-values
+parameters:
+  - name: A
+    type: text
+  - name: B
+    type: integer
+    default: many
+  - name: C
+    enum: [x, y]
+    default: z
+  - name: D
+    type: boolean
+    enum: [true, maybe]
+  - name: A
+outputs:
+  - name: OUT
+    type: integer
+    value: "1.5"
+  - name: OUT
+    value: x
+  - name: 9X
+    value: x
+  - name: EMPTY
+  - name: BAD_TYPE
+    type: list
+    value: x
+actions:
+  - { id: start, type: core.start }
