@@ -1,0 +1,64 @@
+{
+  "kind": "Workflow",
+  "apiVersion": "runnel/v1",
+  "name": "typed",
+  "parameters": [
+    {
+      "name": "CUSTOMER_ID",
+      "description": "Customer number in the ERP",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "MODE",
+      "default": "delta",
+      "enum": [
+        "full",
+        "delta"
+      ]
+    },
+    {
+      "name": "LIMIT",
+      "type": "number",
+      "default": "2.5"
+    },
+    {
+      "name": "DRY_RUN",
+      "type": "boolean",
+      "default": "false"
+    },
+    {
+      "name": "FILTER",
+      "type": "json",
+      "default": "{\"country\": \"DE\"}"
+    },
+    {
+      "name": "RETRIES",
+      "type": "integer",
+      "default": "${DEFAULT_RETRIES}",
+      "enum": [
+        "1",
+        "3",
+        "5"
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "STATUS",
+      "description": "Result of the sync",
+      "value": "synced ${CUSTOMER_ID}"
+    },
+    {
+      "name": "COUNT",
+      "type": "integer",
+      "value": "42"
+    }
+  ],
+  "actions": [
+    {
+      "id": "start",
+      "type": "core.start"
+    }
+  ]
+}

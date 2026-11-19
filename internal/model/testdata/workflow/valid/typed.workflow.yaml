@@ -1,0 +1,34 @@
+# Typed parameters and outputs (ADR 0012)
+kind: Workflow
+apiVersion: runnel/v1
+name: typed
+parameters:
+  - name: CUSTOMER_ID
+    type: integer
+    description: Customer number in the ERP
+    required: true
+  - name: MODE
+    enum: [full, delta]
+    default: delta
+  - name: LIMIT
+    type: number
+    default: 2.5
+  - name: DRY_RUN
+    type: boolean
+    default: "false"
+  - name: FILTER
+    type: json
+    default: '{"country": "DE"}'
+  - name: RETRIES
+    type: integer
+    enum: [1, 3, 5]
+    default: ${DEFAULT_RETRIES}
+outputs:
+  - name: STATUS
+    description: Result of the sync
+    value: synced ${CUSTOMER_ID}
+  - name: COUNT
+    type: integer
+    value: "42"
+actions:
+  - { id: start, type: core.start }

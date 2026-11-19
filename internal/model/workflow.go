@@ -46,6 +46,7 @@ type Workflow struct {
 	Name        string           `yaml:"name" json:"name"`
 	Description string           `yaml:"description,omitempty" json:"description,omitempty"`
 	Parameters  []Parameter      `yaml:"parameters,omitempty" json:"parameters,omitempty"`
+	Outputs     []Output         `yaml:"outputs,omitempty" json:"outputs,omitempty"`
 	Settings    WorkflowSettings `yaml:"settings,omitempty" json:"settings,omitzero"`
 	Actions     []Action         `yaml:"actions,omitempty" json:"actions,omitempty"`
 	Links       []Link           `yaml:"links,omitempty" json:"links,omitempty"`
@@ -59,8 +60,21 @@ type Workflow struct {
 type Parameter struct {
 	Name        string `yaml:"name" json:"name"`
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
-	Default     string `yaml:"default,omitempty" json:"default,omitempty"`
-	Required    bool   `yaml:"required,omitempty" json:"required,omitempty"`
+	// Type is string (default), integer, number, boolean or json.
+	Type     ValueType `yaml:"type,omitempty" json:"type,omitempty"`
+	Default  string    `yaml:"default,omitempty" json:"default,omitempty"`
+	Required bool      `yaml:"required,omitempty" json:"required,omitempty"`
+	// Enum lists the allowed values, if restricted.
+	Enum []string `yaml:"enum,omitempty" json:"enum,omitempty"`
+}
+
+// Output is a result value of a workflow, evaluated when it ends successfully.
+type Output struct {
+	Name        string    `yaml:"name" json:"name"`
+	Description string    `yaml:"description,omitempty" json:"description,omitempty"`
+	Type        ValueType `yaml:"type,omitempty" json:"type,omitempty"`
+	// Value is the text of the output, usually with variables, e.g. "${STATUS}".
+	Value string `yaml:"value" json:"value"`
 }
 
 // WorkflowSettings control the execution of a workflow as a whole.
@@ -196,6 +210,7 @@ func (w *Workflow) validate() error {
 
 	errs = append(errs, checkHeader(s, w.Kind, KindWorkflow, w.APIVersion, w.Name)...)
 
+	params := map[string]bool{}
 	for i, p := range w.Parameters {
 		path := fmt.Sprintf("$.parameters[%d]", i)
 		switch {
@@ -203,6 +218,48 @@ func (w *Workflow) validate() error {
 			add(path, `parameter: missing required field "name"`)
 		case !vars.ValidName(p.Name):
 			add(path+".name", "invalid parameter name %q (letters, digits and _, not starting with a digit)", p.Name)
+		case params[p.Name]:
+			add(path+".name", "duplicate parameter %q", p.Name)
+		}
+		params[p.Name] = true
+		if !p.Type.Valid() {
+			add(path+".type", "parameter %q: invalid type %q (expected %s)", p.Name, p.Type, typeNames())
+			continue
+		}
+		for j, e := range p.Enum {
+			if _, err := p.Type.Parse(e); err != nil {
+				add(fmt.Sprintf("%s.enum[%d]", path, j), "parameter %q: allowed value %v", p.Name, err)
+			}
+		}
+		if p.Default != "" && !hasReferences(p.Default) {
+			if _, err := p.CheckValue(p.Default); err != nil {
+				add(path+".default", "parameter %q: default value %v", p.Name, err)
+			}
+		}
+	}
+
+	outputs := map[string]bool{}
+	for i, o := range w.Outputs {
+		path := fmt.Sprintf("$.outputs[%d]", i)
+		switch {
+		case o.Name == "":
+			add(path, `output: missing required field "name"`)
+		case !vars.ValidName(o.Name):
+			add(path+".name", "invalid output name %q (letters, digits and _, not starting with a digit)", o.Name)
+		case outputs[o.Name]:
+			add(path+".name", "duplicate output %q", o.Name)
+		}
+		outputs[o.Name] = true
+		if !o.Type.Valid() {
+			add(path+".type", "output %q: invalid type %q (expected %s)", o.Name, o.Type, typeNames())
+		}
+		switch {
+		case o.Value == "":
+			add(path, `output %q: missing required field "value"`, o.Name)
+		case o.Type.Valid() && !hasReferences(o.Value):
+			if _, err := o.Type.Parse(o.Value); err != nil {
+				add(path+".value", "output %q: value %v", o.Name, err)
+			}
 		}
 	}
 

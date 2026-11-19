@@ -32,6 +32,7 @@ func TestRunHello(t *testing.T) {
 	}
 	want := `TIME INFO  workflow "hello" started (environment prod), run RUNID
 TIME INFO  [greet] Moin, Production! (production on TESTPC, files in \\fileserver\exchange\runnel-hello)
+TIME INFO  output MESSAGE = "Moin, Production!"
 TIME INFO  workflow "hello" succeeded in DURATION
 `
 	if got := normalizeLog(out); got != want {
@@ -117,6 +118,14 @@ parameters:
 actions:
   - { id: start, type: core.start }
 `)}, "missing required parameter(s) [TARGET]"},
+		{"parameter not in allowed values", []string{"run", "--param", "GREETING=Servus", "examples/hello/workflows/hello.workflow.yaml"},
+			`parameter GREETING (string): "Servus" is not one of the allowed values Hello, Hi, Moin`},
+		{"parameter of wrong type", []string{"run", "--param", "N=many", writeWorkflow(t, `
+parameters:
+  - { name: N, type: integer }
+actions:
+  - { id: start, type: core.start }
+`)}, `parameter N (integer): "many" is not an integer`},
 		{"unknown environment", []string{"run", "--env", "qa", "examples/hello/workflows/hello.workflow.yaml"}, `environment "qa" not found`},
 		{"env without project", []string{"run", "--env", "dev", writeWorkflow(t, "actions:\n  - { id: start, type: core.start }\n")}, "no project (project.yaml) found"},
 		{"missing file", []string{"run", "does-not-exist.workflow.yaml"}, "does-not-exist.workflow.yaml"},

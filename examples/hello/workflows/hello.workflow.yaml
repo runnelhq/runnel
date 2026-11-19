@@ -5,7 +5,13 @@ name: hello
 description: Greets, waits a moment and reports success or failure.
 parameters:
   - name: GREETING
+    description: Word to greet with
+    enum: [Hello, Hi, Moin]
     default: Hello
+outputs:
+  - name: MESSAGE
+    description: The greeting that was logged
+    value: "${GREETING}, ${TARGET}!"
 actions:
   - id: start
     type: core.start

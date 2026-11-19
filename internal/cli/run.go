@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -150,18 +152,29 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	return runner, nil
 }
 
-// checkParams fails for missing required parameters and warns about unknown ones.
+// checkParams fails for missing required parameters and values that do not match
+// the declared type or allowed values, and warns about undeclared parameters.
 func checkParams(errOut io.Writer, w *model.Workflow, params map[string]string) error {
 	declared := map[string]bool{}
-	var missing []string
+	var problems, missing []string
 	for _, p := range w.Parameters {
 		declared[p.Name] = true
-		if _, given := params[p.Name]; p.Required && !given && p.Default == "" {
-			missing = append(missing, p.Name)
+		value, given := params[p.Name]
+		if !given {
+			if p.Required && p.Default == "" {
+				missing = append(missing, p.Name)
+			}
+			continue
+		}
+		if _, err := p.CheckValue(value); err != nil {
+			problems = append(problems, fmt.Sprintf("parameter %s (%s): %v", p.Name, p.Type.OrString(), err))
 		}
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("missing required parameter(s) %v (set with --param NAME=VALUE)", missing)
+		problems = append(problems, fmt.Sprintf("missing required parameter(s) %v (set with --param NAME=VALUE)", missing))
+	}
+	if len(problems) > 0 {
+		return errors.New(strings.Join(problems, "; "))
 	}
 	var unknown []string
 	for name := range params {
@@ -209,6 +222,9 @@ func (l *runLogger) event(e workflow.Event) {
 			l.line(e.Time, slog.LevelDebug, e.ActionID, fmt.Sprintf("%s in %s", e.Status, round(e.Duration)))
 		}
 	case workflow.RunFinished:
+		for _, name := range sortedKeys(e.Outputs) {
+			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("output %s = %s", name, formatValue(e.Outputs[name])))
+		}
 		if e.Status == workflow.Succeeded {
 			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("workflow %q succeeded in %s", l.workflow, round(e.Duration)))
 		} else {
@@ -223,6 +239,24 @@ func (l *runLogger) line(t time.Time, level slog.Level, actionID, msg string) {
 		prefix = "[" + actionID + "] "
 	}
 	_, _ = fmt.Fprintf(l.out, "%s %-5s %s%s\n", t.Format("15:04:05.000"), level.String(), prefix, msg)
+}
+
+func sortedKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+// formatValue shows output values as JSON, so that types are visible ("1" vs 1).
+func formatValue(v any) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprint(v)
+	}
+	return string(data)
 }
 
 func round(d time.Duration) time.Duration {

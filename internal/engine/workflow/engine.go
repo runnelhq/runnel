@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -49,6 +50,8 @@ type Result struct {
 	Status   Status
 	Err      error // reason for Failed
 	Duration time.Duration
+	// Outputs holds the workflow outputs (typed values by name) if the run succeeded.
+	Outputs map[string]any
 }
 
 // EventKind classifies events of a run.
@@ -72,9 +75,10 @@ type Event struct {
 	ActionType string
 	Level      slog.Level // for Log
 	Message    string
-	Err        error         // ActionFinished/RunFinished: failure reason
-	Status     Status        // ActionFinished/RunFinished
-	Duration   time.Duration // ActionFinished/RunFinished
+	Err        error          // ActionFinished/RunFinished: failure reason
+	Status     Status         // ActionFinished/RunFinished
+	Duration   time.Duration  // ActionFinished/RunFinished
+	Outputs    map[string]any // RunFinished: workflow outputs of a successful run
 }
 
 // Runner executes a prepared workflow.
@@ -105,6 +109,11 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 
 	if w.Settings.Timeout != "" {
 		unsupported("$.settings.timeout", "a workflow timeout")
+	}
+	for i, o := range w.Outputs {
+		if strings.Contains(o.Value, "{{") {
+			unsupported(fmt.Sprintf("$.outputs[%d].value", i), fmt.Sprintf("output %q: an expression", o.Name))
+		}
 	}
 	for i := range w.Actions {
 		a := &w.Actions[i]
@@ -164,10 +173,40 @@ func (r *Runner) Run(ctx context.Context) Result {
 	r.emit(Event{Time: started, Kind: RunStarted, RunID: runID, Message: r.w.Name})
 
 	status, err := r.loop(ctx, runID)
+	var outputs map[string]any
+	if status == Succeeded {
+		if outputs, err = r.outputs(); err != nil {
+			status = Failed
+		}
+	}
 
-	res := Result{RunID: runID, Status: status, Err: err, Duration: now().Sub(started)}
-	r.emit(Event{Time: now(), Kind: RunFinished, RunID: runID, Status: status, Err: err, Duration: res.Duration})
+	res := Result{RunID: runID, Status: status, Err: err, Duration: now().Sub(started), Outputs: outputs}
+	r.emit(Event{Time: now(), Kind: RunFinished, RunID: runID, Status: status, Err: err,
+		Duration: res.Duration, Outputs: outputs})
 	return res
+}
+
+// outputs evaluates the workflow outputs after a successful run.
+func (r *Runner) outputs() (map[string]any, error) {
+	if len(r.w.Outputs) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]any, len(r.w.Outputs))
+	for _, o := range r.w.Outputs {
+		text := o.Value
+		if r.opts.Scope != nil {
+			var err error
+			if text, err = r.opts.Scope.Expand(text); err != nil {
+				return nil, fmt.Errorf("output %q: %w", o.Name, err)
+			}
+		}
+		v, err := o.Type.Parse(text)
+		if err != nil {
+			return nil, fmt.Errorf("output %q: %w", o.Name, err)
+		}
+		out[o.Name] = v
+	}
+	return out, nil
 }
 
 func (r *Runner) loop(ctx context.Context, runID string) (Status, error) {
