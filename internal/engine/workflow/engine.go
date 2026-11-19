@@ -160,6 +160,22 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 	return r, nil
 }
 
+// Check returns the problems Prepare finds – unknown action types, malformed
+// configurations, unsupported features – without preparing a run. It is used by
+// "runnel validate" and the editor's validation, so that they report what a run
+// would reject. The workflow must have been validated without errors.
+func Check(w *model.Workflow, opts Options) model.Errors {
+	_, err := Prepare(w, opts)
+	if err == nil {
+		return nil
+	}
+	var diags model.Errors
+	if errors.As(err, &diags) {
+		return diags
+	}
+	return model.Errors{w.ErrorAt("$", "%v", err)}
+}
+
 // Run executes the workflow and returns when it has finished.
 func (r *Runner) Run(ctx context.Context) Result {
 	now := r.opts.Now

@@ -1,0 +1,63 @@
+{
+  "name": "demo",
+  "path": "",
+  "type": "dir",
+  "children": [
+    {
+      "name": "data",
+      "path": "data",
+      "type": "dir",
+      "children": [
+        {
+          "name": "in.csv",
+          "path": "data/in.csv",
+          "type": "file",
+          "kind": "other",
+          "size": 12
+        }
+      ]
+    },
+    {
+      "name": "environments",
+      "path": "environments",
+      "type": "dir",
+      "children": [
+        {
+          "name": "dev.yaml",
+          "path": "environments/dev.yaml",
+          "type": "file",
+          "kind": "environment",
+          "size": 75
+        }
+      ]
+    },
+    {
+      "name": "workflows",
+      "path": "workflows",
+      "type": "dir",
+      "children": [
+        {
+          "name": "Archive.workflow.yaml",
+          "path": "workflows/Archive.workflow.yaml",
+          "type": "file",
+          "kind": "workflow",
+          "size": 205
+        },
+        {
+          "name": "import.workflow.yaml",
+          "path": "workflows/import.workflow.yaml",
+          "type": "file",
+          "kind": "workflow",
+          "size": 205
+        }
+      ]
+    },
+    {
+      "name": "project.yaml",
+      "path": "project.yaml",
+      "type": "file",
+      "kind": "project",
+      "size": 47
+    }
+  ]
+}

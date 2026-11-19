@@ -20,6 +20,9 @@ Erledigte Schritte sind mit ✅ markiert.
   Dazu gibt es bei Bedarf ein Beispiel unter `examples/`.
 - **Nur das Nötige:** Keine Vorab-Implementierung für spätere Schritte. Schnittstellen werden erweitert, wenn sie gebraucht werden.
 - **Doku im selben PR:** Betroffene Abschnitte in Konzept/ADRs werden mit angepasst.
+- **Oberflächen nach Corporate Design und freigegebenem Mockup:** Schritte mit sichtbarer Oberfläche (u. a. E4–E8,
+  S25a, S35, S44, S46, S47) beginnen mit einem Mockup-PR unter `design/mockups/`; die Umsetzung folgt erst nach dessen
+  Freigabe ([design/README.md, Kap. 9](../design/README.md#9-mockups)).
 - **Anleitungen aktuell halten:** Ändert ein Schritt den Vertrag einer Action (oder später eines Transforms bzw.
   Plugins), aktualisiert derselbe PR die Anleitung in [`docs/dev/`](dev/ACTIONS.md); ebenso [`AGENTS.md`](../AGENTS.md)
   bei neuen Befehlen, Paketen oder Konventionen.
@@ -60,12 +63,12 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
 | E1 ✅ | Action-Beschreibung (Descriptor) | Jede Action erhält Kategorie, Bezeichnung und ein JSON-Schema ihrer `with:`-Felder (Grundlage für Palette und Eigenschaftsdialog); `/catalog`-taugliche Ausgabe; Vertragstest erzwingt Descriptor und Schema; ADR 0014 | Vertragstest; `runnel catalog [typ] [--json]` |
-| E2 | Server & Datei-API | `runnel serve` (nur `127.0.0.1`): Projektbaum, Dateien lesen/speichern mit ETag (Konfliktschutz), `/catalog`, `/validate` | Tests mit `httptest`; `curl` |
+| E2 ✅ | Server & Datei-API | `runnel serve` (nur `127.0.0.1`, Host-/Origin-Prüfung): Projektbaum, Dateien lesen/speichern/löschen mit ETag (Konfliktschutz), `/catalog`, `/validate` (auch ungespeicherter Inhalt, mit YAML-Pfad je Meldung); `runnel validate` prüft wie `/validate` auch Action-Typen und `with:`; API in `docs/dev/API.md` | Tests mit `httptest`; `curl` |
 | E3 | Run-API & Live-Events | Läufe starten und abbrechen, Ereignisse und Logs live per WebSocket; Läufe **zunächst nur im Speicher** (letzte N), SQLite-Historie folgt mit S26 ohne API-Änderung | Tests; `curl`/`websocat` |
 | E4 | Editor-Gerüst | Vite + React + TypeScript, in die exe eingebettet; Projekt-Explorer, Datei als YAML anzeigen; Frontend-Build in CI und Release; SBOM um npm-Pakete ergänzen (`cyclonedx-npm`, mit Go-SBOM zusammenführen); Playwright-Grundlage; Design-Tokens (ADR 0011) | Browser; erster Playwright-Test |
 | E5 | Canvas (nur lesen) | Workflows mit React Flow darstellen, Layout aus der Datei, Auto-Layout falls fehlend; Meldungen aus `/validate` an den Knoten | `examples/` im Editor öffnen |
 | E6 | Canvas bearbeiten | Knoten anlegen/verschieben/löschen, Links ziehen und Typ umschalten, Palette aus `/catalog`, Speichern mit Konfliktdialog, Undo/Redo; bei Bedarf geteilt in E6a/E6b | Playwright; zwei Browser gleichzeitig |
-| E7 | Eigenschaften | Eigenschaftsdialog aus dem Schema (E1) inkl. Join, Retry, Timeouts; Prüfung beim Tippen, Tab „Probleme“ | Playwright |
+| E7 | Eigenschaften | Eigenschaftsdialog aus dem Schema (E1) inkl. Join, Retry, Timeouts; Prüfung beim Tippen, Tab „Problems“ | Playwright |
 | E8 | Ausführen im Editor | Ausführen mit Environment und Parametern, Live-Status auf dem Canvas, Log-Bereich, Abbrechen | Manuell; Playwright |
 
 **Ergebnis 0.2:** Workflows unter `http://localhost:7300` visuell bauen, prüfen, starten und beobachten – auf denselben YAML-Dateien wie die CLI.

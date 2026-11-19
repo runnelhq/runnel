@@ -51,6 +51,25 @@ func TestFor(t *testing.T) {
 	golden(t, "sample.golden.json", append(got, '\n'))
 }
 
+func TestRoundTrip(t *testing.T) {
+	s, err := For(sample{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(s)
+	var back Schema
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := json.Marshal(&back)
+	if string(again) != string(data) {
+		t.Errorf("round trip changed the schema:\n%s\n%s", data, again)
+	}
+	if err := json.Unmarshal([]byte(`{"properties": []}`), &back); err == nil {
+		t.Error("properties as array accepted")
+	}
+}
+
 func TestForNoConfiguration(t *testing.T) {
 	s, err := For(nil)
 	if err != nil {

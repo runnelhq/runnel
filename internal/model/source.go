@@ -85,7 +85,7 @@ func (s *source) pos(path string) Position {
 
 // errorf creates an error located at the given YAML path.
 func (s *source) errorf(path, format string, args ...any) *Error {
-	return &Error{File: s.name, Pos: s.pos(path), Msg: fmt.Sprintf(format, args...)}
+	return &Error{File: s.name, Pos: s.pos(path), Path: path, Msg: fmt.Sprintf(format, args...)}
 }
 
 // warnf creates a warning located at the given YAML path.

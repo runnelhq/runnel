@@ -29,6 +29,10 @@ stehen in [AGENTS.md](AGENTS.md).
 - **Sprache:** Code, Kommentare und Programmausgaben englisch; Dokumentation deutsch.
 - **Entscheidungen:** Grundsätzliches (Formate, Semantik, neue Abhängigkeiten, Namensregeln) als
   [ADR](docs/adr/README.md) festhalten.
+- **Oberflächen:** Corporate Design aus [`design/`](design/README.md) anwenden (nur Tokens, keine Hex-Werte). Vor
+  der Umsetzung einer neuen oder deutlich geänderten Oberfläche ein Mockup unter `design/mockups/` als eigenen PR
+  vorlegen; umgesetzt wird erst nach der Freigabe (Merge), Abweichungen nur über ein geändertes Mockup – Details in
+  [design/README.md, Kap. 9](design/README.md#9-mockups).
 - **Lizenz:** Beiträge stehen unter der [MIT-Lizenz](LICENSE) des Projekts (ADR 0004). Abhängigkeiten müssen
   MIT-kompatibel sein.
 
@@ -37,6 +41,7 @@ stehen in [AGENTS.md](AGENTS.md).
 | Thema | Dokument |
 |---|---|
 | Neue Action entwickeln | [docs/dev/ACTIONS.md](docs/dev/ACTIONS.md) |
+| Server-API | [docs/dev/API.md](docs/dev/API.md) |
 | Neue Transforms | folgt mit Roadmap-Schritt S12/S13 |
 | Plugins | folgt mit Roadmap-Schritt S49–S51 |
 | Testen, bekannte Einschränkungen | [docs/TESTPLAN.md](docs/TESTPLAN.md) |

@@ -42,6 +42,7 @@ daneben legen.
 | W14 | Ausführung über die Windows-Aufgabenplanung (Programm `runnel.exe`, Argumente `run C:\…\hello.workflow.yaml`) | Aufgabe zeigt Ergebnis 0 (bzw. 0x1 bei Fehler) |
 | W15 | Herkunft prüfen: `gh attestation verify runnel_0.1.0-alpha.2_windows_amd64.zip --repo runnelhq/runnel` | „Verification succeeded“ |
 | W16 | ab dem ersten Release nach E1: `.\runnel.exe catalog`, dann `.\runnel.exe catalog core.log` und `.\runnel.exe catalog --json > catalog.json` | Liste der Core-Actions unter `general`; Felder `message` (required) und `level` (debug\|info\|warn\|error, default info); gültiges JSON, Umlaute/Gedankenstrich korrekt dargestellt |
+| W17 | ab dem ersten Release nach E2: `.\runnel.exe serve examples\hello`, im Browser `http://localhost:7300/api/v1/projects/current/tree` und `…/api/v1/files/workflows/hello.workflow.yaml` öffnen; Windows-Firewall-Abfrage beobachten; Strg+C | Baum und Datei werden angezeigt; **keine** Firewall-Abfrage (nur lokal); `Server stopped` |
 
 Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe festhalten.
 

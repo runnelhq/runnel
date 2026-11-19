@@ -19,7 +19,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Formatieren | `make fmt` (oder `gofmt -w`) |
 | Fuzzing | `make fuzz FUZZTIME=1m` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – danach Diff prüfen |
-| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel catalog core.log` |
+| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel catalog core.log` · `bin/runnel serve examples/hello` |
 
 Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 
@@ -28,11 +28,12 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 | Pfad | Inhalt |
 |---|---|
 | `cmd/runnel/` | Einstiegspunkt, Signalbehandlung |
-| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`) |
+| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`) |
 | `internal/model/` | Dateiformate (Workflow, Project, Environment), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
+| `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung; Doku in `docs/dev/API.md` |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
 | `examples/` | Beispiele, in Tests mitgeprüft |
@@ -40,13 +41,26 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 
 ## Konventionen
 
-- **Sprache:** Code, Kommentare, CLI-Ausgaben und Fehlermeldungen **englisch**; Dokumentation, ADRs, PR-Beschreibungen **deutsch**.
+- **Sprache:** Code, Kommentare, CLI-Ausgaben, Fehlermeldungen und alle Texte der Oberfläche **englisch** (ADR 0015); Dokumentation, ADRs, PR-Beschreibungen **deutsch**.
 - **Neue Action:** genau nach [docs/dev/ACTIONS.md](docs/dev/ACTIONS.md) (eine Datei je Action, `register.go`, Vertragstest).
 - **Typnamen:** `<namensraum>.<name>`; Actions und Transforms haben getrennte Namensräume, **kein** `-transform`-Suffix (ADR 0013).
 - **Fehlermeldungen in Dateien** mit Position: `datei:zeile:spalte: error|warning: text`; für Anwender verständlich, ohne Go-Typnamen.
 - **Tests:** Golden-Files für Formate und Ausgaben, `t.TempDir()` statt echter Pfade, plattformunabhängig (Linux und Windows in CI).
 - **Windows-first:** Pfade über `path/filepath`, UNC-Pfade, Kodierungen (BOM, UTF-16), CRLF berücksichtigen.
 - **Kein Vorgriff:** nur umsetzen, was der aktuelle Roadmap-Schritt verlangt; Nicht-Unterstütztes klar melden statt still ignorieren.
+
+## Oberfläche (UI)
+
+Gilt für alles Sichtbare: Editor, Website, Installer, Tray, Grafiken, Dokumente – und sinngemäß für CLI-Ausgaben.
+
+- **Corporate Design anwenden** ([ADR 0011](docs/adr/0011-corporate-design.md), [design/README.md](design/README.md)):
+  Farben, Schriften, Radien und Abstände nur über die Tokens (`design/tokens/`), **keine Hex-Werte** im Code; Logos aus
+  `design/logo/`; Funktionsfarben nur mit fester Bedeutung und nie ohne Symbol; Texte nach Kap. 7 (Sprache und Ton).
+- **Erst Mockup, dann Umsetzung:** Vor jeder neuen oder deutlich geänderten Oberfläche ein Mockup unter
+  `design/mockups/` anlegen (statisches HTML mit `design/tokens/runnel.css`, hell und dunkel, dazu PNG-Screenshots für
+  den PR) und als **eigenen PR** vorlegen. Umgesetzt wird erst, wenn der Maintainer das Mockup freigegeben (gemergt) hat.
+- **Umsetzung folgt dem Mockup;** Abweichungen erst im Mockup ändern und erneut freigeben lassen. Der Umsetzungs-PR
+  verweist auf das freigegebene Mockup.
 
 ## Arbeitsweise
 

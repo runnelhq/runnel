@@ -12,6 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/vars"
 )
@@ -24,7 +27,8 @@ func newValidateCommand() *cobra.Command {
 		Use:   "validate [path...]",
 		Short: "Check workflow files for errors",
 		Long: "Checks workflow files (*" + workflowSuffix + ") for syntax errors, invalid fields,\n" +
-			"links to unknown actions, cycles, unreachable actions and undefined variables.\n\n" +
+			"links to unknown actions, cycles, unreachable actions, undefined variables,\n" +
+			"unknown action types and invalid action configurations (with:).\n\n" +
 			"Paths can be files or directories; directories are searched recursively.\n" +
 			"Without a path, the current directory is checked.\n\n" +
 			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
@@ -46,7 +50,8 @@ func newValidateCommand() *cobra.Command {
 			if len(files) == 0 {
 				return fmt.Errorf("no workflow files (*%s) found in %s", workflowSuffix, strings.Join(args, ", "))
 			}
-			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{}}
+			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
+				registry: actions.Builtin()}
 			return v.run(files)
 		},
 	}
@@ -68,6 +73,7 @@ type validator struct {
 	params map[string]string
 	// projects caches loaded projects by absolute directory; nil if loading failed.
 	projects           map[string]*model.Project
+	registry           *action.Registry
 	nErrors, nWarnings int
 }
 
@@ -107,11 +113,16 @@ func (v *validator) file(file string) error {
 		return fmt.Errorf("--env %s: no project (%s) found for %s", v.opts.env, model.ProjectFile, file)
 	}
 	if !found || p != nil {
-		contexts, err := v.varContexts(w, p)
+		contexts, err := model.VarContexts(w, p, v.opts.env, v.params)
 		if err != nil {
 			return err
 		}
 		diags = append(diags, w.CheckVariables(contexts)...)
+	}
+	// Action types and configurations are only checked on an otherwise valid workflow,
+	// like before a run.
+	if !diags.HasErrors() {
+		diags = append(diags, workflow.Check(w, workflow.Options{Registry: v.registry})...)
 	}
 	diags.Sort()
 	v.report(diags)
@@ -140,27 +151,6 @@ func (v *validator) project(dir string) (p *model.Project, found bool, err error
 	}
 	v.projects[root] = p
 	return p, true, nil
-}
-
-func (v *validator) varContexts(w *model.Workflow, p *model.Project) ([]model.VarContext, error) {
-	if p == nil {
-		return []model.VarContext{{Scope: model.Scope(w, nil, nil, v.params)}}, nil
-	}
-	envs := p.EnvironmentNames()
-	if v.opts.env != "" {
-		if _, err := p.SelectEnvironment(v.opts.env); err != nil {
-			return nil, err
-		}
-		envs = []string{v.opts.env}
-	}
-	if len(envs) == 0 {
-		return []model.VarContext{{Scope: model.Scope(w, p, nil, v.params)}}, nil
-	}
-	contexts := make([]model.VarContext, len(envs))
-	for i, name := range envs {
-		contexts[i] = model.VarContext{Environment: name, Scope: model.Scope(w, p, p.Environments[name], v.params)}
-	}
-	return contexts, nil
 }
 
 func (v *validator) report(diags model.Errors) {

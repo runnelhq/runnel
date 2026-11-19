@@ -683,7 +683,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 
 | Thema | Lösung |
 |---|---|
-| Netzwerk | Server bindet standardmäßig nur an `127.0.0.1`. Für Netzzugriff explizit `--listen 0.0.0.0:7300` + TLS (eigenes Zertifikat oder selbstsigniert erzeugt) |
+| Netzwerk | Server bindet standardmäßig nur an `127.0.0.1` und nimmt nur Anfragen an `localhost`/`127.0.0.1` ohne fremden `Origin` an (Schutz vor DNS-Rebinding und Anfragen fremder Webseiten). Für Netzzugriff explizit `--listen 0.0.0.0:7300` + TLS (eigenes Zertifikat oder selbstsigniert erzeugt) |
 | Authentifizierung | **Keine Benutzerverwaltung** ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)). Lokal-Modus ohne Zugangsschutz; im Netzmodus ein gemeinsamer Zugangsschlüssel für den Server (+ TLS), gleichzeitig nutzbar als API-Token |
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
 | Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `RUNNEL_MASTER_KEY` |
@@ -754,12 +754,13 @@ Aufbewahrung: konfigurierbare Retention (z. B. 30 Tage Historie, 7 Tage Samples)
 ## 10. API (Server-Modus)
 
 REST unter `/api/v1`, JSON. Der Editor nutzt ausschließlich diese API – damit ist alles auch skriptbar.
+Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.md).
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET | `/projects/current/tree` | Dateibaum des Projekts |
+| GET | `/projects/current` · `/projects/current/tree` | Projekt (Name, Ordner) · Dateibaum des Projekts |
 | GET/PUT/DELETE | `/files/{path}` | Workflow/Pipeline/Trigger lesen, speichern (mit ETag gegen Überschreiben) |
-| POST | `/validate` | Definition prüfen, Fehler mit Zeilen-/Knotenbezug |
+| POST | `/validate` | Definition prüfen (auch ungespeicherten Inhalt), Fehler mit Zeilen- und Knotenbezug (YAML-Pfad) |
 | GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
 | POST | `/runs` | Run starten `{ path, environment, params, runConfig, startAt?, only?, reuseResultsFrom? }` |
 | GET | `/runs?status=&path=` | Historie |
@@ -776,31 +777,33 @@ REST unter `/api/v1`, JSON. Der Editor nutzt ausschließlich diese API – damit
 
 ## 11. Editor – UX-Konzept
 
+Die Oberfläche ist englisch ([ADR 0015](adr/0015-sprache-oberflaeche.md)).
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ Runnel      Projekt: my-project ▾   Env: dev ▾        ▶ Ausführen  ⏸  ⟲  💾    │
+│ Runnel      Project: my-project ▾   Env: dev ▾            ▶ Run  ⏸  ⟲  💾     │
 ├───────────────┬──────────────────────────────────────────────┬─────────────────┤
-│ Explorer      │                                              │ Eigenschaften   │
-│ ▸ workflows   │    (Start)──▶[Datei warten]──✔──▶[Pipeline]  │ HTTP-Request    │
+│ Explorer      │                                              │ Properties      │
+│ ▸ workflows   │    (Start)──▶[Wait for file]──✔──▶[Pipeline] │ HTTP Request    │
 │ ▸ pipelines   │                    │✖           │✔           │ URL: ________   │
-│ ▸ triggers    │                    ▼            ▼            │ Methode: POST ▾ │
-│ ▸ connections │              [Mail senden]  [Archivieren]    │ Body: {{ … }}   │
+│ ▸ triggers    │                    ▼            ▼            │ Method: POST ▾  │
+│ ▸ connections │              [Send mail]    [Archive]        │ Body: {{ … }}   │
 │───────────────│                                              │ Retry: 3        │
 │ Palette 🔍    │                                              │                 │
-│ ▸ Allgemein   │                                              │                 │
-│ ▸ Dateien     │                                              │                 │
-│ ▸ Datenbank   │                                              │                 │
-│ ▸ Netzwerk    │                                              │                 │
+│ ▸ General     │                                              │                 │
+│ ▸ Files       │                                              │                 │
+│ ▸ Database    │                                              │                 │
+│ ▸ Network     │                                              │                 │
 ├───────────────┴──────────────────────────────────────────────┴─────────────────┤
-│ Logs │ Metriken │ Vorschau │ Probleme │ Historie                                 │
-│ 14:02:11 load        ✔  12.430 Zeilen   1,8 s                                   │
+│ Logs │ Metrics │ Preview │ Problems │ History                                    │
+│ 14:02:11 load        ✔  12,430 rows   1.8 s                                     │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Kernfunktionen:
 - Drag & Drop aus der Palette, Links per Ziehen zwischen Ports, Link-Typ per Klick umschalten (✔/✖/∞/ƒ)
 - Live-Status auf dem Canvas (Knotenfarbe, Zeilenzähler an Links)
-- Inline-Validierung (rote Markierung + „Probleme“-Tab)
+- Inline-Validierung (rote Markierung + Tab „Problems“)
 - Feld-Autovervollständigung: Der Editor kennt das Ausgabeschema jedes Transforms (aus `Init`) und schlägt Feldnamen vor
 - Copy/Paste von Knoten als YAML (zwischen Instanzen und in Tickets/Chats teilbar)
 - Tastatur-Shortcuts, Undo/Redo, Auto-Layout, Gruppierung/Notizen auf dem Canvas

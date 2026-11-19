@@ -1,0 +1,13 @@
+{
+  "errors": 1,
+  "warnings": 0,
+  "problems": [
+    {
+      "file": "workflows/new.workflow.yaml",
+      "line": 2,
+      "column": 10,
+      "severity": "error",
+      "message": "syntax error: sequence end token ']' not found"
+    }
+  ]
+}

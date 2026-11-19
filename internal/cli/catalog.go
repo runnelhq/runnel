@@ -13,18 +13,16 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/schema"
+	"github.com/runnelhq/runnel/internal/server"
 )
-
-// catalog is the list of available building blocks, as served later by /catalog.
-type catalog struct {
-	Actions []action.Descriptor `json:"actions"`
-}
 
 func newCatalogCommand() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "catalog [type]",
 		Short: "List the available actions, or describe one action and its fields",
+		Long: "Lists the available actions by category, or describes one action and its configuration\n" +
+			"fields. With --json, prints the descriptors in the form the server returns from /api/v1/catalog.",
 		Example: "  runnel catalog\n" +
 			"  runnel catalog core.wait\n" +
 			"  runnel catalog --json",
@@ -34,7 +32,7 @@ func newCatalogCommand() *cobra.Command {
 			out := cmd.OutOrStdout()
 			if len(args) == 0 {
 				if asJSON {
-					return writeJSON(out, catalog{Actions: r.Descriptors()})
+					return writeJSON(out, server.NewCatalog(r))
 				}
 				return printCatalog(out, r.Descriptors())
 			}
