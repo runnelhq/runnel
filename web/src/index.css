@@ -13,6 +13,16 @@
   --text-xl: var(--rn-text-xl);
 }
 
+/* Colours of the file view, derived from the tokens (mockup E4). */
+:root {
+  --code-string: var(--rn-tiefe-700);
+  --code-gutter: var(--rn-tiefe-400);
+}
+[data-theme="dark"] {
+  --code-string: var(--rn-tiefe-300);
+  --code-gutter: var(--rn-tiefe-600);
+}
+
 /* Base styles of the editor: 13 px base size like an IDE (design/README.md, chapter 4.1). */
 @layer base {
   html,

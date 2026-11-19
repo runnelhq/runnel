@@ -6,7 +6,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 
 | Mockup | Schritt | Zustände | Status |
 |---|---|---|---|
-| [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23 |
+| [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23, umgesetzt mit E4a/E4b |
 
 ## Entscheidungen
 
