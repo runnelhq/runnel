@@ -1,0 +1,428 @@
+<!doctype html>
+<!--
+  Mockup E4 – Editor-Gerüst: Kopfzeile, Projekt-Explorer, Datei als YAML (nur lesen), Statusleiste.
+  Static mockup, no build. Uses only the design tokens (../tokens/runnel.css).
+
+  Query parameters:
+    theme = light | dark            (default light)
+    state = file | empty | offline | error   (default file)
+    controls = 0                    hides the mockup control bar (used for screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runnel – hello</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<style>
+  /* Code colours: derived from tokens only. */
+  :root {
+    --code-key: var(--foreground);
+    --code-string: var(--rn-tiefe-700);
+    --code-punct: var(--muted-foreground);
+    --code-comment: var(--muted-foreground);
+    --code-var: var(--expression);
+    --code-gutter: var(--rn-tiefe-400);
+    --code-line-active: var(--muted);
+  }
+  [data-theme="dark"] {
+    --code-string: var(--rn-tiefe-300);
+    --code-gutter: var(--rn-tiefe-600);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--rn-font-sans);
+    font-size: var(--rn-text-sm);
+    line-height: 1.5;
+    color: var(--foreground);
+    background: var(--background);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  .mono { font-family: var(--rn-font-mono); }
+
+  /* Layout */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 248px 1fr; min-height: 0; }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; gap: var(--rn-space-4);
+    padding: 0 var(--rn-space-4);
+    border-bottom: 1px solid var(--border);
+    background: var(--background);
+  }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand img.icon { width: 20px; height: 20px; }
+  .brand img.word { height: 15px; }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .project { display: flex; align-items: baseline; gap: var(--rn-space-2); min-width: 0; }
+  .project .label {
+    font-size: var(--rn-text-2xs); font-weight: var(--rn-font-weight-semibold);
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground);
+  }
+  .project .name { font-weight: var(--rn-font-weight-semibold); }
+  .project .path { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground);
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .spacer { flex: 1; }
+  .segmented {
+    display: inline-flex; padding: 2px; gap: 2px;
+    border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted);
+  }
+  .segmented button {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 0; background: transparent; padding: 3px 8px; border-radius: var(--rn-radius-sm);
+    font-size: var(--rn-text-xs); color: var(--muted-foreground); cursor: pointer;
+  }
+  .segmented button[aria-pressed="true"] {
+    background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm);
+  }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
+          stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .segmented svg.i { width: 14px; height: 14px; }
+
+  /* Explorer */
+  aside {
+    background: var(--sidebar); color: var(--sidebar-foreground);
+    border-right: 1px solid var(--sidebar-border);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .panel-title {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 36px; padding: 0 var(--rn-space-2) 0 var(--rn-space-4);
+    font-size: var(--rn-text-2xs); font-weight: var(--rn-font-weight-semibold);
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground);
+  }
+  .icon-btn {
+    display: inline-grid; place-items: center; width: 24px; height: 24px;
+    border: 0; border-radius: var(--rn-radius-sm); background: transparent; color: var(--muted-foreground); cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
+  .tree { list-style: none; margin: 0; padding: 0 var(--rn-space-2) var(--rn-space-2); overflow: auto; }
+  .tree ul { list-style: none; margin: 0; padding: 0; }
+  .row {
+    display: flex; align-items: center; gap: 6px; height: 26px;
+    padding: 0 var(--rn-space-2); border-radius: var(--rn-radius-sm);
+    white-space: nowrap; cursor: default;
+  }
+  .row:hover { background: var(--sidebar-accent); }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: var(--rn-font-weight-medium); }
+  .row .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .row .chev.none { visibility: hidden; }
+  .row .kind { color: var(--muted-foreground); }
+  .row.selected .kind { color: var(--accent-foreground); }
+  .depth-1 { padding-left: 26px; }
+  .row .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+
+  /* Main */
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--background); }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); }
+  .tab {
+    display: flex; align-items: center; gap: var(--rn-space-2);
+    padding: 0 var(--rn-space-3) 0 var(--rn-space-4);
+    border-right: 1px solid var(--border); color: var(--muted-foreground); font-size: var(--rn-text-sm);
+  }
+  .tab.active {
+    background: var(--background); color: var(--foreground);
+    box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px;
+  }
+  .tab .close { width: 18px; height: 18px; }
+  .tab .close svg.i { width: 12px; height: 12px; }
+  .filebar {
+    display: flex; align-items: center; gap: var(--rn-space-3);
+    height: 40px; padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border);
+  }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: var(--rn-font-weight-medium); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px;
+    border-radius: var(--rn-radius-full); font-size: var(--rn-text-2xs); font-weight: var(--rn-font-weight-semibold);
+    background: var(--secondary); color: var(--secondary-foreground);
+  }
+  .badge svg.i { width: 12px; height: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+    border: 1px solid var(--input); border-radius: var(--rn-radius-md); background: var(--background);
+    font-size: var(--rn-text-xs); font-weight: var(--rn-font-weight-medium); cursor: pointer;
+  }
+  .btn svg.i { width: 14px; height: 14px; }
+
+  /* Code view */
+  .code { flex: 1; overflow: auto; padding: var(--rn-space-2) 0 var(--rn-space-6); font-family: var(--rn-font-mono);
+          font-size: var(--rn-text-sm); line-height: 20px; }
+  .line { display: grid; grid-template-columns: 56px 1fr; }
+  .line:hover { background: var(--code-line-active); }
+  .ln { text-align: right; padding-right: var(--rn-space-4); color: var(--code-gutter); user-select: none;
+        font-variant-numeric: tabular-nums; }
+  .src { white-space: pre; padding-right: var(--rn-space-4); }
+  .k { color: var(--code-key); font-weight: var(--rn-font-weight-medium); }
+  .s { color: var(--code-string); }
+  .p { color: var(--code-punct); }
+  .c { color: var(--code-comment); font-style: italic; }
+  .v { color: var(--code-var); background: var(--expression-soft); border-radius: 3px; }
+
+  /* Banners and states */
+  .banner {
+    display: flex; align-items: center; gap: var(--rn-space-3);
+    padding: var(--rn-space-2) var(--rn-space-4); border-bottom: 1px solid var(--border);
+    font-size: var(--rn-text-sm);
+  }
+  .banner.warning { background: var(--warning-soft); color: var(--warning); }
+  .banner .muted { color: var(--muted-foreground); }
+  .empty, .error {
+    flex: 1; display: grid; place-items: center; padding: var(--rn-space-8);
+  }
+  .empty .box, .error .box { max-width: 420px; text-align: center; }
+  .empty img { width: 48px; height: 48px; opacity: 0.9; }
+  .empty h2, .error h2 { font-size: var(--rn-text-md); font-weight: var(--rn-font-weight-semibold); margin: var(--rn-space-4) 0 var(--rn-space-1); }
+  .empty p, .error p { color: var(--muted-foreground); margin: 0 0 var(--rn-space-4); }
+  .error .symbol {
+    display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--rn-radius-full);
+    background: var(--danger-soft); color: var(--destructive); font-size: var(--rn-text-lg); font-weight: var(--rn-font-weight-bold);
+  }
+  /* Status bar */
+  footer {
+    display: flex; align-items: center; gap: var(--rn-space-4);
+    padding: 0 var(--rn-space-3); border-top: 1px solid var(--border);
+    background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs);
+  }
+  footer .ok { color: var(--success); }
+  footer .warn { color: var(--warning); }
+  footer .mono { font-size: var(--rn-text-2xs); }
+
+  /* Mockup controls (not part of the design) */
+  .controls {
+    height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+    font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300);
+  }
+  .controls a { color: var(--rn-strom-300); }
+  .controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="controls" id="controls">
+  <b>Mockup E4</b> theme:
+  <a href="?theme=light&state=file">light</a> <a href="?theme=dark&state=file">dark</a> · state:
+  <a data-state="file" href="#">file</a> <a data-state="empty" href="#">empty</a>
+  <a data-state="offline" href="#">offline</a> <a data-state="error" href="#">error</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img class="icon" src="../logo/runnel-icon.svg" alt="">
+      <img class="word on-light" src="../logo/runnel-wordmark.svg" alt="runnel">
+      <img class="word on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="runnel">
+    </div>
+    <div class="divider"></div>
+    <div class="project">
+      <span class="label">Project</span>
+      <span class="name">hello</span>
+      <span class="path">C:\Runnel\projects\hello</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="segmented" role="group" aria-label="Theme">
+      <button aria-pressed="false" id="t-system" title="Follow Windows setting">
+        <svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button aria-pressed="false" id="t-light" title="Light">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Light</button>
+      <button aria-pressed="false" id="t-dark" title="Dark">
+        <svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside>
+      <div class="panel-title">Explorer
+        <button class="icon-btn" title="Reload">
+          <svg class="i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5L20 16M20 20v-4h-4"/></svg>
+        </button>
+      </div>
+      <ul class="tree" id="tree"></ul>
+    </aside>
+
+    <main id="main"></main>
+  </div>
+
+  <footer id="status"></footer>
+</div>
+
+<template id="tpl-file">
+  <div class="tabs">
+    <div class="tab active">
+      <svg class="i kind" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/></svg>
+      hello.workflow.yaml
+      <button class="icon-btn close" title="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="tab">
+      <svg class="i kind" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      dev.yaml
+      <button class="icon-btn close" title="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+  </div>
+  <div class="filebar">
+    <span class="crumbs">workflows / <b>hello.workflow.yaml</b></span>
+    <span class="badge">Workflow</span>
+    <span class="badge" title="Editing follows with the canvas">
+      <svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Read-only</span>
+    <div class="spacer"></div>
+    <button class="btn" title="Copy the file path">
+      <svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Copy path</button>
+  </div>
+  <div class="code" id="code"></div>
+</template>
+
+<script>
+  const yaml = `# A small, valid workflow. Check it with:  runnel validate examples/hello
+kind: Workflow
+apiVersion: runnel/v1
+name: hello
+description: Greets, waits a moment and reports success or failure.
+parameters:
+  - name: GREETING
+    description: Word to greet with
+    enum: [Hello, Hi, Moin]
+    default: Hello
+outputs:
+  - name: MESSAGE
+    description: The greeting that was logged
+    value: "\${GREETING}, \${TARGET}!"
+actions:
+  - id: start
+    type: core.start
+  - id: greet
+    type: core.log
+    with:
+      message: "\${GREETING}, \${TARGET}! (\${STAGE} on \${env:COMPUTERNAME}, files in \${OUTBOX})"
+  - id: pause
+    type: core.wait
+    with:
+      duration: 1s
+  - id: done
+    type: core.success
+  - id: failed
+    type: core.abort
+links:
+  - { from: start, to: greet }
+  - { from: greet, to: pause }
+  - { from: pause, to: done }
+  - { from: pause, to: failed, when: failure }
+layout:
+  start:  { x: 40,  y: 120 }
+  greet:  { x: 200, y: 120 }
+  pause:  { x: 360, y: 120 }
+  done:   { x: 520, y: 120 }
+  failed: { x: 520, y: 260 }`;
+
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const vars = s => esc(s).replace(/\$\{[^}]*\}/g, m => `<span class="v">${m}</span>`);
+  // Minimal highlighter for the mockup: comments, keys, punctuation, values, ${…}.
+  function highlight(line) {
+    if (/^\s*#/.test(line)) return `<span class="c">${esc(line)}</span>`;
+    const m = line.match(/^(\s*)(- )?([\w.-]+)(:)(.*)$/);
+    if (m) {
+      const [, ind, dash, key, colon, rest] = m;
+      return ind + (dash ? `<span class="p">- </span>` : "") + `<span class="k">${key}</span><span class="p">${colon}</span>` + value(rest);
+    }
+    const d = line.match(/^(\s*)(- )(.*)$/);
+    if (d) return d[1] + `<span class="p">- </span>` + value(d[3]);
+    return esc(line);
+  }
+  function value(v) {
+    if (/^\s*\{.*\}\s*$/.test(v) || /^\s*\[.*\]\s*$/.test(v)) {
+      return esc(v).replace(/([{}\[\],])/g, `<span class="p">$1</span>`)
+                   .replace(/(\w+)(:)/g, `<span class="k">$1</span><span class="p">$2</span>`);
+    }
+    return `<span class="s">${vars(v)}</span>`;
+  }
+
+  const kindIcon = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    workflow: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    environment: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    project: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  };
+  const icon = k => `<svg class="i kind" viewBox="0 0 24 24">${kindIcon[k]}</svg>`;
+  const chev = open => `<svg class="i chev" viewBox="0 0 24 24"><path d="${open ? "M6 9l6 6 6-6" : "M9 6l6 6-6 6"}"/></svg>`;
+
+  function renderTree(selected) {
+    const row = (depth, kind, name, opts = {}) =>
+      `<li><div class="row depth-${depth}${opts.sel ? " selected" : ""}" title="${opts.title || name}">` +
+      (kind === "folder" ? chev(opts.open) : `<svg class="i chev none" viewBox="0 0 24 24"></svg>`) +
+      icon(kind) + `<span>${name}</span>` + (opts.count ? `<span class="count">${opts.count}</span>` : "") + `</div></li>`;
+    document.getElementById("tree").innerHTML =
+      row(0, "folder", "environments", { open: true, count: 2 }) +
+      row(1, "environment", "dev.yaml") +
+      row(1, "environment", "prod.yaml") +
+      row(0, "folder", "workflows", { open: true, count: 3 }) +
+      row(1, "workflow", "collector.workflow.yaml") +
+      row(1, "workflow", "hello.workflow.yaml", { sel: selected }) +
+      row(1, "workflow", "parallel.workflow.yaml") +
+      row(0, "project", "project.yaml");
+  }
+
+  function renderFile(main) {
+    main.append(document.getElementById("tpl-file").content.cloneNode(true));
+    document.getElementById("code").innerHTML = yaml.split("\n").map((l, i) =>
+      `<div class="line"><span class="ln">${i + 1}</span><span class="src">${highlight(l) || " "}</span></div>`).join("");
+  }
+
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "file";
+  document.documentElement.dataset.theme = theme;
+  document.getElementById("t-" + theme).setAttribute("aria-pressed", "true");
+  if (params.get("controls") === "0") {
+    document.getElementById("controls").remove();
+  } else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+
+  const main = document.getElementById("main");
+  const status = document.getElementById("status");
+  const connected = `<span class="ok">● Connected</span><span class="mono">127.0.0.1:7300</span>`;
+  const version = `<span class="spacer"></span><span>Runnel v0.1.0</span>`;
+
+  switch (state) {
+    case "empty":
+      renderTree(false);
+      main.innerHTML = `<div class="empty"><div class="box">
+        <img src="../logo/runnel-mark.svg" alt="">
+        <h2>No file open</h2>
+        <p>Select a workflow or another file in the explorer to view it.</p>
+      </div></div>`;
+      status.innerHTML = connected + version;
+      break;
+    case "offline":
+      renderTree(true);
+      main.innerHTML = `<div class="banner warning"><strong>⚠ Connection to the Runnel server lost.</strong>
+        <span class="muted">Reconnecting… Is <code class="mono">runnel serve</code> still running?</span></div>`;
+      renderFile(main);
+      status.innerHTML = `<span class="warn">⚠ Disconnected</span><span class="mono">127.0.0.1:7300</span>` + version;
+      break;
+    case "error":
+      renderTree(false);
+      main.innerHTML = `<div class="error"><div class="box">
+        <span class="symbol">✖</span>
+        <h2>File not found</h2>
+        <p><code class="mono">workflows/import.workflow.yaml</code> no longer exists. It may have been renamed or deleted outside the editor.</p>
+        <button class="btn"><svg class="i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5L20 16M20 20v-4h-4"/></svg>Reload explorer</button>
+      </div></div>`;
+      status.innerHTML = connected + version;
+      break;
+    default:
+      renderTree(true);
+      renderFile(main);
+      status.innerHTML = connected + `<span>YAML · UTF-8 · ${yaml.split("\n").length} lines</span>` + version;
+  }
+</script>
+</body>
+</html>
