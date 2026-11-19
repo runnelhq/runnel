@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/schema"
 )
 
 // Action is one configured step, ready to run.
@@ -57,11 +58,33 @@ type Result struct {
 	Message string
 }
 
+// Categories group actions in the editor's palette (ADR 0014). The editor shows
+// them in this order and translates the identifiers into display names.
+const (
+	CategoryGeneral   = "general"
+	CategoryExecution = "execution"
+	CategoryFiles     = "files"
+	CategoryNetwork   = "network"
+	CategoryDatabase  = "database"
+)
+
+// Categories lists all categories in palette order.
+var Categories = []string{CategoryGeneral, CategoryExecution, CategoryFiles, CategoryNetwork, CategoryDatabase}
+
 // Definition describes an action type.
 type Definition struct {
 	// Type is the name used in workflow files, e.g. "core.log".
-	Type        string
+	Type string
+	// Category is one of Categories.
+	Category string
+	// Label is the short display name in the editor, e.g. "Log" (English, title case).
+	Label string
+	// Description is one short English sentence without a final period.
 	Description string
+	// Config is the configuration struct that New decodes "with" into, e.g. logAction{};
+	// nil for actions without configuration. The JSON Schema of the action is derived
+	// from it (package schema).
+	Config any
 	// New creates an action from its "with" configuration. It is called once before
 	// the run with the configuration as written (to report unknown or missing fields
 	// early) and again before each execution with variables resolved. New must only
@@ -69,19 +92,31 @@ type Definition struct {
 	New func(with map[string]any) (Action, error)
 }
 
+// Descriptor describes an action type for the editor, the API (/catalog) and tools
+// (ADR 0014). Plugins will provide the same structure.
+type Descriptor struct {
+	Type        string         `json:"type"`
+	Kind        string         `json:"kind"` // always "action"; transforms use "transform"
+	Category    string         `json:"category"`
+	Label       string         `json:"label"`
+	Description string         `json:"description"`
+	Schema      *schema.Schema `json:"schema"` // schema of the "with" configuration
+}
+
 // Registry holds the available action types. Transforms have a registry of their own,
 // so that the same type name may exist as action and as transform (ADR 0013).
 type Registry struct {
-	defs map[string]Definition
+	defs        map[string]Definition
+	descriptors map[string]Descriptor
 }
 
 // NewRegistry creates an empty registry.
 func NewRegistry() *Registry {
-	return &Registry{defs: map[string]Definition{}}
+	return &Registry{defs: map[string]Definition{}, descriptors: map[string]Descriptor{}}
 }
 
-// Register adds an action type. It panics on invalid type names and duplicates,
-// which are programming errors.
+// Register adds an action type. It panics on invalid type names, duplicates and
+// configuration structs without a valid schema, which are programming errors.
 func (r *Registry) Register(d Definition) {
 	if !model.ValidTypeName(d.Type) {
 		panic(fmt.Sprintf("invalid action type name %q (expected \"<namespace>.<name>\")", d.Type))
@@ -89,13 +124,40 @@ func (r *Registry) Register(d Definition) {
 	if _, dup := r.defs[d.Type]; dup {
 		panic("action type registered twice: " + d.Type)
 	}
+	s, err := schema.For(d.Config)
+	if err != nil {
+		panic(fmt.Sprintf("action type %s: %v", d.Type, err))
+	}
 	r.defs[d.Type] = d
+	r.descriptors[d.Type] = Descriptor{
+		Type:        d.Type,
+		Kind:        "action",
+		Category:    d.Category,
+		Label:       d.Label,
+		Description: d.Description,
+		Schema:      s,
+	}
 }
 
 // Lookup returns the definition of an action type.
 func (r *Registry) Lookup(typ string) (Definition, bool) {
 	d, ok := r.defs[typ]
 	return d, ok
+}
+
+// Descriptor returns the descriptor of an action type.
+func (r *Registry) Descriptor(typ string) (Descriptor, bool) {
+	d, ok := r.descriptors[typ]
+	return d, ok
+}
+
+// Descriptors returns the descriptors of all action types, sorted by type.
+func (r *Registry) Descriptors() []Descriptor {
+	out := make([]Descriptor, 0, len(r.descriptors))
+	for _, typ := range r.Types() {
+		out = append(out, r.descriptors[typ])
+	}
+	return out
 }
 
 // Types returns all registered type names, sorted.
@@ -109,7 +171,8 @@ func (r *Registry) Types() []string {
 }
 
 // DecodeConfig decodes a "with" configuration into the struct pointed to by v.
-// Unknown fields are an error. Field names are those of the json tags.
+// Unknown fields and missing required fields (tag schema:"required") are errors.
+// Field names are those of the json tags.
 func DecodeConfig(with map[string]any, v any) error {
 	data, err := json.Marshal(with)
 	if err != nil {
@@ -126,6 +189,9 @@ func DecodeConfig(with map[string]any, v any) error {
 			return fmt.Errorf("unknown field %s", field)
 		}
 		return err
+	}
+	if field := schema.MissingRequired(v, with); field != "" {
+		return fmt.Errorf("missing required field %q", field)
 	}
 	return nil
 }

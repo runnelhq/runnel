@@ -13,12 +13,15 @@ import (
 // core.wait waits for a given time; it ends early when the run is cancelled.
 var waitDefinition = action.Definition{
 	Type:        "core.wait",
+	Category:    action.CategoryGeneral,
+	Label:       "Wait",
 	Description: "Waits for a given time",
+	Config:      wait{},
 	New:         newWait,
 }
 
 type wait struct {
-	Duration string `json:"duration"`
+	Duration string `json:"duration" doc:"How long to wait, e.g. 30s, 5m or 1h30m" schema:"required,format=runnel-duration,example=30s"`
 }
 
 func newWait(with map[string]any) (action.Action, error) {
@@ -26,13 +29,13 @@ func newWait(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
-	if a.Duration == "" {
-		return nil, errors.New(`missing required field "duration"`)
-	}
 	return a, nil
 }
 
 func (a *wait) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
+	if a.Duration == "" {
+		return action.Result{}, errors.New("no duration given")
+	}
 	d, err := model.Duration(a.Duration).Value()
 	if err != nil {
 		return action.Result{}, err

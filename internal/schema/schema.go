@@ -1,0 +1,383 @@
+// Package schema derives JSON Schemas (draft 2020-12) from the configuration structs
+// of actions, so that code and schema cannot drift apart (ADR 0014). The editor builds
+// its property dialogs from these schemas; the same schemas describe actions as tools.
+//
+// A configuration struct describes its fields with tags:
+//
+//		type wait struct {
+//			Duration string `json:"duration" doc:"How long to wait" schema:"required,format=runnel-duration,example=30s"`
+//		}
+//
+//	  - json: the field name as written in workflow files; fields without a json name
+//	    or with json:"-" and unexported fields are not part of the schema.
+//	  - doc: description of the field for editor and tools (English, one sentence).
+//	  - schema: comma-separated options:
+//	    required, default=<value>, enum=<a>|<b>|…, example=<value>, format=<name>.
+//	    Values must not contain commas.
+package schema
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"slices"
+	"strconv"
+	"strings"
+)
+
+// Draft is the JSON Schema dialect of all generated schemas.
+const Draft = "https://json-schema.org/draft/2020-12/schema"
+
+// FormatDuration marks a time span as written in workflow files, e.g. "30s", "5m",
+// "1h30m". JSON Schema's own "duration" format means ISO 8601, so Runnel uses its own name.
+const FormatDuration = "runnel-duration"
+
+// Schema is a JSON Schema, limited to what configuration structs need.
+type Schema struct {
+	Schema      string     `json:"$schema,omitempty"`
+	Type        string     `json:"type,omitempty"`
+	Description string     `json:"description,omitempty"`
+	Format      string     `json:"format,omitempty"`
+	Enum        []any      `json:"enum,omitempty"`
+	Default     any        `json:"default,omitempty"`
+	Examples    []any      `json:"examples,omitempty"`
+	Minimum     *int       `json:"minimum,omitempty"`
+	Items       *Schema    `json:"items,omitempty"`
+	Properties  Properties `json:"properties,omitempty"`
+	Required    []string   `json:"required,omitempty"`
+	// AdditionalProperties is false for structs (unknown fields are errors) and the
+	// value schema for maps.
+	AdditionalProperties any `json:"additionalProperties,omitempty"`
+}
+
+// Property is a named field of an object schema.
+type Property struct {
+	Name   string
+	Schema *Schema
+}
+
+// Properties are the fields of an object schema in the order of the struct,
+// which is the order the editor shows them in.
+type Properties []Property
+
+// MarshalJSON writes the properties as a JSON object, keeping their order.
+func (ps Properties) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i, p := range ps {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		name, err := json.Marshal(p.Name)
+		if err != nil {
+			return nil, err
+		}
+		value, err := json.Marshal(p.Schema)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(name)
+		buf.WriteByte(':')
+		buf.Write(value)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
+// Lookup returns the schema of a property.
+func (ps Properties) Lookup(name string) (*Schema, bool) {
+	for _, p := range ps {
+		if p.Name == name {
+			return p.Schema, true
+		}
+	}
+	return nil, false
+}
+
+// For returns the schema of a configuration struct. config is a struct value or a
+// pointer to one; nil stands for "no configuration" and yields an object schema
+// without properties.
+func For(config any) (*Schema, error) {
+	s := &Schema{Type: "object", AdditionalProperties: false}
+	if config != nil {
+		t := reflect.TypeOf(config)
+		for t.Kind() == reflect.Pointer {
+			t = t.Elem()
+		}
+		if t.Kind() != reflect.Struct {
+			return nil, fmt.Errorf("configuration must be a struct, not %s", t)
+		}
+		var err error
+		if s, err = forType(t, "", nil); err != nil {
+			return nil, err
+		}
+	}
+	s.Schema = Draft
+	return s, nil
+}
+
+func forType(t reflect.Type, path string, seen []reflect.Type) (*Schema, error) {
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.String:
+		return &Schema{Type: "string"}, nil
+	case reflect.Bool:
+		return &Schema{Type: "boolean"}, nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return &Schema{Type: "integer"}, nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		zero := 0
+		return &Schema{Type: "integer", Minimum: &zero}, nil
+	case reflect.Float32, reflect.Float64:
+		return &Schema{Type: "number"}, nil
+	case reflect.Interface:
+		return &Schema{}, nil // any value
+	case reflect.Slice, reflect.Array:
+		items, err := forType(t.Elem(), path+"[]", seen)
+		if err != nil {
+			return nil, err
+		}
+		return &Schema{Type: "array", Items: items}, nil
+	case reflect.Map:
+		if t.Key().Kind() != reflect.String {
+			return nil, fmt.Errorf("%s: map keys must be strings", describe(path))
+		}
+		values, err := forType(t.Elem(), path+"{}", seen)
+		if err != nil {
+			return nil, err
+		}
+		return &Schema{Type: "object", AdditionalProperties: values}, nil
+	case reflect.Struct:
+		for _, s := range seen {
+			if s == t {
+				return nil, fmt.Errorf("%s: recursive type %s", describe(path), t)
+			}
+		}
+		return forStruct(t, path, append(seen, t))
+	default:
+		return nil, fmt.Errorf("%s: unsupported type %s", describe(path), t)
+	}
+}
+
+func forStruct(t reflect.Type, path string, seen []reflect.Type) (*Schema, error) {
+	s := &Schema{Type: "object", AdditionalProperties: false}
+	for _, f := range fields(t) {
+		fieldPath := join(path, f.name)
+		if f.options.err != nil {
+			return nil, fmt.Errorf("%s: %w", describe(fieldPath), f.options.err)
+		}
+		fs, err := forType(f.typ, fieldPath, seen)
+		if err != nil {
+			return nil, err
+		}
+		fs.Description = f.doc
+		if err := applyOptions(fs, f.options, fieldPath); err != nil {
+			return nil, err
+		}
+		if _, dup := s.Properties.Lookup(f.name); dup {
+			return nil, fmt.Errorf("%s: field name used twice", describe(fieldPath))
+		}
+		s.Properties = append(s.Properties, Property{f.name, fs})
+		if f.options.required {
+			s.Required = append(s.Required, f.name)
+		}
+	}
+	return s, nil
+}
+
+func applyOptions(s *Schema, o options, path string) error {
+	if o.format != "" {
+		if s.Type != "string" {
+			return fmt.Errorf("%s: format is only allowed for strings", describe(path))
+		}
+		s.Format = o.format
+	}
+	var err error
+	if o.defaultValue != nil {
+		if s.Default, err = parseValue(s.Type, *o.defaultValue); err != nil {
+			return fmt.Errorf("%s: default: %w", describe(path), err)
+		}
+	}
+	if o.example != nil {
+		v, err := parseValue(s.Type, *o.example)
+		if err != nil {
+			return fmt.Errorf("%s: example: %w", describe(path), err)
+		}
+		s.Examples = []any{v}
+	}
+	for _, e := range o.enum {
+		v, err := parseValue(s.Type, e)
+		if err != nil {
+			return fmt.Errorf("%s: enum: %w", describe(path), err)
+		}
+		s.Enum = append(s.Enum, v)
+	}
+	return nil
+}
+
+// parseValue converts a tag value to the JSON type of the field.
+func parseValue(typ, text string) (any, error) {
+	switch typ {
+	case "string":
+		return text, nil
+	case "boolean":
+		return strconv.ParseBool(text)
+	case "integer":
+		return strconv.ParseInt(text, 10, 64)
+	case "number":
+		return strconv.ParseFloat(text, 64)
+	}
+	return nil, fmt.Errorf("values are only supported for strings, numbers and booleans, not %q", typ)
+}
+
+type field struct {
+	name    string
+	doc     string
+	typ     reflect.Type
+	options options
+}
+
+type options struct {
+	required     bool
+	defaultValue *string
+	example      *string
+	enum         []string
+	format       string
+	err          error
+}
+
+// fields returns the configuration fields of a struct, including those of embedded
+// structs, in declaration order – the fields encoding/json decodes.
+func fields(t reflect.Type) []field {
+	var out []field
+	for i := range t.NumField() {
+		f := t.Field(i)
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if f.Anonymous && name == "" {
+			et := f.Type
+			if et.Kind() == reflect.Pointer {
+				et = et.Elem()
+			}
+			if et.Kind() == reflect.Struct {
+				out = append(out, fields(et)...)
+				continue
+			}
+		}
+		if !f.IsExported() || name == "" || name == "-" {
+			continue
+		}
+		out = append(out, field{
+			name:    name,
+			doc:     f.Tag.Get("doc"),
+			typ:     f.Type,
+			options: parseOptions(f.Tag.Get("schema")),
+		})
+	}
+	return out
+}
+
+func parseOptions(tag string) options {
+	var o options
+	if tag == "" {
+		return o
+	}
+	for opt := range strings.SplitSeq(tag, ",") {
+		key, value, hasValue := strings.Cut(opt, "=")
+		switch {
+		case key == "required" && !hasValue:
+			o.required = true
+		case key == "default" && hasValue:
+			o.defaultValue = &value
+		case key == "example" && hasValue:
+			o.example = &value
+		case key == "enum" && hasValue:
+			o.enum = strings.Split(value, "|")
+		case key == "format" && hasValue:
+			o.format = value
+		default:
+			o.err = fmt.Errorf("unknown schema option %q", opt)
+		}
+	}
+	return o
+}
+
+func join(path, name string) string {
+	if path == "" {
+		return name
+	}
+	return path + "." + name
+}
+
+func describe(path string) string {
+	if path == "" {
+		return "configuration"
+	}
+	return fmt.Sprintf("field %q", path)
+}
+
+// MissingRequired returns the path of the first required field that is missing in
+// data, the decoded configuration of the struct config (e.g. "duration" or
+// "target.host"), or "" if all required fields are present. A field set to null
+// counts as missing. Nested objects are checked where data contains them.
+func MissingRequired(config any, data map[string]any) string {
+	if config == nil {
+		return ""
+	}
+	return missing(reflect.TypeOf(config), data, "")
+}
+
+func missing(t reflect.Type, value any, path string) string {
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.Struct:
+		data, ok := value.(map[string]any)
+		if !ok {
+			return ""
+		}
+		for _, f := range fields(t) {
+			fieldPath := join(path, f.name)
+			v, present := data[f.name]
+			if present && v == nil {
+				present = false
+			}
+			if !present {
+				if f.options.required {
+					return fieldPath
+				}
+				continue
+			}
+			if m := missing(f.typ, v, fieldPath); m != "" {
+				return m
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		items, _ := value.([]any)
+		for i, item := range items {
+			if m := missing(t.Elem(), item, fmt.Sprintf("%s[%d]", path, i)); m != "" {
+				return m
+			}
+		}
+	case reflect.Map:
+		entries, _ := value.(map[string]any)
+		for _, key := range sortedKeys(entries) {
+			if m := missing(t.Elem(), entries[key], join(path, key)); m != "" {
+				return m
+			}
+		}
+	}
+	return ""
+}
+
+func sortedKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	return keys
+}

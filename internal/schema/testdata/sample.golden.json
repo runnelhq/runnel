@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "comment": {
+      "type": "string",
+      "description": "Free text"
+    },
+    "source": {
+      "type": "string",
+      "description": "File to copy",
+      "examples": [
+        "C:\\in\\data.csv"
+      ]
+    },
+    "timeout": {
+      "type": "string",
+      "description": "Maximum time",
+      "format": "runnel-duration",
+      "default": "5m"
+    },
+    "mode": {
+      "type": "string",
+      "description": "What to do",
+      "enum": [
+        "copy",
+        "move"
+      ],
+      "default": "copy"
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of tries",
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "ratio": {
+      "type": "number",
+      "description": "Share",
+      "default": 0.5
+    },
+    "overwrite": {
+      "type": "boolean",
+      "description": "Replace existing files",
+      "default": false
+    },
+    "patterns": {
+      "type": "array",
+      "description": "File patterns",
+      "items": {
+        "type": "string"
+      }
+    },
+    "targets": {
+      "type": "array",
+      "description": "Where to copy to",
+      "items": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Server name"
+          },
+          "port": {
+            "type": "integer",
+            "description": "TCP port",
+            "default": 22,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "headers": {
+      "type": "object",
+      "description": "Extra headers",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "main": {
+      "type": "object",
+      "description": "Primary target",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Server name"
+        },
+        "port": {
+          "type": "integer",
+          "description": "TCP port",
+          "default": 22,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "extra": {
+      "description": "Anything"
+    }
+  },
+  "required": [
+    "source"
+  ],
+  "additionalProperties": false
+}

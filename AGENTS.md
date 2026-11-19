@@ -19,7 +19,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Formatieren | `make fmt` (oder `gofmt -w`) |
 | Fuzzing | `make fuzz FUZZTIME=1m` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – danach Diff prüfen |
-| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` |
+| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel catalog core.log` |
 
 Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 
@@ -28,11 +28,12 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 | Pfad | Inhalt |
 |---|---|
 | `cmd/runnel/` | Einstiegspunkt, Signalbehandlung |
-| `internal/cli/` | Befehle (`version`, `validate`, `run`) |
+| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`) |
 | `internal/model/` | Dateiformate (Workflow, Project, Environment), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
+| `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
-| `internal/action/` | Schnittstelle Engine ↔ Actions, Registry |
+| `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
 | `examples/` | Beispiele, in Tests mitgeprüft |
 | `docs/` | Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (`docs/dev/`) |

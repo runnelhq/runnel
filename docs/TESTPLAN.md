@@ -27,7 +27,7 @@ daneben legen.
 | # | Test | Erwartung |
 |---|---|---|
 | W1 | `.\runnel.exe version` | Version `v0.1.0-alpha.2`, `windows/amd64`; ggf. SmartScreen-Warnung beim ersten Start (exe noch nicht signiert) |
-| W2 | `.\runnel.exe validate examples\hello` | `2 workflow files checked: 0 errors, 0 warnings` |
+| W2 | `.\runnel.exe validate examples\hello` | `3 workflow files checked: 0 errors, 0 warnings` |
 | W3 | `.\runnel.exe validate examples\broken` | 4 Fehler, 2 Warnungen; Exit-Code 1 (`$LASTEXITCODE`) |
 | W4 | `.\runnel.exe run examples\hello\workflows\hello.workflow.yaml` | Gruß mit Rechnername und `%TEMP%`-Pfad, `output MESSAGE = …`, Exit-Code 0 |
 | W5 | wie W4 mit `--env prod --param GREETING=Moin` | „Moin, Production! … \\fileserver\exchange\runnel-hello“ |
@@ -41,6 +41,7 @@ daneben legen.
 | W13 | Pfad mit Leerzeichen, z. B. `"C:\Mein Ordner\test.workflow.yaml"` | wie lokal |
 | W14 | Ausführung über die Windows-Aufgabenplanung (Programm `runnel.exe`, Argumente `run C:\…\hello.workflow.yaml`) | Aufgabe zeigt Ergebnis 0 (bzw. 0x1 bei Fehler) |
 | W15 | Herkunft prüfen: `gh attestation verify runnel_0.1.0-alpha.2_windows_amd64.zip --repo runnelhq/runnel` | „Verification succeeded“ |
+| W16 | ab dem ersten Release nach E1: `.\runnel.exe catalog`, dann `.\runnel.exe catalog core.log` und `.\runnel.exe catalog --json > catalog.json` | Liste der Core-Actions unter `general`; Felder `message` (required) und `level` (debug\|info\|warn\|error, default info); gültiges JSON, Umlaute/Gedankenstrich korrekt dargestellt |
 
 Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe festhalten.
 
