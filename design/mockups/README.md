@@ -10,6 +10,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | freigegeben mit PR #26, umgesetzt mit E5 |
 | [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28, umgesetzt mit E6a |
 | [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | freigegeben mit PR #30, umgesetzt mit E6b |
+| [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | zur Freigabe |
 
 ## Entscheidungen
 
@@ -41,6 +42,7 @@ node design/mockups/screenshots.cjs e4-editor-shell file,empty,offline,error
 node design/mockups/screenshots.cjs e5-canvas canvas,problems,invalid,auto
 node design/mockups/screenshots.cjs e6a-edit edit,deleted,conflict
 node design/mockups/screenshots.cjs e6b-create palette,rename,connect,linkmenu
+node design/mockups/screenshots.cjs e7-properties action,wait,link,workflow,problems
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
