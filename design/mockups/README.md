@@ -6,7 +6,16 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 
 | Mockup | Schritt | Zustände | Status |
 |---|---|---|---|
-| [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | zur Freigabe |
+| [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23 |
+
+## Entscheidungen
+
+| Mockup | Entscheidung |
+|---|---|
+| E4 | `${…}`-Variablen in der Ausdrucksfarbe (Indigo), wie `{{ … }}`-Ausdrücke |
+| E4 | Mehrere geöffnete Dateien als Tabs schon in E4 |
+| E4 | Umschalter für das Farbschema in der Kopfzeile (Standard: System); ein Einstellungsmenü erst, wenn es mehrere Einstellungen gibt |
+| E4 | Zielgerät Desktop-PC; schmale Fenster stehen im Backlog |
 
 ## Screenshots erzeugen
 

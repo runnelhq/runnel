@@ -168,6 +168,7 @@ Werden bei Bedarf als eigener Schritt (je ein PR) eingeplant. Reihenfolge ist of
 | Dateitransfer | SFTP/FTP Upload/Download, ZIP/Entpacken |
 | Netzwerk-Transforms | REST-Eingabe mit Paging, HTTP-Lookup, REST-Ausgabe |
 | Datenbanken | Treiber MySQL/MariaDB, Oracle, ODBC |
+| Editor | Schmale Fenster (einklappbarer Explorer, Tablet/Laptop) – der Editor zielt zunächst auf Desktop-PCs; Einstellungsmenü, sobald es mehrere Einstellungen gibt |
 | Transforms | Pivot/Unpivot, Feld teilen, Wertzuordnung, String-/Datum-Funktionen als eigene Transforms, Sequenz, externes Sortieren (große Datenmengen) |
 | KI ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Connections für Modell-Anbieter (Anthropic, OpenAI-kompatibel, Ollama); `ai.chat` (inkl. strukturierter Ausgabe per JSON Schema); `ai.agent` mit Werkzeugen (Workflows, Actions, MCP-Tools) und Positivliste; `mcp.call-tool` und MCP-Server als Plugin-Quelle; `core.approval` (Freigabe abwarten); Chat-Trigger mit Streaming und Gesprächsgedächtnis; Transforms `ai.chunk`, `ai.embed`, Vektor-Ausgabe (pgvector, Qdrant); MCP über HTTP (Token, später OAuth); Token-/Kosten-Erfassung und Rate-Limit je Connection; Link-Typ `tool` im Editor |
 | Plugin-SDKs | Python, C#/.NET, Node |
