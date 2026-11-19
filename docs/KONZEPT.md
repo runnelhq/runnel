@@ -198,6 +198,19 @@ Details: [ADR 0008](adr/0008-ausfuehrungsvarianten.md).
 | Teilausführung | Editor: „Ab hier ausführen“, „Nur diese Action ausführen“, Pipeline-Vorschau bis Transform X |
 | Später | Mappings (wiederverwendbare Unter-Pipelines), Remote-Ausführung |
 
+### 2.9 KI-Funktionen
+
+Details: [ADR 0012](adr/0012-ki-faehigkeit.md).
+
+| Baustein | Umsetzung |
+|---|---|
+| Sprachmodelle | Action `ai.chat`; Anbieter (Anthropic, OpenAI-kompatibel, Ollama lokal) als Connection, Schlüssel per `${secret:…}` |
+| Agenten | Action `ai.agent`: Schleife Modell → Werkzeug → Modell innerhalb der Action; Werkzeuge per Positivliste (`with.tools`) |
+| Werkzeug-Vertrag | Workflows mit typisierten `parameters` (`type`, `enum`, `description`) und `outputs` – gilt für Sub-Workflows, Agenten, MCP und Webhooks |
+| MCP | Server: `runnel mcp` stellt Workflows als Tools bereit; Client: Action `mcp.call-tool`; MCP-Server als Plugin-Quelle |
+| RAG | Pipelines mit `ai.chunk`, `ai.embed` und Vektor-Ausgabe (pgvector, Qdrant) |
+| Leitplanken | Positivliste, Freigabe-Action `core.approval`, Protokollierung jedes Modell-/Werkzeugaufrufs, Maskierung von Secrets, Schritt-, Rate- und Kostenlimits |
+
 ---
 
 ## 3. Systemarchitektur
@@ -868,14 +881,14 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 
 | Phase | Schritte | Ergebnis |
 |---|---|---|
-| **0.1 – Runner-Kern** | S01–S11: Projektgerüst, Workflow-Format & Validierung, Variablen, Engine (sequenziell, parallel/Join, Retry/Timeout), Ausdrücke, Datei-Actions, HTTP, Sub-Workflows | Workflows per CLI / Aufgabenplanung |
+| **0.1 – Runner-Kern** | S01–S11a: Projektgerüst, Workflow-Format & Validierung, Variablen, typisierte Parameter & Outputs, Engine (sequenziell, parallel/Join, Retry/Timeout), Ausdrücke, Datei-Actions, HTTP, Sub-Workflows, MCP-Server | Workflows per CLI / Aufgabenplanung |
 | **0.2 – Pipelines** | S12–S25: Pipeline-Engine, Typsystem, CSV, Basis-Transforms, Fehler-Links, JSON, Datenbank, Sortieren/Gruppieren, Lookups, Ausführung pro Datensatz | ETL-Fälle per CLI |
 | **0.3 – Server & Editor** | S26–S36: Historie, REST/WebSocket, Resume, Editor (Canvas, Eigenschaften, Ausführen, Ausdruckseditor, Teilausführung) | Visuelles Designen & Starten |
 | **0.4 – Betrieb** | S37–S43: Trigger, Secret-Store, Netzwerkbetrieb, Windows-Dienst, Run-Konfigurationen, Wartung | Produktionsbetrieb auf Windows-Server |
 | **0.5 – Komfort** | S44–S48: Datenvorschau, Samples, Felder ermitteln, Desktop-Modus, Installer | Rund nutzbares Produkt |
 | **0.6 – Erweiterbarkeit** | S49–S52: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

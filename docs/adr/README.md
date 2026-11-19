@@ -13,6 +13,7 @@
 | [0009](0009-begriff-link.md) | „Link“ statt „Hop“ für Verbindungen zwischen Knoten | Angenommen |
 | [0010](0010-projektname-runnel.md) | Projektname „Runnel“ | Angenommen |
 | [0011](0011-corporate-design.md) | Corporate Design | Angenommen |
+| [0012](0012-ki-faehigkeit.md) | KI-Fähigkeit – LLMs, Agenten und MCP | Angenommen |
 
 Neue ADRs: nächste freie Nummer, Aufbau wie die bestehenden (Kontext, Entscheidung, Konsequenzen).
 Wird eine Entscheidung revidiert, erhält die alte ADR den Status „Ersetzt durch ADR xxxx“.
