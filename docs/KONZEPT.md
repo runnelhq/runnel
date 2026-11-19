@@ -777,31 +777,33 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 
 ## 11. Editor – UX-Konzept
 
+Die Oberfläche ist englisch ([ADR 0015](adr/0015-sprache-oberflaeche.md)).
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ Runnel      Projekt: my-project ▾   Env: dev ▾        ▶ Ausführen  ⏸  ⟲  💾    │
+│ Runnel      Project: my-project ▾   Env: dev ▾            ▶ Run  ⏸  ⟲  💾     │
 ├───────────────┬──────────────────────────────────────────────┬─────────────────┤
-│ Explorer      │                                              │ Eigenschaften   │
-│ ▸ workflows   │    (Start)──▶[Datei warten]──✔──▶[Pipeline]  │ HTTP-Request    │
+│ Explorer      │                                              │ Properties      │
+│ ▸ workflows   │    (Start)──▶[Wait for file]──✔──▶[Pipeline] │ HTTP Request    │
 │ ▸ pipelines   │                    │✖           │✔           │ URL: ________   │
-│ ▸ triggers    │                    ▼            ▼            │ Methode: POST ▾ │
-│ ▸ connections │              [Mail senden]  [Archivieren]    │ Body: {{ … }}   │
+│ ▸ triggers    │                    ▼            ▼            │ Method: POST ▾  │
+│ ▸ connections │              [Send mail]    [Archive]        │ Body: {{ … }}   │
 │───────────────│                                              │ Retry: 3        │
 │ Palette 🔍    │                                              │                 │
-│ ▸ Allgemein   │                                              │                 │
-│ ▸ Dateien     │                                              │                 │
-│ ▸ Datenbank   │                                              │                 │
-│ ▸ Netzwerk    │                                              │                 │
+│ ▸ General     │                                              │                 │
+│ ▸ Files       │                                              │                 │
+│ ▸ Database    │                                              │                 │
+│ ▸ Network     │                                              │                 │
 ├───────────────┴──────────────────────────────────────────────┴─────────────────┤
-│ Logs │ Metriken │ Vorschau │ Probleme │ Historie                                 │
-│ 14:02:11 load        ✔  12.430 Zeilen   1,8 s                                   │
+│ Logs │ Metrics │ Preview │ Problems │ History                                    │
+│ 14:02:11 load        ✔  12,430 rows   1.8 s                                     │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Kernfunktionen:
 - Drag & Drop aus der Palette, Links per Ziehen zwischen Ports, Link-Typ per Klick umschalten (✔/✖/∞/ƒ)
 - Live-Status auf dem Canvas (Knotenfarbe, Zeilenzähler an Links)
-- Inline-Validierung (rote Markierung + „Probleme“-Tab)
+- Inline-Validierung (rote Markierung + Tab „Problems“)
 - Feld-Autovervollständigung: Der Editor kennt das Ausgabeschema jedes Transforms (aus `Init`) und schlägt Feldnamen vor
 - Copy/Paste von Knoten als YAML (zwischen Instanzen und in Tickets/Chats teilbar)
 - Tastatur-Shortcuts, Undo/Redo, Auto-Layout, Gruppierung/Notizen auf dem Canvas

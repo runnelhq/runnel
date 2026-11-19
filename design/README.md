@@ -149,15 +149,16 @@ Regeln:
 Kennfarben für die Icon-Kachel der Actions/Transforms in Palette und Knoten. Nur als kleine Kachel hinter einem weißen
 Icon, nie für Flächen, Text oder Zustände.
 
-| Kategorie | Hex | | Kategorie | Hex |
+| Kategorie (Kennung) | Hex | | Kategorie (Kennung) | Hex |
 |---|---|---|---|---|
-| Allgemein | `#67778A` | | Eingabe | `#2F7D4F` |
-| Ausführung | `#0A6DA6` | | Transformation | `#B5487F` |
-| Dateien | `#C2700E` | | Fluss | `#4D5C6F` |
-| Netzwerk | `#0E8A8A` | | Ausgabe | `#9A5B2E` |
-| Datenbank | `#7B4FC9` | | | |
+| General (`general`) | `#67778A` | | Input | `#2F7D4F` |
+| Execution (`execution`) | `#0A6DA6` | | Transform | `#B5487F` |
+| Files (`files`) | `#C2700E` | | Flow | `#4D5C6F` |
+| Network (`network`) | `#0E8A8A` | | Output | `#9A5B2E` |
+| Database (`database`) | `#7B4FC9` | | | |
 
-Plugins ohne eigene Kategorie nutzen „Allgemein“.
+Links die Kategorien der Actions ([ADR 0014](../docs/adr/0014-action-descriptor-schema.md)), rechts die der
+Transforms (Kennungen folgen mit den Pipelines). Plugins ohne eigene Kategorie nutzen „General“.
 
 ### 3.4 Kontrast
 
@@ -305,8 +306,11 @@ Farben nur bei TTY und ohne `NO_COLOR`; Symbole (✔ ✖ ⚠) immer, damit Logs 
 ## 7. Sprache und Ton
 
 - **Sachlich, knapp, konkret.** Runnel spricht wie eine erfahrene Kollegin, nicht wie ein Werbeprospekt.
-- UI-Texte im Infinitiv bzw. Imperativ ohne Anrede: „Pipeline ausführen“, „Änderungen speichern“. Wo eine Anrede nötig ist: **du**.
-- Fehlermeldungen sagen, **was** passiert ist und **was zu tun ist**: „Datei `customers.csv` nicht gefunden. Pfad in ‚CSV-Eingabe‘ prüfen.“
+- **Produktsprache ist Englisch** – Editor, CLI, Meldungen, Installer, Tray ([ADR 0015](../docs/adr/0015-sprache-oberflaeche.md)).
+  Diese Doku bleibt deutsch.
+- UI-Texte als Imperativ ohne Anrede, in Satzschreibweise: „Run pipeline“, „Save changes“. Wo eine Anrede nötig ist: **you**.
+  Anzeigenamen von Actions/Transforms in Title Case („Copy Files“).
+- Fehlermeldungen sagen, **was** passiert ist und **was zu tun ist**: „File `customers.csv` not found. Check the path in ‘CSV Input’.“
 - Fachbegriffe sind fest und werden nicht übersetzt oder variiert: **Workflow, Pipeline, Action, Transform, Link, Trigger,
   Environment, Connection, Run, Runner, Editor** ([ADR 0009](../docs/adr/0009-begriff-link.md)).
 - Keine Emojis in Produkt und Doku; Symbole nur mit fester Bedeutung (✔ ✖ ∞ ƒ ⚠).

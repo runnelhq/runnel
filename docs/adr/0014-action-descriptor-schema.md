@@ -58,8 +58,8 @@ Jede Action liefert einen Descriptor:
 | `description` | ein englischer Satz ohne Punkt |
 | `schema` | JSON Schema (Draft 2020-12) der `with:`-Konfiguration |
 
-- **Sprache:** Kennungen, Bezeichnungen und Beschreibungen sind englisch, wie CLI-Ausgaben und Fehlermeldungen. Der
-  Editor übersetzt die Kategorie-Kennungen in Anzeigenamen; eine Übersetzung der übrigen Texte ist nicht geplant.
+- **Sprache:** Kennungen, Bezeichnungen und Beschreibungen sind englisch, wie die gesamte Oberfläche
+  ([ADR 0015](0015-sprache-oberflaeche.md)). Der Editor zeigt die Kategorie-Kennungen als englische Anzeigenamen.
 - **Noch nicht enthalten:** `icon`, `ports` und `uiHints` aus dem Konzept. Sie kommen mit dem Schritt, der sie braucht
   (Icons mit E5/E6, Ports mit den Pipelines, Darstellungshinweise mit E7).
 - **Variablen:** Das Schema beschreibt den Wert **nach** dem Auflösen von `${…}`. Werte mit `${…}` oder `{{ … }}`

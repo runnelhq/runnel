@@ -68,7 +68,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | E4 | Editor-Gerüst | Vite + React + TypeScript, in die exe eingebettet; Projekt-Explorer, Datei als YAML anzeigen; Frontend-Build in CI und Release; SBOM um npm-Pakete ergänzen (`cyclonedx-npm`, mit Go-SBOM zusammenführen); Playwright-Grundlage; Design-Tokens (ADR 0011) | Browser; erster Playwright-Test |
 | E5 | Canvas (nur lesen) | Workflows mit React Flow darstellen, Layout aus der Datei, Auto-Layout falls fehlend; Meldungen aus `/validate` an den Knoten | `examples/` im Editor öffnen |
 | E6 | Canvas bearbeiten | Knoten anlegen/verschieben/löschen, Links ziehen und Typ umschalten, Palette aus `/catalog`, Speichern mit Konfliktdialog, Undo/Redo; bei Bedarf geteilt in E6a/E6b | Playwright; zwei Browser gleichzeitig |
-| E7 | Eigenschaften | Eigenschaftsdialog aus dem Schema (E1) inkl. Join, Retry, Timeouts; Prüfung beim Tippen, Tab „Probleme“ | Playwright |
+| E7 | Eigenschaften | Eigenschaftsdialog aus dem Schema (E1) inkl. Join, Retry, Timeouts; Prüfung beim Tippen, Tab „Problems“ | Playwright |
 | E8 | Ausführen im Editor | Ausführen mit Environment und Parametern, Live-Status auf dem Canvas, Log-Bereich, Abbrechen | Manuell; Playwright |
 
 **Ergebnis 0.2:** Workflows unter `http://localhost:7300` visuell bauen, prüfen, starten und beobachten – auf denselben YAML-Dateien wie die CLI.

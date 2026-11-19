@@ -41,7 +41,7 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 
 ## Konventionen
 
-- **Sprache:** Code, Kommentare, CLI-Ausgaben und Fehlermeldungen **englisch**; Dokumentation, ADRs, PR-Beschreibungen **deutsch**.
+- **Sprache:** Code, Kommentare, CLI-Ausgaben, Fehlermeldungen und alle Texte der Oberfläche **englisch** (ADR 0015); Dokumentation, ADRs, PR-Beschreibungen **deutsch**.
 - **Neue Action:** genau nach [docs/dev/ACTIONS.md](docs/dev/ACTIONS.md) (eine Datei je Action, `register.go`, Vertragstest).
 - **Typnamen:** `<namensraum>.<name>`; Actions und Transforms haben getrennte Namensräume, **kein** `-transform`-Suffix (ADR 0013).
 - **Fehlermeldungen in Dateien** mit Position: `datei:zeile:spalte: error|warning: text`; für Anwender verständlich, ohne Go-Typnamen.
