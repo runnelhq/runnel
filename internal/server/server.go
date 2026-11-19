@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/webui"
 )
 
 // APIPrefix is the path prefix of all API endpoints.
@@ -31,6 +33,8 @@ type Options struct {
 	Dir string
 	// Registry holds the available actions.
 	Registry *action.Registry
+	// UI holds the editor files; nil uses the editor embedded into the binary.
+	UI fs.FS
 }
 
 // Server serves the API for one project.
@@ -38,6 +42,7 @@ type Server struct {
 	dir      string
 	root     *os.Root
 	registry *action.Registry
+	ui       fs.FS
 	// writeMu serializes changes to files, so that the ETag check and the write
 	// happen atomically with respect to other requests of this server.
 	writeMu sync.Mutex
@@ -53,7 +58,12 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{dir: opts.Dir, root: root, registry: opts.Registry, runs: runs.NewManager(), stop: make(chan struct{})}, nil
+	ui := opts.UI
+	if ui == nil {
+		ui = webui.FS()
+	}
+	return &Server{dir: opts.Dir, root: root, registry: opts.Registry, ui: ui, runs: runs.NewManager(),
+		stop: make(chan struct{})}, nil
 }
 
 // Shutdown ends open event streams, cancels running runs and waits until they have
@@ -84,7 +94,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}", s.handleGetRun)
 	mux.HandleFunc("POST "+APIPrefix+"/runs/{id}/cancel", s.handleCancelRun)
 	mux.HandleFunc("GET "+APIPrefix+"/events", s.handleEvents)
-	mux.HandleFunc("GET /{$}", handleIndex)
+	mux.HandleFunc("GET "+APIPrefix+"/version", handleVersion)
+	mux.HandleFunc("/", s.handleUI)
 	mux.HandleFunc(APIPrefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown endpoint %s %s", r.Method, r.URL.Path))
 	})
@@ -117,11 +128,6 @@ func isLoopbackHost(hostport string) bool {
 	}
 	ip := net.ParseIP(strings.Trim(host, "[]"))
 	return ip != nil && ip.IsLoopback()
-}
-
-func handleIndex(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = fmt.Fprintf(w, "Runnel server. The editor is not part of this version yet; the API is available under %s.\n", APIPrefix)
 }
 
 // apiError is the body of all error responses.

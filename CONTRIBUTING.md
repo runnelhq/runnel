@@ -8,6 +8,7 @@ stehen in [AGENTS.md](AGENTS.md).
 - [Go](https://go.dev/dl/) in der Version aus `go.mod` (derzeit Go 1.26)
 - [golangci-lint](https://golangci-lint.run/) v2.15.0 für `make lint`
 - `make` (unter Windows z. B. über Git Bash); alle Befehle gehen auch ohne `make`, siehe [README](README.md#entwicklung)
+- [Node.js](https://nodejs.org/) 22 LTS für den Editor (`make build`, `make e2e`); ohne Node baut `make build-go` die exe ohne Editor
 
 ## Ablauf
 
@@ -42,6 +43,7 @@ stehen in [AGENTS.md](AGENTS.md).
 |---|---|
 | Neue Action entwickeln | [docs/dev/ACTIONS.md](docs/dev/ACTIONS.md) |
 | Server-API | [docs/dev/API.md](docs/dev/API.md) |
+| Editor (Frontend) | [docs/dev/EDITOR.md](docs/dev/EDITOR.md) |
 | Neue Transforms | folgt mit Roadmap-Schritt S12/S13 |
 | Plugins | folgt mit Roadmap-Schritt S49–S51 |
 | Testen, bekannte Einschränkungen | [docs/TESTPLAN.md](docs/TESTPLAN.md) |

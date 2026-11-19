@@ -325,7 +325,9 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 | UI-Kit | `shadcn/ui` + Tailwind (leicht, kein schweres Komponenten-Framework) |
 | Gestaltung | Design Tokens aus [`design/tokens`](../design/README.md) (Farben, Schriften, Radien, hell/dunkel) – [ADR 0011](adr/0011-corporate-design.md) |
 
-Ziel-Bundle: < 3 MB gzip, wird in die exe eingebettet.
+Ziel-Bundle: < 3 MB gzip, wird in die exe eingebettet. Schriften (Inter, JetBrains Mono) liegen lokal unter
+`design/fonts/`. Weitere Bibliotheken der Tabelle werden erst mit dem Schritt aufgenommen, der sie braucht – mit
+Begründung im PR. Entwicklung: [docs/dev/EDITOR.md](dev/EDITOR.md).
 
 ---
 
@@ -886,7 +888,7 @@ runnel/
 │  ├─ plugin/               # Externes Plugin-Protokoll (JSON-RPC Host)
 │  └─ winsvc/               # Windows-Dienst, EventLog (build tag windows)
 ├─ pkg/sdk/                 # Öffentliches Go-SDK für Plugin-Entwickler
-├─ web/                     # Editor (React + Vite + React Flow)
+├─ web/                     # Editor (React + Vite + TypeScript; Build → internal/webui/dist, per go:embed eingebettet)
 ├─ examples/                # Beispielprojekte
 ├─ docs/                    # Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (docs/dev/)
 ├─ design/                  # Corporate Design: Logos, Design Tokens, Social-Grafiken

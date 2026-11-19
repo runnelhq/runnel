@@ -18,6 +18,7 @@ design/
 │  ├─ build.mjs              # erzeugt runnel.css und tailwind.css
 │  ├─ runnel.css             # CSS-Variablen, hell/dunkel, shadcn/ui-kompatibel
 │  └─ tailwind.css           # Tailwind-v4-Theme (bg-primary, text-strom-600 …)
+├─ fonts/                    # Inter, JetBrains Mono (WOFF2, Latin), fonts.css, Lizenzen (OFL)
 ├─ social/                   # Social-/Open-Graph-Bild (1280 × 640) inkl. HTML-Vorlage
 └─ mockups/                  # freigegebene Mockups für Oberflächen (HTML + PNG), siehe Kap. 9
 ```
@@ -177,7 +178,8 @@ für Flächen, Linien und großen Text (≥ 18 px fett) zugelassen.
 
 Beide Schriften stehen unter der SIL Open Font License 1.1 und dürfen eingebettet werden. Der Editor liefert sie als
 WOFF2 (nur Latin-Subset) **lokal** aus – keine Google-Fonts-Abfrage, weil Runnel offline und im Firmennetz laufen muss.
-Lizenztexte gehören dann in `THIRD_PARTY_NOTICES.txt`.
+Die Dateien liegen unter [`fonts/`](fonts/fonts.css) (aus Fontsource 5.3.0); ihre Lizenztexte stehen in
+`THIRD_PARTY_NOTICES.txt` jedes Releases.
 
 ### 4.1 Größen
 
