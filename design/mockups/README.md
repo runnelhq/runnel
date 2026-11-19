@@ -7,7 +7,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | Mockup | Schritt | Zustände | Status |
 |---|---|---|---|
 | [`e4-editor-shell.html`](e4-editor-shell.html) | E4 – Editor-Gerüst | `file`, `empty`, `offline`, `error` | freigegeben mit PR #23, umgesetzt mit E4a/E4b |
-| [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | zur Freigabe |
+| [`e5-canvas.html`](e5-canvas.html) | E5 – Canvas (nur lesen) | `canvas`, `problems`, `invalid`, `auto` | freigegeben mit PR #26 |
 
 ## Entscheidungen
 
@@ -17,6 +17,12 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E4 | Mehrere geöffnete Dateien als Tabs schon in E4 |
 | E4 | Umschalter für das Farbschema in der Kopfzeile (Standard: System); ein Einstellungsmenü erst, wenn es mehrere Einstellungen gibt |
 | E4 | Zielgerät Desktop-PC; schmale Fenster stehen im Backlog |
+| E5 | Knoten als Karten (176 × 52 px); `layout`-Koordinaten sind Pixel der linken oberen Ecke; die Beispiele werden mit E5 auseinandergezogen |
+| E5 | Link-Symbol bei 35 % des Wegs ab der Quelle, damit sich kreuzende Links nicht überdecken |
+| E5 | Markierung oben rechts am Knoten: beim Ausführen (E8) hat der Laufstatus Vorrang; Meldungen bleiben über Rahmen und Zähler sichtbar |
+| E5 | Kachelfarbe nach Kategorie (Core-Actions: `general`, grau), Unterscheidung über das Icon je Typ |
+| E5 | Keine Minimap; bei Bedarf später |
+| E5 | Abhängigkeiten: `@xyflow/react` (MIT) für den Canvas, `@dagrejs/dagre` (MIT) für das automatische Anordnen statt `elkjs` (EPL-2.0/GPL-3.0, nicht MIT-kompatibel) |
 
 ## Screenshots erzeugen
 

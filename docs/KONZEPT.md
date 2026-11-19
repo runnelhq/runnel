@@ -317,7 +317,7 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 | Zweck | Wahl |
 |---|---|
 | Framework | **React 19 + TypeScript**, Build mit **Vite** |
-| Graph-Canvas | **React Flow (xyflow)** – Knoten, Links, Zoom, Minimap, Auto-Layout (`elkjs`) |
+| Graph-Canvas | **React Flow (xyflow)** – Knoten, Links, Zoom; Auto-Layout mit `@dagrejs/dagre` (MIT; `elkjs` scheidet wegen EPL-2.0/GPL-3.0 aus) |
 | Formulare | Automatisch aus JSON-Schema der Action/Transform generiert (`@rjsf/core` oder eigene schlanke Lösung) |
 | Code-/Ausdruckseditor | **Monaco** (Autovervollständigung für Variablen, Felder, Funktionen) |
 | Zustand | `zustand` + Undo/Redo-Stack (Command-Pattern) |
