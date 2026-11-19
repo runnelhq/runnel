@@ -18,7 +18,8 @@ design/
 │  ├─ build.mjs              # erzeugt runnel.css und tailwind.css
 │  ├─ runnel.css             # CSS-Variablen, hell/dunkel, shadcn/ui-kompatibel
 │  └─ tailwind.css           # Tailwind-v4-Theme (bg-primary, text-strom-600 …)
-└─ social/                   # Social-/Open-Graph-Bild (1280 × 640) inkl. HTML-Vorlage
+├─ social/                   # Social-/Open-Graph-Bild (1280 × 640) inkl. HTML-Vorlage
+└─ mockups/                  # freigegebene Mockups für Oberflächen (HTML + PNG), siehe Kap. 9
 ```
 
 ---
@@ -320,3 +321,24 @@ Farben nur bei TTY und ohne `NO_COLOR`; Symbole (✔ ✖ ⚠) immer, damit Logs 
 - **Logo ändern:** SVG ist die Quelle; PNG/ICO werden daraus exportiert (Chromium/Inkscape, transparente Ränder beibehalten).
   Größere Änderungen an Logo oder Farben brauchen eine neue ADR.
 - Neue Kanäle (z. B. Merch, Messestand) leiten sich aus Kapitel 2–5 ab und werden hier ergänzt.
+
+---
+
+## 9. Mockups
+
+Jede neue oder deutlich geänderte Oberfläche (Editor-Ansichten, Dialoge, Website-Seiten, Installer, Tray) wird **vor
+der Umsetzung** als Mockup entworfen und vom Maintainer freigegeben. So werden Gestaltung und Bedienung geklärt, bevor
+Code entsteht, und der Umsetzungs-PR muss nur noch prüfen, ob er dem Mockup entspricht.
+
+| Punkt | Regel |
+|---|---|
+| Ablage | `design/mockups/<schritt>-<thema>.html`, z. B. `e5-canvas.html`; mehrere Zustände in einer Datei oder als `…-<zustand>.html` |
+| Technik | Statisches HTML/CSS ohne Build, bindet `../tokens/runnel.css` ein, nutzt nur die Tokens (keine Hex-Werte); Inhalte mit realistischen Beispieldaten aus `examples/` |
+| Varianten | hell **und** dunkel; Zustände, die das Mockup betrifft (leer, Fehler, läuft, ausgewählt …); bei Bedarf schmales Fenster |
+| Screenshots | je Variante ein PNG (`…-hell.png`, `…-dunkel.png`), damit der PR das Mockup direkt zeigt |
+| Freigabe | Mockup als **eigener PR**; der Merge ist die Freigabe. Offene Fragen stehen in der PR-Beschreibung |
+| Umsetzung | verweist auf das Mockup und folgt ihm; Abweichungen erst im Mockup ändern und erneut freigeben lassen |
+| Pflege | Mockups bleiben nach der Umsetzung liegen und dienen als Referenz; überholte werden gelöscht, wenn ein neues sie ersetzt |
+
+Mockups wenden Kapitel 2–7 an: Tokens und Kategoriefarben, Typografie (Editor 13 px), Raster 4 px, Funktionsfarben nur
+mit Symbol, Texte nach „Sprache und Ton“.

@@ -20,6 +20,9 @@ Erledigte Schritte sind mit ✅ markiert.
   Dazu gibt es bei Bedarf ein Beispiel unter `examples/`.
 - **Nur das Nötige:** Keine Vorab-Implementierung für spätere Schritte. Schnittstellen werden erweitert, wenn sie gebraucht werden.
 - **Doku im selben PR:** Betroffene Abschnitte in Konzept/ADRs werden mit angepasst.
+- **Oberflächen nach Corporate Design und freigegebenem Mockup:** Schritte mit sichtbarer Oberfläche (u. a. E4–E8,
+  S25a, S35, S44, S46, S47) beginnen mit einem Mockup-PR unter `design/mockups/`; die Umsetzung folgt erst nach dessen
+  Freigabe ([design/README.md, Kap. 9](../design/README.md#9-mockups)).
 - **Anleitungen aktuell halten:** Ändert ein Schritt den Vertrag einer Action (oder später eines Transforms bzw.
   Plugins), aktualisiert derselbe PR die Anleitung in [`docs/dev/`](dev/ACTIONS.md); ebenso [`AGENTS.md`](../AGENTS.md)
   bei neuen Befehlen, Paketen oder Konventionen.

@@ -40,6 +40,8 @@ Das Corporate Design liegt unter [`design/`](../../design/README.md) und besteht
 - Werden Inter/JetBrains Mono in die exe eingebettet, kommen ihre Lizenztexte in `THIRD_PARTY_NOTICES.txt`.
 - `runnel.exe` und der Installer erhalten `design/logo/runnel.ico`; die CLI nutzt für Zustände die ANSI-Standardfarben
   passend zu den Funktionsfarben.
+- Oberflächen werden vor der Umsetzung als Mockup unter `design/mockups/` entworfen und freigegeben
+  ([design/README.md, Kap. 9](../../design/README.md#9-mockups)); ergänzt am 2026-11-19.
 - Änderungen an Farben erfolgen nur in `tokens.json`; Änderungen an Logo oder Markenfarben erfordern eine neue ADR.
 - Vor einer öffentlichen Bekanntmachung sollte – zusammen mit der Markenrecherche aus ADR 0010 – geprüft werden, ob die
   Bildmarke mit bestehenden Marken verwechselbar ist.

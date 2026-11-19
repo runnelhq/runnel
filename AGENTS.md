@@ -48,6 +48,19 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein.
 - **Windows-first:** Pfade über `path/filepath`, UNC-Pfade, Kodierungen (BOM, UTF-16), CRLF berücksichtigen.
 - **Kein Vorgriff:** nur umsetzen, was der aktuelle Roadmap-Schritt verlangt; Nicht-Unterstütztes klar melden statt still ignorieren.
 
+## Oberfläche (UI)
+
+Gilt für alles Sichtbare: Editor, Website, Installer, Tray, Grafiken, Dokumente – und sinngemäß für CLI-Ausgaben.
+
+- **Corporate Design anwenden** ([ADR 0011](docs/adr/0011-corporate-design.md), [design/README.md](design/README.md)):
+  Farben, Schriften, Radien und Abstände nur über die Tokens (`design/tokens/`), **keine Hex-Werte** im Code; Logos aus
+  `design/logo/`; Funktionsfarben nur mit fester Bedeutung und nie ohne Symbol; Texte nach Kap. 7 (Sprache und Ton).
+- **Erst Mockup, dann Umsetzung:** Vor jeder neuen oder deutlich geänderten Oberfläche ein Mockup unter
+  `design/mockups/` anlegen (statisches HTML mit `design/tokens/runnel.css`, hell und dunkel, dazu PNG-Screenshots für
+  den PR) und als **eigenen PR** vorlegen. Umgesetzt wird erst, wenn der Maintainer das Mockup freigegeben (gemergt) hat.
+- **Umsetzung folgt dem Mockup;** Abweichungen erst im Mockup ändern und erneut freigeben lassen. Der Umsetzungs-PR
+  verweist auf das freigegebene Mockup.
+
 ## Arbeitsweise
 
 - **Ein Roadmap-Schritt = ein PR**, Richtwert ≤ ca. 1.000 geänderte Zeilen inklusive Tests; größere Schritte vorher teilen.
