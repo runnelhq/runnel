@@ -39,7 +39,8 @@ const field = (page: Page, key: string) => panel(page).locator(`[data-field="${k
 
 test("shows the properties of the selected action", async ({ page }) => {
   await open(page);
-  await expect(panel(page)).toContainText("Select an action to see its properties.");
+  // Nothing selected: the properties of the workflow (E7b).
+  await expect(panel(page).getByTestId("workflow-properties")).toBeVisible();
   // With the panel, the file bar is compact (mockup E7).
   await expect(page.getByTestId("crumbs")).toHaveText("properties.workflow.yaml");
   await expect(page.getByRole("button", { name: "Copy path" })).toBeVisible();
@@ -61,7 +62,7 @@ test("shows the properties of the selected action", async ({ page }) => {
 
   // Several actions selected; hiding and showing the panel.
   await page.getByTestId("node-fetch-a").click({ modifiers: ["Control"] });
-  await expect(panel(page)).toContainText("2 actions selected");
+  await expect(panel(page)).toContainText("2 elements selected");
   await page.getByRole("button", { name: "Hide properties" }).click();
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByTestId("crumbs")).toHaveText("workflows / properties.workflow.yaml");
@@ -161,4 +162,86 @@ test("renames an action in the panel", async ({ page }) => {
   await expect(page.getByTestId("node-merge")).toBeVisible();
   await expect(id).toHaveValue("merge");
   expect(await yaml(page)).toContain("{ from: fetch-a, to: merge }");
+});
+
+test("shows and changes the properties of a link", async ({ page }) => {
+  await open(page);
+  // The link fetch-a → report-error (failure) is links[4].
+  await page.getByTestId("link-4").click();
+  await page.keyboard.press("Escape"); // closes the link menu, the link stays selected
+  const link = panel(page).getByTestId("link-properties");
+  await expect(link.getByTestId("link-ends")).toHaveText("fetch-a → report-error");
+  const condition = link.getByRole("group", { name: "Condition" });
+  await expect(condition.getByRole("button", { name: "✖ Failure" })).toHaveAttribute("aria-pressed", "true");
+  await expect(field(page, "when")).toContainText("Followed when fetch-a has failed");
+
+  await condition.getByRole("button", { name: "∞ Always" }).click();
+  await expect(page.getByTestId("link-4")).toHaveAttribute("data-kind", "always");
+  await link.getByRole("checkbox", { name: /Disabled/ }).click();
+  await expect(link.getByRole("checkbox", { name: /Disabled/ })).toBeChecked();
+  expect(await yaml(page)).toContain("  - { from: fetch-a, to: report-error, when: always, disabled: true }\n");
+
+  await page.getByTestId("link-4").click();
+  await page.keyboard.press("Escape");
+  await panel(page).getByRole("button", { name: "Delete link" }).click();
+  await expect(page.getByRole("status")).toContainText("Deleted 1 link");
+  expect(await yaml(page)).not.toContain("to: report-error, when: always");
+});
+
+test("shows and changes the properties of the workflow", async ({ page }) => {
+  await open(page);
+  const wf = panel(page).getByTestId("workflow-properties");
+  await expect(field(page, "name").getByRole("textbox")).toHaveValue("parallel");
+  await expect(wf).toContainText("DELAY_A");
+  await expect(wf).toContainText("string · optional");
+
+  await field(page, "description").getByRole("textbox").fill("Two branches");
+  await field(page, "description").getByRole("textbox").blur();
+  await field(page, "settings.maxConcurrentRuns").getByRole("textbox").fill("0");
+  await field(page, "settings.maxConcurrentRuns").getByRole("textbox").blur();
+  await expect(field(page, "settings.maxConcurrentRuns").getByRole("alert")).toContainText("whole number of 1 or more");
+  await field(page, "settings.maxConcurrentRuns").getByRole("textbox").fill("1");
+  await field(page, "settings.maxConcurrentRuns").getByRole("textbox").blur();
+  await expect.poll(() => yaml(page)).toContain("name: parallel\ndescription: Two branches\n");
+  expect(await yaml(page)).toContain("settings:\n  maxConcurrentRuns: 1\nactions:\n");
+
+  // An empty name is reported at the field.
+  await field(page, "name").getByRole("textbox").fill("");
+  await field(page, "name").getByRole("textbox").blur();
+  await expect(field(page, "name").getByRole("alert")).toContainText('missing required field "name"');
+});
+
+test("lists the problems below the canvas and jumps to the field", async ({ page }) => {
+  await open(page);
+  // Two problems: a missing message (error) and an invalid timeout.
+  await select(page, "combine");
+  await field(page, "with.message").getByRole("textbox").fill("");
+  await field(page, "with.message").getByRole("textbox").blur();
+  await select(page, "fetch-a");
+  await field(page, "timeout").getByRole("textbox").fill("5 mins");
+  await field(page, "timeout").getByRole("textbox").blur();
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
+
+  const bar = page.getByRole("region", { name: "Problems" });
+  await expect(bar.getByTestId("problem-count")).toHaveText("1");
+  await expect(bar.getByRole("table")).toHaveCount(0);
+  await page.getByTestId("error-count").click(); // the badge opens the list
+  const rows = bar.getByRole("table").getByRole("row");
+  await expect(rows.nth(1)).toContainText('invalid duration "5 mins"');
+  await expect(rows.nth(1)).toContainText("fetch-a · Timeout");
+
+  await rows.nth(1).click();
+  await expect(page.getByRole("textbox", { name: "ID", exact: true })).toHaveValue("fetch-a");
+  await expect(field(page, "timeout").getByRole("textbox")).toBeFocused();
+  await field(page, "timeout").getByRole("textbox").fill("5m");
+  await field(page, "timeout").getByRole("textbox").blur();
+
+  // Once the timeout is valid, the configuration is checked and the missing message shows up.
+  await expect(rows.nth(1)).toContainText('missing required field "message"');
+  await expect(rows.nth(1)).toContainText("combine · Message");
+  await rows.nth(1).click();
+  await expect(field(page, "with.message").getByRole("textbox")).toBeFocused();
+
+  await bar.getByRole("button", { name: /Problems/ }).click();
+  await expect(bar.getByRole("table")).toHaveCount(0);
 });

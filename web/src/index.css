@@ -72,6 +72,13 @@
   color: var(--muted-foreground);
 }
 
+/* A field shown after a click on a problem lights up briefly (mockup E7). */
+.runnel-flash input,
+.runnel-flash textarea,
+.runnel-flash select {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
 /* Base styles of the editor: 13 px base size like an IDE (design/README.md, chapter 4.1). */
 @layer base {
   html,

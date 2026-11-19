@@ -1,18 +1,26 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { categoryColor, useCatalog, type Schema } from "../catalog";
-import { idPattern, type Action, type Problem, type Workflow } from "../workflow";
-import { ActionIcon, ChevronIcon, CloseIcon } from "./Icons";
+import { idPattern, linkKind, type Action, type Problem, type Workflow } from "../workflow";
+import type { Selection } from "./Canvas";
+import { ActionIcon, ChevronIcon, CloseIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import type { SettableKind } from "./LinkEdge";
 
 /** A value written to a field; null removes the field from the file. */
 export type FieldValue = string | number | boolean | null;
 
 export interface PropertiesProps {
   workflow: Workflow;
-  /** Ids of the selected actions. */
-  selected: string[];
+  /** The selected actions and links. */
+  selected: Selection;
   problems: Problem[];
+  /** A field to show and focus (data-field key); seq changes with every request. */
+  focus?: { key: string; seq: number } | null;
   /** Sets a field of an action, e.g. "with.message" or "retry.attempts". */
   onSet: (id: string, field: string, value: FieldValue) => void;
+  /** Sets a field of the workflow: name, description, settings.timeout, settings.maxConcurrentRuns. */
+  onSetWorkflow: (field: string, value: FieldValue) => void;
+  onLinkChange: (index: number, change: { when?: SettableKind; loop?: boolean; disabled?: boolean }) => void;
+  onDeleteLink: (index: number) => void;
   onRename: (from: string, to: string) => void;
   onHide: () => void;
 }
@@ -21,15 +29,37 @@ export interface PropertiesProps {
 export const applyDelay = 500;
 
 /**
- * Properties of the selected action (mockup design/mockups/e7-properties.html): ID,
+ * Properties (mockup design/mockups/e7-properties.html) of the selected action – ID,
  * description, the configuration as a form generated from the JSON Schema of the
- * descriptor (ADR 0014) and the execution settings. Changes apply after a short pause
- * or when leaving the field; problems reported by the server appear at their field.
+ * descriptor (ADR 0014) and the execution settings –, of the selected link, or of the
+ * workflow when nothing is selected. Changes apply after a short pause or when leaving
+ * the field; problems reported by the server appear at their field.
  */
 export function PropertiesPanel(props: PropertiesProps) {
-  const { workflow, selected } = props;
-  const index = selected.length === 1 ? (workflow.actions ?? []).findIndex((a) => a.id === selected[0]) : -1;
+  const { workflow, selected, focus } = props;
+  const actions = selected.actions;
+  const index = actions.length === 1 ? (workflow.actions ?? []).findIndex((a) => a.id === actions[0]) : -1;
   const action = index >= 0 ? workflow.actions![index] : undefined;
+  const link = actions.length === 0 && selected.links.length === 1 ? selected.links[0] : undefined;
+  const count = actions.length + selected.links.length;
+  const scroller = useRef<HTMLDivElement>(null);
+
+  // Shows and focuses a field, e.g. after a click on a problem; it lights up briefly.
+  useEffect(() => {
+    if (!focus) return;
+    let frame = requestAnimationFrame(function find(tries = 0) {
+      const el = scroller.current?.querySelector<HTMLElement>(`[data-field="${CSS.escape(focus.key)}"]`);
+      if (!el) {
+        if (tries < 20) frame = requestAnimationFrame(() => find(tries + 1));
+        return;
+      }
+      el.scrollIntoView({ block: "nearest" });
+      el.querySelector<HTMLElement>("input, textarea, select, button")?.focus({ preventScroll: true });
+      el.classList.add("runnel-flash");
+      setTimeout(() => el.classList.remove("runnel-flash"), 1200);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focus]);
 
   return (
     <section aria-label="Properties" className="flex min-h-0 w-[320px] shrink-0 flex-col border-l border-border bg-background">
@@ -45,14 +75,18 @@ export function PropertiesPanel(props: PropertiesProps) {
           <CloseIcon width={14} height={14} />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto pb-4">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-auto pb-4">
         {action ? (
           // The key resets all fields when another action is selected.
           <ActionProperties key={action.id} {...props} action={action} index={index} />
-        ) : (
+        ) : link !== undefined && workflow.links?.[link] ? (
+          <LinkProperties key={link} {...props} index={link} />
+        ) : count > 1 ? (
           <p className="mx-4 my-4 text-xs text-muted-foreground">
-            {selected.length > 1 ? `${selected.length} actions selected. Select one action to see its properties.` : "Select an action to see its properties."}
+            {count} elements selected. Select one action or link to see its properties.
           </p>
+        ) : (
+          <WorkflowProperties {...props} />
         )}
       </div>
     </section>
@@ -103,6 +137,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       </Field>
       <RetryFields action={action} problems={[...at("retry")]} onSet={(f, v) => set(`retry.${f}`)(v)} />
       <Check
+        fieldKey="continueOnError"
         checked={action.continueOnError ?? false}
         label="Continue on error"
         help="Failure links are not followed; the workflow continues as if it succeeded"
@@ -189,8 +224,8 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
   );
 }
 
-function Section(props: { title: string; summary?: string; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
+function Section(props: { title: string; summary?: string; defaultOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(props.defaultOpen ?? true);
   return (
     <div className="mt-2 border-t border-border">
       <button
@@ -392,6 +427,7 @@ function SchemaField(props: {
   if (s.type === "boolean") {
     return (
       <Check
+        fieldKey={`with.${name}`}
         checked={value === true}
         label={label}
         help={s.description}
@@ -551,9 +587,16 @@ function Segmented(props: {
   );
 }
 
-function Check(props: { checked: boolean; label: string; help?: string; problems?: Problem[]; onChange: (on: boolean) => void }) {
+function Check(props: {
+  checked: boolean;
+  label: string;
+  help?: string;
+  fieldKey?: string;
+  problems?: Problem[];
+  onChange: (on: boolean) => void;
+}) {
   return (
-    <div className="mb-3 px-4">
+    <div className="mb-3 px-4" data-field={props.fieldKey}>
       <label className="flex cursor-pointer items-start gap-2 text-xs">
         <input
           type="checkbox"
@@ -572,5 +615,224 @@ function Check(props: { checked: boolean; label: string; help?: string; problems
         </div>
       ))}
     </div>
+  );
+}
+
+/** Problems at a YAML path below base, e.g. "$.links[2]" and field "when". */
+function problemsAt(problems: Problem[], base: string, field: string) {
+  const path = base === "$" ? `$.${field}` : `${base}.${field}`;
+  return problems.filter((p) => p.path === path || p.path?.startsWith(path + ".") || p.path?.startsWith(path + "["));
+}
+
+const kindSymbols: Record<string, string> = { success: "✔", failure: "✖", always: "∞", expression: "ƒ" };
+const kindColors: Record<string, string> = {
+  success: "var(--link-success)",
+  failure: "var(--link-failure)",
+  always: "var(--link-always)",
+  expression: "var(--link-expression)",
+};
+
+/** Properties of a link: condition, loop, disabled (mockup E7, state "link"). */
+function LinkProperties(props: PropertiesProps & { index: number }) {
+  const { index, workflow, problems } = props;
+  const l = workflow.links![index];
+  const kind = linkKind(l.when);
+  const base = `$.links[${index}]`;
+  const own = problems.filter((p) => p.path === base || p.path?.startsWith(base + "."));
+  const rest = own.filter((p) => !["when", "loop", "disabled"].some((f) => p.path?.startsWith(`${base}.${f}`)));
+  const help: Record<string, string> = {
+    success: `Followed when ${l.from} has succeeded`,
+    failure: `Followed when ${l.from} has failed (after all retries)`,
+    always: `Followed when ${l.from} has finished, whatever the result`,
+    expression: "Followed when the expression is true",
+  };
+  return (
+    <div data-testid="link-properties">
+      <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-1.5">
+        <span
+          className="grid h-6 min-w-6 place-items-center rounded-full border-[1.5px] border-current bg-card px-1 text-xs font-bold"
+          style={{ color: kindColors[kind] }}
+        >
+          {kindSymbols[kind]}
+        </span>
+        <div>
+          <h3 className="m-0 text-base leading-tight font-semibold">Link</h3>
+          <div className="font-mono text-2xs text-muted-foreground">links[{index}]</div>
+        </div>
+      </div>
+      <p className="mx-4 mt-0 mb-2 font-mono text-xs" data-testid="link-ends">
+        {l.from} → {l.to}
+      </p>
+      {rest.length > 0 && <ProblemList problems={rest} />}
+      <Field label="Condition" fieldKey="when" help={help[kind]} problems={problemsAt(problems, base, "when")}>
+        {() =>
+          kind === "expression" ? (
+            <div className="rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-expression">{l.when}</div>
+          ) : (
+            <Segmented
+              label="Condition"
+              value={kind}
+              options={[
+                ["success", "✔ Success"],
+                ["failure", "✖ Failure"],
+                ["always", "∞ Always"],
+              ]}
+              onChange={(v) => props.onLinkChange(index, { when: v as SettableKind })}
+            />
+          )
+        }
+      </Field>
+      <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
+        ƒ Conditions with expressions <span className="font-mono">{"{{ … }}"}</span> follow with expressions (roadmap S08).
+      </p>
+      <Check
+        fieldKey="loop"
+        checked={l.loop ?? false}
+        label="Loop link"
+        help="Leads back to an earlier action; set automatically when a drawn link closes a cycle"
+        problems={problemsAt(problems, base, "loop")}
+        onChange={(on) => props.onLinkChange(index, { loop: on })}
+      />
+      <Check
+        fieldKey="disabled"
+        checked={l.disabled ?? false}
+        label="Disabled"
+        help="Kept in the file, but never followed (shown dashed)"
+        problems={problemsAt(problems, base, "disabled")}
+        onChange={(on) => props.onLinkChange(index, { disabled: on })}
+      />
+      <div className="px-4">
+        <button
+          type="button"
+          onClick={() => props.onDeleteLink(index)}
+          className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-destructive bg-background px-2.5 text-xs font-medium text-destructive hover:bg-danger-soft"
+        >
+          <TrashIcon width={14} height={14} />
+          Delete link
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Properties of the workflow when nothing is selected (mockup E7, state "workflow"). */
+function WorkflowProperties(props: PropertiesProps) {
+  const { workflow, problems, onSetWorkflow } = props;
+  const [localError, setLocalError] = useState<string | null>(null);
+  const params = workflow.parameters ?? [];
+  const outputs = workflow.outputs ?? [];
+  return (
+    <div data-testid="workflow-properties">
+      <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-1.5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
+          <WorkflowIcon />
+        </span>
+        <div className="min-w-0">
+          <h3 className="m-0 text-base leading-tight font-semibold">Workflow</h3>
+        </div>
+      </div>
+      <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">Nothing selected – properties of the workflow.</p>
+      <Field label="Name" fieldKey="name" required problems={problemsAt(problems, "$", "name")}>
+        {(p) => <TextInput {...p} value={workflow.name ?? ""} onCommit={(v) => onSetWorkflow("name", v || null)} />}
+      </Field>
+      <Field label="Description" fieldKey="description" problems={problemsAt(problems, "$", "description")}>
+        {(p) => (
+          <TextInput {...p} multiline value={workflow.description ?? ""} onCommit={(v) => onSetWorkflow("description", v || null)} />
+        )}
+      </Field>
+      <Section title="Settings">
+        <Field
+          label="Timeout"
+          fieldKey="settings.timeout"
+          help="Limits the whole run, e.g. 2h. Empty: no limit"
+          problems={problemsAt(problems, "$", "settings.timeout")}
+        >
+          {(p) => (
+            <TextInput
+              {...p}
+              mono
+              value={workflow.settings?.timeout ?? ""}
+              placeholder="Empty: no limit"
+              onCommit={(v) => onSetWorkflow("settings.timeout", v || null)}
+            />
+          )}
+        </Field>
+        <Field
+          label="Max. concurrent runs"
+          fieldKey="settings.maxConcurrentRuns"
+          help="How many runs of this workflow may run at the same time"
+          problems={problemsAt(problems, "$", "settings.maxConcurrentRuns")}
+          localError={localError}
+        >
+          {(p) => (
+            <TextInput
+              {...p}
+              mono
+              value={workflow.settings?.maxConcurrentRuns ? String(workflow.settings.maxConcurrentRuns) : ""}
+              placeholder="Empty: no limit"
+              onCommit={(v) => {
+                const n = Number(v);
+                if (v !== "" && (!Number.isInteger(n) || n < 1)) {
+                  setLocalError("Enter a whole number of 1 or more");
+                  return;
+                }
+                setLocalError(null);
+                onSetWorkflow("settings.maxConcurrentRuns", v === "" ? null : n);
+              }}
+            />
+          )}
+        </Field>
+      </Section>
+      <Section title="Parameters" summary={String(params.length)}>
+        <div data-field="parameters">
+          {params.length > 0 && (
+            <ul className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0">
+              {params.map((p) => (
+                <li key={p.name} className="grid grid-cols-[1fr_auto] gap-x-2 border-b border-border px-2.5 py-1.5 text-xs last:border-b-0">
+                  <b className="font-mono">{p.name}</b>
+                  <span className="font-mono">{p.default ?? ""}</span>
+                  <small className="col-span-2 font-mono text-2xs text-muted-foreground">
+                    {p.type ?? "string"} · {p.required ? "required" : "optional"}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ProblemList problems={problemsAt(problems, "$", "parameters")} />
+        </div>
+        <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
+          Adding and changing parameters and outputs follows in a later step; until then in the YAML view.
+        </p>
+      </Section>
+      <Section title="Outputs" summary={String(outputs.length)} defaultOpen={false}>
+        <div data-field="outputs">
+          {outputs.length > 0 && (
+            <ul className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0">
+              {outputs.map((o) => (
+                <li key={o.name} className="grid grid-cols-[1fr_auto] gap-x-2 border-b border-border px-2.5 py-1.5 text-xs last:border-b-0">
+                  <b className="font-mono">{o.name}</b>
+                  <span className="truncate font-mono">{o.value}</span>
+                  <small className="col-span-2 font-mono text-2xs text-muted-foreground">{o.type ?? "string"}</small>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ProblemList problems={problemsAt(problems, "$", "outputs")} />
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function ProblemList(props: { problems: Problem[] }) {
+  if (props.problems.length === 0) return null;
+  return (
+    <ul className="mx-4 mt-0 mb-3 list-none rounded-md bg-danger-soft px-2.5 py-1.5 text-2xs text-destructive">
+      {props.problems.map((p, i) => (
+        <li key={i}>
+          {p.severity === "error" ? "✖" : "⚠"} {p.message}
+        </li>
+      ))}
+    </ul>
   );
 }

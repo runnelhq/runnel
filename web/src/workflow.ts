@@ -23,8 +23,28 @@ export interface Link {
   disabled?: boolean;
 }
 
+export interface Parameter {
+  name: string;
+  description?: string;
+  type?: string;
+  default?: string;
+  required?: boolean;
+  enum?: string[];
+}
+
+export interface Output {
+  name: string;
+  description?: string;
+  type?: string;
+  value: string;
+}
+
 export interface Workflow {
   name: string;
+  description?: string;
+  parameters?: Parameter[];
+  outputs?: Output[];
+  settings?: { timeout?: string; maxConcurrentRuns?: number };
   actions?: Action[];
   links?: Link[];
   layout?: Record<string, { x: number; y: number }>;
@@ -138,9 +158,46 @@ export interface WorkflowEdit {
   rename?: Record<string, string>;
   addLinks?: Link[];
   deleteLinks?: number[];
-  updateLinks?: { index: number; when: "success" | "failure" | "always" }[];
+  updateLinks?: { index: number; when?: "success" | "failure" | "always"; loop?: boolean; disabled?: boolean }[];
   /** Changes one field of an action (properties panel); null removes the field. */
   set?: { id: string; field: string; value: string | number | boolean | null }[];
+  /** Changes one field of the workflow itself (name, description, settings.*). */
+  setWorkflow?: { field: string; value: string | number | boolean | null }[];
+}
+
+/** What a problem belongs to: an action, a link or the workflow, and the field in the properties panel. */
+export interface ProblemTarget {
+  action?: string;
+  link?: number;
+  /** Key of the field (data-field in the panel), e.g. "with.message", "timeout", "when", "settings.timeout". */
+  field?: string;
+}
+
+/** Finds the action, link or workflow field a problem refers to, from its YAML path. */
+export function problemTarget(wf: Workflow, p: Problem): ProblemTarget | null {
+  const path = p.path;
+  if (!path) return null;
+  let m = path.match(/^\$\.actions\[(\d+)\](?:\.(.*))?$/);
+  if (m) {
+    const action = wf.actions?.[Number(m[1])]?.id;
+    if (!action) return null;
+    const rest = m[2] ?? "";
+    let field: string | undefined;
+    if (rest === "with") field = p.message.match(/field "([^"]+)"/)?.[1]?.replace(/^/, "with.");
+    else if (rest.startsWith("with.")) field = rest.split(".").slice(0, 2).join(".");
+    else if (rest === "retry.strategy") field = "retry.strategy";
+    else if (rest.startsWith("retry")) field = "retry";
+    else if (rest) field = rest.split(".")[0];
+    return { action, field };
+  }
+  m = path.match(/^\$\.links\[(\d+)\](?:\.(\w+))?/);
+  if (m) {
+    const field = m[2] === "from" || m[2] === "to" ? undefined : m[2];
+    return { link: Number(m[1]), field };
+  }
+  m = path.match(/^\$\.(name|description|settings\.\w+|parameters|outputs)/);
+  if (m) return { field: m[1] };
+  return {};
 }
 
 /** Allowed action ids (as checked by the server). */

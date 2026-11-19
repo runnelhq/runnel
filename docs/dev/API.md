@@ -1,6 +1,6 @@
 # Server-API (`runnel serve`)
 
-Stand: E7a. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+Stand: E7b. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
 ([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)).
 
 ```bash
@@ -185,7 +185,8 @@ POST /api/v1/workflows/edit
 | `rename` | ändert IDs (`{"alt": "neu"}`) in der Action, in `from`/`to` aller Links und im `layout`; nur allein, nicht zusammen mit anderen Änderungen |
 | `addLinks` | hängt Links an (`from`, `to`, optional `when`: `success`, `failure`, `always`, `loop`, `disabled`), im Flow-Stil `- { from: a, to: b }` |
 | `deleteLinks` | entfernt Links über ihre Nummer in der Liste (ab 0, wie `$.links[i]`) |
-| `updateLinks` | setzt die Bedingung (`[{"index": 2, "when": "failure"}]`); `success` entfernt `when:` |
+| `updateLinks` | ändert Links über ihre Nummer: `when` (`success` entfernt `when:`), `loop`, `disabled` – nur die angegebenen Felder, z. B. `[{"index": 2, "when": "failure"}]` oder `[{"index": 0, "disabled": true}]` |
+| `setWorkflow` | ändert ein Feld des Workflows selbst (`[{"field": "description", "value": "…"}]`): `name`, `description`, `settings.timeout`, `settings.maxConcurrentRuns`; `null` entfernt es. Eine fehlende Description kommt hinter `name:`, fehlende Settings vor `actions:` |
 | `set` | ändert ein Feld einer Action (`[{"id": "combine", "field": "with.message", "value": "Done"}]`); erlaubt sind `description`, `timeout`, `continueOnError`, `join`, `joinTimeout`, `retry.attempts`, `retry.backoff`, `retry.strategy` und `with.<name>`. Werte: Text, Zahl oder `true`/`false`; `null` entfernt das Feld (mit dem letzten Eintrag auch `with:` bzw. `retry:`). Mehrzeilige Texte werden als `\|`-Block geschrieben, Texte, die YAML anders lesen würde (`true`, `1`, `a: b`), in Anführungszeichen; ein Kommentar am Zeilenende bleibt erhalten. Höchstens ein Feld je Action und Anfrage |
 
 Fehlende Listen (`actions:`, `links:`, `layout:`) werden angelegt. Listen im Flow-Stil (`actions: [ … ]`) mit Einträgen
