@@ -374,7 +374,8 @@ links:
 		t.Fatalf("want model.Errors, got %v", err)
 	}
 	for _, want := range []string{
-		`9:20: action "a": unknown action type "file.copy" (available: [core.abort core.log core.start core.success core.wait test.fail test.flaky test.ok])`,
+		// The list of available types grows with every new action; only check that it is shown.
+		`9:20: action "a": unknown action type "file.copy" (available: [core.abort `,
 		`10:38: action "b" (core.log): unknown field "mesage"`,
 		`15:29: link #2: an expression condition is not supported`,
 	} {

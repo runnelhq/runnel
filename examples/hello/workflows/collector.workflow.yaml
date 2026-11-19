@@ -1,0 +1,49 @@
+# core.dummy as collection point. Run it with:
+#   runnel run -v examples/hello/workflows/collector.workflow.yaml
+# Three checks run in parallel and are collected by "checks-done" (join: all).
+# The following steps hang off the dummy only: adding or removing a check changes
+# just the links into "checks-done", not the rest of the workflow.
+kind: Workflow
+apiVersion: runnel/v1
+name: collector
+actions:
+  - id: start
+    type: core.start
+  - id: check-inbox
+    type: core.wait
+    with:
+      duration: 300ms
+  - id: check-archive
+    type: core.wait
+    with:
+      duration: 200ms
+  - id: check-network
+    type: core.wait
+    with:
+      duration: 100ms
+  - id: checks-done
+    type: core.dummy
+    join: all
+  - id: report
+    type: core.log
+    with:
+      message: All checks finished
+  - id: done
+    type: core.success
+links:
+  - { from: start, to: check-inbox }
+  - { from: start, to: check-archive }
+  - { from: start, to: check-network }
+  - { from: check-inbox, to: checks-done }
+  - { from: check-archive, to: checks-done }
+  - { from: check-network, to: checks-done }
+  - { from: checks-done, to: report }
+  - { from: report, to: done }
+layout:
+  start:         { x: 40,  y: 200 }
+  check-inbox:   { x: 200, y: 80 }
+  check-archive: { x: 200, y: 200 }
+  check-network: { x: 200, y: 320 }
+  checks-done:   { x: 380, y: 200 }
+  report:        { x: 520, y: 200 }
+  done:          { x: 660, y: 200 }

@@ -2,7 +2,7 @@
 
 | Ordner | Inhalt |
 |---|---|
-| [`hello/`](hello/) | Kleines Projekt mit zwei Environments (`dev`, `prod`) und einem gültigen Workflow |
+| [`hello/`](hello/) | Kleines Projekt mit zwei Environments (`dev`, `prod`); Workflows: `hello` (Variablen, Outputs), `parallel` (parallele Zweige, Join, Fehlerpfad), `collector` (`core.dummy` als Sammelpunkt) |
 | [`broken/`](broken/) | Absichtlich fehlerhafte Workflows, um die Meldungen von `runnel validate` zu zeigen |
 
 ```bash

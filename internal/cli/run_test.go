@@ -188,3 +188,19 @@ links:
 		t.Errorf("exit code %d, output:\n%s", code, out)
 	}
 }
+
+func TestRunCollectorExample(t *testing.T) {
+	chdirRepoRoot(t)
+	code, out, errOut := run(t, "run", "-v", "examples/hello/workflows/collector.workflow.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr %q, output:\n%s", code, errOut, out)
+	}
+	// The dummy starts once, after all three checks.
+	if strings.Count(out, "[checks-done] started (core.dummy)") != 1 {
+		t.Errorf("checks-done should start exactly once:\n%s", out)
+	}
+	last := strings.LastIndex(out, "[check-inbox] succeeded")
+	if dummy := strings.Index(out, "[checks-done] started"); last < 0 || dummy < last {
+		t.Errorf("checks-done must start after the slowest check:\n%s", out)
+	}
+}
