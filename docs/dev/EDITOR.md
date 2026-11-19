@@ -4,7 +4,7 @@ Der Editor ist eine React-Anwendung in [`web/`](../../web). Sie wird gebaut, in 
 `runnel serve` unter `http://127.0.0.1:7300/` ausgeliefert. Mit dem Server spricht sie nur über die
 [API](API.md). Gestaltung: [Corporate Design](../../design/README.md), freigegebene [Mockups](../../design/mockups/README.md).
 
-> Stand: E4a (Gerüst: Kopfzeile, Farbschema, Verbindungsstatus). Explorer, Tabs und YAML-Ansicht folgen mit E4b.
+> Stand: E4b – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Tabs, Datei nur lesend. Der Canvas folgt mit E5.
 
 ## Voraussetzungen
 
@@ -33,8 +33,10 @@ web/
   index.html            # Einstieg
   src/
     main.tsx            # React-Start
-    App.tsx             # Gerüst: Kopfzeile, Hauptbereich, Statusleiste
+    App.tsx             # Gerüst: Kopfzeile, Explorer, Tabs, Datei, Statusleiste
     api.ts              # API-Zugriff, Verbindung (Server-Sent Events)
+    files.ts            # Projektbaum, Dateien laden, Kodierung erkennen
+    yaml.ts             # Hervorhebung für die Nur-lesen-Ansicht (zeilenweise, ohne Abhängigkeit)
     theme.ts            # Farbschema (System/Light/Dark, gespeichert im Browser)
     index.css           # Tailwind + Design-Tokens + Schriften
     components/         # eine Datei je Komponente
@@ -56,6 +58,15 @@ design/fonts/           # Inter, JetBrains Mono (woff2, OFL) – lokal, kein Sch
   Was in den Build eingeht (`dependencies`), landet automatisch in `THIRD_PARTY_NOTICES.txt` und in der SBOM;
   Werkzeuge gehören in `devDependencies`.
 - **Tests:** Jede sichtbare Funktion bekommt einen Playwright-Test gegen den echten Server (`web/e2e/`).
+
+## Verhalten
+
+| Thema | Umsetzung |
+|---|---|
+| Laden | Projekt, Version und Baum beim Start und nach jeder Wiederverbindung; geöffnete Dateien werden nach einer Wiederverbindung neu geladen |
+| Kodierung | wie der Runner: UTF-8 (mit/ohne BOM), UTF-16 mit BOM; sonst Anzeige als Windows-1252. Die Statusleiste nennt die erkannte Kodierung |
+| Hervorhebung | nur YAML-Dateien; `${…}` und `{{ … }}` in der Ausdrucksfarbe (Entscheidung zum Mockup E4) |
+| Pfad kopieren | vollständiger Pfad mit dem Trennzeichen des Projektordners (`\` unter Windows) |
 
 ## Auslieferung
 
