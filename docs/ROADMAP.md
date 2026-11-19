@@ -55,7 +55,7 @@ werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 ---
 
-## Phase 0.2 – Editor-Grundlage
+## Phase 0.2 – Editor-Grundlage ✅
 
 Ziel: Workflows im Browser entwerfen, prüfen, ausführen und beobachten. Die vorhandenen Core-Actions reichen dafür;
 neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsdialog.
@@ -72,7 +72,6 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | E6b ✅ | Knoten und Links anlegen | Mockup: [`design/mockups/e6b-create.html`](../design/mockups/e6b-create.html). Palette aus `/catalog` unter dem Explorer (nach Kategorie, Suche mit `/`), Knoten per Drag & Drop mit automatischer ID (`log-1` …) und sofortigem Umbenennen (auch per Doppelklick), Links zwischen Ports ziehen (Rückwärts-Links mit `loop: true`), Link-Menü für Typ (On success / On failure / Always) und Löschen | Playwright |
 | E7a ✅ | Eigenschaften einer Action | Mockup: [`design/mockups/e7-properties.html`](../design/mockups/e7-properties.html). Panel „Properties“ rechts: ID, Description, Konfiguration als Formular aus dem Schema (E1, neues Format `runnel-text` für mehrzeilige Texte), Timeout, Retry, Continue on error, Join; Änderungen nach kurzer Tipp-Pause, je Feld ein Rückgängig-Schritt; Meldungen am Feld; Workflows mit ungültigen Feldern bleiben auf dem Canvas | Playwright |
 | E7b ✅ | Links, Workflow, Meldungen | Mockup wie E7a. Eigenschaften eines Links (Bedingung, Loop, Disabled) und des Workflows (Name, Description, Settings; Parameter und Outputs nur anzeigen); Leiste „Problems“ unter dem Canvas mit Sprung zum Feld | Playwright |
-| E7c | Parameter und Outputs | Parameter und Outputs des Workflows im Panel anlegen, ändern und löschen (Entscheidung zum Mockup E7); vorher Mockup | Playwright |
 | E8a ✅ | Ausführen im Editor | Mockup: [`design/mockups/e8-run.html`](../design/mockups/e8-run.html). Run (F5) mit gemerkten Werten, Dialog für Environment und Parameter (▾, Shift+F5), Rückfrage bei ungespeicherten Änderungen, Abbrechen (Ctrl+.), Live-Status an Actions und Links, Ergebnis in der Statusleiste | Manuell; Playwright |
 | E8b ✅ | Log und Ergebnis | Mockup wie E8a. Tab „Log“ unter dem Canvas (folgt dem Lauf, Schalter „Debug“), Ergebnis der gewählten Action im Panel mit Sprung ins Log; Zustand „wartet“ (Join) am Knoten über das neue Ereignis `action.waiting` der Engine | Go-Test der Engine; Playwright |
 
@@ -173,7 +172,7 @@ Werden bei Bedarf als eigener Schritt (je ein PR) eingeplant. Reihenfolge ist of
 | Dateitransfer | SFTP/FTP Upload/Download, ZIP/Entpacken |
 | Netzwerk-Transforms | REST-Eingabe mit Paging, HTTP-Lookup, REST-Ausgabe |
 | Datenbanken | Treiber MySQL/MariaDB, Oracle, ODBC |
-| Editor | Schmale Fenster (einklappbarer Explorer, Tablet/Laptop) – der Editor zielt zunächst auf Desktop-PCs; Einstellungsmenü, sobald es mehrere Einstellungen gibt |
+| Editor | **E7c – Parameter und Outputs** des Workflows im Panel anlegen, ändern und löschen (Entscheidung zum Mockup E7; vorher Mockup) – zurückgestellt, bis dahin in der YAML-Ansicht; schmale Fenster (einklappbarer Explorer, Tablet/Laptop) – der Editor zielt zunächst auf Desktop-PCs; Einstellungsmenü, sobald es mehrere Einstellungen gibt |
 | Transforms | Pivot/Unpivot, Feld teilen, Wertzuordnung, String-/Datum-Funktionen als eigene Transforms, Sequenz, externes Sortieren (große Datenmengen) |
 | KI ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Connections für Modell-Anbieter (Anthropic, OpenAI-kompatibel, Ollama); `ai.chat` (inkl. strukturierter Ausgabe per JSON Schema); `ai.agent` mit Werkzeugen (Workflows, Actions, MCP-Tools) und Positivliste; `mcp.call-tool` und MCP-Server als Plugin-Quelle; `core.approval` (Freigabe abwarten); Chat-Trigger mit Streaming und Gesprächsgedächtnis; Transforms `ai.chunk`, `ai.embed`, Vektor-Ausgabe (pgvector, Qdrant); MCP über HTTP (Token, später OAuth); Token-/Kosten-Erfassung und Rate-Limit je Connection; Link-Typ `tool` im Editor |
 | Plugin-SDKs | Python, C#/.NET, Node |

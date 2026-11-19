@@ -915,7 +915,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | Phase | Schritte | Ergebnis |
 |---|---|---|
 | **0.1 – Runner-Basis** ✅ | S01–S07, S05a, Q1–Q4: Projektgerüst, Workflow-Format & Validierung, Variablen, typisierte Parameter & Outputs, Engine (sequenziell, parallel/Join, Retry/Timeout/Abbruch), Core-Actions | Workflows per CLI / Aufgabenplanung |
-| **0.2 – Editor-Grundlage** | E1–E8: Action-Descriptor & Schema, Server mit Datei- und Run-API, Live-Events, Editor (Canvas, Bearbeiten, Eigenschaften, Ausführen) | Workflows visuell bauen und testen |
+| **0.2 – Editor-Grundlage** ✅ | E1–E8: Action-Descriptor & Schema, Server mit Datei- und Run-API, Live-Events, Editor (Canvas, Bearbeiten, Eigenschaften, Ausführen) | Workflows visuell bauen und testen |
 | **0.3 – Workflow-Ausbau** | S08–S11, S26, S29, S35, S36: Ausdrücke, Datei-/HTTP-Actions, Sub-Workflows, Historie, Resume, Ausdruckseditor, Teilausführung | Praxistaugliche Workflows |
 | **0.4 – Pipelines** | S12–S25a: Pipeline-Engine, Typsystem, CSV, JSON, Datenbank, Transforms, Ausführung pro Datensatz, Pipeline-Canvas | ETL per CLI und Editor |
 | **0.5 – Betrieb** | S37–S43: Trigger, Secret-Store, Netzwerkbetrieb, Windows-Dienst, Run-Konfigurationen, Wartung | Produktionsbetrieb auf Windows-Server |
