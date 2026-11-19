@@ -34,6 +34,12 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E6b | Ausdrücke als Link-Bedingung (ƒ) erst mit dem Eigenschaftsdialog (E7) bzw. den Ausdrücken (S08) |
 | E6b | Palette in der Seitenleiste unter dem Explorer |
 | E6b | Ein gezogener Link, der sonst einen Zyklus schließen würde, erhält automatisch `loop: true` (↻) |
+| E7 | Eigenschaften als festes Panel rechts neben dem Canvas statt als Dialog; mit × ausblendbar |
+| E7 | Änderungen gelten nach kurzer Tipp-Pause (0,5 s) oder beim Verlassen des Felds, ohne „Apply“; je Feldänderung ein Schritt für Rückgängig; gespeichert wird weiter mit Save/Strg+S |
+| E7 | Ausdrücke (ƒ) als Link-Bedingung erst mit S08; das Link-Panel zeigt bis dahin einen Hinweis |
+| E7 | Parameter und Outputs des Workflows in E7 nur anzeigen; Bearbeiten wird ein eigener Roadmap-Schritt |
+| E7 | Mehrzeilige Texte über das neue Schema-Format `runnel-text` (Ergänzung zu ADR 0014): wachsendes Textfeld, alle anderen Felder einzeilig |
+| E7 | Umsetzung in zwei Schritten: E7a Panel für Actions mit Prüfung am Feld, E7b Link- und Workflow-Eigenschaften und die Leiste „Problems“ |
 
 ## Screenshots erzeugen
 
