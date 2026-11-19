@@ -42,8 +42,11 @@ func (s Severity) String() string {
 
 // Error is a problem found in a file, with its location.
 type Error struct {
-	File     string
-	Pos      Position
+	File string
+	Pos  Position
+	// Path is the YAML path of the element concerned, e.g. "$.actions[2].with",
+	// if known. The editor uses it to show the problem at the right node.
+	Path     string
 	Severity Severity
 	Msg      string
 }

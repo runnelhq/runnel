@@ -1,0 +1,78 @@
+# Server-API (`runnel serve`)
+
+Stand: E2. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)). Weitere Endpunkte (Läufe, Live-Events) folgen mit E3.
+
+```bash
+runnel serve examples/hello            # Projekt im Ordner oder darüber, Port 7300
+runnel serve --port 0 .                 # freier Port; die Ausgabe nennt die Adresse
+```
+
+## Grundsätze
+
+| Thema | Regel |
+|---|---|
+| Adresse | nur `127.0.0.1` (Netzwerkbetrieb mit Zugangsschlüssel und TLS folgt mit S39) |
+| Präfix | alle Endpunkte unter `/api/v1` |
+| Format | JSON (UTF-8, eingerückt); Dateiinhalte als Rohdaten |
+| Fehler | Statuscode und `{"error": "…"}` mit englischer, verständlicher Meldung |
+| Schutz | Anfragen müssen an `localhost`, `127.0.0.1` oder `[::1]` gerichtet sein (`Host`-Header, Schutz vor DNS-Rebinding); ein `Origin`-Header muss zum Server passen (Schutz vor Anfragen fremder Webseiten). Sonst `403` |
+| Pfade | relativ zum Projektordner, Trenner `/`; versteckte Einträge (`.git`, `.env` …), `..`, `\`, `:` und unter Windows unzulässige oder reservierte Namen (`CON`, `NUL`, `COM1` …) werden mit `400` abgelehnt. Symbolische Links aus dem Projekt heraus sind nicht erreichbar |
+
+## Endpunkte
+
+| Methode | Pfad | Ergebnis |
+|---|---|---|
+| GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello"}` |
+| GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `other`; versteckte Einträge und symbolische Links fehlen |
+| GET | `/files/{path}` | Inhalt der Datei, Header `ETag` |
+| PUT | `/files/{path}` | Datei speichern (Body = Inhalt, max. 10 MiB); Antwort `{path, etag}` und Header `ETag` |
+| DELETE | `/files/{path}` | Datei löschen, `204` |
+| GET | `/catalog` | `{"actions": [Descriptor …]}` wie `runnel catalog --json` ([ADR 0014](../adr/0014-action-descriptor-schema.md)) |
+| POST | `/validate` | Workflow prüfen, siehe unten |
+
+## Konfliktschutz (ETag)
+
+Jede Datei hat ein `ETag` (Hash des Inhalts). Gespeichert wird nur, wenn sich die Datei seit dem Laden nicht geändert
+hat – egal ob durch einen anderen Browser, einen Texteditor oder `git pull` ([ADR 0005](../adr/0005-mehrbenutzerbetrieb.md)).
+
+| Anfrage | Datei existiert | Datei fehlt |
+|---|---|---|
+| `PUT` ohne `If-Match` | `428` – ETag erforderlich | `201` – angelegt (fehlende Ordner werden erzeugt) |
+| `PUT` mit passendem `If-Match` | `200` – ersetzt | – |
+| `PUT` mit anderem `If-Match` | `412` – „changed in the meantime“ | `412` – „deleted in the meantime“ |
+| `DELETE` ohne `If-Match` | `428` | `428` |
+| `DELETE` mit passendem / anderem `If-Match` | `204` / `412` | `412` |
+
+`If-Match: *` überschreibt bewusst ohne Prüfung. Gespeichert wird atomar (temporäre Datei, dann Umbenennen).
+
+## Prüfen (`/validate`)
+
+```json
+POST /api/v1/validate
+{ "path": "workflows/import.workflow.yaml", "content": "kind: Workflow\n…" }
+```
+
+`content` ist optional; ohne ihn wird die gespeicherte Datei geprüft, mit ihm der ungespeicherte Stand des Editors.
+Geprüft wird wie bei `runnel validate` (Felder, Links, Zyklen, Erreichbarkeit, Variablen gegen alle Environments,
+Projektdateien) und zusätzlich wie vor einem Lauf (unbekannte Action-Typen, Konfiguration `with:`). Derzeit nur
+Workflow-Dateien.
+
+```json
+{
+  "errors": 1,
+  "warnings": 0,
+  "problems": [
+    {
+      "file": "workflows/import.workflow.yaml",
+      "line": 7, "column": 42,
+      "path": "$.actions[2].with",
+      "severity": "error",
+      "message": "action \"greet\" (core.log): unknown field \"msg\""
+    }
+  ]
+}
+```
+
+`path` (YAML-Pfad, sofern bekannt) ordnet die Meldung einem Knoten zu: `$.actions[2]…` ist die dritte Action,
+`$.links[0]…` der erste Link.

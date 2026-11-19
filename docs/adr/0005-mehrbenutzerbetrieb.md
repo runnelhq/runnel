@@ -32,7 +32,7 @@ der Schutz erfolgt über Betriebssystem, Netzwerk und Dateirechte.
 
 | Modus | Schutz |
 |---|---|
-| Standard | Server bindet nur an `127.0.0.1` – nur lokal erreichbar, kein Schutz nötig |
+| Standard | Server bindet nur an `127.0.0.1` – nur lokal erreichbar, kein Zugangsschlüssel nötig; Anfragen müssen an `localhost`/`127.0.0.1` gerichtet sein und dürfen nicht von fremden Webseiten (`Origin`) kommen (ergänzt mit E2) |
 | Netzwerk (`--listen 0.0.0.0:7300`) | **TLS** + ein **gemeinsamer Zugangsschlüssel** für den Server (in `runnel.yaml` bzw. als Secret, nicht pro Person). Der Browser fragt ihn einmal ab und merkt ihn sich als Cookie |
 | Webhooks | Weiterhin eigenes Token bzw. HMAC-Signatur pro Webhook, unabhängig vom Zugangsschlüssel |
 | Zusätzlich möglich | Windows-Firewall (nur bestimmte Hosts) oder Reverse-Proxy (IIS, Caddy) mit eigener Anmeldung davor |

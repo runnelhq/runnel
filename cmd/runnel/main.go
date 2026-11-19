@@ -1,5 +1,5 @@
 // Command runnel is the Runnel CLI: it validates and runs workflows and pipelines
-// and (in later versions) serves the editor.
+// and serves the API for the editor.
 package main
 
 import (

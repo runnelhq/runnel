@@ -245,3 +245,27 @@ func Scope(w *Workflow, p *Project, env *Environment, params map[string]string) 
 	layers = append(layers, vars.Layer{Name: "parameters", Values: params})
 	return vars.NewScope(layers...)
 }
+
+// VarContexts returns the variable contexts to check a workflow against: one per
+// environment of the project, or only the environment named only (if not empty).
+// p may be nil (workflow without project); params are the values passed at start.
+func VarContexts(w *Workflow, p *Project, only string, params map[string]string) ([]VarContext, error) {
+	if p == nil {
+		return []VarContext{{Scope: Scope(w, nil, nil, params)}}, nil
+	}
+	envs := p.EnvironmentNames()
+	if only != "" {
+		if _, err := p.SelectEnvironment(only); err != nil {
+			return nil, err
+		}
+		envs = []string{only}
+	}
+	if len(envs) == 0 {
+		return []VarContext{{Scope: Scope(w, p, nil, params)}}, nil
+	}
+	contexts := make([]VarContext, len(envs))
+	for i, name := range envs {
+		contexts[i] = VarContext{Environment: name, Scope: Scope(w, p, p.Environments[name], params)}
+	}
+	return contexts, nil
+}

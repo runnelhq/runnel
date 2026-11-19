@@ -41,6 +41,7 @@ stehen in [AGENTS.md](AGENTS.md).
 | Thema | Dokument |
 |---|---|
 | Neue Action entwickeln | [docs/dev/ACTIONS.md](docs/dev/ACTIONS.md) |
+| Server-API | [docs/dev/API.md](docs/dev/API.md) |
 | Neue Transforms | folgt mit Roadmap-Schritt S12/S13 |
 | Plugins | folgt mit Roadmap-Schritt S49–S51 |
 | Testen, bekannte Einschränkungen | [docs/TESTPLAN.md](docs/TESTPLAN.md) |

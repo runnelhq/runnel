@@ -85,6 +85,29 @@ func (ps Properties) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// UnmarshalJSON reads properties from a JSON object, keeping their order.
+func (ps *Properties) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return fmt.Errorf("properties must be a JSON object")
+	}
+	*ps = nil
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		name, _ := tok.(string)
+		s := &Schema{}
+		if err := dec.Decode(s); err != nil {
+			return err
+		}
+		*ps = append(*ps, Property{Name: name, Schema: s})
+	}
+	_, err := dec.Token()
+	return err
+}
+
 // Lookup returns the schema of a property.
 func (ps Properties) Lookup(name string) (*Schema, bool) {
 	for _, p := range ps {

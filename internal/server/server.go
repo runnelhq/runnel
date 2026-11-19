@@ -1,0 +1,149 @@
+// Package server implements "runnel serve": the HTTP API under /api/v1 that the
+// editor uses to read and write project files, list the available actions and
+// validate workflows (docs/KONZEPT.md, chapter 10).
+//
+// The server only listens on the loopback interface. It rejects requests whose
+// Host header is not a loopback address (protection against DNS rebinding) and
+// requests from other origins (protection against cross-site requests from web pages).
+package server
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+
+	"github.com/runnelhq/runnel/internal/action"
+)
+
+// APIPrefix is the path prefix of all API endpoints.
+const APIPrefix = "/api/v1"
+
+// Options configure a server.
+type Options struct {
+	// Dir is the project directory (containing project.yaml).
+	Dir string
+	// Registry holds the available actions.
+	Registry *action.Registry
+}
+
+// Server serves the API for one project.
+type Server struct {
+	dir      string
+	root     *os.Root
+	registry *action.Registry
+	// writeMu serializes changes to files, so that the ETag check and the write
+	// happen atomically with respect to other requests of this server.
+	writeMu sync.Mutex
+}
+
+// New opens the project directory. Close releases it.
+func New(opts Options) (*Server, error) {
+	root, err := os.OpenRoot(opts.Dir)
+	if err != nil {
+		return nil, err
+	}
+	return &Server{dir: opts.Dir, root: root, registry: opts.Registry}, nil
+}
+
+// Close releases the project directory.
+func (s *Server) Close() error {
+	return s.root.Close()
+}
+
+// Handler returns the HTTP handler with all endpoints.
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET "+APIPrefix+"/projects/current", s.handleProject)
+	mux.HandleFunc("GET "+APIPrefix+"/projects/current/tree", s.handleTree)
+	mux.HandleFunc("GET "+APIPrefix+"/files/{path...}", s.handleGetFile)
+	mux.HandleFunc("PUT "+APIPrefix+"/files/{path...}", s.handlePutFile)
+	mux.HandleFunc("DELETE "+APIPrefix+"/files/{path...}", s.handleDeleteFile)
+	mux.HandleFunc("GET "+APIPrefix+"/catalog", s.handleCatalog)
+	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
+	mux.HandleFunc("GET /{$}", handleIndex)
+	mux.HandleFunc(APIPrefix+"/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown endpoint %s %s", r.Method, r.URL.Path))
+	})
+	return guard(mux)
+}
+
+// guard rejects requests that do not come from a local client of this server.
+func guard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !isLoopbackHost(r.Host) {
+			writeError(w, http.StatusForbidden, "requests must be addressed to localhost or 127.0.0.1")
+			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" && origin != "http://"+r.Host {
+			writeError(w, http.StatusForbidden, "requests from other origins are not allowed")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// isLoopbackHost reports whether a Host header names this machine's loopback interface.
+func isLoopbackHost(hostport string) bool {
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host = hostport
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
+func handleIndex(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = fmt.Fprintf(w, "Runnel server. The editor is not part of this version yet; the API is available under %s.\n", APIPrefix)
+}
+
+// apiError is the body of all error responses.
+type apiError struct {
+	Error string `json:"error"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, apiError{Error: msg})
+}
+
+// writeErr maps an error to a response; errors of type *httpError carry their status.
+func writeErr(w http.ResponseWriter, err error) {
+	var he *httpError
+	if errors.As(err, &he) {
+		writeError(w, he.status, he.msg)
+		return
+	}
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		writeError(w, http.StatusNotFound, "file not found")
+	default:
+		writeError(w, http.StatusInternalServerError, err.Error())
+	}
+}
+
+type httpError struct {
+	status int
+	msg    string
+}
+
+func (e *httpError) Error() string { return e.msg }
+
+func errorf(status int, format string, args ...any) error {
+	return &httpError{status: status, msg: fmt.Sprintf(format, args...)}
+}

@@ -107,7 +107,7 @@ func (v *validator) file(file string) error {
 		return fmt.Errorf("--env %s: no project (%s) found for %s", v.opts.env, model.ProjectFile, file)
 	}
 	if !found || p != nil {
-		contexts, err := v.varContexts(w, p)
+		contexts, err := model.VarContexts(w, p, v.opts.env, v.params)
 		if err != nil {
 			return err
 		}
@@ -140,27 +140,6 @@ func (v *validator) project(dir string) (p *model.Project, found bool, err error
 	}
 	v.projects[root] = p
 	return p, true, nil
-}
-
-func (v *validator) varContexts(w *model.Workflow, p *model.Project) ([]model.VarContext, error) {
-	if p == nil {
-		return []model.VarContext{{Scope: model.Scope(w, nil, nil, v.params)}}, nil
-	}
-	envs := p.EnvironmentNames()
-	if v.opts.env != "" {
-		if _, err := p.SelectEnvironment(v.opts.env); err != nil {
-			return nil, err
-		}
-		envs = []string{v.opts.env}
-	}
-	if len(envs) == 0 {
-		return []model.VarContext{{Scope: model.Scope(w, p, nil, v.params)}}, nil
-	}
-	contexts := make([]model.VarContext, len(envs))
-	for i, name := range envs {
-		contexts[i] = model.VarContext{Environment: name, Scope: model.Scope(w, p, p.Environments[name], v.params)}
-	}
-	return contexts, nil
 }
 
 func (v *validator) report(diags model.Errors) {
