@@ -7,7 +7,8 @@ import { expect, test, type Page } from "@playwright/test";
 test.use({ baseURL: "http://127.0.0.1:7398" });
 test.describe.configure({ mode: "serial" });
 
-const path = "workflows/parallel.workflow.yaml";
+// Its own copy of parallel.workflow.yaml: the spec files run in parallel workers on the same server.
+const path = "workflows/create.workflow.yaml";
 const fileURL = `/api/v1/files/${path}`;
 const original = readFileSync(new URL("../../examples/hello/workflows/parallel.workflow.yaml", import.meta.url), "utf8");
 
@@ -17,7 +18,7 @@ test.beforeEach(async ({ request }) => {
 
 async function open(page: Page) {
   await page.goto("/");
-  await page.getByRole("tree").getByText("parallel.workflow.yaml", { exact: true }).click();
+  await page.getByRole("tree").getByText("create.workflow.yaml", { exact: true }).click();
   await expect(page.getByTestId("node-fetch-b")).toBeVisible();
 }
 

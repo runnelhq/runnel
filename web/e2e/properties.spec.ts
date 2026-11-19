@@ -6,7 +6,8 @@ import { expect, test, type Page } from "@playwright/test";
 test.use({ baseURL: "http://127.0.0.1:7398" });
 test.describe.configure({ mode: "serial" });
 
-const path = "workflows/parallel.workflow.yaml";
+// Its own copy of parallel.workflow.yaml: the spec files run in parallel workers on the same server.
+const path = "workflows/properties.workflow.yaml";
 const fileURL = `/api/v1/files/${path}`;
 const original = readFileSync(new URL("../../examples/hello/workflows/parallel.workflow.yaml", import.meta.url), "utf8");
 
@@ -16,7 +17,7 @@ test.beforeEach(async ({ request }) => {
 
 async function open(page: Page) {
   await page.goto("/");
-  await page.getByRole("tree").getByText("parallel.workflow.yaml", { exact: true }).click();
+  await page.getByRole("tree").getByText("properties.workflow.yaml", { exact: true }).click();
   await expect(page.getByTestId("node-fetch-b")).toBeVisible();
 }
 
@@ -40,7 +41,7 @@ test("shows the properties of the selected action", async ({ page }) => {
   await open(page);
   await expect(panel(page)).toContainText("Select an action to see its properties.");
   // With the panel, the file bar is compact (mockup E7).
-  await expect(page.getByTestId("crumbs")).toHaveText("parallel.workflow.yaml");
+  await expect(page.getByTestId("crumbs")).toHaveText("properties.workflow.yaml");
   await expect(page.getByRole("button", { name: "Copy path" })).toBeVisible();
 
   await select(page, "combine");
@@ -63,7 +64,7 @@ test("shows the properties of the selected action", async ({ page }) => {
   await expect(panel(page)).toContainText("2 actions selected");
   await page.getByRole("button", { name: "Hide properties" }).click();
   await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByTestId("crumbs")).toHaveText("workflows / parallel.workflow.yaml");
+  await expect(page.getByTestId("crumbs")).toHaveText("workflows / properties.workflow.yaml");
   await page.getByRole("button", { name: "Show properties" }).click();
   await expect(panel(page)).toBeVisible();
 });
