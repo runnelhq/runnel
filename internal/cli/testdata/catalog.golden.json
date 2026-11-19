@@ -43,6 +43,7 @@
           "message": {
             "type": "string",
             "description": "Text to write; may span several lines",
+            "format": "runnel-text",
             "examples": [
               "Import finished"
             ]

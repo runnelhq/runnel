@@ -159,6 +159,13 @@ export const LayoutIcon = (p: P) => (
   </Icon>
 );
 
+export const PanelIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M15 4v16" />
+  </Icon>
+);
+
 export const SearchIcon = (p: P) => (
   <Icon {...p}>
     <circle cx="11" cy="11" r="6" />

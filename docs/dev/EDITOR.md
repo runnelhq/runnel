@@ -4,7 +4,7 @@ Der Editor ist eine React-Anwendung in [`web/`](../../web). Sie wird gebaut, in 
 `runnel serve` unter `http://127.0.0.1:7300/` ausgeliefert. Mit dem Server spricht sie nur über die
 [API](API.md). Gestaltung: [Corporate Design](../../design/README.md), freigegebene [Mockups](../../design/mockups/README.md).
 
-> Stand: E6b – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Palette, Tabs, Workflows als Canvas mit Anlegen, Umbenennen, Verbinden, Verschieben, Löschen, Rückgängig und Speichern. Der Eigenschaftsdialog folgt mit E7.
+> Stand: E7a – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Palette, Tabs, Workflows als Canvas mit Anlegen, Umbenennen, Verbinden, Verschieben, Löschen, Rückgängig und Speichern; Eigenschaften einer Action im Panel. Eigenschaften von Links und Workflow und die Leiste „Problems“ folgen mit E7b.
 
 ## Voraussetzungen
 
@@ -75,6 +75,9 @@ design/fonts/           # Inter, JetBrains Mono (woff2, OFL) – lokal, kein Sch
 | Anlegen | Ablegen auf dem Canvas (HTML-Drag-and-drop, Vorschaukarte im 8-px-Raster); die ID ist der Typname mit der kleinsten freien Nummer (`log-1`). Danach ist die ID ein Eingabefeld: Enter benennt um, Esc behält die ID; später per Doppelklick auf die ID. Neue Actions haben noch keine Konfiguration (`with:`), Pflichtfelder erscheinen als Meldung bis zum Eigenschaftsdialog (E7) |
 | Verbinden | Vom Ausgang (rechts) zum Eingang (links) ziehen; neue Links sind „On success“. Würde der Link einen Zyklus schließen, erhält er `loop: true` (↻). Links auf sich selbst und doppelte Links werden nicht angelegt |
 | Link-Menü | Klick auf das Link-Symbol oder den Link: On success / On failure / Always, Delete link; ein gewählter Link wird auch mit Entf gelöscht. Ausdrücke (ƒ) folgen mit E7/S08 |
+| Eigenschaften | `components/PropertiesPanel.tsx` rechts neben dem Canvas (mit × ausblendbar, „Show properties“ in der Dateileiste blendet es wieder ein); mit Panel ist die Dateileiste kompakter (Dateiname, Pfad im Tooltip, „Copy path“ als Symbol). Für die gewählte Action: ID, Description, Konfiguration als Formular aus dem Schema des Descriptors (`enum` → Auswahl, Boolean → Kontrollkästchen, Zahlen, `runnel-duration`, `runnel-text` → wachsendes Textfeld; Listen und verschachtelte Werte nur in der YAML-Ansicht), Timeout, Retry, Continue on error, Join (nur bei mehreren eingehenden Links) |
+| Übernehmen | Textfelder nach 0,5 s Tipp-Pause, beim Verlassen oder mit Enter; Auswahl, Kontrollkästchen und Schalter sofort. Leere Felder werden aus der Datei entfernt. Mehrere Änderungen desselben Felds hintereinander sind ein Schritt für Rückgängig. Zahlen, die keine sind (z. B. Retry „x“), werden nicht geschrieben, sondern am Feld gemeldet |
+| Meldungen am Feld | aus `/validate` über den YAML-Pfad (`$.actions[i].timeout`, `$.actions[i].with` + Feldname); übrige Meldungen der Action oben im Panel. Solange das Panel offen ist, zeigt der Knoten kein eigenes Meldungsfenster |
 | Bearbeiten | Jede Änderung (verschieben mit 8-px-Raster, löschen, anlegen, umbenennen, Links) geht an `POST /workflows/edit`, nacheinander; der Server ändert den Text zeilengenau. Rückgängig/Wiederholen speichern Textstände (bis 100). Ungespeicherte Änderungen bleiben beim Tab-Wechsel erhalten; ein Neuladen nach Wiederverbindung überschreibt sie nie |
 | Speichern | `PUT /files/{path}` mit dem ETag des geladenen Stands; `412` öffnet den Konfliktdialog (Cancel, Reload, Overwrite = `If-Match: *`). Speichern wartet auf eine noch laufende Änderung. Gespeichert wird als UTF-8 – auch Dateien, die als UTF-16 oder Windows-1252 geöffnet wurden |
 | Schließen | Tab mit ungespeicherten Änderungen: Rückfrage Save / Don’t save / Cancel; beim Verlassen der Seite fragt der Browser |

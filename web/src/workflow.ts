@@ -7,7 +7,12 @@ export interface Action {
   id: string;
   type: string;
   description?: string;
-  join?: "all" | "first" | "each";
+  with?: Record<string, unknown>;
+  timeout?: string;
+  retry?: { attempts?: number; backoff?: string; strategy?: string };
+  continueOnError?: boolean;
+  join?: string;
+  joinTimeout?: string;
 }
 
 export interface Link {
@@ -134,6 +139,8 @@ export interface WorkflowEdit {
   addLinks?: Link[];
   deleteLinks?: number[];
   updateLinks?: { index: number; when: "success" | "failure" | "always" }[];
+  /** Changes one field of an action (properties panel); null removes the field. */
+  set?: { id: string; field: string; value: string | number | boolean | null }[];
 }
 
 /** Allowed action ids (as checked by the server). */

@@ -115,6 +115,13 @@ func TestEditWorkflowErrors(t *testing.T) {
 		{editSource, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 0, When: "maybe"}}}, "not supported here"},
 		{strings.Replace(editSource, "actions:\n", "links2: x\nactions:\n", 1), WorkflowEdit{}, "unknown field"},
 		{"kind: Workflow\napiVersion: runnel/v1\nname: x\nactions: [{ id: a, type: core.start }]\n", WorkflowEdit{Add: []NewAction{{ID: "b", Type: "core.log"}}}, "flow style"},
+		{editSource, WorkflowEdit{Set: []SetField{{ID: "nope", Field: "timeout", Value: "1s"}}}, `cannot change action "nope": it does not exist`},
+		{editSource, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "type", Value: "core.log"}}}, `field "type" cannot be changed here`},
+		{editSource, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "with.a b", Value: "x"}}}, `cannot be changed here`},
+		{editSource, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "with.a", Value: []any{1}}}}, "only a text, a number or true/false"},
+		{editSource, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "timeout", Value: "1s"}, {ID: "wait", Field: "join", Value: "first"}}}, "only one field per action"},
+		{editSource, WorkflowEdit{Set: []SetField{{ID: "done", Field: "timeout", Value: "1s"}}}, "flow style"},
+		{editSource, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "with.duration", Value: "1s"}}, Rename: map[string]string{"wait": "w"}}, "cannot be combined"},
 	} {
 		if _, err := EditWorkflow("x.workflow.yaml", []byte(tt.src), tt.edit); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("error %v, want containing %q", err, tt.want)
@@ -186,6 +193,76 @@ func TestEditWorkflowRename(t *testing.T) {
 	want = strings.Replace(want, "  wait:   { x: 280", "  pause:   { x: 280", 1)
 	if got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestEditWorkflowSet(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		set  SetField
+		old  string
+		new  string
+	}{
+		{"replace a value, keep its comment", SetField{ID: "wait", Field: "with.duration", Value: "5m"},
+			"      duration: 1s   # short\n", "      duration: 5m   # short\n"},
+		{"add a field to with", SetField{ID: "wait", Field: "with.label", Value: "x: y"},
+			"      duration: 1s   # short\n", "      duration: 1s   # short\n      label: \"x: y\"\n"},
+		{"add a top-level field", SetField{ID: "wait", Field: "timeout", Value: "30s"},
+			"      duration: 1s   # short\n", "      duration: 1s   # short\n    timeout: 30s\n"},
+		{"create with", SetField{ID: "start", Field: "with.note", Value: "${GREETING}"},
+			"    type: core.start\n", "    type: core.start\n    with:\n      note: ${GREETING}\n"},
+		{"create retry", SetField{ID: "start", Field: "retry.attempts", Value: float64(3)},
+			"    type: core.start\n", "    type: core.start\n    retry:\n      attempts: 3\n"},
+		{"booleans", SetField{ID: "start", Field: "continueOnError", Value: true},
+			"    type: core.start\n", "    type: core.start\n    continueOnError: true\n"},
+		{"multi-line text as literal block", SetField{ID: "wait", Field: "with.duration", Value: "a\n\nb\n"},
+			"      duration: 1s   # short\n", "      duration: |\n        a\n\n        b\n"},
+		{"replace a literal block", SetField{ID: "report", Field: "with.message", Value: "one line"},
+			"      message: |\n        line one\n        line two\n", "      message: one line\n"},
+		{"quote texts YAML would read differently", SetField{ID: "report", Field: "with.message", Value: "true"},
+			"      message: |\n        line one\n        line two\n", "      message: \"true\"\n"},
+		{"remove the last entry removes with", SetField{ID: "wait", Field: "with.duration"},
+			"    with:\n      duration: 1s   # short\n", ""},
+		{"removing a missing field changes nothing", SetField{ID: "wait", Field: "timeout"}, "", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := edit(t, editSource, WorkflowEdit{Set: []SetField{tt.set}})
+			want := strings.Replace(editSource, tt.old, tt.new, 1)
+			if got != want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+
+	// Two entries in "with": only the one is removed.
+	src := strings.Replace(editSource, "      duration: 1s   # short\n", "      duration: 1s   # short\n      note: x\n", 1)
+	got := edit(t, src, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "with.note"}}})
+	if got != editSource {
+		t.Errorf("got:\n%s", got)
+	}
+	// The comment after a quoted value is kept as well.
+	src = strings.Replace(editSource, "      duration: 1s   # short\n", "      duration: \"1s # x\"  # short\n", 1)
+	got = edit(t, src, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "with.duration", Value: "2s"}}})
+	if !strings.Contains(got, "      duration: 2s  # short\n") {
+		t.Errorf("got:\n%s", got)
+	}
+	// "with: {}" is replaced.
+	src = strings.Replace(editSource, "    type: core.start\n", "    type: core.start\n    with: {}\n", 1)
+	got = edit(t, src, WorkflowEdit{Set: []SetField{{ID: "start", Field: "with.a", Value: "b"}}})
+	if !strings.Contains(got, "    type: core.start\n    with:\n      a: b\n") {
+		t.Errorf("got:\n%s", got)
+	}
+}
+
+func TestEditWorkflowWithFieldErrors(t *testing.T) {
+	// A workflow with an invalid field can still be edited, e.g. to fix the field.
+	src := strings.Replace(editSource, "      duration: 1s   # short\n", "      duration: 1s   # short\n    timeout: 5 mins\n", 1)
+	got := edit(t, src, WorkflowEdit{Set: []SetField{{ID: "wait", Field: "timeout", Value: "5m"}}})
+	if !strings.Contains(got, "    timeout: 5m\n") {
+		t.Errorf("got:\n%s", got)
+	}
+	if _, err := ParseWorkflow("x", []byte(got)); err != nil {
+		t.Errorf("result does not parse: %v", err)
 	}
 }
 

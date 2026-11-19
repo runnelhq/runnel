@@ -4,9 +4,10 @@ import { editWorkflow, validate, type Link, type Validation, type WorkflowEdit }
 import { Canvas } from "./Canvas";
 import { CodeView } from "./CodeView";
 import { Dialog } from "./Dialog";
+import { PropertiesPanel, type FieldValue } from "./PropertiesPanel";
 import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
-import { CodeIcon, CopyIcon, LockIcon, RedoIcon, ReloadIcon, SaveIcon, UndoIcon, WorkflowIcon } from "./Icons";
+import { CodeIcon, CopyIcon, LockIcon, PanelIcon, RedoIcon, ReloadIcon, SaveIcon, UndoIcon, WorkflowIcon } from "./Icons";
 
 type View = "canvas" | "yaml";
 
@@ -62,6 +63,8 @@ export function FileView(props: {
   const [conflict, setConflict] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [selection, setSelection] = useState<string[]>([]);
+  const [panel, setPanel] = useState(true);
 
   const doc = state.status === "loaded" ? state.doc : null;
   const dirty = doc !== null && doc.text !== doc.saved;
@@ -127,11 +130,16 @@ export function FileView(props: {
 
   const docRef = useRef<Doc | null>(null);
   docRef.current = doc;
-  const setText = useCallback((next: string, history: "push" | "undo" | "redo") => {
+  // Key of the field changed last: further changes of it are one undo step (decision for mockup E7).
+  const lastField = useRef<string | null>(null);
+  const setText = useCallback((next: string, history: "push" | "undo" | "redo" | "merge") => {
     const current = docRef.current;
     if (!current || current.text === next) return;
     const prev = current.text;
-    if (history === "push") {
+    if (history !== "merge") lastField.current = null;
+    if (history === "merge") {
+      setRedo([]);
+    } else if (history === "push") {
       setUndo((u) => [...u.slice(-historyLimit + 1), prev]);
       setRedo([]);
     } else if (history === "undo") {
@@ -148,14 +156,16 @@ export function FileView(props: {
   // The edits on their way to the server, one after the other; saving waits for them.
   const pending = useRef<Promise<unknown> | null>(null);
   const applyEdit = useCallback(
-    (edit: WorkflowEdit): Promise<string | null> => {
+    (edit: WorkflowEdit, field?: string): Promise<string | null> => {
       const run = async () => {
         await pending.current?.catch(() => undefined);
         const current = docRef.current;
         if (!current) return null;
         try {
           const next = await editWorkflow(path, current.text, edit);
-          setText(next, "push");
+          const merge = field !== undefined && lastField.current === field;
+          setText(next, merge ? "merge" : "push");
+          lastField.current = field ?? null;
           setEditError(null);
           return next;
         } catch (err) {
@@ -198,6 +208,21 @@ export function FileView(props: {
   );
   const onRename = useCallback((from: string, to: string) => void applyEdit({ rename: { [from]: to } }), [applyEdit]);
   const onConnect = useCallback((link: Link) => void applyEdit({ addLinks: [link] }), [applyEdit]);
+  // While a rename from the panel is on its way, the canvas briefly has no selection; keep the new id.
+  const renamedTo = useRef<string | null>(null);
+  const onSelect = useCallback((ids: string[]) => {
+    const to = renamedTo.current;
+    if (to && !ids.includes(to)) {
+      if (ids.length === 0) return;
+      renamedTo.current = null;
+    }
+    if (to && ids.includes(to)) renamedTo.current = null;
+    setSelection((s) => (s.length === ids.length && s.every((id, i) => id === ids[i]) ? s : ids));
+  }, []);
+  const onSet = useCallback(
+    (id: string, field: string, value: FieldValue) => void applyEdit({ set: [{ id, field, value }] }, `${id}:${field}`),
+    [applyEdit],
+  );
   const onLinkKind = useCallback(
     (index: number, when: SettableKind) => void applyEdit({ updateLinks: [{ index, when }] }),
     [applyEdit],
@@ -306,11 +331,13 @@ export function FileView(props: {
 
   const slash = path.lastIndexOf("/");
   const editable = isWorkflow && !!validation?.workflow;
+  // The properties panel (mockup E7) takes room; the file bar is then more compact.
+  const showPanel = editable && view === "canvas" && panel;
   return (
     <>
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-4">
-        <span className="font-mono text-xs text-muted-foreground" data-testid="crumbs">
-          {slash >= 0 && `${path.slice(0, slash).split("/").join(" / ")} / `}
+        <span className="font-mono text-xs whitespace-nowrap text-muted-foreground" data-testid="crumbs" title={path}>
+          {slash >= 0 && !showPanel && `${path.slice(0, slash).split("/").join(" / ")} / `}
           <b className="font-medium text-foreground">{path.slice(slash + 1)}</b>
         </span>
         <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
@@ -349,12 +376,17 @@ export function FileView(props: {
               className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 text-xs font-medium text-primary-foreground disabled:cursor-default disabled:opacity-50"
             >
               <SaveIcon width={14} height={14} />
-              Save <kbd className="font-mono text-[10px] opacity-75">Ctrl+S</kbd>
+              Save {!showPanel && <kbd className="font-mono text-[10px] opacity-75">Ctrl+S</kbd>}
             </button>
             <ViewSwitch view={view} onView={setView} />
+            {editable && view === "canvas" && !panel && (
+              <IconButton title="Show properties" onClick={() => setPanel(true)}>
+                <PanelIcon width={14} height={14} />
+              </IconButton>
+            )}
           </>
         )}
-        <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} />
+        <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} compact={showPanel} />
       </div>
       {editError && (
         <div role="alert" className="flex shrink-0 items-center gap-3 border-b border-border bg-danger-soft px-4 py-1.5 text-xs text-destructive">
@@ -364,7 +396,8 @@ export function FileView(props: {
           </button>
         </div>
       )}
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {!doc ? (
           <div className="flex-1" aria-busy="true" />
         ) : view === "yaml" ? (
@@ -382,6 +415,9 @@ export function FileView(props: {
             onLinkKind={editable ? onLinkKind : undefined}
             renaming={renaming}
             onRenaming={setRenaming}
+            onSelect={onSelect}
+            selection={selection}
+            problemsInPanel={showPanel}
           />
         ) : validation ? (
           <NotAGraph path={path} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
@@ -405,6 +441,21 @@ export function FileView(props: {
             </SmallButton>
           </div>
         )}
+      </div>
+      {showPanel && validation?.workflow && (
+        <PropertiesPanel
+          workflow={validation.workflow}
+          selected={selection}
+          problems={validation.problems}
+          onSet={onSet}
+          onRename={(from, to) => {
+            renamedTo.current = to;
+            setSelection([to]);
+            onRename(from, to);
+          }}
+          onHide={() => setPanel(false)}
+        />
+      )}
       </div>
       {conflict && (
         <Dialog
@@ -535,11 +586,12 @@ function IconButton(props: { children: React.ReactNode; title: string; disabled?
   );
 }
 
-function SmallButton(props: { children: React.ReactNode; onClick: () => void; title?: string }) {
+function SmallButton(props: { children: React.ReactNode; onClick: () => void; title?: string; ariaLabel?: string }) {
   return (
     <button
       type="button"
       title={props.title}
+      aria-label={props.ariaLabel}
       onClick={props.onClick}
       className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted"
     >
@@ -548,7 +600,7 @@ function SmallButton(props: { children: React.ReactNode; onClick: () => void; ti
   );
 }
 
-function CopyPath(props: { path: string }) {
+function CopyPath(props: { path: string; compact?: boolean }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -558,10 +610,11 @@ function CopyPath(props: { path: string }) {
   return (
     <SmallButton
       title="Copy the file path"
+      ariaLabel={props.compact ? (copied ? "Copied" : "Copy path") : undefined}
       onClick={() => navigator.clipboard.writeText(props.path).then(() => setCopied(true), () => setCopied(false))}
     >
-      <CopyIcon width={14} height={14} />
-      {copied ? "✔ Copied" : "Copy path"}
+      {copied && props.compact ? "✔" : <CopyIcon width={14} height={14} />}
+      {!props.compact && (copied ? "✔ Copied" : "Copy path")}
     </SmallButton>
   );
 }

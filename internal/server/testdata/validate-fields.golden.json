@@ -1,0 +1,48 @@
+{
+  "errors": 2,
+  "warnings": 0,
+  "problems": [
+    {
+      "file": "workflows/import.workflow.yaml",
+      "line": 5,
+      "column": 45,
+      "path": "$.actions[0].timeout",
+      "severity": "error",
+      "message": "action \"start\" timeout: invalid duration \"5 mins\" (examples: 30s, 5m, 2h, 1h30m)"
+    },
+    {
+      "file": "workflows/import.workflow.yaml",
+      "line": 5,
+      "column": 59,
+      "path": "$.actions[0].join",
+      "severity": "error",
+      "message": "action \"start\": invalid join \"some\" (expected all, first or each)"
+    }
+  ],
+  "workflow": {
+    "kind": "Workflow",
+    "apiVersion": "runnel/v1",
+    "name": "import",
+    "actions": [
+      {
+        "id": "start",
+        "type": "core.start",
+        "timeout": "5 mins",
+        "join": "some"
+      },
+      {
+        "id": "greet",
+        "type": "core.log",
+        "with": {
+          "message": "Hello ${TARGET}"
+        }
+      }
+    ],
+    "links": [
+      {
+        "from": "start",
+        "to": "greet"
+      }
+    ]
+  }
+}

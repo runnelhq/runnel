@@ -68,7 +68,12 @@ test("shows problems at the actions and jumps to the YAML line", async ({ page }
   await expect(page.getByTestId("error-count")).toHaveText("✖ 1");
   await expect(page.getByTestId("warning-count")).toHaveText("⚠ 1");
 
+  // With the properties panel (E7a), the problems are shown there; the popover at the node
+  // is shown when the panel is hidden.
   await canvas.getByTestId("node-fetch-b").click();
+  await expect(page.getByRole("region", { name: "Properties" })).toContainText('unknown action type "core.wiat"');
+  await expect(page.getByRole("dialog", { name: "Problems of fetch-b" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Hide properties" }).click();
   const dialog = page.getByRole("dialog", { name: "Problems of fetch-b" });
   await expect(dialog).toContainText('unknown action type "core.wiat"');
   await dialog.getByRole("button", { name: "Show in YAML ›" }).click();

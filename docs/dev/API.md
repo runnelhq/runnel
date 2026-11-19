@@ -1,6 +1,6 @@
 # Server-API (`runnel serve`)
 
-Stand: E6b. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+Stand: E7a. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
 ([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)).
 
 ```bash
@@ -86,7 +86,9 @@ Workflow-Dateien.
 `path` (YAML-Pfad, sofern bekannt) ordnet die Meldung einem Knoten zu: `$.actions[2]…` ist die dritte Action,
 `$.links[0]…` der erste Link. Auch Meldungen zu Variablen tragen den Pfad des Werts, z. B. `$.actions[3].with.message`.
 
-Lässt sich die Datei als Workflow lesen (keine Syntax- oder Feldfehler), enthält die Antwort zusätzlich `workflow`: das
+Lässt sich die Datei als Workflow lesen (keine Syntaxfehler, falschen Typen oder unbekannten Felder), enthält die
+Antwort zusätzlich `workflow` – seit E7a auch bei ungültigen Feldwerten wie `timeout: 5 mins`, damit der Editor die
+Meldung am Feld zeigen kann: das
 geparste Modell mit `name`, `actions` (`id`, `type`, `join`, `with` …), `links` (`from`, `to`, `when`, `loop`,
 `disabled`) und `layout` (Koordinaten je Action-ID in Pixeln, linke obere Ecke). Der Canvas des Editors baut darauf
 auf; der Editor braucht so keinen eigenen YAML-Parser.
@@ -184,6 +186,7 @@ POST /api/v1/workflows/edit
 | `addLinks` | hängt Links an (`from`, `to`, optional `when`: `success`, `failure`, `always`, `loop`, `disabled`), im Flow-Stil `- { from: a, to: b }` |
 | `deleteLinks` | entfernt Links über ihre Nummer in der Liste (ab 0, wie `$.links[i]`) |
 | `updateLinks` | setzt die Bedingung (`[{"index": 2, "when": "failure"}]`); `success` entfernt `when:` |
+| `set` | ändert ein Feld einer Action (`[{"id": "combine", "field": "with.message", "value": "Done"}]`); erlaubt sind `description`, `timeout`, `continueOnError`, `join`, `joinTimeout`, `retry.attempts`, `retry.backoff`, `retry.strategy` und `with.<name>`. Werte: Text, Zahl oder `true`/`false`; `null` entfernt das Feld (mit dem letzten Eintrag auch `with:` bzw. `retry:`). Mehrzeilige Texte werden als `\|`-Block geschrieben, Texte, die YAML anders lesen würde (`true`, `1`, `a: b`), in Anführungszeichen; ein Kommentar am Zeilenende bleibt erhalten. Höchstens ein Feld je Action und Anfrage |
 
 Fehlende Listen (`actions:`, `links:`, `layout:`) werden angelegt. Listen im Flow-Stil (`actions: [ … ]`) mit Einträgen
 lassen sich nicht ergänzen; die Fehlermeldung sagt, was im Text zu ändern ist. Geänderte Links schreibt der
@@ -192,5 +195,6 @@ Server neu (einzeilige Links bleiben einzeilig, mit ihrem Kommentar).
 Geändert werden **nur die betroffenen Zeilen** (Positionen aus dem Syntaxbaum); Kommentare, Reihenfolge, Anführungszeichen,
 Flow- oder Block-Stil und Zeilenenden (LF/CRLF) aller anderen Zeilen bleiben erhalten – ein gespeicherter Stand ergibt
 einen kleinen Git-Diff. Antworten: `400` für unbekannte oder ungültige Action-IDs, unbekannte Links und nicht
-unterstützte Bedingungen, `422` (Format wie `/validate`), wenn die Datei nicht als Workflow lesbar ist.
+unterstützte Bedingungen, `422` (Format wie `/validate`), wenn die Datei nicht als Workflow lesbar ist. Ungültige
+Feldwerte verhindern das Bearbeiten nicht – sie lassen sich so im Panel korrigieren.
 

@@ -3,11 +3,13 @@ package model
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 )
 
@@ -28,7 +30,27 @@ type WorkflowEdit struct {
 	DeleteLinks []int `json:"deleteLinks,omitempty"`
 	// UpdateLinks changes the condition of links.
 	UpdateLinks []LinkUpdate `json:"updateLinks,omitempty"`
+	// Set changes fields of actions (properties panel, E7a); at most one per action.
+	Set []SetField `json:"set,omitempty"`
 }
+
+// SetField sets a field of an action to a value; a nil value removes the field.
+type SetField struct {
+	ID string `json:"id"`
+	// Field is one of description, timeout, continueOnError, join, joinTimeout,
+	// retry.attempts, retry.backoff, retry.strategy or with.<name>.
+	Field string `json:"field"`
+	// Value is a text, a number or true/false.
+	Value any `json:"value"`
+}
+
+var (
+	settableFields = map[string]bool{
+		"description": true, "timeout": true, "continueOnError": true, "join": true, "joinTimeout": true,
+		"retry.attempts": true, "retry.backoff": true, "retry.strategy": true,
+	}
+	configKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+)
 
 // NewAction is an action added on the canvas.
 type NewAction struct {
@@ -46,7 +68,7 @@ type LinkUpdate struct {
 // EditWorkflow applies an edit to the text of a workflow file and returns the new text.
 // Only the lines concerned are changed: comments, order, quoting and formatting of
 // everything else stay as they are, so that a saved file gives a small Git diff.
-// The workflow must be readable (no syntax or field errors).
+// The workflow must be readable (no syntax errors, wrong types or unknown fields).
 func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 	text := string(data)
 	eol := "\n"
@@ -55,8 +77,9 @@ func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 	}
 	// Line numbers of the parser refer to LF line endings; CRLF is restored when joining.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
-	w, err := ParseWorkflow(name, []byte(text))
-	if err != nil {
+	// Field errors (e.g. an invalid duration) do not prevent editing; they are fixed by editing.
+	w, err := ReadWorkflow(name, []byte(text))
+	if w == nil {
 		return nil, err
 	}
 	finalNewline := strings.HasSuffix(text, "\n")
@@ -106,7 +129,7 @@ type editor struct {
 func (e *editor) check() error {
 	edit := e.edit
 	if len(edit.Rename) > 0 && (len(edit.Move) > 0 || len(edit.Delete) > 0 || len(edit.Add) > 0 ||
-		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0) {
+		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0) {
 		return errors.New("renaming cannot be combined with other changes")
 	}
 	e.ids = map[string]bool{}
@@ -161,6 +184,23 @@ func (e *editor) check() error {
 			return fmt.Errorf("cannot add link from %q to %q: %w", l.From, l.To, err)
 		}
 	}
+	existing := map[string]bool{}
+	for _, a := range e.w.Actions {
+		existing[a.ID] = !e.deleted[a.ID]
+	}
+	set := map[string]bool{}
+	for _, f := range edit.Set {
+		if !existing[f.ID] {
+			return fmt.Errorf("cannot change action %q: it does not exist", f.ID)
+		}
+		if set[f.ID] {
+			return fmt.Errorf("cannot change action %q: only one field per action can be changed at a time", f.ID)
+		}
+		set[f.ID] = true
+		if err := checkSetField(f); err != nil {
+			return fmt.Errorf("cannot change action %q: %w", f.ID, err)
+		}
+	}
 	links := map[int]bool{}
 	for _, i := range edit.DeleteLinks {
 		if i < 0 || i >= len(e.w.Links) {
@@ -182,6 +222,19 @@ func (e *editor) check() error {
 func checkID(id string) error {
 	if !idPattern.MatchString(id) {
 		return fmt.Errorf("invalid action id %q (letters, digits, - and _, starting with a letter)", id)
+	}
+	return nil
+}
+
+func checkSetField(f SetField) error {
+	name, ok := strings.CutPrefix(f.Field, "with.")
+	if (!ok || !configKeyPattern.MatchString(name)) && !settableFields[f.Field] {
+		return fmt.Errorf("field %q cannot be changed here", f.Field)
+	}
+	switch v := f.Value.(type) {
+	case nil, string, bool, float64, int:
+	default:
+		return fmt.Errorf("%s: only a text, a number or true/false can be set here, not %T", f.Field, v)
 	}
 	return nil
 }
@@ -265,8 +318,203 @@ func (e *editor) apply() error {
 		}
 	}
 
+	for _, f := range edit.Set {
+		if err := e.set(f); err != nil {
+			return fmt.Errorf("cannot change action %q: %w", f.ID, err)
+		}
+	}
+
 	e.layout()
 	return nil
+}
+
+// set changes one field of an action in place, adds it or removes it.
+func (e *editor) set(f SetField) error {
+	items := seqValues(valueOf(e.top, "actions"))
+	i := slices.IndexFunc(e.w.Actions, func(a Action) bool { return a.ID == f.ID })
+	if i < 0 || i >= len(items) {
+		return errors.New("the action was not found in the file")
+	}
+	item := items[i]
+	itemEntries := entries(item)
+	if m, ok := item.(*ast.MappingNode); ok && m.IsFlowStyle || len(itemEntries) == 0 {
+		return errors.New("the action is written in flow style ({ … }); write it as a block to edit it in the properties")
+	}
+	indent := strings.Repeat(" ", itemEntries[0].Key.GetToken().Position.Column-1)
+	parent, child, nested := strings.Cut(f.Field, ".")
+	if !nested {
+		return e.setEntry(keyOf(itemEntries, parent), maxLine(item), indent, parent, f.Value)
+	}
+
+	pe := keyOf(itemEntries, parent)
+	if pe == nil {
+		if f.Value == nil {
+			return nil
+		}
+		lines, err := entryLines(indent+"  ", child, f.Value)
+		if err != nil {
+			return err
+		}
+		e.insert(maxLine(item)+1, append([]string{indent + parent + ":"}, lines...)...)
+		return nil
+	}
+	children := entries(pe.Value)
+	if m, ok := pe.Value.(*ast.MappingNode); ok && m.IsFlowStyle && len(children) > 0 {
+		return fmt.Errorf("%q is written in flow style ({ … }); write it as a block to edit it in the properties", parent)
+	}
+	if len(children) == 0 {
+		// "with:" without entries (or "with: {}"): replace the line.
+		if f.Value == nil {
+			return nil
+		}
+		line := minLine(pe)
+		if maxLine(pe) != line {
+			return fmt.Errorf("%q cannot be edited in the properties", parent)
+		}
+		prefix, err := e.prefix(pe)
+		if err != nil {
+			return err
+		}
+		lines, err := entryLines(indent+"  ", child, f.Value)
+		if err != nil {
+			return err
+		}
+		e.edits = append(e.edits, lineEdit{start: line, end: line, lines: append([]string{prefix + parent + ":"}, lines...)})
+		return nil
+	}
+	ce := keyOf(children, child)
+	if f.Value == nil && ce != nil && len(children) == 1 {
+		return e.setEntry(pe, 0, "", parent, nil) // the last entry: remove the parent as well
+	}
+	childIndent := strings.Repeat(" ", children[0].Key.GetToken().Position.Column-1)
+	return e.setEntry(ce, maxLine(pe.Value), childIndent, child, f.Value)
+}
+
+// setEntry replaces, removes (nil value) or – if entry is nil – inserts "key: value" after the given line.
+func (e *editor) setEntry(entry *ast.MappingValueNode, after int, indent, key string, value any) error {
+	if entry == nil {
+		if value == nil {
+			return nil
+		}
+		lines, err := entryLines(indent, key, value)
+		if err != nil {
+			return err
+		}
+		e.insert(after+1, lines...)
+		return nil
+	}
+	prefix, err := e.prefix(entry)
+	if err != nil {
+		return err
+	}
+	if value == nil {
+		if strings.Contains(prefix, "-") {
+			return fmt.Errorf("%q is the first field of the action and cannot be removed here", key)
+		}
+		e.remove(entry)
+		return nil
+	}
+	lines, err := entryLines(strings.Repeat(" ", len(prefix)), key, value)
+	if err != nil {
+		return err
+	}
+	lines[0] = prefix + strings.TrimLeft(lines[0], " ")
+	if len(lines) == 1 {
+		lines[0] += e.trailingComment(entry)
+	}
+	e.replace(entry, lines...)
+	return nil
+}
+
+// trailingComment returns the comment after a one-line scalar entry ("   # short"), or "".
+func (e *editor) trailingComment(entry *ast.MappingValueNode) string {
+	t := entry.Value.GetToken()
+	if t == nil || t.Position == nil || minLine(entry) != maxLine(entry) {
+		return ""
+	}
+	line := []rune(e.lines[t.Position.Line-1])
+	at := t.Position.Column - 1
+	if at < 0 || at >= len(line) {
+		return ""
+	}
+	end := at + len([]rune(t.Value))
+	if q := line[at]; q == '"' || q == '\'' {
+		end = at + 1
+		for end < len(line) && (line[end] != q || (q == '"' && line[end-1] == '\\')) {
+			end++
+		}
+		end++
+	}
+	if end > len(line) {
+		return ""
+	}
+	if rest := string(line[end:]); strings.HasPrefix(strings.TrimSpace(rest), "#") {
+		return rest
+	}
+	return ""
+}
+
+// prefix returns the text before the key of an entry: its indentation, maybe with "- ".
+func (e *editor) prefix(entry *ast.MappingValueNode) (string, error) {
+	pos := entry.Key.GetToken().Position
+	line := []rune(e.lines[pos.Line-1])
+	if pos.Column-1 > len(line) || strings.Trim(string(line[:pos.Column-1]), " -") != "" {
+		return "", errors.New("the field shares its line with others; change it in the YAML file")
+	}
+	return string(line[:pos.Column-1]), nil
+}
+
+// entryLines writes "key: value" with the given indentation; multi-line texts become a literal block.
+func entryLines(indent, key string, value any) ([]string, error) {
+	switch v := value.(type) {
+	case bool:
+		return []string{fmt.Sprintf("%s%s: %t", indent, key, v)}, nil
+	case float64:
+		return []string{indent + key + ": " + coord(v)}, nil
+	case int:
+		return []string{fmt.Sprintf("%s%s: %d", indent, key, v)}, nil
+	case string:
+		if block, ok := literalBlock(indent, v); ok {
+			return append([]string{indent + key + ": " + block[0]}, block[1:]...), nil
+		}
+		return []string{indent + key + ": " + yamlScalar(v)}, nil
+	}
+	return nil, fmt.Errorf("unsupported value %T", value)
+}
+
+// yamlScalar writes a text as plain YAML scalar if it reads back unchanged, otherwise double-quoted.
+func yamlScalar(s string) string {
+	if s != "" && s == strings.TrimSpace(s) && !strings.ContainsAny(s[:1], "-?:,[]{}#&*!|>'\"%@`") &&
+		!strings.Contains(s, ": ") && !strings.Contains(s, " #") && !strings.HasSuffix(s, ":") {
+		var v map[string]any
+		if err := yaml.Unmarshal([]byte("v: "+s), &v); err == nil && v["v"] == s {
+			return s
+		}
+	}
+	return strconv.Quote(s)
+}
+
+// literalBlock writes a multi-line text as "|" block; ok is false for texts it cannot hold exactly.
+func literalBlock(indent, s string) ([]string, bool) {
+	if !strings.Contains(s, "\n") {
+		return nil, false
+	}
+	head, body := "|-", s
+	if strings.HasSuffix(s, "\n") {
+		head, body = "|", strings.TrimSuffix(s, "\n")
+	}
+	if strings.HasSuffix(body, "\n") || strings.HasPrefix(body, " ") || strings.ContainsAny(body, "\t\r") {
+		return nil, false
+	}
+	lines := []string{head}
+	for _, l := range strings.Split(body, "\n") {
+		if l == "" {
+			lines = append(lines, "")
+		} else {
+			lines = append(lines, indent+"  "+l)
+		}
+	}
+	return lines, true
 }
 
 // layout removes the entries of deleted actions and sets the moved ones.

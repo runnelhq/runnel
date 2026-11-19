@@ -30,11 +30,11 @@ async function yaml(page: Page) {
   return text;
 }
 
-/** Drops an action from the palette right of report-error. */
+/** Drops an action from the palette below start, where the canvas is free. */
 async function drop(page: Page, type: string) {
-  const target = (await page.getByTestId("node-report-error").boundingBox())!;
+  const target = (await page.getByTestId("node-start").boundingBox())!;
   await page.getByTestId(`palette-${type}`).dragTo(page.getByTestId("canvas"), {
-    targetPosition: await canvasPoint(page, target.x + target.width + 160, target.y + target.height / 2),
+    targetPosition: await canvasPoint(page, target.x + target.width / 2, target.y + 200),
   });
 }
 
@@ -106,7 +106,8 @@ test("drops an action from the palette and renames it", async ({ page }) => {
   const [, x, y] = text.match(/notify: \{ x: (\d+), y: (\d+) \}/)!.map(Number);
   expect(x % 8).toBe(0);
   expect(y % 8).toBe(0);
-  expect(x).toBeGreaterThan(520);
+  expect(x).toBeLessThan(280); // below start, left of fetch-b
+  expect(y).toBeGreaterThan(300);
 
   // Undo takes back the rename, then the new action.
   await page.keyboard.press("Control+z");

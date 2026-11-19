@@ -138,8 +138,11 @@ func fieldFacts(s *schema.Schema, required bool) string {
 	if required {
 		facts = append(facts, "required")
 	}
-	if s.Format == schema.FormatDuration {
+	switch s.Format {
+	case schema.FormatDuration:
 		facts = append(facts, "duration")
+	case schema.FormatText:
+		facts = append(facts, "multi-line")
 	}
 	if len(s.Enum) > 0 {
 		values := make([]string, len(s.Enum))

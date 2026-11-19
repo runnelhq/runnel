@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
 import { apiBase } from "./api";
 
-/** Descriptor of an action type (GET /catalog, ADR 0014); only what the canvas needs. */
+/** A JSON Schema as generated from a configuration struct (ADR 0014); only what the editor needs. */
+export interface Schema {
+  type?: string;
+  description?: string;
+  format?: string;
+  enum?: unknown[];
+  default?: unknown;
+  examples?: unknown[];
+  properties?: Record<string, Schema>;
+  required?: string[];
+  items?: Schema;
+}
+
+/** Descriptor of an action type (GET /catalog, ADR 0014). */
 export interface Descriptor {
   type: string;
   category: string;
   label: string;
   description: string;
+  schema?: Schema;
 }
 
 /** Category colours of the tiles (design/README.md, chapter 3.3). */

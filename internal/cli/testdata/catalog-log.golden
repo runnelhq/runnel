@@ -3,6 +3,6 @@ Writes a message to the run log
 
 Fields (with:):
   message  Text to write; may span several lines
-           string, required, e.g. Import finished
+           string, required, multi-line, e.g. Import finished
   level    Log level of the message
            string, one of debug|info|warn|error, default info

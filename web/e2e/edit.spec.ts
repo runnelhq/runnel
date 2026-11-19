@@ -101,7 +101,7 @@ test("asks when the file was changed in another browser", async ({ page, browser
   await expect(page.getByTestId("unsaved")).toBeVisible();
 
   // A second browser saves a change first.
-  const context = await browser.newContext({ baseURL: "http://127.0.0.1:7398" });
+  const context = await browser.newContext({ baseURL: "http://127.0.0.1:7398", viewport: page.viewportSize() });
   const other = await context.newPage();
   await open(other);
   await drag(other, "fetch-a", 0, 40);

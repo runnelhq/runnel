@@ -17,7 +17,9 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     trace: "off",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // A desktop screen (the editor targets desktop PCs, decision for mockup E4); with the
+  // properties panel (E7), 1280 × 720 leaves the canvas too narrow for the examples at 100 %.
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
   webServer: [
     {
       command: `${binary} serve ../examples/hello --port ${port}`,
