@@ -128,7 +128,8 @@ func TestProject(t *testing.T) {
 	dir, s := newProject(t)
 	rec := do(t, s, "GET", "/api/v1/projects/current", "")
 	var info projectInfo
-	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil || info.Name != "demo" || info.Dir != dir {
+	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil || info.Name != "demo" || info.Dir != dir ||
+		strings.Join(info.Environments, ",") != "dev" {
 		t.Errorf("project %+v, err %v", info, err)
 	}
 }

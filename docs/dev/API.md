@@ -1,6 +1,6 @@
 # Server-API (`runnel serve`)
 
-Stand: E7b. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+Stand: E8a. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
 ([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)).
 
 ```bash
@@ -26,7 +26,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | Methode | Pfad | Ergebnis |
 |---|---|---|
 | GET | `/version` | `{"version", "commit", "date", "goVersion", "os", "arch"}` wie `runnel version --json` |
-| GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello"}` |
+| GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello", "environments": ["dev", "prod"], "defaultEnvironment": "dev"}` |
 | GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `other`; versteckte Einträge und symbolische Links fehlen |
 | GET | `/files/{path}` | Inhalt der Datei, Header `ETag` |
 | PUT | `/files/{path}` | Datei speichern (Body = Inhalt, max. 10 MiB); Antwort `{path, etag}` und Header `ETag` |

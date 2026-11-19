@@ -9,6 +9,7 @@ import { Palette, type PaletteTarget } from "./components/Palette";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
 import { fetchTree, type Entry } from "./files";
+import type { RunView } from "./run";
 import { useTheme } from "./theme";
 
 // Editor shell after the approved mockups E4–E6b (design/mockups/): header, explorer and
@@ -24,6 +25,7 @@ export function App() {
   const [active, setActive] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [paletteTarget, setPaletteTarget] = useState<PaletteTarget | null>(null);
+  const [run, setRun] = useState<RunView | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [closing, setClosing] = useState<string | null>(null);
   const handles = useRef(new Map<string, FileHandle>());
@@ -111,6 +113,8 @@ export function App() {
                   path={path}
                   active={path === active}
                   projectDir={project?.dir ?? null}
+                  project={project}
+                  onRun={setRun}
                   epoch={epoch}
                   onSummary={setSummary}
                   onPalette={setPaletteTarget}
@@ -136,6 +140,7 @@ export function App() {
         version={version}
         summary={active ? summary : null}
         dirty={active !== null && dirty.has(active)}
+        run={active ? run : null}
       />
       {closing && (
         <Dialog

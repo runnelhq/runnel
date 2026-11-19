@@ -11,7 +11,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e6a-edit.html`](e6a-edit.html) | E6a – Canvas bearbeiten und speichern | `edit`, `deleted`, `conflict` | freigegeben mit PR #28, umgesetzt mit E6a |
 | [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | freigegeben mit PR #30, umgesetzt mit E6b |
 | [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | freigegeben mit PR #32, umgesetzt mit E7a (`action`, `wait`) und E7b |
-| [`e8-run.html`](e8-run.html) | E8 – Ausführen im Editor | `run`, `running`, `done`, `cancelled`, `unsaved` | zur Freigabe |
+| [`e8-run.html`](e8-run.html) | E8 – Ausführen im Editor | `run`, `running`, `done`, `cancelled`, `unsaved` | freigegeben mit PR #35; Run, Live-Status und Rückfrage umgesetzt mit E8a, Log und Ergebnis im Panel folgen mit E8b |
 
 ## Entscheidungen
 
