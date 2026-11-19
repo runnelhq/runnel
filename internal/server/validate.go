@@ -51,9 +51,9 @@ type validateResponse struct {
 	Problems []Problem `json:"problems"`
 }
 
-// handleValidate checks a workflow like "runnel validate" does, and additionally
-// whether its action types exist and their configuration is well-formed (as checked
-// before a run). Variables are checked against every environment of the project.
+// handleValidate checks a workflow like "runnel validate" does: fields, links, graph,
+// variables against every environment of the project, and – as before a run – action
+// types and their configuration.
 func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	var req validateRequest
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxFileSize+1024))
@@ -115,13 +115,7 @@ func (s *Server) validate(name string, data []byte) (model.Errors, error) {
 		diags = append(diags, wf.CheckVariables(contexts)...)
 	}
 	if !diags.HasErrors() {
-		if _, err := workflow.Prepare(wf, workflow.Options{Registry: s.registry}); err != nil {
-			var prepDiags model.Errors
-			if !errors.As(err, &prepDiags) {
-				return nil, err
-			}
-			diags = append(diags, prepDiags...)
-		}
+		diags = append(diags, workflow.Check(wf, workflow.Options{Registry: s.registry})...)
 	}
 	diags.Sort()
 	return diags, nil

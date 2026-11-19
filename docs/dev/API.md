@@ -54,8 +54,8 @@ POST /api/v1/validate
 ```
 
 `content` ist optional; ohne ihn wird die gespeicherte Datei geprüft, mit ihm der ungespeicherte Stand des Editors.
-Geprüft wird wie bei `runnel validate` (Felder, Links, Zyklen, Erreichbarkeit, Variablen gegen alle Environments,
-Projektdateien) und zusätzlich wie vor einem Lauf (unbekannte Action-Typen, Konfiguration `with:`). Derzeit nur
+Geprüft wird genau wie bei `runnel validate`: Felder, Links, Zyklen, Erreichbarkeit, Variablen gegen alle
+Environments, Projektdateien und – wie vor einem Lauf – unbekannte Action-Typen und Konfiguration `with:`. Derzeit nur
 Workflow-Dateien.
 
 ```json

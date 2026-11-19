@@ -12,6 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/vars"
 )
@@ -24,7 +27,8 @@ func newValidateCommand() *cobra.Command {
 		Use:   "validate [path...]",
 		Short: "Check workflow files for errors",
 		Long: "Checks workflow files (*" + workflowSuffix + ") for syntax errors, invalid fields,\n" +
-			"links to unknown actions, cycles, unreachable actions and undefined variables.\n\n" +
+			"links to unknown actions, cycles, unreachable actions, undefined variables,\n" +
+			"unknown action types and invalid action configurations (with:).\n\n" +
 			"Paths can be files or directories; directories are searched recursively.\n" +
 			"Without a path, the current directory is checked.\n\n" +
 			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
@@ -46,7 +50,8 @@ func newValidateCommand() *cobra.Command {
 			if len(files) == 0 {
 				return fmt.Errorf("no workflow files (*%s) found in %s", workflowSuffix, strings.Join(args, ", "))
 			}
-			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{}}
+			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
+				registry: actions.Builtin()}
 			return v.run(files)
 		},
 	}
@@ -68,6 +73,7 @@ type validator struct {
 	params map[string]string
 	// projects caches loaded projects by absolute directory; nil if loading failed.
 	projects           map[string]*model.Project
+	registry           *action.Registry
 	nErrors, nWarnings int
 }
 
@@ -112,6 +118,11 @@ func (v *validator) file(file string) error {
 			return err
 		}
 		diags = append(diags, w.CheckVariables(contexts)...)
+	}
+	// Action types and configurations are only checked on an otherwise valid workflow,
+	// like before a run.
+	if !diags.HasErrors() {
+		diags = append(diags, workflow.Check(w, workflow.Options{Registry: v.registry})...)
 	}
 	diags.Sort()
 	v.report(diags)

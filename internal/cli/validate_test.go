@@ -54,14 +54,46 @@ func TestValidateExamples(t *testing.T) {
 }
 
 func TestValidateStrict(t *testing.T) {
-	chdirRepoRoot(t)
-	file := "internal/model/testdata/workflow/graph/unreachable.workflow.yaml" // warnings only
+	file := writeWorkflow(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: used, type: core.log, with: { message: "${UNDEFINED}" } }
+  - { id: orphan, type: core.dummy }
+links:
+  - { from: start, to: used }
+`) // warnings only
 
-	if code, out, _ := run(t, "validate", file); code != 0 || !strings.Contains(out, "0 errors, 3 warnings") {
+	if code, out, _ := run(t, "validate", file); code != 0 || !strings.Contains(out, "0 errors, 2 warnings") {
 		t.Errorf("without --strict: exit code %d, output:\n%s", code, out)
 	}
 	if code, _, _ := run(t, "validate", "--strict", file); code != 1 {
 		t.Errorf("with --strict: exit code %d, want 1", code)
+	}
+}
+
+// validate reports what a run would reject: unknown action types and invalid configurations.
+func TestValidateActionTypesAndConfig(t *testing.T) {
+	file := writeWorkflow(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: copy, type: file.copy }
+  - { id: greet, type: core.log, with: { msg: hi } }
+links:
+  - { from: start, to: copy }
+  - { from: copy, to: greet }
+`)
+	code, out, _ := run(t, "validate", file)
+	for _, want := range []string{
+		`:7:23: error: action "copy": unknown action type "file.copy"`,
+		`:8:42: error: action "greet" (core.log): unknown field "msg"`,
+		"2 errors, 0 warnings",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if code != 1 {
+		t.Errorf("exit code %d, want 1", code)
 	}
 }
 
