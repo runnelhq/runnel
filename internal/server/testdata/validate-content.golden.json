@@ -22,6 +22,7 @@
       "file": "workflows/import.workflow.yaml",
       "line": 7,
       "column": 47,
+      "path": "$.actions[2].with.msg",
       "severity": "warning",
       "message": "variable \"MISSING\" is not defined (neither as workflow parameter nor in the project or environment)"
     },
@@ -33,5 +34,41 @@
       "severity": "warning",
       "message": "action \"lonely\" is not reachable from the start action \"start\" and will never run"
     }
-  ]
+  ],
+  "workflow": {
+    "kind": "Workflow",
+    "apiVersion": "runnel/v1",
+    "name": "import",
+    "actions": [
+      {
+        "id": "start",
+        "type": "core.start"
+      },
+      {
+        "id": "copy",
+        "type": "file.copy"
+      },
+      {
+        "id": "greet",
+        "type": "core.log",
+        "with": {
+          "msg": "${MISSING}"
+        }
+      },
+      {
+        "id": "lonely",
+        "type": "core.dummy"
+      }
+    ],
+    "links": [
+      {
+        "from": "start",
+        "to": "greet"
+      },
+      {
+        "from": "greet",
+        "to": "copy"
+      }
+    ]
+  }
 }

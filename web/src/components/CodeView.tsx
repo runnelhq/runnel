@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { highlightLine, type TokenKind } from "../yaml";
 
 const tokenClass: Record<TokenKind, string> = {
@@ -10,9 +11,13 @@ const tokenClass: Record<TokenKind, string> = {
   text: "",
 };
 
-/** Read-only file view with line numbers; YAML files are highlighted. */
-export function CodeView(props: { text: string; yaml: boolean }) {
+/** Read-only file view with line numbers; YAML files are highlighted. focusLine is scrolled into view and marked. */
+export function CodeView(props: { text: string; yaml: boolean; focusLine?: number | null }) {
   const lines = props.text.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
+  const focusRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ block: "center" });
+  }, [props.focusLine]);
   return (
     <div
       data-testid="code"
@@ -21,7 +26,12 @@ export function CodeView(props: { text: string; yaml: boolean }) {
       aria-label="File content"
     >
       {lines.map((line, i) => (
-        <div key={i} className="grid grid-cols-[56px_1fr] hover:bg-muted">
+        <div
+          key={i}
+          ref={i + 1 === props.focusLine ? focusRef : undefined}
+          data-focus={i + 1 === props.focusLine || undefined}
+          className={"grid grid-cols-[56px_1fr] hover:bg-muted" + (i + 1 === props.focusLine ? " bg-accent" : "")}
+        >
           <span className="pr-4 text-right text-(--code-gutter) tabular-nums select-none">{i + 1}</span>
           <span className="pr-4 whitespace-pre">
             {props.yaml

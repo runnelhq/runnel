@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/goccy/go-yaml/ast"
@@ -9,39 +10,51 @@ import (
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
-// scalar is a string value of a file with its position.
+// scalar is a string value of a file with its position and YAML path
+// (e.g. "$.actions[1].with.message"), which locates problems for the editor.
 type scalar struct {
 	value string
 	pos   Position
+	path  string
 }
+
+var simpleKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // scalars returns all string values of the document (not the mapping keys).
 func (s *source) scalars() []scalar {
 	var res []scalar
-	var walk func(n ast.Node)
-	walk = func(n ast.Node) {
+	var walk func(n ast.Node, path string)
+	walk = func(n ast.Node, path string) {
 		switch n := n.(type) {
 		case *ast.MappingNode:
 			for _, v := range n.Values {
-				walk(v)
+				walk(v, path)
 			}
 		case *ast.MappingValueNode:
-			walk(n.Value)
+			key := ""
+			if t := n.Key.GetToken(); t != nil {
+				key = t.Value
+			}
+			if simpleKey.MatchString(key) {
+				walk(n.Value, path+"."+key)
+			} else {
+				walk(n.Value, keyPath(path, key))
+			}
 		case *ast.SequenceNode:
-			for _, v := range n.Values {
-				walk(v)
+			for i, v := range n.Values {
+				walk(v, fmt.Sprintf("%s[%d]", path, i))
 			}
 		case *ast.TagNode:
-			walk(n.Value)
+			walk(n.Value, path)
 		case *ast.AnchorNode:
-			walk(n.Value)
+			walk(n.Value, path)
 		case *ast.LiteralNode:
-			res = append(res, scalar{value: n.Value.Value, pos: tokenPos(n.GetToken())})
+			res = append(res, scalar{value: n.Value.Value, pos: tokenPos(n.GetToken()), path: path})
 		case *ast.StringNode:
-			res = append(res, scalar{value: n.Value, pos: tokenPos(n.GetToken())})
+			res = append(res, scalar{value: n.Value, pos: tokenPos(n.GetToken()), path: path})
 		}
 	}
-	walk(s.body)
+	walk(s.body, "$")
 	return res
 }
 
@@ -50,7 +63,7 @@ func checkReferenceSyntax(s *source) Errors {
 	var errs Errors
 	for _, sc := range s.scalars() {
 		if _, err := vars.Parse(sc.value); err != nil {
-			errs = append(errs, &Error{File: s.name, Pos: sc.pos, Msg: err.Error()})
+			errs = append(errs, &Error{File: s.name, Pos: sc.pos, Path: sc.path, Msg: err.Error()})
 		}
 	}
 	return errs
@@ -72,7 +85,7 @@ func (w *Workflow) CheckVariables(contexts []VarContext) Errors {
 	for _, sc := range w.src.scalars() {
 		refs, err := vars.Parse(sc.value)
 		if err != nil {
-			errs = append(errs, &Error{File: w.src.name, Pos: sc.pos, Msg: err.Error()})
+			errs = append(errs, &Error{File: w.src.name, Pos: sc.pos, Path: sc.path, Msg: err.Error()})
 			continue
 		}
 		for _, r := range refs {
@@ -86,7 +99,7 @@ func (w *Workflow) CheckVariables(contexts []VarContext) Errors {
 				}
 			}
 			if msg := undefinedMessage(r.Name, missing, len(contexts)); msg != "" {
-				errs = append(errs, &Error{File: w.src.name, Pos: sc.pos, Severity: SeverityWarning, Msg: msg})
+				errs = append(errs, &Error{File: w.src.name, Pos: sc.pos, Path: sc.path, Severity: SeverityWarning, Msg: msg})
 			}
 		}
 	}

@@ -19,6 +19,8 @@ test("the explorer shows the project tree", async ({ page }) => {
 test("opens files in tabs and shows them as highlighted YAML", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tree").getByText("hello.workflow.yaml").click();
+  // Workflows open as canvas (E5); this test is about the YAML view.
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
 
   await expect(page.getByRole("tab", { name: /hello\.workflow\.yaml/ })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("crumbs")).toHaveText("workflows / hello.workflow.yaml");
@@ -93,6 +95,6 @@ test("works with files while the connection is lost", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("alert")).toContainText("Connection to the Runnel server lost.");
   await page.getByRole("tree").getByText("hello.workflow.yaml").click();
-  await expect(page.getByTestId("code")).toContainText("kind: Workflow");
+  await expect(page.getByTestId("node-greet")).toBeVisible();
   await expect(page.getByTestId("connection")).toHaveText("⚠ Disconnected");
 });

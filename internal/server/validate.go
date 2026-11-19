@@ -49,6 +49,9 @@ type validateResponse struct {
 	Errors   int       `json:"errors"`
 	Warnings int       `json:"warnings"`
 	Problems []Problem `json:"problems"`
+	// Workflow is the parsed workflow (actions, links, layout …) for the canvas; it is
+	// missing if the file cannot be read as a workflow (syntax or field errors).
+	Workflow *model.Workflow `json:"workflow,omitempty"`
 }
 
 // handleValidate checks a workflow like "runnel validate" does: fields, links, graph,
@@ -78,22 +81,25 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	diags, err := s.validate(name, data)
+	wf, diags, err := s.validate(name, data)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.response(diags))
+	res := s.response(diags)
+	res.Workflow = wf
+	writeJSON(w, http.StatusOK, res)
 }
 
-func (s *Server) validate(name string, data []byte) (model.Errors, error) {
+// validate returns the parsed workflow (nil if it cannot be parsed) and all problems.
+func (s *Server) validate(name string, data []byte) (*model.Workflow, model.Errors, error) {
 	wf, err := model.ParseWorkflow(name, data)
 	if err != nil {
 		var diags model.Errors
 		if errors.As(err, &diags) {
-			return diags, nil
+			return nil, diags, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	diags := wf.Validate()
 
@@ -105,12 +111,12 @@ func (s *Server) validate(name string, data []byte) (model.Errors, error) {
 			p = nil
 		}
 	} else if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if p != nil {
 		contexts, err := model.VarContexts(wf, p, "", nil)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		diags = append(diags, wf.CheckVariables(contexts)...)
 	}
@@ -118,7 +124,7 @@ func (s *Server) validate(name string, data []byte) (model.Errors, error) {
 		diags = append(diags, workflow.Check(wf, workflow.Options{Registry: s.registry})...)
 	}
 	diags.Sort()
-	return diags, nil
+	return wf, diags, nil
 }
 
 func (s *Server) response(diags model.Errors) validateResponse {

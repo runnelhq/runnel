@@ -4,7 +4,7 @@ Der Editor ist eine React-Anwendung in [`web/`](../../web). Sie wird gebaut, in 
 `runnel serve` unter `http://127.0.0.1:7300/` ausgeliefert. Mit dem Server spricht sie nur über die
 [API](API.md). Gestaltung: [Corporate Design](../../design/README.md), freigegebene [Mockups](../../design/mockups/README.md).
 
-> Stand: E4b – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Tabs, Datei nur lesend. Der Canvas folgt mit E5.
+> Stand: E5 – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Tabs, Datei nur lesend, Workflows als Canvas (nur lesen). Bearbeiten folgt mit E6.
 
 ## Voraussetzungen
 
@@ -36,6 +36,8 @@ web/
     App.tsx             # Gerüst: Kopfzeile, Explorer, Tabs, Datei, Statusleiste
     api.ts              # API-Zugriff, Verbindung (Server-Sent Events)
     files.ts            # Projektbaum, Dateien laden, Kodierung erkennen
+    workflow.ts         # /validate, Workflow-Modell, Link-Arten, Zuordnung der Meldungen, Anordnung (dagre)
+    catalog.ts          # Descriptors aus /catalog (Kategorie → Kachelfarbe)
     yaml.ts             # Hervorhebung für die Nur-lesen-Ansicht (zeilenweise, ohne Abhängigkeit)
     theme.ts            # Farbschema (System/Light/Dark, gespeichert im Browser)
     index.css           # Tailwind + Design-Tokens + Schriften
@@ -66,6 +68,9 @@ design/fonts/           # Inter, JetBrains Mono (woff2, OFL) – lokal, kein Sch
 | Laden | Projekt, Version und Baum beim Start und nach jeder Wiederverbindung; geöffnete Dateien werden nach einer Wiederverbindung neu geladen |
 | Kodierung | wie der Runner: UTF-8 (mit/ohne BOM), UTF-16 mit BOM; sonst Anzeige als Windows-1252. Die Statusleiste nennt die erkannte Kodierung |
 | Hervorhebung | nur YAML-Dateien; `${…}` und `{{ … }}` in der Ausdrucksfarbe (Entscheidung zum Mockup E4) |
+| Canvas | React Flow (`@xyflow/react`); Knoten `components/ActionNode.tsx`, Links `components/LinkEdge.tsx` (Symbol bei 35 % ab der Quelle). Das Modell kommt aus `/validate` (gesendet wird der angezeigte Text), nicht aus einem YAML-Parser im Browser |
+| Anordnung | `layout` der Datei (Pixel, linke obere Ecke, Karte 176 × 52 px); fehlen Positionen, ordnet dagre von links nach rechts an und ein Hinweis erscheint |
+| Meldungen | über den YAML-Pfad (`$.actions[i]…`) dem Knoten zugeordnet; Zähler in der Dateileiste; Klick auf den Knoten zeigt sie mit „Show in YAML ›“ |
 | Pfad kopieren | vollständiger Pfad mit dem Trennzeichen des Projektordners (`\` unter Windows) |
 
 ## Auslieferung

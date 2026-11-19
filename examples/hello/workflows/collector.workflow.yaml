@@ -40,10 +40,10 @@ links:
   - { from: checks-done, to: report }
   - { from: report, to: done }
 layout:
-  start:         { x: 40,  y: 200 }
-  check-inbox:   { x: 200, y: 80 }
-  check-archive: { x: 200, y: 200 }
-  check-network: { x: 200, y: 320 }
-  checks-done:   { x: 380, y: 200 }
-  report:        { x: 520, y: 200 }
-  done:          { x: 660, y: 200 }
+  start:         { x: 40, y: 200 }
+  check-inbox:   { x: 280, y: 80 }
+  check-archive: { x: 280, y: 200 }
+  check-network: { x: 280, y: 320 }
+  checks-done:   { x: 520, y: 200 }
+  report:        { x: 760, y: 200 }
+  done:          { x: 1000, y: 200 }

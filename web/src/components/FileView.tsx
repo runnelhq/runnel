@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, type FileContent } from "../files";
+import { validate, type Validation } from "../workflow";
+import { Canvas } from "./Canvas";
 import { CodeView } from "./CodeView";
-import { CopyIcon, LockIcon, ReloadIcon } from "./Icons";
+import { CodeIcon, CopyIcon, LockIcon, ReloadIcon, WorkflowIcon } from "./Icons";
+
+type View = "canvas" | "yaml";
 
 type State =
   | { status: "loading" }
@@ -27,6 +31,11 @@ export function FileView(props: {
 }) {
   const { path, epoch, onSummary } = props;
   const [state, setState] = useState<State>({ status: "loading" });
+  const isWorkflow = kindOf(path) === "workflow";
+  // Workflows open as canvas (mockup E5); other files as YAML.
+  const [view, setView] = useState<View>(isWorkflow ? "canvas" : "yaml");
+  const [focusLine, setFocusLine] = useState<number | null>(null);
+  const [validation, setValidation] = useState<Validation | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,9 +55,33 @@ export function FileView(props: {
     };
   }, [path, epoch]);
 
+  // Workflows are checked by the server, which also returns the parsed workflow for the canvas.
   useEffect(() => {
-    onSummary(state.status === "loaded" ? fileSummary(path, state.file) : null);
-  }, [state, path, onSummary]);
+    if (!isWorkflow || state.status !== "loaded") return;
+    let cancelled = false;
+    validate(path, state.file.text).then(
+      (v) => !cancelled && setValidation(v),
+      () => !cancelled && setValidation(null),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [isWorkflow, path, state]);
+
+  useEffect(() => {
+    if (state.status !== "loaded") return onSummary(null);
+    const wf = validation?.workflow;
+    onSummary(
+      view === "canvas" && wf
+        ? `Workflow · ${wf.actions?.length ?? 0} actions · ${wf.links?.length ?? 0} links`
+        : fileSummary(path, state.file),
+    );
+  }, [state, path, view, validation, onSummary]);
+
+  const showInYAML = useCallback((line: number) => {
+    setView("yaml");
+    setFocusLine(line);
+  }, []);
 
   if (state.status === "error") {
     return (
@@ -82,28 +115,110 @@ export function FileView(props: {
           <b className="font-medium text-foreground">{path.slice(slash + 1)}</b>
         </span>
         <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
-        <Badge title="Editing follows with the canvas">
+        <Badge title="Editing follows in a later version">
           <LockIcon width={12} height={12} />
           Read-only
         </Badge>
+        {validation && validation.errors > 0 && (
+          <Badge testId="error-count" tone="error" title={problemList(validation, "error")}>
+            ✖ {validation.errors}
+          </Badge>
+        )}
+        {validation && validation.warnings > 0 && (
+          <Badge testId="warning-count" tone="warning" title={problemList(validation, "warning")}>
+            ⚠ {validation.warnings}
+          </Badge>
+        )}
         <span className="flex-1" />
+        {isWorkflow && <ViewSwitch view={view} onView={setView} />}
         <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} />
       </div>
-      {state.status === "loaded" ? (
-        <CodeView text={state.file.text} yaml={isYAML(path)} />
-      ) : (
+      {state.status !== "loaded" ? (
         <div className="flex-1" aria-busy="true" />
+      ) : view === "yaml" ? (
+        <CodeView text={state.file.text} yaml={isYAML(path)} focusLine={focusLine} />
+      ) : validation?.workflow ? (
+        <Canvas workflow={validation.workflow} problems={validation.problems} onShowInYAML={showInYAML} />
+      ) : validation ? (
+        <NotAGraph path={path} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
+      ) : (
+        <div className="runnel-canvas flex-1" aria-busy="true" />
       )}
     </>
   );
 }
 
-function Badge(props: { children: React.ReactNode; title?: string; testId?: string }) {
+const problemList = (v: Validation, severity: "error" | "warning") =>
+  v.problems
+    .filter((p) => p.severity === severity)
+    .map((p) => (p.line ? `${p.line}:${p.column ?? 1} ${p.message}` : p.message))
+    .join("\n");
+
+function ViewSwitch(props: { view: View; onView: (v: View) => void }) {
+  const views: [View, string, typeof CodeIcon][] = [
+    ["canvas", "Canvas", WorkflowIcon],
+    ["yaml", "YAML", CodeIcon],
+  ];
+  return (
+    <div role="group" aria-label="View" className="inline-flex gap-0.5 rounded-md border border-border bg-muted p-0.5">
+      {views.map(([v, label, Icon]) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={props.view === v}
+          onClick={() => props.onView(v)}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-[3px] text-xs text-muted-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
+        >
+          <Icon width={14} height={14} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Shown instead of the canvas when the file cannot be read as a workflow. */
+function NotAGraph(props: { path: string; validation: Validation; onShowYAML: () => void }) {
+  const first = props.validation.problems.find((p) => p.severity === "error");
+  return (
+    <div className="runnel-canvas grid flex-1 place-items-center p-8" role="alert">
+      <div className="max-w-[440px] rounded-xl border border-border bg-card px-7 py-6 text-center shadow-md">
+        <span className="inline-grid size-10 place-items-center rounded-full bg-danger-soft text-lg font-bold text-destructive">
+          ✖
+        </span>
+        <h2 className="mt-3 mb-1 text-md font-semibold">This workflow can’t be shown as a graph</h2>
+        <p className="mt-0 mb-3 text-muted-foreground">
+          The file has errors. Fix them in the YAML view or in your text editor.
+        </p>
+        {first && (
+          <pre className="mt-0 mb-4 rounded-md bg-muted px-2.5 py-2 text-left text-xs whitespace-pre-wrap">
+            {props.path}
+            {first.line ? `:${first.line}:${first.column ?? 1}` : ""}
+            {"\n"}
+            {first.message}
+          </pre>
+        )}
+        <SmallButton onClick={props.onShowYAML}>
+          <CodeIcon width={14} height={14} />
+          Show YAML
+        </SmallButton>
+      </div>
+    </div>
+  );
+}
+
+function Badge(props: { children: React.ReactNode; title?: string; testId?: string; tone?: "error" | "warning" }) {
+  const tone =
+    props.tone === "error"
+      ? "bg-danger-soft text-destructive"
+      : props.tone === "warning"
+        ? "bg-warning-soft text-warning"
+        : "bg-secondary text-secondary-foreground";
   return (
     <span
       title={props.title}
       data-testid={props.testId}
-      className="inline-flex h-5 items-center gap-1 rounded-full bg-secondary px-2 text-2xs font-semibold text-secondary-foreground"
+      className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs font-semibold whitespace-pre-line ${tone}`}
     >
       {props.children}
     </span>
