@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 )
 
@@ -267,6 +268,32 @@ func TestTriggers(t *testing.T) {
 	}
 	d := waitRun(t, s, list[0].Last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
 	if d.Status != "succeeded" || d.Trigger != "cron:often" || d.Params["DELAY"] != "1ms" || d.Environment != "dev" {
+		t.Errorf("run %+v", d.Run)
+	}
+}
+
+// A file trigger starts its target with the path of the new file (S38).
+func TestFileTrigger(t *testing.T) {
+	dir, s := newRunProject(t)
+	writeFile(t, filepath.Join(dir, "workflows", "file.workflow.yaml"), "kind: Workflow\napiVersion: runnel/v1\nname: file\n"+
+		"parameters:\n  - { name: FILE, required: true }\nactions:\n  - { id: start, type: core.start }\n")
+	writeFile(t, filepath.Join(dir, "triggers", "inbox.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: inbox\ntype: file\n"+
+		"target: workflows/file.workflow.yaml\nwith: { path: inbox, param: FILE }\n")
+	writeFile(t, filepath.Join(dir, "inbox", "a.csv"), "x\n")
+	s.triggers.Reload()
+	if p := s.triggers.Problems(); len(p) != 0 {
+		t.Fatal(p)
+	}
+	now := time.Now()
+	s.triggers.Tick(now)
+	s.triggers.Tick(now.Add(model.DefaultFileInterval))
+	last := s.triggers.List()[0].Last
+	if last == nil || last.RunID == "" {
+		t.Fatalf("not started: %+v", last)
+	}
+	d := waitRun(t, s, last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
+	want, _ := filepath.Abs(filepath.Join(dir, "inbox", "a.csv"))
+	if d.Status != "succeeded" || d.Trigger != "file:inbox" || d.Params["FILE"] != want {
 		t.Errorf("run %+v", d.Run)
 	}
 }

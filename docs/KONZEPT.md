@@ -178,8 +178,8 @@ Der Secret-Store ist lokal verschlüsselt (siehe Kap. 8).
 | `manual` | Start über UI oder CLI |
 | `cron` | Zeitplan (Cron-Syntax + Zeitzone), Optionen: kein paralleler Lauf, Nachholen verpasster Läufe |
 | `http` | HTTP-Endpunkt mit Methode und Pfad (`/api/customers/{id}`); Pfad, Query und Body werden zu Parametern. Als Webhook sofort `202` (`response: accepted`) oder als Dienst mit Antwort aus dem Lauf (`response: run`, Action `http.respond` bzw. Transform `http.response`) – [ADR 0018](adr/0018-http-trigger.md) |
-| `file` | Dateisystem-Überwachung (Ordner + Pattern), z. B. neue CSV in Eingangsordner |
-| `interval` | Polling alle n Sekunden/Minuten |
+| `file` | Ordner-Überwachung (Ordner + Pattern), z. B. neue CSV im Eingangsordner: ein Lauf je neuer Datei oder einer für alle neuen Dateien; der Ordner wird abgefragt (Polling), damit Netzlaufwerke und UNC-Pfade gleich funktionieren |
+| `interval` | fester Abstand, z. B. alle 15 Minuten; der erste Lauf nach dem ersten Abstand |
 
 Trigger können sowohl Workflows als auch Pipelines direkt starten.
 
@@ -535,8 +535,55 @@ with:
 Trigger-Dateien liegen unter `triggers/*.yaml`. Gestartet wird nur, solange `runnel serve` läuft; geänderte Dateien
 übernimmt der Server ohne Neustart. Verpasste Zeitpunkte (Server lief nicht) werden nicht nachgeholt. `runnel triggers`
 listet die Trigger mit ihrem nächsten Zeitpunkt, `runnel validate` prüft sie (Zeitplan, Ziel, Environment, Parameter).
-`overlap: skip` startet keinen Lauf, solange der vorige dieses Triggers läuft. `runConfig` (S42), `overlap: queue`,
-das Nachholen verpasster Läufe und die Typen `file`, `interval` (S38) und `http` (ADR 0018) folgen später.
+`overlap: skip` startet keinen Lauf, solange der vorige dieses Triggers läuft. Felder unter `with:`, die der Typ nicht
+kennt (z. B. `schedule` bei `interval`), sind ein Fehler. `runConfig` (S42), `overlap: queue`, das Nachholen verpasster
+Läufe und der Typ `http` (ADR 0018) folgen später.
+
+Intervall (seit S38) – der erste Lauf kommt einen Abstand nach dem Start des Servers, danach je ein Abstand nach dem
+fälligen Zeitpunkt; ein unveränderter Trigger behält beim Neuladen seinen nächsten Zeitpunkt:
+
+```yaml
+type: interval
+with:
+  every: 15m               # mindestens 1s
+  overlap: skip
+```
+
+Datei-Überwachung (seit S38):
+
+```yaml
+type: file
+target: workflows/import.workflow.yaml
+with:
+  path: inbox              # Ordner: relativ zum Projekt oder absolut, auch \\server\freigabe\eingang
+  pattern: "orders-*.csv"  # Dateiname, Groß-/Kleinschreibung egal; Standard *
+  interval: 10s            # Abstand der Abfragen; Standard 10s, mindestens 1s
+  param: FILE              # Parameter des Ziels, der den Pfad bekommt
+  mode: each               # each (Standard): ein Lauf je Datei | batch: ein Lauf für alle neuen Dateien
+  existing: process        # process (Standard): beim Start vorhandene Dateien verarbeiten | ignore
+  overlap: skip
+```
+
+- Der Ordner wird im Abstand `interval` gelesen (Polling, keine Benachrichtigungen des Dateisystems): Das funktioniert
+  auf Netzlaufwerken und UNC-Pfaden gleich, kostet aber je Abfrage ein Lesen des Ordners. Unterordner werden nicht
+  durchsucht.
+- **Neu** ist eine Datei, die vorher nicht da war oder sich seit dem Start ihres Laufs geändert hat (Größe oder
+  Änderungszeit). **Bereit** ist sie, wenn sie bei zwei Abfragen nacheinander unverändert ist – so wird eine Datei, die
+  noch geschrieben wird, nicht halb verarbeitet. Eine neue Datei wird also frühestens nach `interval` gestartet.
+- **Verarbeitet** ist eine Datei, sobald ihr Lauf gestartet wurde – nicht erst, wenn er erfolgreich war. Das Verschieben
+  oder Löschen der Datei ist Sache des Workflows (z. B. `file.move` ins Archiv). Wird der Start übersprungen
+  (`overlap: skip`) oder abgelehnt (`settings.maxConcurrentRuns`), bleibt die Datei neu und wird bei der nächsten
+  Abfrage erneut versucht; die Meldung dazu steht nur einmal im Log.
+- `mode: each` gibt den absoluten Pfad an den Parameter `param` (Typ `string`). Mit `overlap: skip` läuft immer nur ein
+  Lauf: Die übrigen bereiten Dateien folgen nacheinander, je eine pro Abfrage. Für viele Dateien eignet sich
+  `overlap: allow` (begrenzt durch `settings.maxConcurrentRuns`) oder `mode: batch`.
+- `mode: batch` gibt die Pfade aller bereiten Dateien einer Abfrage als JSON-Liste an `param` (Typ `json`), z. B. für
+  `forEach: "{{ params.FILES }}"`.
+- Welche Dateien verarbeitet sind, weiß nur der laufende Server: Nach einem Neustart gilt `existing` erneut.
+
+Ziel-Parameter prüft `runnel validate`: `param` muss das Ziel deklarieren (`string` bzw. `json`, ohne `enum`) und darf
+nicht zusätzlich unter `params` stehen. Ein Trigger startet Workflows und Pipelines gleich; Pipelines bekommen den Pfad
+ebenso als Parameter (z. B. für `csv.input`).
 
 Ein HTTP-Trigger (`type: http`) hat statt `schedule` Methode, Pfad, Absicherung und Antwortmodus unter `with:`;
 Format und Verhalten in [ADR 0018](adr/0018-http-trigger.md).
@@ -778,7 +825,7 @@ CREATE TABLE runs (
   path          TEXT NOT NULL,             -- relativer Pfad im Projekt
   file_hash     TEXT NOT NULL,             -- Version der ausgeführten Definition
   environment   TEXT,
-  trigger       TEXT,                      -- manual | cron:<name> | http:<name> | cli
+  trigger       TEXT,                      -- manual | cron:<name> | interval:<name> | file:<name> | http:<name> | cli
   parent_run_id TEXT REFERENCES runs(id),  -- Sub-Workflow / Pipeline aus Workflow
   status        TEXT NOT NULL,             -- queued|running|succeeded|failed|cancelled
   params_json   TEXT,

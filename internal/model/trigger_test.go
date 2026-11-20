@@ -56,8 +56,11 @@ func TestParseTriggerErrors(t *testing.T) {
 		old, new, want string
 	}{
 		{"type: cron", "type: http", `trigger type "http" is not supported yet (roadmap S38a, ADR 0018)`},
-		{"type: cron", "type: file", `trigger type "file" is not supported yet (roadmap S38)`},
-		{"type: cron", "type: hourly", `unknown trigger type "hourly" (expected cron)`},
+		{"type: cron", "type: hourly", `unknown trigger type "hourly" (expected cron, interval or file)`},
+		{"type: cron", "type: interval", "schedule is not used by interval triggers (fields: every, overlap)"},
+		{"type: cron", "type: interval", `missing required field "every" (e.g. 15m)`},
+		{"type: cron", "type: file", `missing required field "path"`},
+		{"type: cron", "type: file", `missing required field "param"`},
 		{"type: cron\n", "", `missing required field "type"`},
 		{"target: workflows/import.workflow.yaml", "target: data/in.csv", "must be a workflow (*.workflow.yaml) or pipeline (*.pipeline.yaml) file"},
 		{"target: workflows/import.workflow.yaml", "target: ../other/x.workflow.yaml", "must be a path inside the project"},
@@ -102,5 +105,68 @@ func TestLoadTriggers(t *testing.T) {
 	}
 	if !IsTriggerFile("triggers/a.yaml") || IsTriggerFile("triggers/sub/a.yaml") || IsTriggerFile("workflows/a.yaml") {
 		t.Error("IsTriggerFile")
+	}
+}
+
+const intervalSource = `kind: Trigger
+apiVersion: runnel/v1
+name: poll
+type: interval
+target: workflows/import.workflow.yaml
+with:
+  every: 15m
+`
+
+const fileSource = `kind: Trigger
+apiVersion: runnel/v1
+name: inbox
+type: file
+target: workflows/import.workflow.yaml
+with:
+  path: data/in
+  pattern: "*.CSV"
+  param: FILE
+`
+
+func TestParseIntervalAndFileTriggers(t *testing.T) {
+	tr, err := ParseTrigger("triggers/poll.yaml", []byte(intervalSource))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.EveryValue() != 15*time.Minute || tr.Describe() != "every 15m" || tr.OverlapMode() != OverlapSkip {
+		t.Errorf("interval %+v", tr)
+	}
+	tr, err = ParseTrigger("triggers/inbox.yaml", []byte(fileSource))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.PollInterval() != DefaultFileInterval || tr.FileMode() != FileEach || tr.FilePattern() != "*.CSV" ||
+		tr.Describe() != "new *.CSV in data/in" || tr.Folder("proj") != filepath.Join("proj", "data", "in") {
+		t.Errorf("file %+v", tr)
+	}
+	abs := filepath.Join(t.TempDir(), "in")
+	tr, err = ParseTrigger("x.yaml", []byte(strings.Replace(fileSource, "data/in", strings.ReplaceAll(abs, `\`, "/"), 1)))
+	if err != nil || tr.Folder("proj") != abs {
+		t.Errorf("absolute folder: %v %v", tr, err)
+	}
+	for _, c := range []struct {
+		src, old, new, want string
+	}{
+		{intervalSource, "every: 15m", "every: 500ms", "every must be at least 1s"},
+		{intervalSource, "every: 15m", "every: soon", "every:"},
+		{intervalSource, "every: 15m", "every: 15m\n  schedule: \"* * * * *\"", "schedule is not used by interval triggers"},
+		{fileSource, "param: FILE", "param: FILE\n  mode: all", `invalid mode "all" (expected each or batch)`},
+		{fileSource, "param: FILE", "param: FILE\n  existing: skip", `invalid existing "skip" (expected process or ignore)`},
+		{fileSource, `"*.CSV"`, `"[x"`, `invalid pattern "[x"`},
+		{fileSource, `"*.CSV"`, `"in/*.csv"`, "matches file names only"},
+		{fileSource, "param: FILE", "param: FILE\n  interval: 0s", "interval must be at least 1s"},
+		{fileSource, "param: FILE", "param: FILE\n  every: 1m", "every is not used by file triggers"},
+		{fileSource, "param: FILE", "param: FILE\n  overlap: queue", "overlap: queue is not supported yet"},
+	} {
+		src := strings.Replace(c.src, c.old, c.new, 1)
+		_, err := ParseTrigger("triggers/t.yaml", []byte(src))
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%q → %q: got %v, want %q", c.old, c.new, err, c.want)
+		}
 	}
 }

@@ -1,0 +1,14 @@
+# Starts workflows/arrived.workflow.yaml for each new order file in the inbox while
+# "runnel serve examples/files" runs (roadmap S38). The files already in the inbox
+# are processed at the start; add "existing: ignore" to process only new ones.
+# A file counts once it is unchanged over two looks into the folder (every 10s).
+kind: Trigger
+apiVersion: runnel/v1
+name: orders
+description: Reports each new order file
+type: file
+target: workflows/arrived.workflow.yaml
+with:
+  path: inbox              # relative to the project, or absolute, e.g. \\server\share\in
+  pattern: "orders-*.csv"  # case is ignored
+  param: FILE              # gets the path of the file

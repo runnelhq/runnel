@@ -65,8 +65,9 @@ runnel triggers examples/hello
 ```
 
 `runnel triggers [projektordner]` listet die Trigger des Projekts (`triggers/*.yaml`) mit Zeitplan, Ziel und nächstem
-Zeitpunkt. Solange `runnel serve` läuft, starten sie ihre Workflows bzw. Pipelines zu diesen Zeiten (Cron-Ausdruck mit
-Zeitzone); das Server-Log zeigt jeden Start.
+Zeitpunkt. Solange `runnel serve` läuft, starten sie ihre Workflows bzw. Pipelines: zu festen Zeiten (Cron-Ausdruck mit
+Zeitzone), in einem festen Abstand (`interval`) oder für neue Dateien in einem Ordner (`file`, z. B.
+`runnel serve examples/files`); das Server-Log zeigt jeden Start.
 
 ```bash
 runnel catalog core.wait
