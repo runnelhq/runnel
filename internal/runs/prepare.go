@@ -83,12 +83,17 @@ func Prepare(spec Spec) (*Prepared, error) {
 	if p.Project != nil {
 		defaultJoin = p.Project.Workflow.DefaultJoin
 	}
+	envName := ""
+	if p.Env != nil {
+		envName = p.Env.Name
+	}
 	p.Runner, err = workflow.Prepare(w, workflow.Options{
 		Registry:    spec.Registry,
 		DefaultJoin: defaultJoin,
 		Scope:       model.Scope(w, p.Project, p.Env, spec.Params),
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
+		Environment: envName,
 	})
 	return p, err
 }

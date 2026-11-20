@@ -93,11 +93,13 @@ Regeln:
   Optionen werden mit Komma getrennt (`schema:"required,example=30s"`); Werte dürfen daher kein Komma enthalten.
   Backslashes in Tags verdoppeln (`example=C:\\in`), sonst ist das ganze Tag ungültig.
 - **Typen:** `string`, `bool`, Ganz- und Kommazahlen, Slices, `map[string]T`, verschachtelte Structs, `any`. Felder,
-  die `${…}` enthalten dürfen, als `string` anlegen – auch Zahlen und Zeitangaben.
+  die `${…}` oder `{{ … }}` enthalten dürfen, als `string` anlegen – auch Zahlen und Zeitangaben. Ergibt ein Ausdruck
+  für ein Textfeld eine Zahl oder ein Datum, erhält die Action den Wert als Text.
 - **`DecodeConfig`** verwenden – es lehnt unbekannte Felder ab (Tippfehler im Workflow werden gemeldet; Vertragstest
   prüft das) und prüft Pflichtfelder.
 - **`New` prüft nur die Struktur:** Pflichtfelder, Typen, unbekannte Felder. `New` wird zweimal aufgerufen: vor dem Lauf
-  mit dem Text aus der Datei (Werte können noch `${…}` enthalten) und vor jeder Ausführung mit aufgelösten Variablen.
+  mit dem Text aus der Datei (Werte können noch `${…}` und `{{ … }}` enthalten) und vor jeder Ausführung mit aufgelösten
+  Variablen und ausgewerteten Ausdrücken.
   **Werte** wie Dauern, Zahlen in Textform, leere Texte oder Pfade werden daher erst in `Execute` geprüft.
 - **Zeitangaben** als `string` übernehmen und in `Execute` mit `model.Duration(s).Value()` umwandeln.
 - **Actions ohne Konfiguration** lassen `Config` weg und lehnen jedes Feld ab (`len(with) > 0` → Fehler); Vorlage: `core/dummy.go`.
@@ -128,7 +130,7 @@ func (a *copyAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 | Log | `ec.Log` / `ec.Logf`: `Info` für das Ergebnis (eine Zeile), `Debug` für Details (sichtbar mit `-v`), `Warn` für Auffälliges, das kein Fehler ist |
 | Secrets | Passwörter, Tokens und `${secret:…}`-Werte nie loggen und nicht in Fehlermeldungen aufnehmen |
 | `Result.End` | nur für Actions, die den Workflow beenden (`core.success`, `core.abort`); sonst leeres `Result` |
-| Ausgabedaten | *kommt mit S08:* strukturierte Ergebnisse (z. B. Dateiliste, Statuscode) für nachfolgende Actions über `result.output` |
+| Ausgabedaten | `action.Result{Output: …}`: strukturierte Ergebnisse (z. B. Dateiliste, Statuscode) für nachfolgende Actions; Ausdrücke lesen sie als `result.output` bzw. `results["id"].output` (ADR 0006). Erlaubt sind Text, Zahlen, Wahrheitswerte, Listen und Maps davon; im Beschreibungstext der Action dokumentieren, was `output` enthält |
 | Wiederholbarkeit | Eine Action kann wiederholt werden (`retry`, Schleifen) – sie sollte bei erneutem Aufruf sinnvoll funktionieren (z. B. Zieldatei überschreiben oder klar melden) |
 | Nebenläufigkeit | Mehrere Instanzen können gleichzeitig laufen (parallele Zweige, `join: each`); keine gemeinsamen veränderlichen Variablen |
 

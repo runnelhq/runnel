@@ -11,13 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
-	"slices"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/vars"
 )
@@ -42,6 +40,8 @@ type Options struct {
 	// RunID is the id of the run; if empty, Run creates one (NewRunID). The server
 	// sets it to return the id before the run starts.
 	RunID string
+	// Environment is the name of the environment of the run (run.environment in expressions).
+	Environment string
 }
 
 // Status is the final state of a run.
@@ -109,6 +109,8 @@ type Runner struct {
 	in      map[string][]int // enabled incoming non-loop links (indexes) per action id
 	start   string
 	emitMu  sync.Mutex
+	// templates caches compiled expressions by text (ADR 0006: compiled once).
+	templates sync.Map
 }
 
 // Prepare checks that the workflow can be run by this engine: all action types exist,
@@ -124,30 +126,12 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 	}
 	r := &Runner{w: w, opts: opts, actions: map[string]*model.Action{}, out: map[string][]int{}, in: map[string][]int{}}
 	var errs model.Errors
-	unsupported := func(path, what string) {
-		errs = append(errs, w.ErrorAt(path, "%s is not supported by this version of Runnel yet", what))
-	}
-
-	for i, o := range w.Outputs {
-		if strings.Contains(o.Value, "{{") {
-			unsupported(fmt.Sprintf("$.outputs[%d].value", i), fmt.Sprintf("output %q: an expression", o.Name))
-		}
-	}
-	// Expressions are checked when the file is read (S08a) and evaluated with S08b.
-	for i, p := range w.Parameters {
-		if strings.Contains(p.Default, "{{") {
-			unsupported(fmt.Sprintf("$.parameters[%d].default", i), fmt.Sprintf("parameter %q: an expression as default value", p.Name))
-		}
-	}
 	for i := range w.Actions {
 		a := &w.Actions[i]
 		path := fmt.Sprintf("$.actions[%d]", i)
 		r.actions[a.ID] = a
 		if a.Type == model.ActionTypeStart {
 			r.start = a.ID
-		}
-		if path, found := findExpression(a.With, path+".with"); found {
-			unsupported(path, fmt.Sprintf("action %q: an expression in the configuration", a.ID))
 		}
 		def, ok := opts.Registry.Lookup(a.Type)
 		if !ok {
@@ -163,7 +147,9 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 			continue
 		}
 		if kind, _ := l.Condition(); kind == model.OnExpression {
-			unsupported(fmt.Sprintf("$.links[%d].when", i), fmt.Sprintf("link #%d: an expression condition", i+1))
+			if err := expr.Check(l.When, expr.WorkflowRoots); err != nil {
+				errs = append(errs, w.ErrorAt(fmt.Sprintf("$.links[%d].when", i), "link #%d: %v", i+1, err))
+			}
 		}
 		r.out[l.From] = append(r.out[l.From], i)
 		if !l.Loop {
@@ -210,7 +196,13 @@ func (r *Runner) Run(ctx context.Context) Result {
 	if timeout > 0 {
 		runCtx, cancel = context.WithTimeout(ctx, timeout)
 	}
-	status, err := newScheduler(runCtx, r, runID).run()
+	var status Status
+	rc, err := r.newRunContext(runID, started)
+	if err != nil {
+		status = Failed
+	} else {
+		status, err = newScheduler(runCtx, r, runID, rc).run()
+	}
 	cancel()
 	// A cancellation or timeout that only happened after the run had succeeded does not count.
 	switch {
@@ -223,7 +215,7 @@ func (r *Runner) Run(ctx context.Context) Result {
 
 	var outputs map[string]any
 	if status == Succeeded {
-		if outputs, err = r.outputs(); err != nil {
+		if outputs, err = r.outputs(rc); err != nil {
 			status = Failed
 		}
 	}
@@ -234,31 +226,33 @@ func (r *Runner) Run(ctx context.Context) Result {
 	return res
 }
 
-// outputs evaluates the workflow outputs after a successful run.
-func (r *Runner) outputs() (map[string]any, error) {
+// outputs evaluates the workflow outputs after a successful run, with the results of
+// all actions (results) available to expressions.
+func (r *Runner) outputs(rc *runContext) (map[string]any, error) {
 	if len(r.w.Outputs) == 0 {
 		return nil, nil
 	}
+	values := rc.values(nil)
 	out := make(map[string]any, len(r.w.Outputs))
 	for _, o := range r.w.Outputs {
-		text := o.Value
-		if r.opts.Scope != nil {
-			var err error
-			if text, err = r.opts.Scope.Expand(text); err != nil {
-				return nil, fmt.Errorf("output %q: %w", o.Name, err)
-			}
-		}
-		v, err := o.Type.Parse(text)
+		v, err := r.evalText(o.Value, rc.scope, values)
 		if err != nil {
 			return nil, fmt.Errorf("output %q: %w", o.Name, err)
 		}
-		out[o.Name] = v
+		text, ok := v.(string)
+		if !ok {
+			text = expr.Format(v)
+		}
+		if out[o.Name], err = o.Type.Parse(text); err != nil {
+			return nil, fmt.Errorf("output %q: %w", o.Name, err)
+		}
 	}
 	return out, nil
 }
 
 // executeAction runs an action including retries and per-attempt timeouts.
-func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Action) (action.Result, error) {
+// values is the context of its expressions (ADR 0006).
+func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any) (action.Result, error) {
 	attempts := 1
 	var retry model.Retry
 	if a.Retry != nil {
@@ -266,7 +260,7 @@ func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Actio
 		attempts = max(retry.Attempts, 1)
 	}
 	for attempt := 1; ; attempt++ {
-		res, err := r.attempt(ctx, runID, a)
+		res, err := r.attempt(ctx, runID, a, scope, values)
 		if err == nil || attempt >= attempts || ctx.Err() != nil {
 			return res, err
 		}
@@ -279,7 +273,7 @@ func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Actio
 }
 
 // attempt runs an action once: resolves variables, creates and executes it within its timeout.
-func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action) (action.Result, error) {
+func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any) (action.Result, error) {
 	timeout, _ := a.Timeout.Value()
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -287,7 +281,7 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action) (ac
 		defer cancel()
 	}
 
-	with, err := expand(a.With, r.opts.Scope)
+	with, err := r.evalWith(a, scope, values)
 	if err != nil {
 		return action.Result{}, err
 	}
@@ -338,68 +332,4 @@ func (r *Runner) emit(e Event) {
 		defer r.emitMu.Unlock()
 		r.opts.Observer(e)
 	}
-}
-
-// findExpression returns the YAML path of the first string with {{ … }} in a configuration.
-func findExpression(v any, path string) (string, bool) {
-	switch v := v.(type) {
-	case string:
-		return path, strings.Contains(v, "{{")
-	case map[string]any:
-		for _, k := range slices.Sorted(maps.Keys(v)) {
-			if p, ok := findExpression(v[k], path+"."+k); ok {
-				return p, true
-			}
-		}
-	case []any:
-		for i, e := range v {
-			if p, ok := findExpression(e, fmt.Sprintf("%s[%d]", path, i)); ok {
-				return p, true
-			}
-		}
-	}
-	return "", false
-}
-
-// expand resolves ${…} references in all strings of a configuration value.
-func expand(v map[string]any, scope *vars.Scope) (map[string]any, error) {
-	if v == nil {
-		return nil, nil
-	}
-	out, err := expandValue(v, scope)
-	if err != nil {
-		return nil, err
-	}
-	return out.(map[string]any), nil
-}
-
-func expandValue(v any, scope *vars.Scope) (any, error) {
-	switch v := v.(type) {
-	case string:
-		if scope == nil {
-			return v, nil
-		}
-		return scope.Expand(v)
-	case map[string]any:
-		out := make(map[string]any, len(v))
-		for k, val := range v {
-			e, err := expandValue(val, scope)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", k, err)
-			}
-			out[k] = e
-		}
-		return out, nil
-	case []any:
-		out := make([]any, len(v))
-		for i, val := range v {
-			e, err := expandValue(val, scope)
-			if err != nil {
-				return nil, fmt.Errorf("[%d]: %w", i, err)
-			}
-			out[i] = e
-		}
-		return out, nil
-	}
-	return v, nil
 }

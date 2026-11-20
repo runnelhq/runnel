@@ -171,3 +171,14 @@ func TestTextAndNullFunctions(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckWithVariables(t *testing.T) {
+	for _, s := range []string{"{{ ${LIMIT} > 3 }}", "{{ '${NAME}' + 'x' }}", "{{ addDays(today(), ${DAYS}) }}"} {
+		if err := Check(s, WorkflowRoots); err != nil {
+			t.Errorf("Check(%q): %v", s, err)
+		}
+	}
+	if err := Check("{{ ${X} + reslt }}", WorkflowRoots); err == nil || !strings.Contains(err.Error(), "unknown name reslt") {
+		t.Errorf("err = %v", err)
+	}
+}

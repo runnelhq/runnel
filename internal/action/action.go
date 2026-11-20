@@ -56,6 +56,9 @@ type Result struct {
 	End End
 	// Message explains an EndSuccess or EndFailure.
 	Message string
+	// Output is data for the following actions, e.g. a list of files; expressions
+	// read it as result.output (ADR 0006). Texts, numbers, booleans, lists and maps.
+	Output any
 }
 
 // Categories group actions in the editor's palette (ADR 0014). The editor shows

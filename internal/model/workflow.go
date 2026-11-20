@@ -253,7 +253,7 @@ func (w *Workflow) validate() error {
 		if !expr.Contains(text) {
 			return
 		}
-		if _, err := expr.Compile(text, expr.WorkflowRoots); err != nil {
+		if err := expr.Check(text, expr.WorkflowRoots); err != nil {
 			add(path, "%s: %v", label, err)
 		}
 	}

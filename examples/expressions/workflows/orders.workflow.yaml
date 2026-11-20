@@ -1,0 +1,52 @@
+# Expressions in a workflow (ADR 0006). Run it with:
+#   runnel run -v examples/expressions/workflows/orders.workflow.yaml
+#   runnel run -v --param ORDERS=25 examples/expressions/workflows/orders.workflow.yaml
+# - DAY is computed when the run starts: yesterday, formatted as dd.MM.yyyy.
+# - The links after "check" are conditions: one of them applies, depending on ORDERS
+#   and the project variable THRESHOLD (${…} is replaced before the expression runs).
+# - The outputs read the parameters and the results of the actions.
+kind: Workflow
+apiVersion: runnel/v1
+name: orders
+parameters:
+  - name: ORDERS
+    type: integer
+    default: "7"
+  - name: DAY
+    default: "{{ formatDate(addDays(today(), -1), 'dd.MM.yyyy') }}"
+outputs:
+  - name: SIZE
+    value: "{{ params.ORDERS > ${THRESHOLD} ? 'large' : 'small' }}"
+  - name: CHECKED
+    value: "{{ results.check.status }} after {{ results.check.durationMs }} ms"
+actions:
+  - id: start
+    type: core.start
+  - id: check
+    type: core.log
+    with:
+      message: "Checking {{ params.ORDERS }} orders of {{ params.DAY }} (run {{ run.id }})"
+  - id: many
+    type: core.log
+    with:
+      message: "{{ params.ORDERS }} orders – more than ${THRESHOLD}, splitting the import"
+      level: warn
+  - id: few
+    type: core.log
+    with:
+      message: "{{ params.ORDERS }} orders – importing at once"
+  - id: done
+    type: core.success
+    join: first
+links:
+  - { from: start, to: check }
+  - { from: check, to: many, when: "{{ params.ORDERS > ${THRESHOLD} }}" }
+  - { from: check, to: few, when: "{{ params.ORDERS <= ${THRESHOLD} }}" }
+  - { from: many, to: done }
+  - { from: few, to: done }
+layout:
+  start: { x: 40, y: 200 }
+  check: { x: 280, y: 200 }
+  many:  { x: 520, y: 100 }
+  few:   { x: 520, y: 300 }
+  done:  { x: 760, y: 200 }

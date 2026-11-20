@@ -86,7 +86,8 @@ when:      "{{ result.rows > 0 }}"
   Als Text eingefügt werden Datumswerte in ISO 8601 (`2026-11-19T14:30:00Z`), ganze Zahlen ohne Nachkommastellen,
   Listen und Objekte als JSON, `nil` als leerer Text. Ein Ausdruck endet am ersten `}}`.
 - Erlaubte Namen sind die Kontextobjekte der Tabelle oben; ein Tippfehler (`reslt.rows`) ist ein Fehler beim Lesen der
-  Datei, mit Datei, Zeile und Spalte. Geprüft werden Link-Bedingungen, alle Texte unter `with:`, `outputs` und
+  Datei, mit Datei, Zeile und Spalte. Felder darunter (`params.ORDRS`) werden erst im Lauf aufgelöst; ein unbekanntes
+  Feld ergibt `nil`. Geprüft werden Link-Bedingungen, alle Texte unter `with:`, `outputs` und
   Standardwerte von Parametern.
 - Grenzen: höchstens 4.096 Zeichen je Ausdruck und 2.000 Knoten im übersetzten Ausdruck; zur Laufzeit gilt das
   Speicherbudget von expr-lang.
@@ -100,6 +101,29 @@ when:      "{{ result.rows > 0 }}"
   Buchstaben außerhalb von Anführungszeichen sind ein Fehler. Ohne Zeitzone im Muster gilt die lokale Zeit.
 - Zahlen (`round` mit Stellen, `decimal`, `formatNumber`, `parseNumber`) und Sonstiges (`uuid`, `sha256` …) folgen mit
   den Pipelines bzw. bei Bedarf.
+
+### Umsetzung (S08b)
+
+- **Reihenfolge:** In jedem Text werden zuerst `${…}`-Variablen ersetzt, dann `{{ … }}` ausgewertet. Übersetzte
+  Ausdrücke werden je Lauf zwischengespeichert. Beim Prüfen einer Datei steht `${…}` für einen Wert, der als Zahl,
+  Wahrheitswert oder – in Anführungszeichen – als Text passt.
+- **Kontext:** `vars` (alle Variablen, aufgelöst), `params` (deklarierte Parameter mit ihrem Typ, z. B. `integer` als
+  Zahl), `env`, `run` (`id`, `workflow`, `environment`, `startedAt`, `lastError` – die Meldung der zuletzt
+  fehlgeschlagenen Action; `trigger` folgt mit den Triggern), `results` (alle bisher beendeten Actions nach ID) und
+  `result`. Ein Ergebnis hat `id`, `type`, `status` (`succeeded`, `failed`, `cancelled`, `skipped`), `success`,
+  `output` (Ausgabedaten der Action), `error` und `durationMs`; `rows`, `files` und `exitCode` liefern die Actions, die
+  sie haben, in `output`.
+- **Wo `result` was ist:** In einer Link-Bedingung das Ergebnis der Action, von der der Link ausgeht. In `with:` das
+  Ergebnis der Action, deren Link die Action zuletzt gestartet hat (bei `start` keins).
+- **Link-Bedingungen** gelten unabhängig davon, ob die Action erfolgreich war; das Ergebnis muss `true` oder `false`
+  sein. Lässt sich eine Bedingung nicht auswerten, wird der Link nicht genommen und der Lauf schlägt fehl.
+- **`with:`:** Ausdrücke werden vor jedem Versuch ausgewertet (bei `retry` also neu). Ein ganzer Ausdruck behält seinen
+  Typ; ist das Feld laut Schema ein Text, erhält die Action das Ergebnis als Text. Ein Fehler lässt die Action
+  fehlschlagen (Fehler-Links greifen).
+- **Standardwerte von Parametern** mit Ausdruck werden einmal beim Start ausgewertet, in der Reihenfolge der Deklaration,
+  und nur, wenn der Parameter nicht übergeben wurde; Kontext ohne `result`/`results`. Ein Fehler beendet den Lauf.
+- **`outputs`** werden nach einem erfolgreichen Lauf mit allen `results` ausgewertet und dann in den Typ des Outputs
+  umgewandelt.
 
 ### JavaScript in Skript-Bausteinen
 
