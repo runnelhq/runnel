@@ -39,6 +39,10 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderunge
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
+| `internal/engine/pipeline/` | Pipeline-Engine: Goroutine je Transform, gepufferte Kanäle, Batches, Zähler |
+| `internal/record/` | Record: geordnete Felder (ADR 0007) |
+| `internal/transform/` | Schnittstelle Engine ↔ Transforms, Registry, Descriptors |
+| `internal/transforms/` | eingebaute Transforms: `transforms.go` (`Builtin()`), Aufbau wie `internal/actions/` |
 | `web/` | Editor (React, Vite, TypeScript, Tailwind); Anleitung `docs/dev/EDITOR.md` |
 | `examples/` | Beispiele, in Tests mitgeprüft |
 | `docs/` | Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (`docs/dev/`) |

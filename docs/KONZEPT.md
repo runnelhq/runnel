@@ -587,24 +587,29 @@ flowchart LR
 - **Metriken** je Transform: gelesen/geschrieben/Fehler/Records pro Sekunde/Puffer-Füllstand – live per Server-Sent Events im Editor (vergleichbar mit dem „Metrics“-Tab in Apache Hop).
 - **Transaktionen**: DB-Outputs mit `commitSize`; optional „Unique Connection“-Modus (eine Transaktion über die ganze Pipeline, Rollback bei Fehler).
 
-Schnittstelle eines Transforms (Go):
+Schnittstelle eines Transforms (Go, umgesetzt mit S13a in `internal/transform`):
 
 ```go
 type Transform interface {
-    // Init leitet das Ausgabeschema ab (geschlossen oder offen, s. ADR 0007).
-    Init(cfg TransformConfig, schemaIn Schema) (schemaOut Schema, err error)
-    // Process erhält Eingangs-Batches und schreibt über out weiter.
-    Process(ctx context.Context, in <-chan Batch, out Emitter) error
+    // Process liest die Batches von in, bis der Kanal geschlossen ist, und gibt Records
+    // mit out.Emit weiter. Ein Fehler hält die ganze Pipeline an.
+    Process(ctx context.Context, in <-chan Batch, out *Output) error
 }
 
-type Emitter interface {
-    Emit(r Record)                 // Standardausgang
-    EmitTo(link string, r Record)   // gezielter Ausgang (z. B. Switch/Case)
-    Error(r Record, err error)     // Fehler-Link
-}
+// Output: Emit(record) – blockiert bei vollen Puffern (Backpressure), meldet den Abbruch;
+// Logf(level, …) – Meldung ins Lauf-Log.
 ```
 
-Zusätzlich gibt es vereinfachte Basistypen (`RowMapper`, `RowFilter`), sodass einfache Transforms nur eine Funktion `func(Record) (Record, error)` implementieren.
+- **Mehrere Eingänge** eines Transforms werden zu einem Strom gemischt (Reihenfolge zwischen den Zweigen nicht
+  festgelegt); **mehrere Ausgänge** bekommen jeden Record (`copy`), ab dem zweiten als Kopie, damit Zweige sich nicht
+  gegenseitig verändern. `distribute` und `copies` folgen mit S17.
+- Batches zu 500 Records, Puffer je Link 10.000 Records (feste Werte bis S17).
+- Hört ein Transform vor dem Ende seiner Eingabe auf zu lesen, verwirft die Engine den Rest, damit die Transforms davor
+  fertig werden. Eine Panik in einem Transform wird zum Fehler der Pipeline.
+- **Zähler** je Transform: gelesen, geschrieben (Ereignis `transform.finished`, Ergebnis des Laufs).
+- Mit S14 kommen Schema und Werttypen dazu (`Init(cfg, schemaIn) → schemaOut`, ADR 0007), ohne `Process` zu ändern;
+  vereinfachte Basistypen (`RowMapper`, `RowFilter`) für Transforms, die nur `func(Record) (Record, error)` brauchen,
+  folgen mit den ersten solchen Transforms (S16).
 
 ### 6.3 Datenvorschau & Debugging (Editor)
 
@@ -928,13 +933,16 @@ runnel/
 │  ├─ expr/                 # expr-lang + goja, gemeinsame Funktionsbibliothek (now, formatDate …)
 │  ├─ engine/
 │  │  ├─ workflow/          # Workflow-Engine, Link-Auswertung, Retry, Resume
-│  │  └─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
+│  │  ├─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
+│  │  └─ runid/             # Lauf-IDs (ULID) für Workflows und Pipelines
 │  ├─ registry/             # Katalog aller Actions/Transforms
 │  ├─ action/               # Schnittstelle Engine ↔ Actions, Registry, Descriptors
 │  ├─ actions/              # eingebaute Actions: actions.go (Builtin, Vertragstest), je Namensraum ein Paket
 │  │  ├─ core/              #   register.go + eine Datei je Action (start.go, log.go …) mit Test daneben
 │  │  └─ actiontest/        #   Test-Hilfen
-│  ├─ transforms/           # eingebaute Transforms, gleicher Aufbau (csv, json, db, core …)
+│  ├─ record/               # Record: geordnete Felder (ADR 0007)
+│  ├─ transform/            # Schnittstelle Engine ↔ Transforms, Registry, Descriptors
+│  ├─ transforms/           # eingebaute Transforms, gleicher Aufbau (csv, json, db, core …), transformtest/
 │  ├─ connections/          # DB-/HTTP-/SMTP-Verbindungen, Pooling
 │  ├─ secrets/              # Secret-Store, DPAPI, Maskierung
 │  ├─ store/                # SQLite-Zugriff, Migrationen
