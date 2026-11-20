@@ -1,0 +1,5 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: no-start
+actions:
+  - { id: a, type: core.log }

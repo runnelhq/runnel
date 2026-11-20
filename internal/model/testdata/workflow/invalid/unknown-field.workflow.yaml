@@ -1,0 +1,6 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: typo
+actions:
+  - id: start
+    tpye: core.start

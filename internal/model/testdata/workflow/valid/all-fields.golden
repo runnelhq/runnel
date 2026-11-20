@@ -1,0 +1,86 @@
+{
+  "kind": "Workflow",
+  "apiVersion": "runnel/v1",
+  "name": "all-fields",
+  "description": "Multi-line\ndescription\n",
+  "parameters": [
+    {
+      "name": "TARGET_DIR",
+      "description": "Where to copy to",
+      "required": true
+    },
+    {
+      "name": "RETRIES",
+      "default": "3"
+    }
+  ],
+  "settings": {
+    "timeout": "1h30m",
+    "maxConcurrentRuns": 2
+  },
+  "actions": [
+    {
+      "id": "start",
+      "type": "core.start"
+    },
+    {
+      "id": "check",
+      "type": "http.request",
+      "description": "Ping the API",
+      "with": {
+        "headers": {
+          "Accept": "application/json"
+        },
+        "method": "GET",
+        "url": "https://example.com/health"
+      },
+      "timeout": "10s",
+      "retry": {
+        "attempts": 5,
+        "backoff": "2s",
+        "strategy": "exponential"
+      },
+      "continueOnError": true
+    },
+    {
+      "id": "collect",
+      "type": "core.log",
+      "join": "all",
+      "joinTimeout": "5m"
+    },
+    {
+      "id": "retry-loop",
+      "type": "core.wait",
+      "with": {
+        "duration": "1m"
+      },
+      "join": "each"
+    }
+  ],
+  "links": [
+    {
+      "from": "start",
+      "to": "check"
+    },
+    {
+      "from": "check",
+      "to": "collect",
+      "when": "always"
+    },
+    {
+      "from": "check",
+      "to": "retry-loop",
+      "when": "{{ result.output.status != 200 }}"
+    },
+    {
+      "from": "retry-loop",
+      "to": "check",
+      "loop": true
+    },
+    {
+      "from": "start",
+      "to": "collect",
+      "disabled": true
+    }
+  ]
+}

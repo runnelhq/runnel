@@ -1,0 +1,9 @@
+# Example project. Check it with:  runnel validate examples/hello
+kind: Project
+apiVersion: runnel/v1
+name: hello
+description: Small example project with two environments
+defaultEnvironment: dev
+variables:
+  TARGET: World
+  OUTBOX: ${env:TEMP}\runnel-hello

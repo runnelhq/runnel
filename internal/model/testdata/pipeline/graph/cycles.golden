@@ -1,0 +1,1 @@
+testdata/pipeline/graph/cycles.pipeline.yaml:13:7: link #4 (c → a) closes a cycle (a → b → c → a); records in a pipeline can only flow forward

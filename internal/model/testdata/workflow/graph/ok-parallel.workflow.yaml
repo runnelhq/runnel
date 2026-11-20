@@ -1,0 +1,21 @@
+# Parallel branches joined again; loop link back for retries. No problems expected.
+kind: Workflow
+apiVersion: runnel/v1
+name: ok-parallel
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: core.log }
+  - { id: b, type: core.log }
+  - { id: join, type: core.log, join: all, joinTimeout: 10m }
+  - { id: check, type: http.request }
+  - { id: wait, type: core.wait }
+  - { id: done, type: core.success }
+links:
+  - { from: start, to: a }
+  - { from: start, to: b }
+  - { from: a, to: join }
+  - { from: b, to: join }
+  - { from: join, to: check }
+  - { from: check, to: done }
+  - { from: check, to: wait, when: failure }
+  - { from: wait, to: check, loop: true }

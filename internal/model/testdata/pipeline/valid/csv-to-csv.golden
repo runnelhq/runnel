@@ -1,0 +1,59 @@
+{
+  "kind": "Pipeline",
+  "apiVersion": "runnel/v1",
+  "name": "active-customers",
+  "description": "Copies the active customers into a new file",
+  "parameters": [
+    {
+      "name": "FILE",
+      "required": true
+    },
+    {
+      "name": "MIN_SALES",
+      "type": "number",
+      "default": "0"
+    }
+  ],
+  "transforms": [
+    {
+      "id": "read",
+      "type": "csv.input",
+      "with": {
+        "delimiter": ";",
+        "path": "${FILE}"
+      }
+    },
+    {
+      "id": "only-active",
+      "type": "core.filter",
+      "with": {
+        "condition": "{{ record.sales \u003e params.MIN_SALES }}"
+      },
+      "copies": 4,
+      "distribution": "copy"
+    },
+    {
+      "id": "write",
+      "type": "csv.output",
+      "with": {
+        "path": "active.csv"
+      },
+      "copies": 1
+    }
+  ],
+  "links": [
+    {
+      "from": "read",
+      "to": "only-active"
+    },
+    {
+      "from": "only-active",
+      "to": "write",
+      "type": "data"
+    }
+  ],
+  "settings": {
+    "bufferSize": 20000,
+    "batchSize": 1000
+  }
+}

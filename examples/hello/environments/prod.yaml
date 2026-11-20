@@ -1,0 +1,8 @@
+kind: Environment
+apiVersion: runnel/v1
+name: prod
+description: Production server
+variables:
+  STAGE: production
+  TARGET: Production
+  OUTBOX: \\fileserver\exchange\runnel-hello

@@ -6,7 +6,7 @@
 
 ## Kontext
 
-Mit dem Namen „Runnel“ stehen Editor (S30 ff.), Website, GitHub-Auftritt, Installer und Release-Artefakte an. Ohne
+Mit dem Namen „Runnel“ stehen Editor (E4 ff.), Website, GitHub-Auftritt, Installer und Release-Artefakte an. Ohne
 gemeinsames Erscheinungsbild entstehen Farben und Logos ad hoc in jedem Kanal und müssen später angeglichen werden.
 Der Editor nutzt React, Tailwind und shadcn/ui; Farben sollten deshalb als CSS-Variablen in deren Schema vorliegen.
 
@@ -40,12 +40,13 @@ Das Corporate Design liegt unter [`design/`](../../design/README.md) und besteht
   Die Marke zeigt den Befehl, den man tippt; im Text bleibt der Name ein normales Substantiv. Damit das nicht
   verwischt, darf „runnel“ nie als Text gesetzt werden. Erwogen und verworfen: Wortmarke „Runnel“ (förmlicher,
   verliert die Nähe zum Befehl) und durchgehende Kleinschreibung (widerspricht ADR 0010, schwierig im Deutschen).
-
-- Der Editor (S30) bindet `design/tokens/tailwind.css` ein und verwendet ausschließlich die semantischen Rollen;
+- Der Editor (E4) bindet `design/tokens/tailwind.css` ein und verwendet ausschließlich die semantischen Rollen;
   Hex-Werte im Frontend-Code sind nicht erlaubt.
 - Werden Inter/JetBrains Mono in die exe eingebettet, kommen ihre Lizenztexte in `THIRD_PARTY_NOTICES.txt`.
 - `runnel.exe` und der Installer erhalten `design/logo/runnel.ico`; die CLI nutzt für Zustände die ANSI-Standardfarben
   passend zu den Funktionsfarben.
+- Oberflächen werden vor der Umsetzung als Mockup unter `design/mockups/` entworfen und freigegeben
+  ([design/README.md, Kap. 9](../../design/README.md#9-mockups)); ergänzt am 2026-11-19.
 - Änderungen an Farben erfolgen nur in `tokens.json`; Änderungen an Logo oder Markenfarben erfordern eine neue ADR.
 - Vor einer öffentlichen Bekanntmachung sollte – zusammen mit der Markenrecherche aus ADR 0010 – geprüft werden, ob die
   Bildmarke mit bestehenden Marken verwechselbar ist.

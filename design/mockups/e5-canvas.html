@@ -1,0 +1,383 @@
+<!doctype html>
+<!--
+  Mockup E5 – Canvas (read-only): a workflow as a graph next to the YAML view of E4.
+  Static mockup, no build. Uses only the design tokens (../tokens/runnel.css).
+
+  Query parameters:
+    theme = light | dark                         (default light)
+    state = canvas | problems | invalid | auto   (default canvas)
+    controls = 0                                 hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hello – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5;
+    color: var(--foreground); background: var(--background); -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  code, .mono { font-family: var(--rn-font-mono); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
+          stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (as approved in mockup E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 248px 1fr; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4);
+           border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border);
+               border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent;
+                      padding: 3px 8px; border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs);
+                      color: var(--muted-foreground); cursor: pointer; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { background: var(--sidebar); color: var(--sidebar-foreground); border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; height: 36px; padding: 0 16px; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .k { color: var(--muted-foreground); }
+  .row.selected .k { color: var(--accent-foreground); }
+  .row .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); }
+  .badge svg.i { width: 12px; height: 12px; }
+  .badge.err { background: var(--danger-soft); color: var(--destructive); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; }
+  .btn svg.i { width: 14px; height: 14px; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+
+  /* Canvas (design/README.md, 6.1 "Canvas-Konventionen") */
+  .canvas {
+    position: relative; flex: 1; overflow: hidden; background-color: var(--canvas);
+    background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1.2px);
+    background-size: 16px 16px;
+  }
+  .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  svg.edges { position: absolute; left: 0; top: 0; overflow: visible; }
+  .edge { fill: none; stroke-width: 2; }
+  .edge.success { stroke: var(--link-success); }
+  .edge.failure { stroke: var(--link-failure); }
+  .edge.always { stroke: var(--link-always); }
+  .edge.expression { stroke: var(--link-expression); }
+  .edge.disabled { stroke: var(--link-disabled); stroke-dasharray: 5 4; }
+  .edge-label {
+    position: absolute; transform: translate(-50%, -50%);
+    display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: var(--rn-radius-full); background: var(--card); border: 1.5px solid currentColor;
+    font-size: 11px; font-weight: 700; line-height: 1;
+  }
+  .edge-label.success { color: var(--link-success); }
+  .edge-label.failure { color: var(--link-failure); }
+  .edge-label.always { color: var(--link-always); }
+  .edge-label.expression { color: var(--link-expression); }
+
+  .node {
+    position: absolute; width: 176px; height: 52px; display: flex; align-items: center; gap: 10px;
+    padding: 0 12px 0 10px; background: var(--node); border: 1px solid var(--node-border);
+    border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-sm);
+  }
+  .node.selected { outline: 2px solid var(--node-selected); outline-offset: 1px; }
+  .node.has-error { border-color: var(--destructive); }
+  .node.has-warning { border-color: var(--warning); }
+  .tile { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-allgemein); color: var(--rn-tiefe-0); flex: none; }
+  .tile.unknown { background: var(--rn-tiefe-300); color: var(--rn-tiefe-800); }
+  .node .text { min-width: 0; line-height: 1.25; }
+  .node .id { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .type { font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .port { position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+          background: var(--node); border: 1.5px solid var(--node-border); }
+  .port.in { left: -5px; }
+  .port.out { right: -5px; }
+  .marker { position: absolute; top: -9px; right: -9px; display: grid; place-items: center; width: 20px; height: 20px;
+            border-radius: 50%; font-size: 11px; font-weight: 700; color: var(--rn-tiefe-0); box-shadow: var(--rn-shadow-sm); }
+  .marker.err { background: var(--destructive); }
+  .marker.warn { background: var(--rn-warnung-600); }
+  .join { position: absolute; left: -2px; top: -22px; padding: 0 6px; height: 18px; display: inline-flex; align-items: center;
+          border-radius: var(--rn-radius-sm); border: 1px solid var(--border); background: var(--card);
+          font: 500 10px/1 var(--rn-font-mono); color: var(--muted-foreground); }
+
+  .popover {
+    position: absolute; width: 288px; padding: 12px 14px; background: var(--popover); color: var(--popover-foreground);
+    border: 1px solid var(--border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md);
+    font-size: var(--rn-text-xs);
+  }
+  .popover h4 { margin: 0 0 6px; font-size: var(--rn-text-xs); font-weight: 600; }
+  .problem { display: grid; grid-template-columns: 16px 1fr; gap: 6px; margin-top: 6px; }
+  .problem .sym.err { color: var(--destructive); }
+  .problem .sym.warn { color: var(--warning); }
+  .problem .where { font-family: var(--rn-font-mono); color: var(--muted-foreground); }
+
+  .controls-panel { position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column;
+                    background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-md);
+                    box-shadow: var(--rn-shadow-sm); overflow: hidden; }
+  .controls-panel button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; background: transparent;
+                           color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+  .controls-panel button:last-child { border-bottom: 0; }
+  .zoom { position: absolute; left: 56px; bottom: 16px; height: 22px; padding: 0 8px; display: inline-flex; align-items: center;
+          background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-sm);
+          font: 11px var(--rn-font-mono); color: var(--muted-foreground); }
+  .hint { position: absolute; right: 16px; top: 16px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+          background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-full);
+          font-size: var(--rn-text-xs); color: var(--muted-foreground); box-shadow: var(--rn-shadow-sm); }
+  .hint svg.i { width: 14px; height: 14px; }
+
+  .blocked { position: absolute; inset: 0; display: grid; place-items: center; }
+  .blocked .box { max-width: 440px; text-align: center; background: var(--card); border: 1px solid var(--border);
+                  border-radius: var(--rn-radius-xl); padding: 24px 28px; box-shadow: var(--rn-shadow-md); }
+  .blocked .symbol { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+                     background: var(--danger-soft); color: var(--destructive); font-size: var(--rn-text-lg); font-weight: 700; }
+  .blocked h2 { font-size: var(--rn-text-md); margin: 12px 0 4px; }
+  .blocked p { color: var(--muted-foreground); margin: 0 0 12px; }
+  .blocked pre { text-align: left; margin: 0 0 16px; padding: 8px 10px; border-radius: var(--rn-radius-md);
+                 background: var(--muted); font-size: var(--rn-text-xs); white-space: pre-wrap; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E5</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="canvas" href="#">canvas</a> <a data-state="problems" href="#">problems</a>
+  <a data-state="invalid" href="#">invalid</a> <a data-state="auto" href="#">auto</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>hello</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\hello</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="panel-title label">Explorer</div>
+      <ul class="tree" id="tree"></ul>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div class="canvas" id="canvas"></div>
+    </main>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "canvas";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+
+  // Icons for action types (white on the category tile).
+  const icons = {
+    "core.start": '<path d="M8 5l11 7-11 7z" fill="currentColor"/>',
+    "core.wait": '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    "core.log": '<path d="M5 6h14M5 12h14M5 18h9"/>',
+    "core.dummy": '<path d="M4 6h5l4 6-4 6H4M13 12h7"/>',
+    "core.success": '<circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+    "core.abort": '<circle cx="12" cy="12" r="8"/><path d="M9 9l6 6M15 9l-6 6"/>',
+    unknown: '<path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 1-1 1.7M12 17h.01"/>',
+  };
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const symbols = { success: "✔", failure: "✖", always: "∞", expression: "ƒ" };
+
+  // Workflows (positions in px, top-left of the node, as in the layout block).
+  const parallel = {
+    file: "parallel.workflow.yaml",
+    nodes: [
+      { id: "start", type: "core.start", x: 40, y: 200 },
+      { id: "fetch-a", type: "core.wait", x: 290, y: 100 },
+      { id: "fetch-b", type: "core.wait", x: 290, y: 300 },
+      { id: "combine", type: "core.log", x: 560, y: 200 },
+      { id: "report-error", type: "core.log", x: 560, y: 400, join: "first" },
+    ],
+    edges: [
+      ["start", "fetch-a", "success"], ["start", "fetch-b", "success"],
+      ["fetch-a", "combine", "success"], ["fetch-b", "combine", "success"],
+      ["fetch-a", "report-error", "failure"], ["fetch-b", "report-error", "failure"],
+    ],
+  };
+  const collector = {
+    file: "collector.workflow.yaml",
+    nodes: [
+      { id: "start", type: "core.start", x: 40, y: 180 },
+      { id: "check-inbox", type: "core.wait", x: 276, y: 60 },
+      { id: "check-archive", type: "core.wait", x: 276, y: 180 },
+      { id: "check-network", type: "core.wait", x: 276, y: 300 },
+      { id: "checks-done", type: "core.dummy", x: 512, y: 180 },
+      { id: "report", type: "core.log", x: 748, y: 180 },
+      { id: "done", type: "core.success", x: 984, y: 180 },
+    ],
+    edges: [
+      ["start", "check-inbox", "success"], ["start", "check-archive", "success"], ["start", "check-network", "success"],
+      ["check-inbox", "checks-done", "success"], ["check-archive", "checks-done", "success"], ["check-network", "checks-done", "success"],
+      ["checks-done", "report", "success"], ["report", "done", "success"],
+    ],
+  };
+
+  let wf = state === "auto" ? collector : parallel;
+  if (state === "problems") {
+    wf = structuredClone(parallel);
+    wf.nodes[2].type = "core.wiat";
+    wf.nodes[2].problem = "err";
+    wf.nodes[3].problem = "warn";
+    wf.nodes[2].selected = true;
+  }
+  if (state === "canvas") wf.nodes[1].selected = true;
+
+  // Explorer, tabs, file bar.
+  const files = [["folder", "environments", 0, "2"], ["env", "dev.yaml", 1], ["env", "prod.yaml", 1],
+                 ["folder", "workflows", 0, "3"], ["wf", "collector.workflow.yaml", 1], ["wf", "hello.workflow.yaml", 1],
+                 ["wf", "parallel.workflow.yaml", 1], ["proj", "project.yaml", 0]];
+  const kind = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    env: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  };
+  document.getElementById("tree").innerHTML = files.map(([k, n, d, c]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === wf.file ? "selected" : ""}">` +
+    (k === "folder" ? `<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>` : `<span style="width:12px"></span>`) +
+    `<span class="k">${icon(kind[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}</div></li>`).join("");
+  document.getElementById("tabs").innerHTML =
+    `<div class="tab">${icon(kind.wf)} hello.workflow.yaml ×</div>` +
+    `<div class="tab active">${icon(kind.wf)} ${wf.file} ×</div>`;
+
+  const problemBadges = state === "problems"
+    ? `<span class="badge err" title="1 error">✖ 1</span><span class="badge warn" title="1 warning">⚠ 1</span>`
+    : state === "invalid" ? `<span class="badge err">✖ 1</span>` : "";
+  document.getElementById("filebar").innerHTML = `
+    <span class="crumbs">workflows / <b>${wf.file}</b></span>
+    <span class="badge">Workflow</span>
+    <span class="badge">${icon('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 12)}Read-only</span>
+    ${problemBadges}
+    <div class="spacer"></div>
+    <div class="segmented" role="group" aria-label="View">
+      <button aria-pressed="${state !== "invalid"}">${icon('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>', 14)}Canvas</button>
+      <button aria-pressed="false">${icon('<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>', 14)}YAML</button>
+    </div>
+    <button class="btn">${icon('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>', 14)}Copy path</button>`;
+  document.getElementById("status").innerHTML =
+    `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>` +
+    (state === "invalid" ? "" : `<span>Workflow · ${wf.nodes.length} actions · ${wf.edges.length} links</span>`) +
+    `<span class="spacer"></span><span>Runnel v0.1.0</span>`;
+
+  // Canvas.
+  const canvas = document.getElementById("canvas");
+  if (state === "invalid") {
+    canvas.innerHTML = `<div class="blocked"><div class="box">
+      <span class="symbol">✖</span>
+      <h2>This workflow can’t be shown as a graph</h2>
+      <p>The file has a syntax error. Fix it in the YAML view or in your text editor.</p>
+      <pre class="mono">workflows/parallel.workflow.yaml:23:5
+syntax error: did not find expected key</pre>
+      <button class="btn">${icon('<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>', 14)}Show YAML</button>
+    </div></div>`;
+  } else {
+    const W = 176, H = 52;
+    const byId = Object.fromEntries(wf.nodes.map(n => [n.id, n]));
+    const stage = document.createElement("div");
+    stage.className = "stage";
+    // "Fit to view": the auto-arranged workflow is wider than the canvas.
+    const zoom = state === "auto" ? 0.8 : 1;
+    stage.style.transform = `translate(24px, ${state === "auto" ? 80 : 32}px) scale(${zoom})`;
+    let svg = `<svg class="edges" width="1100" height="600">`;
+    let labels = "";
+    for (const [from, to, type] of wf.edges) {
+      const a = byId[from], b = byId[to];
+      const x1 = a.x + W + 4, y1 = a.y + H / 2, x2 = b.x - 4, y2 = b.y + H / 2;
+      const dx = Math.max(40, (x2 - x1) / 2);
+      svg += `<path class="edge ${type}" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}"/>`;
+      // Symbol at 35 % of the curve (from the source), so that crossing links don't hide each other.
+      const t = 0.35, u = 1 - t;
+      const mx = u*u*u*x1 + 3*u*u*t*(x1 + dx) + 3*u*t*t*(x2 - dx) + t*t*t*x2;
+      const my = u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2;
+      labels += `<span class="edge-label ${type}" style="left:${mx}px;top:${my}px" title="when: ${type}">${symbols[type]}</span>`;
+    }
+    svg += `</svg>`;
+    const nodes = wf.nodes.map(n => {
+      const known = icons[n.type];
+      const cls = ["node", n.selected ? "selected" : "", n.problem === "err" ? "has-error" : "", n.problem === "warn" ? "has-warning" : ""].join(" ");
+      return `<div class="${cls}" style="left:${n.x}px;top:${n.y}px">
+        ${n.join ? `<span class="join" title="join: ${n.join}">join: ${n.join}</span>` : ""}
+        ${n.type !== "core.start" ? `<span class="port in"></span>` : ""}
+        <span class="tile ${known ? "" : "unknown"}">${icon(known || icons.unknown)}</span>
+        <span class="text"><div class="id">${n.id}</div><div class="type">${n.type}</div></span>
+        ${n.type !== "core.success" && n.type !== "core.abort" ? `<span class="port out"></span>` : ""}
+        ${n.problem ? `<span class="marker ${n.problem}">${n.problem === "err" ? "✖" : "⚠"}</span>` : ""}
+      </div>`;
+    }).join("");
+    stage.innerHTML = svg + labels + nodes;
+    canvas.append(stage);
+
+    if (state === "problems") {
+      canvas.insertAdjacentHTML("beforeend", `<div class="popover" style="left:${290 + 24 - 120}px;top:${300 + 32 + 52 + 10}px">
+        <h4>fetch-b</h4>
+        <div class="problem"><span class="sym err">✖</span><span>unknown action type “core.wiat”
+          <div class="where">line 21, column 11</div></span></div>
+        <div class="problem"><span class="sym warn" style="visibility:hidden">⚠</span><span style="color:var(--muted-foreground)">Show in YAML ›</span></div>
+      </div>`);
+    }
+    if (state === "auto") {
+      canvas.insertAdjacentHTML("beforeend", `<span class="hint">${icon('<path d="M4 6h16M4 12h10M4 18h6"/>', 14)}Arranged automatically – the file has no layout yet</span>`);
+    }
+    canvas.insertAdjacentHTML("beforeend", `<div class="controls-panel">
+      <button title="Zoom in">${icon('<path d="M12 5v14M5 12h14"/>', 14)}</button>
+      <button title="Zoom out">${icon('<path d="M5 12h14"/>', 14)}</button>
+      <button title="Fit to view">${icon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>', 14)}</button>
+    </div><span class="zoom">${Math.round(zoom * 100)} %</span>`);
+  }
+</script>
+</body>
+</html>

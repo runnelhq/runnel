@@ -1,0 +1,16 @@
+# One source, two outputs and a transform with two inputs: no problems.
+kind: Pipeline
+apiVersion: runnel/v1
+name: branches
+transforms:
+  - { id: read, type: csv.input }
+  - { id: big, type: core.filter }
+  - { id: small, type: core.filter }
+  - { id: merge, type: core.dummy }
+  - { id: write, type: csv.output }
+links:
+  - { from: read, to: big }
+  - { from: read, to: small }
+  - { from: big, to: merge }
+  - { from: small, to: merge }
+  - { from: merge, to: write }

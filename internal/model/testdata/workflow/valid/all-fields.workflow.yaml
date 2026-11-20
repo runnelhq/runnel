@@ -1,0 +1,48 @@
+# Uses every field of the workflow format at least once.
+kind: Workflow
+apiVersion: runnel/v1
+name: all-fields
+description: |
+  Multi-line
+  description
+parameters:
+  - name: TARGET_DIR
+    description: Where to copy to
+    required: true
+  - name: RETRIES
+    default: 3            # scalars are read as text
+settings:
+  timeout: 1h30m
+  maxConcurrentRuns: 2
+actions:
+  - id: start
+    type: core.start
+  - id: check
+    type: http.request
+    description: Ping the API
+    timeout: 10s
+    continueOnError: true
+    retry:
+      attempts: 5
+      backoff: 2s
+      strategy: exponential
+    with:
+      method: GET
+      url: https://example.com/health
+      headers:
+        Accept: application/json
+  - id: collect
+    type: core.log
+    join: all
+    joinTimeout: 5m
+  - id: retry-loop
+    type: core.wait
+    join: each
+    with:
+      duration: 1m
+links:
+  - { from: start, to: check }
+  - { from: check, to: collect, when: always }
+  - { from: check, to: retry-loop, when: "{{ result.output.status != 200 }}" }
+  - { from: retry-loop, to: check, loop: true }
+  - { from: start, to: collect, disabled: true }

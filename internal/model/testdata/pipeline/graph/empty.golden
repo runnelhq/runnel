@@ -1,0 +1,1 @@
+testdata/pipeline/graph/empty.pipeline.yaml:1:1: pipeline has no transforms (add them under "transforms:")

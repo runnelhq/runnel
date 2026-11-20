@@ -1,0 +1,314 @@
+@import "tailwindcss";
+@import "../../design/tokens/tailwind.css";
+@import "../../design/fonts/fonts.css";
+
+/* Text sizes of the tokens instead of Tailwind's defaults (text-2xs … text-xl). */
+@theme inline {
+  --text-2xs: var(--rn-text-2xs);
+  --text-xs: var(--rn-text-xs);
+  --text-sm: var(--rn-text-sm);
+  --text-base: var(--rn-text-base);
+  --text-md: var(--rn-text-md);
+  --text-lg: var(--rn-text-lg);
+  --text-xl: var(--rn-text-xl);
+}
+
+/* Colours of the file view, derived from the tokens (mockup E4). */
+:root {
+  --code-string: var(--rn-tiefe-700);
+  --code-gutter: var(--rn-tiefe-400);
+}
+[data-theme="dark"] {
+  --code-string: var(--rn-tiefe-300);
+  --code-gutter: var(--rn-tiefe-600);
+}
+
+/* Canvas (React Flow) after design/README.md 6.1 and mockup E5. */
+.runnel-canvas {
+  background: var(--canvas);
+}
+.runnel-canvas .react-flow__background circle {
+  fill: var(--canvas-grid);
+}
+.runnel-canvas .react-flow__handle.runnel-port {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 50%;
+  background: var(--node);
+  border: 1.5px solid var(--node-border);
+}
+/* Drawing a link (mockup E6b): the output in use and the target input are highlighted. */
+.runnel-canvas .react-flow__handle.runnel-port.connectable {
+  cursor: crosshair;
+}
+.runnel-canvas .react-flow__handle.runnel-port.connectingfrom {
+  border-color: var(--node-selected);
+  background: var(--node-selected);
+}
+.runnel-canvas .react-flow__handle.runnel-port.connectingto.valid {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--node-selected);
+  background: var(--accent);
+}
+.runnel-canvas .react-flow__node {
+  font-size: var(--rn-text-sm);
+  color: var(--foreground);
+}
+.runnel-canvas .react-flow__node.dragging > div {
+  box-shadow: var(--rn-shadow-md);
+}
+.runnel-canvas .react-flow__node.selected,
+.runnel-canvas .react-flow__node:focus-visible {
+  outline: none;
+}
+.runnel-canvas .react-flow__attribution {
+  background: transparent;
+  font-size: var(--rn-text-2xs);
+}
+.runnel-canvas .react-flow__attribution a {
+  color: var(--muted-foreground);
+}
+
+/* Running (mockup E8): the link to a running action "flows", the running symbol turns. */
+.runnel-canvas .runnel-flow {
+  stroke-dasharray: 6 6;
+  animation: runnel-flow 1.2s linear infinite;
+}
+.runnel-spin {
+  animation: runnel-spin 0.9s linear infinite;
+}
+@keyframes runnel-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes runnel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .runnel-canvas .runnel-flow,
+  .runnel-spin {
+    animation: none;
+  }
+}
+
+/* A field shown after a click on a problem lights up briefly (mockup E7). */
+.runnel-flash input,
+.runnel-flash textarea,
+.runnel-flash select {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+/* Base styles of the editor: 13 px base size like an IDE (design/README.md, chapter 4.1). */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    font-family: var(--rn-font-sans);
+    font-size: var(--rn-text-sm);
+    line-height: 1.5;
+    color: var(--foreground);
+    background: var(--background);
+    -webkit-font-smoothing: antialiased;
+  }
+  code,
+  kbd,
+  pre {
+    font-family: var(--rn-font-mono);
+  }
+}
+
+/* Small uppercase panel titles ("Explorer", "Project"). */
+@utility label-caps {
+  font-size: var(--rn-text-2xs);
+  font-weight: var(--rn-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+/* Expression editor (roadmap S35a, mockup design/mockups/s35-expressions.html). */
+:root {
+  --code-function: var(--rn-strom-700);
+}
+[data-theme="dark"] {
+  --code-function: var(--rn-strom-300);
+}
+.runnel-expr .cm-editor {
+  min-height: 30px;
+  border: 1px solid var(--input);
+  border-radius: var(--rn-radius-md);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--rn-font-mono);
+  font-size: var(--rn-text-xs);
+}
+.runnel-expr-area .cm-editor .cm-content {
+  min-height: 56px;
+}
+.runnel-expr .cm-editor.cm-focused {
+  outline: 2px solid color-mix(in srgb, var(--ring) 25%, transparent);
+  border-color: var(--ring);
+}
+.runnel-expr[data-invalid] .cm-editor {
+  border-color: var(--destructive);
+  outline: 2px solid var(--danger-soft);
+}
+.runnel-expr .cm-scroller {
+  font-family: inherit;
+  line-height: 1.55;
+}
+.runnel-expr .cm-content {
+  padding: 5px 0;
+  caret-color: var(--foreground);
+}
+.runnel-expr .cm-line {
+  padding: 0 8px;
+}
+.runnel-expr .cm-placeholder {
+  color: var(--muted-foreground);
+}
+.runnel-expr .cm-cursor {
+  border-left-color: var(--foreground);
+}
+.runnel-expr .cm-selectionBackground,
+.runnel-expr .cm-focused .cm-selectionBackground {
+  background: var(--accent) !important;
+}
+.rx-expr,
+.rx-var {
+  background: var(--expression-soft);
+  border-radius: 3px;
+}
+.rx-var,
+.rx-brace,
+.rx-root {
+  color: var(--expression);
+}
+.rx-brace,
+.rx-root {
+  font-weight: 600;
+}
+.rx-fn {
+  color: var(--code-function);
+}
+.rx-string,
+.rx-number {
+  color: var(--code-string);
+}
+.rx-error {
+  text-decoration: underline wavy var(--destructive);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* Suggestions, signature help and hover of the expression editor. */
+.runnel-expr .cm-tooltip.rx-complete,
+.runnel-expr .cm-tooltip.rx-signature,
+.runnel-expr .cm-tooltip.rx-hover {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--rn-radius-lg);
+  box-shadow: var(--rn-shadow-md);
+  font-family: var(--rn-font-sans);
+  font-size: var(--rn-text-xs);
+}
+.runnel-expr .cm-tooltip.rx-complete > ul {
+  max-height: 16em;
+  min-width: 240px;
+  padding: 4px;
+  font-family: var(--rn-font-sans);
+}
+.runnel-expr .cm-tooltip.rx-complete > ul > li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px !important;
+  border-radius: var(--rn-radius-sm);
+}
+.runnel-expr .cm-tooltip.rx-complete > ul > li[aria-selected] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.runnel-expr .rx-complete .rx-kind {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--rn-radius-sm);
+  background: var(--expression-soft);
+  color: var(--expression);
+  font: 600 10px var(--rn-font-mono);
+}
+.runnel-expr .rx-complete .cm-completionLabel {
+  font-family: var(--rn-font-mono);
+}
+.runnel-expr .rx-complete .cm-completionMatchedText {
+  text-decoration: none;
+  color: var(--expression);
+  font-weight: 700;
+}
+.runnel-expr .rx-complete .cm-completionDetail {
+  margin-left: auto;
+  padding-left: 12px;
+  font: 10px var(--rn-font-mono);
+  font-style: normal;
+  color: var(--muted-foreground);
+}
+.runnel-expr .rx-complete .cm-completionInfo {
+  max-width: 260px;
+  padding: 8px 10px;
+  white-space: pre-line;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--rn-radius-lg);
+  box-shadow: var(--rn-shadow-md);
+  color: var(--muted-foreground);
+}
+.runnel-expr .rx-signature,
+.runnel-expr .rx-hover {
+  max-width: 300px;
+  padding: 7px 10px;
+}
+.rx-signature-head,
+.rx-hover-head {
+  font-family: var(--rn-font-mono);
+  margin-bottom: 4px;
+}
+.rx-signature-current {
+  color: var(--expression);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.rx-signature-text,
+.rx-hover-text {
+  color: var(--muted-foreground);
+}
+.runnel-expr-expandable .cm-line {
+  padding-right: 28px;
+}
+.runnel-expr-large .cm-editor {
+  height: 100%;
+  font-size: var(--rn-text-sm);
+}
+.runnel-expr-large .cm-scroller {
+  line-height: 1.7;
+}
+.runnel-expr-large .cm-gutters {
+  background: var(--muted);
+  color: var(--code-gutter);
+  border-right: 1px solid var(--border);
+  border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md);
+}

@@ -1,0 +1,12 @@
+# Greets every hour while "runnel serve examples/hello" runs (roadmap S38); the first
+# run is one hour after the start. A run still running is not started twice
+# (overlap: skip, the default).
+kind: Trigger
+apiVersion: runnel/v1
+name: hourly
+description: Greets every hour
+type: interval
+target: workflows/hello.workflow.yaml
+environment: dev
+with:
+  every: 1h

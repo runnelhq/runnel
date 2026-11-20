@@ -60,7 +60,7 @@ Das Go-Plugin-SDK (`pkg/sdk`) bleibt im Monorepo; bei Bedarf wird es als eigenes
 
 Die Entscheidung wird überprüft, sobald einer der folgenden Punkte eintritt:
 
-- Das Plugin-Protokoll erreicht eine stabile Version (geplant Phase 0.6 / 1.0) → **SDKs für Python, C# und Node**
+- Das Plugin-Protokoll erreicht eine stabile Version (geplant Phase 0.7 / 1.0) → **SDKs für Python, C# und Node**
   sowie **externe Plugins** (z. B. SAP) werden dann voraussichtlich in eigene Repos ausgelagert.
 - Externe Beitragende oder abweichende Lizenzmodelle erfordern getrennte Repos.
 - CI-Laufzeiten bleiben trotz Pfadfilterung dauerhaft zu lang.

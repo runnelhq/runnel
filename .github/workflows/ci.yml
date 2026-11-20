@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 5 * * 1" # weekly, to catch newly published vulnerabilities
 
 permissions:
   contents: read
@@ -21,9 +23,35 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          check-latest: true
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+
+  vulncheck:
+    name: Vulnerability check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: govulncheck
+        run: make vulncheck
+
+  fuzz:
+    name: Fuzz (weekly)
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: Fuzz parser and variables (5 minutes each)
+        run: make fuzz FUZZTIME=5m
 
   test:
     name: Test (${{ matrix.os }})
@@ -37,6 +65,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          check-latest: true
       - name: Test with race detector
         if: runner.os == 'Linux'
         run: go test -race ./...
@@ -44,19 +73,59 @@ jobs:
         if: runner.os == 'Windows'
         run: go test ./...
 
-  build:
-    name: Build
-    needs: [lint, test]
+  editor:
+    name: Editor (typecheck, E2E)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Build and package Windows and Linux binaries
+          check-latest: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build editor and binary
+        run: make build
+      - name: Install Playwright browser
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests
+        working-directory: web
+        run: npx playwright test
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
+
+  build:
+    name: Build
+    needs: [lint, vulncheck, test, editor]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build and package Windows and Linux binaries with editor (incl. SBOMs)
         run: make package
       - name: Smoke test
-        run: ./bin/runnel-linux-amd64 version
+        run: |
+          ./bin/runnel-linux-amd64 version
+          ./bin/runnel-linux-amd64 serve examples/hello --port 7310 &
+          for _ in $(seq 20); do curl -sf http://127.0.0.1:7310/api/v1/version >/dev/null && break; sleep 0.5; done
+          curl -sf http://127.0.0.1:7310/ | grep -q '<div id="root">' || { echo "::error::editor not embedded"; exit 1; }
+          kill %1
       - uses: actions/upload-artifact@v7
         with:
           name: runnel-${{ github.sha }}

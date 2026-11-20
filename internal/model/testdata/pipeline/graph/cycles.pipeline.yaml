@@ -1,0 +1,13 @@
+kind: Pipeline
+apiVersion: runnel/v1
+name: cycles
+transforms:
+  - { id: read, type: csv.input }
+  - { id: a, type: core.filter }
+  - { id: b, type: core.select-fields }
+  - { id: c, type: core.dummy }
+links:
+  - { from: read, to: a }
+  - { from: a, to: b }
+  - { from: b, to: c }
+  - { from: c, to: a }

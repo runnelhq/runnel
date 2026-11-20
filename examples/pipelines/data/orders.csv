@@ -1,0 +1,4 @@
+Nr;Kunde;Betrag;Datum;Bezahlt
+1001;Müller GmbH;1.234,50;19.11.2026;ja
+1002;Schmidt & Söhne;89,90;19.11.2026;nein
+1003;Weber, Anna;12.500,00;20.11.2026;ja

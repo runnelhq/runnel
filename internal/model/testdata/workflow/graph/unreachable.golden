@@ -1,0 +1,3 @@
+unreachable.workflow.yaml:7:11: warning: action "orphan" is not reachable from the start action "start" and will never run
+unreachable.workflow.yaml:8:11: warning: action "only-disabled" is not reachable from the start action "start" and will never run
+unreachable.workflow.yaml:9:11: warning: action "after-orphan" is not reachable from the start action "start" and will never run

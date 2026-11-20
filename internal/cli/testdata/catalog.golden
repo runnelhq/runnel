@@ -1,0 +1,38 @@
+actions / general
+  core.abort    Abort    Ends the workflow as failed
+  core.dummy    Dummy    Does nothing; collects branches into one point
+  core.log      Log      Writes a message to the run log
+  core.start    Start    Entry point of the workflow
+  core.success  Success  Ends the workflow successfully
+  core.wait     Wait     Waits for a given time
+actions / execution
+  core.run-pipeline  Run Pipeline  Runs a pipeline with parameters; output: the counts of its transforms
+  core.run-workflow  Run Workflow  Runs another workflow with parameters; output: its outputs
+actions / files
+  file.copy    Copy Files     Copies files or folders; output: the copied files
+  file.delete  Delete Files   Deletes files or folders; output: the deleted paths
+  file.exists  File Exists    Checks whether files or folders exist; output: the matching paths
+  file.list    List Files     Lists the files of a folder; output: path, name, size, modified and folder of each entry
+  file.mkdir   Create Folder  Creates a folder with its parent folders; output: the path
+  file.move    Move Files     Moves files or folders; output: the new paths
+  file.wait    Wait for File  Waits until files exist; output: the matching paths
+transforms / input
+  core.generate-rows  Generate Rows  Creates records with constant fields
+  csv.input           CSV Input      Reads the rows of a CSV file as records
+transforms / transform
+  core.constant       Add Constants  Adds fields with the same value to every record
+  core.convert        Convert Types  Converts fields to another type, with a number or date format
+  core.filter         Filter         Passes on the records for which a condition is true
+  core.select-fields  Select Fields  Keeps, orders and renames fields, or removes fields
+transforms / flow
+  core.dummy   Dummy   Passes all records on unchanged
+  core.switch  Switch  Passes each record to the link of the first case whose condition is true
+transforms / execution
+  core.from-result  Records from Workflow  Passes on the records the calling workflow gave to the pipeline (rows)
+  core.to-result    Records to Workflow    Returns the records to the calling workflow (output.rows) and passes them on
+transforms / combine
+  core.group-by  Group By  Combines records with the same values into one, with count, sum and other aggregates
+  core.sort      Sort      Sorts the records by fields; keeps all records in memory
+transforms / output
+  core.log    Log         Writes records to the run log and passes them on
+  csv.output  CSV Output  Writes records to a CSV file and passes them on

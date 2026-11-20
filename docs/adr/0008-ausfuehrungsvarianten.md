@@ -152,9 +152,9 @@ Technisch: `POST /api/v1/runs` mit `startAt: "<action-id>"` bzw. `only: "<action
 
 | Phase | Inhalt |
 |---|---|
-| 0.2 – Pipelines | Executor-Transforms, `forEachRow`, `core.to-result`/`core.from-result`, dynamische Ziele |
-| 0.3 – Server & Editor | Teilausführung im Editor |
-| 0.4 – Betrieb | Run-Konfigurationen (`local`), Trigger für Pipelines |
+| 0.4 – Pipelines | Executor-Transforms, `forEachRow`, `core.to-result`/`core.from-result`, dynamische Ziele |
+| 0.3 – Workflow-Ausbau | Teilausführung im Editor |
+| 0.5 – Betrieb | Run-Konfigurationen (`local`), Trigger für Pipelines |
 | später | Mappings, `RunConfig type: remote` |
 
 ## Konsequenzen
@@ -172,3 +172,31 @@ Technisch: `POST /api/v1/runs` mit `startAt: "<action-id>"` bzw. `only: "<action
   standardmäßig 1.
 - Dynamische Ziele sind statisch nur eingeschränkt prüfbar.
 - Ergebnis-Datensätze im Speicher brauchen ein Auslagerungskonzept (siehe oben).
+
+## Nachtrag 2026-11-20 (S24a): Ergebnis-Datensätze
+
+Abstimmung mit dem Maintainer zur Umsetzung von 3c:
+
+- **Übergabe ausdrücklich:** Eine Pipeline erhält Datensätze über das Feld `rows` von `core.run-pipeline`, eine Liste
+  aus einem Ausdruck (z. B. `rows: "{{ results.list.output }}"`); `core.from-result` gibt sie weiter. Ein implizites
+  Lesen des Ergebnisses der vorherigen Action (wie „Get rows from result“ in Hop) gibt es nicht – es hinge davon ab,
+  über welchen Link die Action erreicht wurde. Objekte werden zu Datensätzen (Felder nach Namen sortiert, da Objekte
+  keine Reihenfolge haben), andere Einträge zu `{value: …}`.
+- **Rückgabe:** `core.to-result` gibt die Datensätze weiter und sammelt sie; `core.run-pipeline` liefert sie als
+  `output.rows` (Liste von Objekten, Datumsfelder wie in Ausdrücken als Zeitpunkt). Ohne Aufrufer bleibt das Ergebnis
+  ungenutzt; ohne `rows` liefert `core.from-result` keine Datensätze und sagt das im Log.
+- **Speicher:** Ergebnis-Datensätze liegen im Speicher, höchstens `maxRows` (Standard 100.000) je `core.to-result`;
+  mehr bricht die Pipeline mit klarer Meldung ab. Das Auslagern in eine temporäre Datei (`resultSpillRows`) ist
+  zurückgestellt (Backlog).
+- **Wiederholung je Datensatz** folgt mit S24b als `forEach: "{{ … }}"` (ausdrückliche Liste, aktueller Eintrag `row`)
+  statt `forEachRow: true`.
+
+## Nachtrag 2026-11-20 (S24b): Wiederholung je Eintrag
+
+- **An der Action, für alle Actions:** `forEach`, `parallel` und `stopOnError` stehen neben `retry` und `timeout`, nicht
+  unter `with` von `core.run-pipeline`/`core.run-workflow` – so lässt sich z. B. auch `file.copy` je Datei wiederholen.
+  Die Engine wertet `with` je Eintrag mit `row` aus; `retry` und `timeout` gelten je Eintrag.
+- **Ergebnis:** `output.items` (je Eintrag `row`, `success`, `output`, `error`, in der Reihenfolge der Liste), dazu
+  `output.succeeded` und `output.failed`. `stopOnError` (Standard `true`) beendet beim ersten Fehler die übrigen
+  Einträge; mit `false` scheitert die Action erst am Ende, wenn ein Eintrag fehlschlug (wie oben unter 3b).
+- `parallel` ist standardmäßig 1, höchstens 64.

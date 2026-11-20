@@ -1,0 +1,6 @@
+# Sub-workflows (roadmap S11). Run it with:
+#   runnel run -v examples/sub-workflows/workflows/nightly.workflow.yaml
+kind: Project
+apiVersion: runnel/v1
+name: sub-workflows
+description: A workflow that calls another workflow once per region

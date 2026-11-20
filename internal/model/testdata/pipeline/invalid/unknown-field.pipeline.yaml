@@ -1,0 +1,10 @@
+# onError and parallel are not part of the format (errors via links, parallel
+# instances with copies). Both are reported, in the order of the file.
+kind: Pipeline
+apiVersion: runnel/v1
+name: later
+transforms:
+  - id: call
+    type: http.request
+    onError: error-link
+    parallel: 4

@@ -1,0 +1,6 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: minimal
+actions:
+  - id: start
+    type: core.start

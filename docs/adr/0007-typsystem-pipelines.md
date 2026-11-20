@@ -82,6 +82,23 @@ Der Editor ergänzt sie um Felder aus der Datenvorschau bzw. aus Samples des let
 Mit `settings.strict: true` an einer Pipeline müssen alle Links ein **geschlossenes** Schema haben; Warnungen zu
 unbekannten Feldern werden zu Fehlern. Gedacht für produktive, stabile Pipelines.
 
+### Nachtrag 2026-11-20 (S14, umgesetzt in `internal/record` und `internal/transform`)
+
+- **`date` ist ein eigener Typ** (`record.Date`: Jahr, Monat, Tag ohne Uhrzeit und Zeitzone), `datetime` bleibt
+  `time.Time`. Ein Datum bleibt beim Weiterreichen ein Datum und verschiebt sich nicht um Mitternacht.
+- **`decimal`** mit `github.com/shopspring/decimal` (MIT, v1.6.0).
+- **Schema-Ableitung:** Transforms mit `Init(ic) → Schema` melden ihr Ausgabeschema; die Engine ruft `Init` vor dem Lauf
+  in der Reihenfolge der Links auf und mischt die Schemas mehrerer Eingänge (unterschiedliche Typen → unbekannt, ein
+  offenes → offen). Transforms ohne `Init` liefern ein offenes Schema, über das nichts bekannt ist.
+- **Verwendete Felder** meldet ein Transform in `Init` mit `ic.Use(name, pfad)`. Geschlossen + fehlt → Fehler, offen +
+  unbekannt → Warnung, beide mit Vorschlag. **Ist im offenen Schema gar kein Feld bekannt, gibt es keine Warnung** –
+  sonst wäre nach jedem Transform ohne Schema jedes verwendete Feld gemeldet, ohne Aussage.
+- **Zahlen in der Konfiguration** (z. B. Konstanten) bleiben ganze Zahlen (`int64`) bzw. werden `float64`; sie werden nicht
+  über `float64` gelesen.
+- **Strikter Modus** (S17c): `settings.strict: true`. Hat ein Link ein offenes Schema, ist das ein Fehler – beim
+  Transform, dessen Records es sind (z. B. `csv.input` ohne `fields`), bzw. beim Fehler-Link. Ein verwendetes Feld,
+  das nicht bekannt ist, ist immer ein Fehler, auch hinter einem offenen Schema.
+
 ## Konsequenzen
 
 **Positiv**

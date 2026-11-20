@@ -1,0 +1,9 @@
+references.workflow.yaml:7:11: duplicate action id "load" (first defined at line 6)
+references.workflow.yaml:8:11: warning: action "archive" is not reachable from the start action "start" and will never run
+references.workflow.yaml:10:24: link #1 (start → laod): unknown action "laod" (did you mean "load"?)
+references.workflow.yaml:12:7: warning: link #3 (start → load): same link as link #2
+references.workflow.yaml:13:13: link #4 (nowhere → archive): unknown action "nowhere"
+references.workflow.yaml:14:23: link #5 (load → start): the start action cannot have incoming links
+references.workflow.yaml:15:7: link #6 (archive → archive): a link from an action to itself must be marked with loop: true
+references.workflow.yaml:16:23: link #7 (load → missing): unknown action "missing"
+references.workflow.yaml:19:15: warning: layout entry for unknown action "old-step"

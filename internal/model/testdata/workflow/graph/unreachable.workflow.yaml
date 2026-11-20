@@ -1,0 +1,13 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: unreachable
+actions:
+  - { id: start, type: core.start }
+  - { id: used, type: core.log }
+  - { id: orphan, type: core.log }
+  - { id: only-disabled, type: core.log }
+  - { id: after-orphan, type: core.log }
+links:
+  - { from: start, to: used }
+  - { from: start, to: only-disabled, disabled: true }
+  - { from: orphan, to: after-orphan }

@@ -1,0 +1,49 @@
+# A workflow that runs a CSV pipeline (roadmap S18). Run it from the folder that
+# contains "examples":
+#   runnel run -v examples/pipelines/workflows/import.workflow.yaml
+# - "prepare" runs pipelines/customers.pipeline.yaml with a batch number from the
+#   parameters; the log of the pipeline appears in its log as "customers/<transform>: …".
+# - Its output are the counts of the transforms: results.prepare.output.transforms.<id>
+#   with read, written and errors, and output.errors for all records on error links.
+# - "check" is reached only if customers were rejected; "done" reports the numbers.
+kind: Workflow
+apiVersion: runnel/v1
+name: import
+parameters:
+  - name: BATCH
+    type: integer
+    default: "7"
+  - name: OUT_DIR
+    description: Folder for the files of the pipeline
+    default: .
+outputs:
+  - name: EXPORTED
+    type: integer
+    value: "{{ results.prepare.output.transforms.write.written }}"
+  - name: REJECTED
+    type: integer
+    value: "{{ results.prepare.output.errors }}"
+actions:
+  - id: start
+    type: core.start
+  - id: prepare
+    type: core.run-pipeline
+    with:
+      pipeline: pipelines/customers.pipeline.yaml
+      params:
+        BATCH: ${BATCH}
+        OUTPUT: ${OUT_DIR}/customers-crm.csv
+        REJECTED: ${OUT_DIR}/customers-rejected.csv
+  - id: check
+    type: core.log
+    with:
+      level: warn
+      message: "{{ results.prepare.output.errors }} customer(s) rejected, see customers-rejected.csv"
+  - id: done
+    type: core.log
+    with:
+      message: "Batch ${BATCH}: {{ results.prepare.output.transforms.write.written }} customer(s) exported"
+links:
+  - { from: start, to: prepare }
+  - { from: prepare, to: check, when: "{{ results.prepare.output.errors > 0 }}" }
+  - { from: prepare, to: done }

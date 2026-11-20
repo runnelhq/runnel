@@ -1,0 +1,3 @@
+testdata/project/ok/workflows/vars.workflow.yaml:17:12: warning: variable "API_URL" is not defined in environment "prod"
+testdata/project/ok/workflows/vars.workflow.yaml:18:13: warning: variable "UNDEFINED_USER" is not defined (neither as workflow parameter nor in the project or environment)
+testdata/project/ok/workflows/vars.workflow.yaml:20:12: invalid variable name "not-valid" in "${not-valid}" (letters, digits and _, not starting with a digit)

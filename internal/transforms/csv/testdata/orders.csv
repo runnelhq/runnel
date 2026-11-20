@@ -1,0 +1,3 @@
+﻿id,customer,amount,day,paid
+7,"Müller, Jörg",1234.5,2026-11-19,true
+8,"Schmidt ""Ltd""",-0.99,,false

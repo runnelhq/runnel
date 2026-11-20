@@ -1,0 +1,48 @@
+# Parallel branches and a join (ADR 0003). Run it with:
+#   runnel run -v examples/hello/workflows/parallel.workflow.yaml
+# "fetch-a" and "fetch-b" run at the same time; "combine" waits until both are
+# finished (join: all). It runs if at least one of its links applies - also when the
+# other branch failed (that link is then "dead"). If a branch fails, "report-error"
+# runs once (join: first). Try: runnel run --param DELAY_B=oops …
+kind: Workflow
+apiVersion: runnel/v1
+name: parallel
+parameters:
+  - name: DELAY_A
+    default: 2s
+  - name: DELAY_B
+    default: 1s
+actions:
+  - id: start
+    type: core.start
+  - id: fetch-a
+    type: core.wait
+    with:
+      duration: ${DELAY_A}
+  - id: fetch-b
+    type: core.wait
+    with:
+      duration: ${DELAY_B}
+  - id: combine
+    type: core.log
+    with:
+      message: Both branches are done
+  - id: report-error
+    type: core.log
+    join: first
+    with:
+      message: A branch failed
+      level: error
+links:
+  - { from: start, to: fetch-a }
+  - { from: start, to: fetch-b }
+  - { from: fetch-a, to: combine }
+  - { from: fetch-b, to: combine }
+  - { from: fetch-a, to: report-error, when: failure }
+  - { from: fetch-b, to: report-error, when: failure }
+layout:
+  start:        { x: 40, y: 200 }
+  fetch-a:      { x: 280, y: 100 }
+  fetch-b:      { x: 280, y: 300 }
+  combine:      { x: 520, y: 200 }
+  report-error: { x: 520, y: 400 }

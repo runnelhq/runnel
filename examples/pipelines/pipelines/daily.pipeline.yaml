@@ -1,0 +1,55 @@
+# Revenue per day from the orders (roadmap S22). Run it from the folder that contains
+# "examples":
+#   runnel run examples/pipelines/pipelines/daily.pipeline.yaml
+# - "days" groups the orders by date: number of orders, total, average and largest order,
+#   and the customers as one text. Groups are formed in memory, in the order in which
+#   the dates first appear.
+# - "order" sorts the days by revenue, largest first.
+kind: Pipeline
+apiVersion: runnel/v1
+name: daily
+parameters:
+  - name: OUTPUT
+    description: CSV file to write
+    default: orders-per-day.csv
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: examples/pipelines/data/orders.csv
+      delimiter: ";"
+      fields:
+        - { name: Kunde }
+        - { name: Betrag, type: decimal, format: "#.##0,00" }
+        - { name: Datum, type: date, format: dd.MM.yyyy }
+  - id: days
+    type: core.group-by
+    with:
+      groupBy: [Datum]
+      aggregates:
+        - { name: orders, function: count }
+        - { name: total, function: sum, field: Betrag }
+        - { name: average, function: avg, field: Betrag }
+        - { name: largest, function: max, field: Betrag }
+        - { name: customers, function: concat, field: Kunde, separator: " / " }
+  - id: order
+    type: core.sort
+    with:
+      fields:
+        - { name: total, descending: true }
+  - id: write
+    type: csv.output
+    with:
+      path: ${OUTPUT}
+      delimiter: ";"
+      fields:
+        - { name: Datum, format: dd.MM.yyyy }
+        - { name: orders }
+        - { name: total, format: "#.##0,00" }
+        - { name: average, format: "#.##0,00" }
+        - { name: largest, format: "#.##0,00" }
+        - { name: customers }
+links:
+  - { from: read, to: days }
+  - { from: days, to: order }
+  - { from: order, to: write }

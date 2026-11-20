@@ -99,3 +99,22 @@ Schlägt `load` fehl, ist der `failure`-Link von `wait-file` bereits `dead` → 
 - Die Engine muss Link-Zustände je Run verwalten und persistieren (auch für Resume) → zusätzliche Tabelle bzw. Feld in `node_runs`.
 - Schleifen benötigen die explizite Markierung von Rückwärts-Links und das Zurücksetzen von Zuständen.
 - Ein späterer Hop-Import muss `join: each` setzen, um das Originalverhalten zu erhalten.
+
+## Umsetzung (S06)
+
+Ergänzende Festlegungen aus der Implementierung (`internal/engine/workflow/scheduler.go`):
+
+- **`all` startet auch, wenn ein Zweig fehlgeschlagen ist** – solange mindestens ein eingehender Link `fired` ist.
+  Soll eine Action nur laufen, wenn *alle* Vorgänger erfolgreich waren, gehören die Fehlerpfade auf eigene Links
+  (z. B. zu einer Fehlerbehandlung mit `join: first`), und das Gesamtergebnis wird über diese bestimmt.
+- **Fehler in einem Zweig:** Die übrigen Zweige laufen zu Ende; danach ist der Lauf fehlgeschlagen, wenn ein Fehler
+  von keinem Link (Fehler- oder Immer-Link) behandelt wurde. Mehrere unbehandelte Fehler werden gemeinsam gemeldet.
+- **`core.success` / `core.abort` beenden den Lauf sofort** und brechen laufende Zweige ab (Kontext wird abgebrochen).
+- **Schleifen:** Ein Schleifen-Link startet sein Ziel als neue Iteration; die Link-Zustände und Join-Markierungen
+  aller Actions *hinter* dem Ziel werden zurückgesetzt. Zwischenergebnisse einer Iteration (z. B. ein Fehlschlag vor
+  der Wiederholung) wirken dabei schon auf Joins außerhalb der Schleife. Für reine Wiederholungen ist `retry` (S07)
+  der einfachere Weg.
+- **Projektstandard:** `workflow.defaultJoin` in `project.yaml`.
+- **`joinTimeout`** (S07): Die Wartezeit beginnt, sobald der erste eingehende Link gefeuert hat. Läuft sie ab, startet
+  die Action nicht, sondern gilt als fehlgeschlagen ("join timeout: still waiting for …"); ihre Fehler-Links werden
+  verfolgt, später eintreffende Links ignoriert.

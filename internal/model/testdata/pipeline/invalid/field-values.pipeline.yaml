@@ -1,0 +1,20 @@
+kind: Workflow
+apiVersion: runnel/v2
+name: broken
+parameters:
+  - name: 1FILE
+  - name: LIMIT
+    type: integer
+    default: many
+transforms:
+  - id: 2read
+    type: csv.input
+  - id: map
+    type: Mapper
+  - id: write
+  - type: csv.output
+links:
+  - { from: read }
+  - { from: read, to: map, type: error }
+  - { from: map, to: write, type: info }
+  - { from: map, to: write, type: lookup }

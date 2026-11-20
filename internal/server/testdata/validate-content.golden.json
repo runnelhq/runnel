@@ -1,0 +1,74 @@
+{
+  "errors": 2,
+  "warnings": 2,
+  "problems": [
+    {
+      "file": "workflows/import.workflow.yaml",
+      "line": 6,
+      "column": 23,
+      "path": "$.actions[1].type",
+      "severity": "error",
+      "message": "action \"copy\": unknown action type \"file.shred\" (available: [core.abort core.dummy core.log core.run-pipeline core.run-workflow core.start core.success core.wait file.copy file.delete file.exists file.list file.mkdir file.move file.wait])"
+    },
+    {
+      "file": "workflows/import.workflow.yaml",
+      "line": 7,
+      "column": 42,
+      "path": "$.actions[2].with",
+      "severity": "error",
+      "message": "action \"greet\" (core.log): unknown field \"msg\""
+    },
+    {
+      "file": "workflows/import.workflow.yaml",
+      "line": 7,
+      "column": 47,
+      "path": "$.actions[2].with.msg",
+      "severity": "warning",
+      "message": "variable \"MISSING\" is not defined (neither as workflow parameter nor in the project or environment)"
+    },
+    {
+      "file": "workflows/import.workflow.yaml",
+      "line": 8,
+      "column": 11,
+      "path": "$.actions[3].id",
+      "severity": "warning",
+      "message": "action \"lonely\" is not reachable from the start action \"start\" and will never run"
+    }
+  ],
+  "workflow": {
+    "kind": "Workflow",
+    "apiVersion": "runnel/v1",
+    "name": "import",
+    "actions": [
+      {
+        "id": "start",
+        "type": "core.start"
+      },
+      {
+        "id": "copy",
+        "type": "file.shred"
+      },
+      {
+        "id": "greet",
+        "type": "core.log",
+        "with": {
+          "msg": "${MISSING}"
+        }
+      },
+      {
+        "id": "lonely",
+        "type": "core.dummy"
+      }
+    ],
+    "links": [
+      {
+        "from": "start",
+        "to": "greet"
+      },
+      {
+        "from": "greet",
+        "to": "copy"
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+field-values.workflow.yaml:6:5: parameter: missing required field "name"
+field-values.workflow.yaml:7:11: invalid parameter name "1ST_PARAM" (letters, digits and _, not starting with a digit)
+field-values.workflow.yaml:9:12: settings.timeout: invalid duration "2x" (examples: 30s, 5m, 2h, 1h30m)
+field-values.workflow.yaml:10:22: maxConcurrentRuns must not be negative
+field-values.workflow.yaml:12:5: action #1: missing required field "id"
+field-values.workflow.yaml:13:9: invalid action id "9lives" (letters, digits, - and _, starting with a letter)
+field-values.workflow.yaml:15:5: action "no-type": missing required field "type"
+field-values.workflow.yaml:17:11: action "bad-type": invalid type "copy" (expected "<namespace>.<name>", e.g. "file.copy")
+field-values.workflow.yaml:20:14: action "bad-values" timeout: invalid duration "30" (examples: 30s, 5m, 2h, 1h30m)
+field-values.workflow.yaml:21:11: action "bad-values": invalid join "any" (expected all, first or each)
+field-values.workflow.yaml:22:18: action "bad-values" joinTimeout: duration "-5m" must not be negative
+field-values.workflow.yaml:24:17: action "bad-values": retry attempts must be at least 1
+field-values.workflow.yaml:25:16: action "bad-values" retry backoff: invalid duration "soon" (examples: 30s, 5m, 2h, 1h30m)
+field-values.workflow.yaml:26:17: action "bad-values": invalid retry strategy "linear" (expected fixed or exponential)
+field-values.workflow.yaml:28:7: link #1: missing required field "from"
+field-values.workflow.yaml:29:7: link #2: missing required field "to"
+field-values.workflow.yaml:30:45: link #3: invalid condition "sucess" (expected success, failure, always or an expression "{{ … }}")
+field-values.workflow.yaml:31:45: link #4: invalid condition "{{ }}" (expected success, failure, always or an expression "{{ … }}")

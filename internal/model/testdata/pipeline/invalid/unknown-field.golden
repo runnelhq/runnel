@@ -1,0 +1,2 @@
+unknown-field.pipeline.yaml:9:5: unknown field "onError"
+unknown-field.pipeline.yaml:10:5: unknown field "parallel"

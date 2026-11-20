@@ -1,0 +1,63 @@
+# Example from docs/KONZEPT.md, chapter 5.1
+kind: Workflow
+apiVersion: runnel/v1
+name: nightly-import
+description: Lädt Kunden aus dem ERP und überträgt sie ins CRM
+parameters:
+  - name: IMPORT_DATE
+    default: "{{ formatDate(addDays(today(), -1), 'yyyy-MM-dd') }}"
+settings:
+  timeout: 2h
+  maxConcurrentRuns: 1
+
+actions:
+  - id: start
+    type: core.start
+
+  - id: wait-file
+    type: file.wait
+    with:
+      path: "${INBOX}\\customers_${IMPORT_DATE}.csv"
+      timeout: 30m
+
+  - id: load
+    type: core.run-pipeline
+    with:
+      pipeline: pipelines/customers-to-crm.pipeline.yaml
+      params:
+        FILE: "${INBOX}\\customers_${IMPORT_DATE}.csv"
+    retry: { attempts: 3, backoff: 1m }
+
+  - id: archive
+    type: file.move
+    with:
+      source: "${INBOX}\\customers_${IMPORT_DATE}.csv"
+      target: "${ARCHIVE}\\"
+
+  - id: notify-error
+    type: mail.send
+    join: first
+    with:
+      connection: smtp-office365
+      to: "${ADMIN_MAIL}"
+      subject: "Import fehlgeschlagen: {{ run.id }}"
+      body: "{{ run.lastError }}"
+
+  - id: abort
+    type: core.abort
+
+links:
+  - { from: start,     to: wait-file }
+  - { from: wait-file, to: load,         when: success }
+  - { from: load,      to: archive,      when: success }
+  - { from: wait-file, to: notify-error, when: failure }
+  - { from: load,      to: notify-error, when: failure }
+  - { from: notify-error, to: abort }
+
+layout:
+  start:        { x: 40,  y: 120 }
+  wait-file:    { x: 200, y: 120 }
+  load:         { x: 380, y: 120 }
+  archive:      { x: 560, y: 120 }
+  notify-error: { x: 380, y: 280 }
+  abort:        { x: 560, y: 280 }

@@ -3,9 +3,22 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. v0.1.0 or v0.1.0-rc.1 (the tag is created on the selected commit of main)"
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: write # create the release and tag
+  id-token: write # sign attestations (Sigstore)
+  attestations: write # store attestations
+  artifact-metadata: write # storage records for attestations
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -13,30 +26,90 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tags are needed for version detection in the SBOM
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          check-latest: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+
+      - name: Determine version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="$INPUT_VERSION"
+          else
+            version="$GITHUB_REF_NAME"
+          fi
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version '$version' (expected e.g. v0.1.0 or v0.1.0-rc.1)"
+            exit 1
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+              echo "::error::Manual releases must be started from the main branch"
+              exit 1
+            fi
+            if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+              echo "::error::Tag $version already exists"
+              exit 1
+            fi
+            # Local tag only, so that version detection sees it; GitHub creates the tag with the release.
+            git tag "$version"
+          fi
+          {
+            echo "VERSION=$version"
+            echo "VERSION_NUMBER=${version#v}"
+          } >> "$GITHUB_ENV"
 
       - name: Test
         run: go test -race ./...
 
-      - name: Build and package
-        run: make package VERSION="$GITHUB_REF_NAME"
+      - name: Build and package (with editor)
+        run: make package VERSION="$VERSION"
 
       - name: Check version of built binary
         run: |
           got="$(./bin/runnel-linux-amd64 version --short)"
-          if [[ "$got" != "$GITHUB_REF_NAME" ]]; then
-            echo "binary reports version '$got', expected '$GITHUB_REF_NAME'" >&2
+          if [[ "$got" != "$VERSION" ]]; then
+            echo "::error::Binary reports version '$got', expected '$VERSION'"
             exit 1
           fi
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.tar.gz
+
+      - name: Attest SBOM (Windows)
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/runnel_${{ env.VERSION_NUMBER }}_windows_amd64.zip
+          sbom-path: dist/runnel_${{ env.VERSION_NUMBER }}_windows_amd64.cdx.json
+
+      - name: Attest SBOM (Linux)
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/runnel_${{ env.VERSION_NUMBER }}_linux_amd64.tar.gz
+          sbom-path: dist/runnel_${{ env.VERSION_NUMBER }}_linux_amd64.cdx.json
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          flags=(--verify-tag --generate-notes --title "Runnel $GITHUB_REF_NAME")
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+          flags=(--generate-notes --title "Runnel $VERSION")
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            flags+=(--target "$GITHUB_SHA")
+          else
+            flags+=(--verify-tag)
+          fi
+          if [[ "$VERSION" == *-* ]]; then
             flags+=(--prerelease)
           fi
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.tar.gz dist/SHA256SUMS "${flags[@]}"
+          gh release create "$VERSION" dist/*.zip dist/*.tar.gz dist/*.cdx.json dist/SHA256SUMS "${flags[@]}"

@@ -1,0 +1,123 @@
+{
+  "kind": "Workflow",
+  "apiVersion": "runnel/v1",
+  "name": "nightly-import",
+  "description": "Lädt Kunden aus dem ERP und überträgt sie ins CRM",
+  "parameters": [
+    {
+      "name": "IMPORT_DATE",
+      "default": "{{ formatDate(addDays(today(), -1), 'yyyy-MM-dd') }}"
+    }
+  ],
+  "settings": {
+    "timeout": "2h",
+    "maxConcurrentRuns": 1
+  },
+  "actions": [
+    {
+      "id": "start",
+      "type": "core.start"
+    },
+    {
+      "id": "wait-file",
+      "type": "file.wait",
+      "with": {
+        "path": "${INBOX}\\customers_${IMPORT_DATE}.csv",
+        "timeout": "30m"
+      }
+    },
+    {
+      "id": "load",
+      "type": "core.run-pipeline",
+      "with": {
+        "params": {
+          "FILE": "${INBOX}\\customers_${IMPORT_DATE}.csv"
+        },
+        "pipeline": "pipelines/customers-to-crm.pipeline.yaml"
+      },
+      "retry": {
+        "attempts": 3,
+        "backoff": "1m"
+      }
+    },
+    {
+      "id": "archive",
+      "type": "file.move",
+      "with": {
+        "source": "${INBOX}\\customers_${IMPORT_DATE}.csv",
+        "target": "${ARCHIVE}\\"
+      }
+    },
+    {
+      "id": "notify-error",
+      "type": "mail.send",
+      "with": {
+        "body": "{{ run.lastError }}",
+        "connection": "smtp-office365",
+        "subject": "Import fehlgeschlagen: {{ run.id }}",
+        "to": "${ADMIN_MAIL}"
+      },
+      "join": "first"
+    },
+    {
+      "id": "abort",
+      "type": "core.abort"
+    }
+  ],
+  "links": [
+    {
+      "from": "start",
+      "to": "wait-file"
+    },
+    {
+      "from": "wait-file",
+      "to": "load",
+      "when": "success"
+    },
+    {
+      "from": "load",
+      "to": "archive",
+      "when": "success"
+    },
+    {
+      "from": "wait-file",
+      "to": "notify-error",
+      "when": "failure"
+    },
+    {
+      "from": "load",
+      "to": "notify-error",
+      "when": "failure"
+    },
+    {
+      "from": "notify-error",
+      "to": "abort"
+    }
+  ],
+  "layout": {
+    "abort": {
+      "x": 560,
+      "y": 280
+    },
+    "archive": {
+      "x": 560,
+      "y": 120
+    },
+    "load": {
+      "x": 380,
+      "y": 120
+    },
+    "notify-error": {
+      "x": 380,
+      "y": 280
+    },
+    "start": {
+      "x": 40,
+      "y": 120
+    },
+    "wait-file": {
+      "x": 200,
+      "y": 120
+    }
+  }
+}

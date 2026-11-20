@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Prints the license texts of all third-party Go modules compiled into the runnel binary.
+# Prints the license texts of all third-party software compiled into the runnel binary:
+# Go modules, the npm packages of the embedded editor and the embedded fonts.
 # Required by the MIT license of those dependencies (see docs/adr/0004-lizenz-mit.md).
 set -euo pipefail
 
@@ -40,3 +41,37 @@ modules |
       exit 1
     fi
   done
+
+# The editor (web/) is embedded as well: its npm production dependencies and the fonts.
+if [[ ! -d web/node_modules ]]; then
+  echo "ERROR: web/node_modules is missing; run \"make web\" first" >&2
+  exit 1
+fi
+(cd web && npm ls --omit=dev --all --parseable) |
+  tail -n +2 |
+  sort -u |
+  while read -r dir; do
+    name="$(node -p "require('$dir/package.json').name")"
+    version="$(node -p "require('$dir/package.json').version")"
+    printf '\n\n--------------------------------------------------------------------------------\n'
+    printf 'npm:%s %s\n' "$name" "$version"
+    printf -- '--------------------------------------------------------------------------------\n\n'
+    found=0
+    for f in "$dir"/LICENSE* "$dir"/LICENCE*; do
+      [[ -f "$f" ]] || continue
+      cat "$f"
+      found=1
+    done
+    if [[ $found -eq 0 ]]; then
+      echo "ERROR: no license file found for npm package $name $version" >&2
+      exit 1
+    fi
+  done
+
+for f in design/fonts/LICENSE-*.txt; do
+  font="$(basename "$f" .txt)"
+  printf '\n\n--------------------------------------------------------------------------------\n'
+  printf 'Font %s (design/fonts)\n' "${font#LICENSE-}"
+  printf -- '--------------------------------------------------------------------------------\n\n'
+  cat "$f"
+done

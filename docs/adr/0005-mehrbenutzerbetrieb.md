@@ -32,7 +32,7 @@ der Schutz erfolgt über Betriebssystem, Netzwerk und Dateirechte.
 
 | Modus | Schutz |
 |---|---|
-| Standard | Server bindet nur an `127.0.0.1` – nur lokal erreichbar, kein Schutz nötig |
+| Standard | Server bindet nur an `127.0.0.1` – nur lokal erreichbar, kein Zugangsschlüssel nötig; Anfragen müssen an `localhost`/`127.0.0.1` gerichtet sein und dürfen nicht von fremden Webseiten (`Origin`) kommen (ergänzt mit E2) |
 | Netzwerk (`--listen 0.0.0.0:7300`) | **TLS** + ein **gemeinsamer Zugangsschlüssel** für den Server (in `runnel.yaml` bzw. als Secret, nicht pro Person). Der Browser fragt ihn einmal ab und merkt ihn sich als Cookie |
 | Webhooks | Weiterhin eigenes Token bzw. HMAC-Signatur pro Webhook, unabhängig vom Zugangsschlüssel |
 | Zusätzlich möglich | Windows-Firewall (nur bestimmte Hosts) oder Reverse-Proxy (IIS, Caddy) mit eigener Anmeldung davor |
@@ -64,3 +64,9 @@ für manuelle Starts, Abbrüche und Dateiänderungen über den Editor. Für fach
 - Kap. 8: Benutzer/Rollen ersetzt durch Zugangsschlüssel im Netzmodus; Audit über Client-Informationen.
 - Kap. 9.2: Tabelle `users` entfällt, `runs` erhält `client_info`.
 - Kap. 15: „Auth/Rollen“ in Phase 0.4 wird zu „Zugangsschlüssel + TLS“; „Windows-Auth“ entfällt aus „später“.
+
+## Nachtrag 2026-11-20 (ADR 0018): HTTP-Trigger
+
+Webhooks sind im Trigger-Typ `http` aufgegangen ([ADR 0018](0018-http-trigger.md)). Sie laufen auf einem eigenen
+Listener, getrennt vom Editor, mit eigenem Token je Trigger (HMAC später); für den Zugriff aus dem Netz genügt TLS für
+diesen Listener (S40a) – der Zugangsschlüssel des Editors (S40b) ist dafür nicht nötig.

@@ -1,0 +1,68 @@
+# Prepares customers for a CRM import. Run it from the folder that contains "examples":
+#   runnel run examples/pipelines/pipelines/customers.pipeline.yaml
+# - "read" reads all columns as text (no field definition).
+# - "types" converts kdnr and umsatz (German format) into numbers. A customer whose
+#   values do not fit ("k. A.") goes over the error link to "rejected", with the reason
+#   in _error, instead of stopping the pipeline.
+# - "active" keeps customers with sales.
+# - "map" keeps three fields under the names the CRM expects; all others are dropped.
+# - "tag" adds the source and the batch number of the run (an expression, once per run).
+kind: Pipeline
+apiVersion: runnel/v1
+name: customers
+parameters:
+  - name: BATCH
+    description: Number of the import batch
+    type: integer
+    default: "1"
+  - name: OUTPUT
+    description: CSV file to write
+    default: customers-crm.csv
+  - name: REJECTED
+    description: CSV file for customers with invalid values
+    default: customers-rejected.csv
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: examples/pipelines/data/customers.csv
+      delimiter: ";"
+  - id: types
+    type: core.convert
+    with:
+      fields:
+        - { name: kdnr, type: int }
+        - { name: umsatz, type: decimal, format: "#.##0,00" }
+  - id: active
+    type: core.filter
+    with:
+      condition: "{{ record.umsatz > 0 }}"
+  - id: map
+    type: core.select-fields
+    with:
+      fields:
+        - { name: kdnr, rename: externalId }
+        - { name: name, rename: companyName }
+        - { name: umsatz, rename: revenue }
+  - id: tag
+    type: core.constant
+    with:
+      fields:
+        - { name: source, value: runnel }
+        - { name: batch, value: "{{ params.BATCH }}" }
+  - id: write
+    type: csv.output
+    with:
+      path: ${OUTPUT}
+  - id: rejected
+    type: csv.output
+    with:
+      path: ${REJECTED}
+      delimiter: ";"
+links:
+  - { from: read, to: types }
+  - { from: types, to: rejected, type: error }
+  - { from: types, to: active }
+  - { from: active, to: map }
+  - { from: map, to: tag }
+  - { from: tag, to: write }

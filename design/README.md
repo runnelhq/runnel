@@ -18,7 +18,9 @@ design/
 │  ├─ build.mjs              # erzeugt runnel.css und tailwind.css
 │  ├─ runnel.css             # CSS-Variablen, hell/dunkel, shadcn/ui-kompatibel
 │  └─ tailwind.css           # Tailwind-v4-Theme (bg-primary, text-strom-600 …)
-└─ social/                   # Social-/Open-Graph-Bild (1280 × 640) inkl. HTML-Vorlage
+├─ fonts/                    # Inter, JetBrains Mono (WOFF2, Latin), fonts.css, Lizenzen (OFL)
+├─ social/                   # Social-/Open-Graph-Bild (1280 × 640) inkl. HTML-Vorlage
+└─ mockups/                  # freigegebene Mockups für Oberflächen (HTML + PNG), siehe Kap. 9
 ```
 
 ---
@@ -150,15 +152,16 @@ Regeln:
 Kennfarben für die Icon-Kachel der Actions/Transforms in Palette und Knoten. Nur als kleine Kachel hinter einem weißen
 Icon, nie für Flächen, Text oder Zustände.
 
-| Kategorie | Hex | | Kategorie | Hex |
+| Kategorie (Kennung) | Hex | | Kategorie (Kennung) | Hex |
 |---|---|---|---|---|
-| Allgemein | `#67778A` | | Eingabe | `#2F7D4F` |
-| Ausführung | `#0A6DA6` | | Transformation | `#B5487F` |
-| Dateien | `#C2700E` | | Fluss | `#4D5C6F` |
-| Netzwerk | `#0E8A8A` | | Ausgabe | `#9A5B2E` |
-| Datenbank | `#7B4FC9` | | | |
+| General (`general`) | `#67778A` | | Input | `#2F7D4F` |
+| Execution (`execution`) | `#0A6DA6` | | Transform | `#B5487F` |
+| Files (`files`) | `#C2700E` | | Flow | `#4D5C6F` |
+| Network (`network`) | `#0E8A8A` | | Output | `#9A5B2E` |
+| Database (`database`) | `#7B4FC9` | | | |
 
-Plugins ohne eigene Kategorie nutzen „Allgemein“.
+Links die Kategorien der Actions ([ADR 0014](../docs/adr/0014-action-descriptor-schema.md)), rechts die der
+Transforms (Kennungen folgen mit den Pipelines). Plugins ohne eigene Kategorie nutzen „General“.
 
 ### 3.4 Kontrast
 
@@ -177,7 +180,8 @@ für Flächen, Linien und großen Text (≥ 18 px fett) zugelassen.
 
 Beide Schriften stehen unter der SIL Open Font License 1.1 und dürfen eingebettet werden. Der Editor liefert sie als
 WOFF2 (nur Latin-Subset) **lokal** aus – keine Google-Fonts-Abfrage, weil Runnel offline und im Firmennetz laufen muss.
-Lizenztexte gehören dann in `THIRD_PARTY_NOTICES.txt`.
+Die Dateien liegen unter [`fonts/`](fonts/fonts.css) (aus Fontsource 5.3.0); ihre Lizenztexte stehen in
+`THIRD_PARTY_NOTICES.txt` jedes Releases.
 
 ### 4.1 Größen
 
@@ -246,7 +250,8 @@ Canvas-Konventionen ([Konzept, Kap. 11](../docs/KONZEPT.md#11-editor--ux-konzept
 | Knoten | `--node`, 1 px `--node-border`, Radius lg, Schatten sm; links eine 28-px-Kachel in Kategoriefarbe mit weißem Icon |
 | Ausgewählt | 2 px Ring `--node-selected` |
 | Zustand | 3 px Statusleiste am unteren Knotenrand in `--status-*` + Symbol oben rechts |
-| Links | 2 px, Bézier wie in der Bildmarke; Farbe nach Typ (`--link-*`), Symbol ✔/✖/∞/ƒ in der Mitte; aktiv = „Strömung“ |
+| Meldungen | Rahmen in `--destructive` bzw. `--warning` + Symbol ✖/⚠ oben rechts; beim Ausführen hat das Laufstatus-Symbol Vorrang |
+| Links | 2 px, Bézier wie in der Bildmarke; Farbe nach Typ (`--link-*`), Symbol ✔/✖/∞/ƒ bei 35 % des Wegs ab der Quelle (damit sich kreuzende Links nicht überdecken); aktiv = „Strömung“ |
 | Zeilenzähler an Links | Monospace 11 px, `tabular-nums`, Pille auf `--card` |
 
 Der Editor zeigt das Logo nur einmal: App-Icon (20 px) + Wortmarke als SVG oben links, mit `aria-label="Runnel"`.
@@ -330,8 +335,11 @@ Die Ausgabe von `runnel version` („runnel v0.1.0 …“) nennt den Befehl, nic
 ### 7.2 Ton
 
 - **Sachlich, knapp, konkret.** Runnel spricht wie eine erfahrene Kollegin, nicht wie ein Werbeprospekt.
-- UI-Texte im Infinitiv bzw. Imperativ ohne Anrede: „Pipeline ausführen“, „Änderungen speichern“. Wo eine Anrede nötig ist: **du**.
-- Fehlermeldungen sagen, **was** passiert ist und **was zu tun ist**: „Datei `customers.csv` nicht gefunden. Pfad in ‚CSV-Eingabe‘ prüfen.“
+- **Produktsprache ist Englisch** – Editor, CLI, Meldungen, Installer, Tray ([ADR 0015](../docs/adr/0015-sprache-oberflaeche.md)).
+  Diese Doku bleibt deutsch.
+- UI-Texte als Imperativ ohne Anrede, in Satzschreibweise: „Run pipeline“, „Save changes“. Wo eine Anrede nötig ist: **you**.
+  Anzeigenamen von Actions/Transforms in Title Case („Copy Files“).
+- Fehlermeldungen sagen, **was** passiert ist und **was zu tun ist**: „File `customers.csv` not found. Check the path in ‘CSV Input’.“
 - Fachbegriffe sind fest und werden nicht übersetzt oder variiert: **Workflow, Pipeline, Action, Transform, Link, Trigger,
   Environment, Connection, Run, Runner, Editor** ([ADR 0009](../docs/adr/0009-begriff-link.md)).
 - Keine Emojis in Produkt und Doku; Symbole nur mit fester Bedeutung (✔ ✖ ∞ ƒ ⚠).
@@ -346,3 +354,24 @@ Die Ausgabe von `runnel version` („runnel v0.1.0 …“) nennt den Befehl, nic
 - **Logo ändern:** SVG ist die Quelle; PNG/ICO werden daraus exportiert (Chromium/Inkscape, transparente Ränder beibehalten).
   Größere Änderungen an Logo oder Farben brauchen eine neue ADR.
 - Neue Kanäle (z. B. Merch, Messestand) leiten sich aus Kapitel 2–5 ab und werden hier ergänzt.
+
+---
+
+## 9. Mockups
+
+Jede neue oder deutlich geänderte Oberfläche (Editor-Ansichten, Dialoge, Website-Seiten, Installer, Tray) wird **vor
+der Umsetzung** als Mockup entworfen und vom Maintainer freigegeben. So werden Gestaltung und Bedienung geklärt, bevor
+Code entsteht, und der Umsetzungs-PR muss nur noch prüfen, ob er dem Mockup entspricht.
+
+| Punkt | Regel |
+|---|---|
+| Ablage | `design/mockups/<schritt>-<thema>.html`, z. B. `e5-canvas.html`; mehrere Zustände in einer Datei oder als `…-<zustand>.html` |
+| Technik | Statisches HTML/CSS ohne Build, bindet `../tokens/runnel.css` ein, nutzt nur die Tokens (keine Hex-Werte); Inhalte mit realistischen Beispieldaten aus `examples/` |
+| Varianten | hell **und** dunkel; Zustände, die das Mockup betrifft (leer, Fehler, läuft, ausgewählt …); bei Bedarf schmales Fenster |
+| Screenshots | je Variante ein PNG (`…-hell.png`, `…-dunkel.png`), damit der PR das Mockup direkt zeigt |
+| Freigabe | Mockup als **eigener PR**; der Merge ist die Freigabe. Offene Fragen stehen in der PR-Beschreibung |
+| Umsetzung | verweist auf das Mockup und folgt ihm; Abweichungen erst im Mockup ändern und erneut freigeben lassen |
+| Pflege | Mockups bleiben nach der Umsetzung liegen und dienen als Referenz; überholte werden gelöscht, wenn ein neues sie ersetzt |
+
+Mockups wenden Kapitel 2–7 an: Tokens und Kategoriefarben, Typografie (Editor 13 px), Raster 4 px, Funktionsfarben nur
+mit Symbol, Texte nach „Sprache und Ton“.

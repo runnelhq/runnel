@@ -1,0 +1,1 @@
+no-start.workflow.yaml:5:3: workflow has no start action (an action of type "core.start")

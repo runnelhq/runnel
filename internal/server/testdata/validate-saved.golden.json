@@ -1,0 +1,29 @@
+{
+  "errors": 0,
+  "warnings": 0,
+  "problems": [],
+  "workflow": {
+    "kind": "Workflow",
+    "apiVersion": "runnel/v1",
+    "name": "import",
+    "actions": [
+      {
+        "id": "start",
+        "type": "core.start"
+      },
+      {
+        "id": "greet",
+        "type": "core.log",
+        "with": {
+          "message": "Hello ${TARGET}"
+        }
+      }
+    ],
+    "links": [
+      {
+        "from": "start",
+        "to": "greet"
+      }
+    ]
+  }
+}

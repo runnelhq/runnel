@@ -1,0 +1,19 @@
+kind: Workflow
+apiVersion: runnel/v1
+name: references
+actions:
+  - { id: start, type: core.start }
+  - { id: load, type: core.log }
+  - { id: load, type: core.log }
+  - { id: archive, type: core.log }
+links:
+  - { from: start, to: laod }
+  - { from: start, to: load }
+  - { from: start, to: load, when: success }
+  - { from: nowhere, to: archive }
+  - { from: load, to: start }
+  - { from: archive, to: archive }
+  - { from: load, to: missing, disabled: true }
+layout:
+  start: { x: 0, y: 0 }
+  old-step: { x: 100, y: 0 }

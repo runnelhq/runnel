@@ -1,0 +1,45 @@
+# Runs a pipeline for each file of a folder (roadmap S24b). Run it from the folder that
+# contains "examples":
+#   runnel run -v examples/pipelines/workflows/each-file.workflow.yaml
+# - "list" lists the order files of the inbox.
+# - "totals" runs pipelines/total.pipeline.yaml once per file (forEach); row is the
+#   current entry of the list, here a file with path and name. Two files run at a time
+#   (parallel: 2). stopOnError: false lets the other files run if one fails; the action
+#   still fails at the end then.
+# - Its output lists the files in order: items[i].row, .success, .output (the result of
+#   the pipeline) and .error, plus succeeded and failed.
+kind: Workflow
+apiVersion: runnel/v1
+name: each-file
+parameters:
+  - name: INBOX
+    default: examples/pipelines/inbox
+outputs:
+  - name: FILES
+    type: integer
+    value: "{{ results.totals.output.succeeded }}"
+actions:
+  - id: start
+    type: core.start
+  - id: list
+    type: file.list
+    with:
+      folder: ${INBOX}
+      pattern: "orders-*.csv"
+  - id: totals
+    type: core.run-pipeline
+    forEach: "{{ results.list.output }}"
+    parallel: 2
+    stopOnError: false
+    with:
+      pipeline: pipelines/total.pipeline.yaml
+      params:
+        FILE: "{{ row.path }}"
+  - id: report
+    type: core.log
+    with:
+      message: "{{ join(map(results.totals.output.items, .row.name + ': ' + string(.output.rows[0].orders) + ' orders, ' + string(.output.rows[0].total)), '; ') }}"
+links:
+  - { from: start, to: list }
+  - { from: list, to: totals }
+  - { from: totals, to: report }

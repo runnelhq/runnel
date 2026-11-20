@@ -1,0 +1,20 @@
+# Deliberately broken, to show what "runnel validate" reports:
+#   runnel validate examples/broken
+kind: Workflow
+apiVersion: runnel/v1
+name: broken
+actions:
+  - id: start
+    type: core.start
+  - id: download
+    type: http.request
+    timeout: 30
+  - id: import
+    type: core.run-pipeline
+  - id: cleanup
+    type: file.delete
+links:
+  - { from: start, to: download }
+  - { from: download, to: imprt }
+  - { from: import, to: download }
+  - { from: import, to: cleanup, when: sucess }
