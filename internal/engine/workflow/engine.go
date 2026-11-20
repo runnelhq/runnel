@@ -254,9 +254,18 @@ func (r *Runner) outputs(rc *runContext) (map[string]any, error) {
 	return out, nil
 }
 
-// executeAction runs an action including retries and per-attempt timeouts.
-// values is the context of its expressions (ADR 0006).
+// executeAction runs an action including retries and per-attempt timeouts, once or for
+// each entry of forEach. values is the context of its expressions (ADR 0006).
 func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any) (action.Result, error) {
+	if a.ForEach != "" {
+		return r.executeForEach(ctx, runID, a, scope, values)
+	}
+	return r.executeWithRetry(ctx, runID, a, scope, values, "")
+}
+
+// executeWithRetry runs an action including retries and per-attempt timeouts. prefix
+// starts its log messages, e.g. "[2/5] " for an entry of forEach.
+func (r *Runner) executeWithRetry(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, prefix string) (action.Result, error) {
 	attempts := 1
 	var retry model.Retry
 	if a.Retry != nil {
@@ -264,12 +273,12 @@ func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Actio
 		attempts = max(retry.Attempts, 1)
 	}
 	for attempt := 1; ; attempt++ {
-		res, err := r.attempt(ctx, runID, a, scope, values)
+		res, err := r.attempt(ctx, runID, a, scope, values, prefix)
 		if err == nil || attempt >= attempts || ctx.Err() != nil {
 			return res, err
 		}
 		wait := retry.Wait(attempt + 1)
-		r.log(runID, a, slog.LevelWarn, fmt.Sprintf("attempt %d of %d failed: %v; retrying in %s", attempt, attempts, err, wait))
+		r.log(runID, a, slog.LevelWarn, fmt.Sprintf("%sattempt %d of %d failed: %v; retrying in %s", prefix, attempt, attempts, err, wait))
 		if !sleep(ctx, wait) {
 			return res, err
 		}
@@ -277,7 +286,7 @@ func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Actio
 }
 
 // attempt runs an action once: resolves variables, creates and executes it within its timeout.
-func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any) (action.Result, error) {
+func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, prefix string) (action.Result, error) {
 	timeout, _ := a.Timeout.Value()
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -297,7 +306,7 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 	ec := &action.ExecContext{
 		RunID:    runID,
 		ActionID: a.ID,
-		Log:      func(level slog.Level, msg string) { r.log(runID, a, level, msg) },
+		Log:      func(level slog.Level, msg string) { r.log(runID, a, level, prefix+msg) },
 	}
 	if r.opts.Workflows != nil {
 		ec.RunWorkflow = func(ctx context.Context, path string, params map[string]string) (map[string]any, error) {

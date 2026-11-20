@@ -32,6 +32,14 @@ func testRegistry(t *testing.T) *action.Registry {
 	r.Register(action.Definition{Type: "test.fail", New: func(with map[string]any) (action.Action, error) {
 		return testAction{value: fmt.Sprint(with["value"]), fail: true}, nil
 	}})
+	r.Register(action.Definition{Type: "test.failif", New: func(with map[string]any) (action.Action, error) {
+		return action.Func(func(context.Context, *action.ExecContext) (action.Result, error) {
+			if with["fail"] == true {
+				return action.Result{}, fmt.Errorf("entry %v failed", with["value"])
+			}
+			return action.Result{Output: with["value"]}, nil
+		}), nil
+	}})
 	r.Register(action.Definition{Type: "test.out", New: func(with map[string]any) (action.Action, error) {
 		return action.Func(func(context.Context, *action.ExecContext) (action.Result, error) {
 			return action.Result{Output: with["value"]}, nil

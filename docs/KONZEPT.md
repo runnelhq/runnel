@@ -935,6 +935,28 @@ Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, L
   gibt der Pipeline eine Liste mit (z. B. die Dateiliste von `file.list`), die `core.from-result` als Datensätze
   weitergibt; was `core.to-result` erreicht, kommt als `output.rows` zurück (höchstens `maxRows`, Standard 100.000).
 
+**Wiederholung je Eintrag (umgesetzt mit S24b, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** Jede
+Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` und `timeout`:
+
+```yaml
+- id: totals
+  type: core.run-pipeline
+  forEach: "{{ results.list.output }}"   # eine Liste aus einem Ausdruck
+  parallel: 2                            # Einträge gleichzeitig, Standard 1 (höchstens 64)
+  stopOnError: false                     # Standard true
+  with:
+    pipeline: pipelines/total.pipeline.yaml
+    params:
+      FILE: "{{ row.path }}"             # row = aktueller Eintrag
+```
+
+- `with` wird je Eintrag ausgewertet; `row` ist nur in Actions mit `forEach` erlaubt (sonst meldet `runnel validate`
+  „unknown name row“). `retry` und `timeout` gelten je Eintrag; Log-Meldungen beginnen mit `[2/5] `.
+- `result.output`: `items` (je Eintrag in Reihenfolge der Liste: `row`, `success`, `output`, `error`), `succeeded`,
+  `failed`. Mit `stopOnError: true` beendet der erste Fehler die übrigen Einträge und lässt die Action scheitern;
+  mit `false` laufen alle, die Action scheitert am Ende, wenn einer fehlschlug (je Fehler eine Warnung im Log).
+- Eine leere Liste ist erfolgreich (`items` leer); ein Wert, der keine Liste ist, ist ein Fehler.
+
 ### 12.2 Pipeline-Transforms
 
 | Kategorie | Transforms |

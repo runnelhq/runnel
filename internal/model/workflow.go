@@ -101,7 +101,17 @@ type Action struct {
 	// Empty means the project default.
 	Join        JoinMode `yaml:"join,omitempty" json:"join,omitempty"`
 	JoinTimeout Duration `yaml:"joinTimeout,omitempty" json:"joinTimeout,omitempty"`
+	// ForEach repeats the action for every entry of a list (an expression, e.g.
+	// "{{ results.list.output }}"); the entry is "row" in its expressions (S24b).
+	ForEach string `yaml:"forEach,omitempty" json:"forEach,omitempty"`
+	// Parallel is the number of entries of forEach run at the same time; 0: 1.
+	Parallel int `yaml:"parallel,omitempty" json:"parallel,omitempty"`
+	// StopOnError stops forEach at the first failed entry; nil: true.
+	StopOnError *bool `yaml:"stopOnError,omitempty" json:"stopOnError,omitempty"`
 }
+
+// MaxParallel limits the entries of forEach that run at the same time.
+const MaxParallel = 64
 
 // Retry configures repeated attempts of a failed action.
 type Retry struct {
@@ -249,26 +259,28 @@ func (w *Workflow) validate() error {
 	}
 	// Expressions {{ … }} are compiled when the file is read, so that mistakes show up
 	// before a run (ADR 0006); they are evaluated by the engine.
-	checkExpr := func(path, label, text string) {
+	checkExprIn := func(path, label, text string, roots []string) {
 		if !expr.Contains(text) {
 			return
 		}
-		if err := expr.Check(text, expr.WorkflowRoots); err != nil {
+		if err := expr.Check(text, roots); err != nil {
 			add(path, "%s: %v", label, err)
 		}
 	}
-	var checkWith func(path, label string, v any)
-	checkWith = func(path, label string, v any) {
+	checkExpr := func(path, label, text string) { checkExprIn(path, label, text, expr.WorkflowRoots) }
+	// The configuration of an action with forEach may use row, the current entry.
+	var checkWith func(path, label string, v any, roots []string)
+	checkWith = func(path, label string, v any, roots []string) {
 		switch v := v.(type) {
 		case string:
-			checkExpr(path, label, v)
+			checkExprIn(path, label, v, roots)
 		case map[string]any:
 			for _, k := range slices.Sorted(maps.Keys(v)) {
-				checkWith(path+"."+k, label, v[k])
+				checkWith(path+"."+k, label, v[k], roots)
 			}
 		case []any:
 			for i, e := range v {
-				checkWith(fmt.Sprintf("%s[%d]", path, i), label, e)
+				checkWith(fmt.Sprintf("%s[%d]", path, i), label, e, roots)
 			}
 		}
 	}
@@ -333,7 +345,26 @@ func (w *Workflow) validate() error {
 		}
 		duration(path+".timeout", label+" timeout", a.Timeout)
 		duration(path+".joinTimeout", label+" joinTimeout", a.JoinTimeout)
-		checkWith(path+".with", label, a.With)
+		roots := expr.WorkflowRoots
+		if a.ForEach != "" {
+			roots = expr.RowRoots
+			if !expr.Contains(a.ForEach) {
+				add(path+".forEach", "%s: forEach must be an expression that returns a list, e.g. \"{{ results.list.output }}\"", label)
+			} else {
+				checkExpr(path+".forEach", label+" forEach", a.ForEach)
+			}
+		} else {
+			if a.Parallel != 0 {
+				add(path+".parallel", "%s: parallel is only possible with forEach", label)
+			}
+			if a.StopOnError != nil {
+				add(path+".stopOnError", "%s: stopOnError is only possible with forEach", label)
+			}
+		}
+		if a.Parallel < 0 || a.Parallel > MaxParallel {
+			add(path+".parallel", "%s: parallel must be between 1 and %d", label, MaxParallel)
+		}
+		checkWith(path+".with", label, a.With, roots)
 		switch a.Join {
 		case "", JoinAll, JoinFirst, JoinEach:
 		default:

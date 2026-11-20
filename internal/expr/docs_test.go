@@ -16,7 +16,7 @@ func TestDocsExamplesCompile(t *testing.T) {
 		if d.Example == "" {
 			continue
 		}
-		if _, err := Compile(d.Example, WorkflowRoots); err != nil {
+		if _, err := Compile(d.Example, RowRoots); err != nil {
 			t.Errorf("%s: example %s: %v", d.Name, d.Example, err)
 		}
 		if d.Signature != "" && !strings.HasPrefix(d.Signature, d.Name+"(") {
@@ -25,14 +25,14 @@ func TestDocsExamplesCompile(t *testing.T) {
 	}
 }
 
-// Every name of WorkflowRoots and every function of the library has a description.
+// Every name of RowRoots (WorkflowRoots and row) and every function of the library has a description.
 func TestDocsComplete(t *testing.T) {
 	var roots []string
 	for _, r := range Roots {
 		roots = append(roots, r.Name)
 	}
-	if !slices.Equal(slices.Sorted(slices.Values(roots)), slices.Sorted(slices.Values(WorkflowRoots))) {
-		t.Errorf("roots %v, want %v", roots, WorkflowRoots)
+	if !slices.Equal(slices.Sorted(slices.Values(roots)), slices.Sorted(slices.Values(RowRoots))) {
+		t.Errorf("roots %v, want %v", roots, RowRoots)
 	}
 	src, err := os.ReadFile("functions.go")
 	if err != nil {
