@@ -6,6 +6,7 @@ import { Dialog } from "./components/Dialog";
 import { FileView, type FileHandle } from "./components/FileView";
 import { Header } from "./components/Header";
 import { Palette, type PaletteTarget } from "./components/Palette";
+import { Splitter, useExplorerHeight } from "./components/Splitter";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
 import { fetchTree, type Entry } from "./files";
@@ -29,6 +30,10 @@ export function App() {
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [closing, setClosing] = useState<string | null>(null);
   const handles = useRef(new Map<string, FileHandle>());
+  // The height of the explorer can be changed; the palette takes the rest.
+  const [explorerHeight, setExplorerHeight] = useExplorerHeight();
+  const sidebar = useRef<HTMLElement>(null);
+  const explorer = useRef<HTMLDivElement>(null);
 
   const onDirty = useCallback((path: string, isDirty: boolean) => {
     setDirty((d) => {
@@ -88,8 +93,16 @@ export function App() {
     <div className="grid h-full grid-rows-[48px_1fr_24px]">
       <Header project={project} theme={theme} onTheme={setTheme} />
       <div className="grid min-h-0 grid-cols-[248px_1fr]">
-        <aside className="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-          <Explorer tree={tree} error={treeError} selected={active} onOpen={open} onReload={loadTree} />
+        <aside ref={sidebar} className="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+          <div
+            ref={explorer}
+            data-testid="explorer-pane"
+            className="flex min-h-[120px] flex-col"
+            style={{ flex: "0 1 auto", height: explorerHeight ?? undefined }}
+          >
+            <Explorer tree={tree} error={treeError} selected={active} onOpen={open} onReload={loadTree} />
+          </div>
+          <Splitter container={sidebar} explorer={explorer} height={explorerHeight} onHeight={setExplorerHeight} />
           <Palette target={active ? paletteTarget : null} />
         </aside>
         <main className="flex min-h-0 min-w-0 flex-col bg-background">

@@ -497,6 +497,13 @@ export function FileView(props: {
             ⚠ {validation.warnings}
           </Badge>
         )}
+        {/* After the problem badges, so that they stay in place when switching views. */}
+        {isGraph && view === "yaml" && (
+          <Badge testId="yaml-read-only" title="The YAML view is read-only: change the file on the canvas or in your text editor">
+            <LockIcon width={12} height={12} />
+            Read-only
+          </Badge>
+        )}
         <span className="flex-1" />
         {isGraph &&
           (running ? (
@@ -554,11 +561,22 @@ export function FileView(props: {
               Save
             </button>
             <ViewSwitch view={view} onView={setView} pipeline={graphKind === "pipeline"} />
-            {editable && view === "canvas" && !panel && (
-              <IconButton title="Show properties" onClick={() => setPanel(true)}>
-                <PanelIcon width={14} height={14} />
-              </IconButton>
-            )}
+            {/* Always there, so that nothing moves: pressed while the panel is shown. */}
+            <IconButton
+              title={
+                editable && view === "canvas"
+                  ? panel
+                    ? "Hide properties panel"
+                    : "Show properties panel"
+                  : "The properties panel belongs to the canvas"
+              }
+              label="Properties panel"
+              pressed={panel && editable && view === "canvas"}
+              disabled={!editable || view !== "canvas"}
+              onClick={() => setPanel((p) => !p)}
+            >
+              <PanelIcon width={14} height={14} />
+            </IconButton>
           </>
         )}
         {!compact && <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} />}
@@ -826,15 +844,25 @@ function Badge(props: {
   );
 }
 
-function IconButton(props: { children: React.ReactNode; title: string; disabled?: boolean; onClick: () => void }) {
+function IconButton(props: {
+  children: React.ReactNode;
+  title: string;
+  /** Accessible name if it differs from the title, e.g. for a toggle whose title changes. */
+  label?: string;
+  /** Makes the button a toggle (aria-pressed). */
+  pressed?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       title={props.title}
-      aria-label={props.title.replace(/ \(.*\)$/, "")}
+      aria-label={props.label ?? props.title.replace(/ \(.*\)$/, "")}
+      aria-pressed={props.pressed}
       disabled={props.disabled}
       onClick={props.onClick}
-      className="grid size-7 cursor-pointer place-items-center rounded-md border border-input bg-background text-foreground hover:bg-muted disabled:cursor-default disabled:text-muted-foreground disabled:opacity-50 disabled:hover:bg-background"
+      className="grid size-7 cursor-pointer place-items-center rounded-md border border-input bg-background text-foreground hover:bg-muted aria-pressed:border-ring aria-pressed:bg-accent aria-pressed:text-accent-foreground disabled:cursor-default disabled:text-muted-foreground disabled:opacity-50 disabled:hover:bg-background"
     >
       {props.children}
     </button>

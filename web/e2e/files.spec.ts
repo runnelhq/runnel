@@ -28,8 +28,9 @@ test("opens files in tabs and shows them as highlighted YAML", async ({ page }) 
   await expect(page.getByTestId("crumbs")).toHaveAttribute("title", "workflows/hello.workflow.yaml");
   await expect(page.getByTestId("kind")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy path" })).toBeVisible();
-  // Workflows are editable (E6a); other files are read-only.
-  await expect(page.getByText("Read-only")).toHaveCount(0);
+  // Workflows are edited on the canvas (E6a); their YAML view is read-only, marked after the problem badges.
+  await expect(page.getByTestId("yaml-read-only")).toHaveText("Read-only");
+  await expect(page.getByTestId("yaml-read-only")).toHaveAttribute("title", /change the file on the canvas or in your text editor/);
 
   const code = page.getByTestId("code");
   await expect(code).toContainText("apiVersion: runnel/v1");

@@ -11,7 +11,13 @@ export function Tabs(props: {
   onClose: (path: string) => void;
 }) {
   return (
-    <div role="tablist" aria-label="Open files" className="flex h-9 shrink-0 overflow-x-auto border-b border-border bg-muted">
+    // The line below the tabs is an inset shadow that the active tab covers: a tab reaching
+    // over a border would make the bar scroll vertically (overflow-x: auto implies y).
+    <div
+      role="tablist"
+      aria-label="Open files"
+      className="flex h-9 shrink-0 overflow-x-auto overflow-y-hidden bg-muted shadow-[inset_0_-1px_0_var(--border)]"
+    >
       {props.paths.map((path) => {
         const active = path === props.active;
         const dirty = props.dirty?.has(path) ?? false;
@@ -30,7 +36,7 @@ export function Tabs(props: {
             className={
               "flex shrink-0 cursor-default items-center gap-2 border-r border-border pr-3 pl-4 " +
               (active
-                ? "-mb-px bg-background text-foreground shadow-[inset_0_2px_0_var(--primary)]"
+                ? "bg-background text-foreground shadow-[inset_0_2px_0_var(--primary)]"
                 : "text-muted-foreground")
             }
           >

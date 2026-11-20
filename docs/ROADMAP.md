@@ -26,7 +26,7 @@ Erledigte Schritte sind mit ✅ markiert.
 - **Nur das Nötige:** Keine Vorab-Implementierung für spätere Schritte. Schnittstellen werden erweitert, wenn sie gebraucht werden.
 - **Doku im selben PR:** Betroffene Abschnitte in Konzept/ADRs werden mit angepasst.
 - **Oberflächen nach Corporate Design und freigegebenem Mockup:** Schritte mit sichtbarer Oberfläche (u. a. E4–E8,
-  S25a, S35, S44, S46, später E7c und S47) beginnen mit einem Mockup-PR unter `design/mockups/`; die Umsetzung folgt erst nach dessen
+  S25a, S35, S44, S46, später E7c, E9 und S47) beginnen mit einem Mockup-PR unter `design/mockups/`; die Umsetzung folgt erst nach dessen
   Freigabe ([design/README.md, Kap. 9](../design/README.md#9-mockups)).
 - **Anleitungen aktuell halten:** Ändert ein Schritt den Vertrag einer Action (oder später eines Transforms bzw.
   Plugins), aktualisiert derselbe PR die Anleitung in [`docs/dev/`](dev/ACTIONS.md); ebenso [`AGENTS.md`](../AGENTS.md)
@@ -148,6 +148,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 |---|---|---|---|
 | S44 | Datenvorschau | Pipeline bis Transform X mit Limit, Records je Link als Tabelle/JSON | Manuell im Editor |
 | S46 | Felder ermitteln | „Felder ermitteln“ für CSV (JSON mit S19) schreibt `fields:` in die Datei | Playwright-Test |
+| E9 | YAML bearbeiten | Workflows und Pipelines in der YAML-Ansicht bearbeiten (Editor mit Hervorhebung, Prüfung beim Tippen über `/validate`, Rückgängig gemeinsam mit dem Canvas, Umgang mit Fehlern, die keinen Graph mehr erlauben); vorher Mockup. Bis dahin ist die YAML-Ansicht als „Read-only“ gekennzeichnet | Playwright |
 
 ---
 

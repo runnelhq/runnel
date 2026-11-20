@@ -64,15 +64,28 @@ test("shows the properties of the selected action", async ({ page }) => {
   // Several actions selected; hiding and showing the panel.
   await page.getByTestId("node-fetch-a").click({ modifiers: ["Control"] });
   await expect(panel(page)).toContainText("2 elements selected");
+  // The toggle in the file bar is always there (in the YAML view disabled), pressed while the panel is shown.
+  const toggle = page.getByRole("button", { name: "Properties panel" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Hide properties" }).click();
   await expect(panel(page)).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
   // The file bar stays as it is, with or without the panel and in the YAML view.
   await expect(page.getByTestId("crumbs")).toHaveText("properties.workflow.yaml");
   await page.getByRole("button", { name: "YAML", exact: true }).click();
   await expect(page.getByTestId("crumbs")).toHaveText("properties.workflow.yaml");
   await expect(page.getByRole("button", { name: "Copy path" })).toBeVisible();
+  await expect(toggle).toBeDisabled();
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  await page.getByRole("button", { name: "Show properties" }).click();
+  // The toggle does not move when the panel is shown or hidden.
+  const before = await toggle.boundingBox();
+  await toggle.click();
+  await expect(panel(page)).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  expect(await toggle.boundingBox()).toEqual(before);
+  await toggle.click();
+  await expect(panel(page)).toHaveCount(0);
+  await toggle.click();
   await expect(panel(page)).toBeVisible();
 });
 
