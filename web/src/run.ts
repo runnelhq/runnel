@@ -13,6 +13,15 @@ export interface ActionRun {
   started?: number;
   durationMs?: number;
   error?: string;
+  /** Pipelines: records read, written and passed to error links, once the transform has finished. */
+  counts?: Counts;
+}
+
+/** Records of a transform in a pipeline run (pipeline.Counts). */
+export interface Counts {
+  read: number;
+  written: number;
+  errors?: number;
 }
 
 /** A line of the run log (mockup E8), worded like "runnel run -v". */
@@ -29,6 +38,9 @@ export const maxLogLines = 5000;
 /** A run of the open workflow as the canvas shows it (mockup E8). */
 export interface RunView {
   id: string;
+  /** A run of a workflow or of a pipeline (S25a3). */
+  kind: "workflow" | "pipeline";
+  /** Name of the workflow or pipeline. */
   workflow: string;
   environment: string;
   status: RunStatus;
@@ -36,6 +48,8 @@ export interface RunView {
   durationMs?: number;
   error?: string;
   actions: Record<string, ActionRun>;
+  /** Pipelines: records per link index, once the transform before it has finished. */
+  linkRows: Record<number, number>;
   log: LogLine[];
   /** Actions and links when the run started; the status is hidden once they change (decision for mockup E8). */
   signature: string;
@@ -53,6 +67,13 @@ interface RunEvent {
   durationMs?: number;
   error?: string;
   outputs?: Record<string, unknown>;
+  counts?: Counts;
+  linkRows?: Record<string, number>;
+}
+
+/** "read 4, written 3, errors 1", like runnel run. */
+export function countsText(c: Counts): string {
+  return `read ${c.read}, written ${c.written}${c.errors ? `, errors ${c.errors}` : ""}`;
 }
 
 /** The log lines of an event, worded like the CLI (internal/cli/run.go). */
@@ -61,7 +82,7 @@ function logLines(ev: RunEvent, run: RunView): LogLine[] {
   const took = formatDuration(ev.durationMs ?? 0);
   switch (ev.kind) {
     case "run.started":
-      return [at("info", `workflow "${run.workflow}" started${run.environment ? ` (environment ${run.environment})` : ""}`)];
+      return [at("info", `${run.kind} "${run.workflow}" started${run.environment ? ` (environment ${run.environment})` : ""}`)];
     case "action.started":
       return [at("debug", `started (${ev.actionType ?? ""})`)];
     case "action.waiting":
@@ -70,15 +91,18 @@ function logLines(ev: RunEvent, run: RunView): LogLine[] {
       return [at("debug", "skipped (no incoming link applies)")];
     case "log":
       return [at(ev.level ?? "info", ev.message ?? "")];
-    case "action.finished":
-      if (ev.status === "cancelled") return [at("warn", `cancelled after ${took}`)];
-      if (ev.error) return [at("error", `failed after ${took}: ${ev.error}`)];
+    case "action.finished": {
+      const counts = ev.counts ? ` (${countsText(ev.counts)})` : "";
+      if (ev.status === "cancelled") return [at("warn", `cancelled after ${took}${counts}`)];
+      if (ev.error) return [at("error", `failed after ${took}: ${ev.error}${counts}`)];
+      if (ev.counts) return [at("debug", `${countsText(ev.counts)} in ${took}`)];
       return [at("debug", `${ev.status ?? "succeeded"} in ${took}`)];
+    }
     case "run.finished": {
       const outputs = Object.entries(ev.outputs ?? {}).map(([k, v]) =>
         at("info", `output ${k} = ${typeof v === "string" ? v : JSON.stringify(v)}`, undefined),
       );
-      const name = `workflow "${run.workflow}"`;
+      const name = `${run.kind} "${run.workflow}"`;
       if (ev.status === "cancelled") return [...outputs, at("warn", `${name} cancelled after ${took}`, undefined)];
       if (ev.status === "failed") return [...outputs, at("error", `${name} failed after ${took}: ${ev.error ?? ""}`, undefined)];
       return [...outputs, at("info", `${name} succeeded in ${took}`, undefined)];
@@ -91,7 +115,7 @@ function logLines(ev: RunEvent, run: RunView): LogLine[] {
 export function structureSignature(wf: Workflow): string {
   return JSON.stringify([
     (wf.actions ?? []).map((a) => [a.id, a.type]),
-    (wf.links ?? []).map((l) => [l.from, l.to, l.when ?? "", !!l.loop, !!l.disabled]),
+    (wf.links ?? []).map((l) => [l.from, l.to, l.when ?? "", !!l.loop, !!l.disabled, l.type ?? ""]),
   ]);
 }
 
@@ -132,7 +156,7 @@ export class StartError extends APIError {
 }
 
 /**
- * useRun starts runs of a workflow file and follows the last one via the event stream
+ * useRun starts runs of a workflow or pipeline file and follows the last one via the event stream
  * (filtered by run, from its first event on).
  */
 export function useRun(path: string) {
@@ -157,7 +181,9 @@ export function useRun(path: string) {
       for (const a of workflow.actions ?? []) actions[a.id] = { status: "pending" };
       setRun({
         id,
+        kind: workflow.kind ?? "workflow",
         workflow: workflow.name,
+        linkRows: {},
         log: [],
         environment: body.environment ?? settings.environment,
         status: "running",
@@ -185,9 +211,13 @@ export function useRun(path: string) {
       on("log", (ev) => update(ev, (r) => r));
       on("action.waiting", (ev) => action(ev, { status: "waiting" }));
       on("action.started", (ev) => action(ev, { status: "running", started: Date.parse(ev.time), durationMs: undefined, error: undefined }));
-      on("action.finished", (ev) =>
-        action(ev, { status: (ev.status as ActionStatus) ?? "succeeded", durationMs: ev.durationMs ?? 0, error: ev.error }),
-      );
+      on("action.finished", (ev) => {
+        if (ev.linkRows) {
+          const rows = Object.fromEntries(Object.entries(ev.linkRows).map(([k, v]) => [Number(k), v]));
+          setRun((r) => (r && r.id === id ? { ...r, linkRows: { ...r.linkRows, ...rows } } : r));
+        }
+        action(ev, { status: (ev.status as ActionStatus) ?? "succeeded", durationMs: ev.durationMs ?? 0, error: ev.error, counts: ev.counts });
+      });
       on("action.skipped", (ev) => action(ev, { status: "skipped" }));
       on("run.finished", (ev) => {
         es.close();

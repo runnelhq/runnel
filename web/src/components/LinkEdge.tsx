@@ -15,6 +15,8 @@ export interface LinkEdgeData extends Record<string, unknown> {
   disabled?: boolean;
   /** During or after a run: "flow" = leads to the running action, "dead" = not followed (mockup E8). */
   run?: "flow" | "dead";
+  /** Pipelines: records passed over the link in the last run (mockup S25a, state "run"). */
+  rows?: number;
   /** The link menu is open (mockup E6b). */
   menu?: boolean;
   onOpenMenu?: () => void;
@@ -112,6 +114,24 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
           {symbol}
           {data?.loop ? " ↻" : ""}
         </span>
+        {data?.rows !== undefined && (
+          <span
+            data-testid={`rows-${id}`}
+            title={`${data.rows} ${data.rows === 1 ? "record" : "records"}`}
+            className="pointer-events-none absolute inline-flex h-5 items-center rounded-full border bg-card px-[7px] font-mono text-[11px] leading-none font-semibold whitespace-nowrap tabular-nums shadow-sm"
+            style={{
+              // At the middle; on an error link below its symbol.
+              transform:
+                kind === "error"
+                  ? `translate(-50%, -50%) translate(${x}px, ${y + 26}px)`
+                  : `translate(-50%, -50%) translate(${(sourceX + targetX) / 2}px, ${(sourceY + targetY) / 2}px)`,
+              color: kind === "error" ? "var(--link-failure)" : "var(--foreground)",
+              borderColor: kind === "error" ? "var(--link-failure)" : "var(--border)",
+            }}
+          >
+            {data.rows.toLocaleString("en-US")}
+          </span>
+        )}
         {data?.menu && (
           <div
             role="menu"

@@ -120,7 +120,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | S25a1a ✅ | Pipeline-Canvas: Server | `layout` im Pipeline-Format, `/validate` für Pipelines (mit Prüfung der Transforms), `POST /pipelines/edit` (zeilengenau wie bei Workflows; gemeinsamer Editor in `internal/model/edit.go`) | Go-Tests |
 | S25a1b ✅ | Pipeline-Canvas: Editor | Pipelines im Canvas anzeigen und bearbeiten: Transform-Palette, Daten- und Fehler-Links, Eigenschaften aus dem Schema mit Execution (`copies`, `distribution`), Problems ([Mockup](../design/mockups/s25a-pipeline.html), Zustände `canvas`, `link`, `problems`) | Playwright |
 | S25a2 ✅ | Pipeline-Canvas: Felder | Felder der eingehenden Datensätze und der Links im Panel (Zustände `canvas`, `link`), Endpunkt für die abgeleiteten Schemas | Playwright |
-| S25a3 | Pipeline-Canvas: Ausführen | Pipelines im Editor ausführen, Zähler an Knoten und Links, Log (Zustand `run`) | Playwright |
+| S25a3 ✅ | Pipeline-Canvas: Ausführen | Pipelines im Editor ausführen, Zähler an Knoten und Links, Log (Zustand `run`) | Playwright |
 
 **Ergebnis 0.4:** ETL-Fälle mit CSV per CLI und im Editor, von Workflows gesteuert (auch je Datei bzw. Datensatz).
 

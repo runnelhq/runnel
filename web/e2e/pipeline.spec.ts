@@ -71,8 +71,6 @@ test("shows a pipeline as a graph with data and error links", async ({ page }) =
   await expect(panel(page).getByTestId("pipeline-properties")).toBeVisible();
   await expect(field(page, "name").getByRole("textbox")).toHaveValue("customers");
   await expect(panel(page)).toContainText("BATCH");
-  // No run in the editor yet.
-  await expect(page.getByRole("button", { name: "Run", exact: true })).toHaveCount(0);
 
   // The palette lists the transforms by category.
   const palette = page.getByRole("region", { name: "Palette" });
@@ -256,4 +254,54 @@ test("shows the fields of the incoming records and of the links", async ({ page,
   await page.getByRole("tree").getByText("canvas.pipeline.yaml", { exact: true }).click();
   await page.getByTestId("node-write").click();
   await expect(panel(page)).toContainText("The fields are shown once the transforms and links have no errors.");
+});
+
+// A pipeline whose filter fails on some records: they go over the error link.
+const checks = `kind: Pipeline
+apiVersion: runnel/v1
+name: checks
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 5, rowNumberField: n } }
+  - id: check
+    type: core.filter
+    with:
+      condition: '{{ record.n > 2 ? record.n < 5 : "unknown" }}'
+  - { id: kept, type: core.dummy }
+  - { id: rejected, type: core.dummy }
+links:
+  - { from: gen, to: check }
+  - { from: check, to: kept }
+  - { from: check, to: rejected, type: error }
+`;
+
+test("runs a pipeline and shows the records of each transform and link", async ({ page, request }) => {
+  await request.put("/api/v1/files/pipelines/checks.pipeline.yaml", { headers: { "If-Match": "*" }, data: checks });
+  await page.goto("/");
+  await page.getByRole("tree").getByText("checks.pipeline.yaml", { exact: true }).click();
+  await expect(page.getByTestId("node-check")).toBeVisible();
+
+  // The project has two environments: the first run asks.
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Run checks.pipeline.yaml" });
+  await dialog.getByRole("button", { name: "Run" }).click();
+  await expect(page.getByTestId("run-status")).toContainText("✔ Last run succeeded", { timeout: 10_000 });
+
+  // Counts at the transforms: read → written, errors with ✖; an input only what it wrote.
+  await expect(page.getByTestId("node-gen").getByTestId("counts")).toHaveText("5");
+  await expect(page.getByTestId("node-check").getByTestId("counts")).toHaveText("5 → 2 · ✖ 2");
+  await expect(page.getByTestId("node-check")).toHaveAttribute("data-run", "succeeded");
+  // Records per link: gen → check, check → kept, check → rejected (error link).
+  await expect(page.getByTestId("rows-0")).toHaveText("5");
+  await expect(page.getByTestId("rows-1")).toHaveText("2");
+  await expect(page.getByTestId("rows-2")).toHaveText("2");
+
+  // The log follows the run, with the counts of each transform.
+  const log = page.getByRole("log", { name: "Run log" });
+  await expect(log).toContainText('pipeline "checks" started (environment dev)');
+  await expect(log).toContainText("read 5, written 2, errors 2 in");
+  await expect(log).toContainText('pipeline "checks" succeeded in');
+
+  // The panel shows the result of the selected transform.
+  await page.getByTestId("node-check").click();
+  await expect(panel(page).getByTestId("run-counts")).toHaveText("5read2written✖ 2to error links");
 });

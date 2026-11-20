@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	"testing/fstest"
 
 	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/engine/pipeline"
+	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transforms"
 )
 
@@ -105,4 +108,37 @@ func TestEditPipeline(t *testing.T) {
 		http.StatusUnprocessableEntity, "prevent editing")
 	expect(t, do(t, s, "POST", "/api/v1/pipelines/edit", mustJSON(t, map[string]any{"path": "workflows/import.workflow.yaml", "content": ""})),
 		http.StatusBadRequest, "only pipeline files")
+}
+
+// A pipeline runs like a workflow; its transforms are reported as actions, with counts (S25a3).
+func TestRunPipeline(t *testing.T) {
+	s := pipelineServer(t)
+	writeFile(t, filepath.Join(s.dir, "pipelines", "numbers.pipeline.yaml"), `kind: Pipeline
+apiVersion: runnel/v1
+name: numbers
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - id: even
+    type: core.filter
+    with: { condition: "{{ record.n % 2 == 0 }}" }
+  - { id: out, type: core.dummy }
+links:
+  - { from: gen, to: even }
+  - { from: even, to: out }
+`)
+	run := startRun(t, s, `{"path": "pipelines/numbers.pipeline.yaml"}`)
+	if run.Kind != "pipeline" || run.Workflow != "numbers" || len(run.LinkRows) != 2 {
+		t.Errorf("run %+v", run)
+	}
+	d := waitRun(t, s, run.ID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
+	if d.Status != "succeeded" || len(d.Actions) != 3 || d.Actions[1].Counts == nil || *d.Actions[1].Counts != (pipeline.Counts{Read: 10, Written: 5}) {
+		t.Fatalf("run %+v, actions %+v", d.Run, d.Actions)
+	}
+	if fmt.Sprint(d.LinkRows) != "[10 5]" {
+		t.Errorf("link rows %v", d.LinkRows)
+	}
+	// A pipeline with problems is not started.
+	writeFile(t, filepath.Join(s.dir, "pipelines", "broken.pipeline.yaml"), "kind: Pipeline\napiVersion: runnel/v1\nname: broken\ntransforms:\n  - { id: x, type: core.nope }\n")
+	rec := do(t, s, "POST", "/api/v1/runs", `{"path": "pipelines/broken.pipeline.yaml"}`)
+	expect(t, rec, http.StatusUnprocessableEntity, "the pipeline cannot be started")
 }

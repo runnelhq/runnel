@@ -13,7 +13,7 @@ import (
 	"github.com/runnelhq/runnel/internal/runs"
 )
 
-// startRequest starts a run of a saved workflow file.
+// startRequest starts a run of a saved workflow or pipeline file.
 type startRequest struct {
 	Path        string            `json:"path"`
 	Environment string            `json:"environment,omitempty"`
@@ -40,8 +40,9 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if fileKind(name) != "workflow" {
-		writeError(w, http.StatusBadRequest, "only workflow files (*.workflow.yaml) can be run")
+	kind := fileKind(name)
+	if kind != "workflow" && kind != "pipeline" {
+		writeError(w, http.StatusBadRequest, "only workflow and pipeline files (*.workflow.yaml, *.pipeline.yaml) can be run")
 		return
 	}
 	data, err := s.readFile(name)
@@ -49,21 +50,33 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	run, _, err := s.runs.Start(name, runs.Spec{
-		Name:       name,
-		File:       filepath.Join(s.dir, filepath.FromSlash(name)),
-		Data:       data,
-		ProjectDir: s.dir,
-		Env:        req.Environment,
-		Params:     req.Params,
-		Registry:   s.registry,
-		Transforms: s.transforms,
-	})
+	var run runs.Run
+	if kind == "pipeline" {
+		run, _, err = s.runs.StartPipeline(name, runs.PipelineSpec{
+			Name:       name,
+			Data:       data,
+			ProjectDir: s.dir,
+			Env:        req.Environment,
+			Params:     req.Params,
+			Registry:   s.transforms,
+		})
+	} else {
+		run, _, err = s.runs.Start(name, runs.Spec{
+			Name:       name,
+			File:       filepath.Join(s.dir, filepath.FromSlash(name)),
+			Data:       data,
+			ProjectDir: s.dir,
+			Env:        req.Environment,
+			Params:     req.Params,
+			Registry:   s.registry,
+			Transforms: s.transforms,
+		})
+	}
 	var diags model.Errors
 	switch {
 	case errors.As(err, &diags):
 		writeJSON(w, http.StatusUnprocessableEntity, startProblems{
-			Error:            "the workflow cannot be started; fix the problems listed",
+			Error:            fmt.Sprintf("the %s cannot be started; fix the problems listed", kind),
 			validateResponse: s.response(diags),
 		})
 	case errors.Is(err, runs.ErrShutdown):

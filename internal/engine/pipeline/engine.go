@@ -80,6 +80,9 @@ type Result struct {
 	Duration time.Duration
 	// Counts by transform id.
 	Counts map[string]Counts
+	// LinkRows are the numbers of records passed over each link, by index in the
+	// list of links (S25a3).
+	LinkRows []int64
 	// Rows are the result records of the run, written by core.to-result (S24a).
 	Rows []record.Record
 }
@@ -109,6 +112,9 @@ type Event struct {
 	Err           error         // TransformFinished, RunFinished
 	Duration      time.Duration // TransformFinished, RunFinished
 	Counts        Counts        // TransformFinished
+	// LinkRows are the numbers of records passed over the outgoing links of the
+	// transform, by link index (TransformFinished).
+	LinkRows map[int]int64
 }
 
 // Runner runs a prepared pipeline.
@@ -235,6 +241,7 @@ func Schemas(p *model.Pipeline, opts Options) map[string]TransformSchemas {
 // outLink is an outgoing link of a transform.
 type outLink struct {
 	ch     chan transform.Batch
+	index  int    // index of the link in the pipeline
 	to     int    // index of the transform it leads to
 	target string // its id
 }
@@ -528,6 +535,7 @@ func (r *Runner) Run(parent context.Context) Result {
 	}
 
 	counts := make([]struct{ read, written, errors atomic.Int64 }, len(r.p.Transforms))
+	linkRows := make([]atomic.Int64, len(r.p.Links))
 	var failMu sync.Mutex
 	var failure error
 	fail := func(err error) {
@@ -546,7 +554,7 @@ func (r *Runner) Run(parent context.Context) Result {
 		var dataLinks, errLinks []outLink
 		for _, li := range outs[i] {
 			l := r.p.Links[li]
-			ol := outLink{ch: links[li], to: index[l.To], target: l.To}
+			ol := outLink{ch: links[li], index: li, to: index[l.To], target: l.To}
 			if l.Type == model.ErrorLink {
 				errLinks = append(errLinks, ol)
 			} else {
@@ -574,6 +582,7 @@ func (r *Runner) Run(parent context.Context) Result {
 					select {
 					case l.ch <- batch:
 						counts[l.to].read.Add(int64(len(b)))
+						linkRows[l.index].Add(int64(len(b)))
 					case <-ctx.Done():
 						return context.Cause(ctx)
 					}
@@ -682,14 +691,22 @@ func (r *Runner) Run(parent context.Context) Result {
 			for range in {
 			}
 			c := Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load()}
+			rows := make(map[int]int64, len(outs[i]))
+			for _, li := range outs[i] {
+				rows[li] = linkRows[li].Load()
+			}
 			end := now()
 			r.emit(Event{Time: end, Kind: TransformFinished, RunID: runID, TransformID: t.ID, TransformType: t.Type,
-				Status: status, Err: err, Duration: end.Sub(start), Counts: c})
+				Status: status, Err: err, Duration: end.Sub(start), Counts: c, LinkRows: rows})
 		}()
 	}
 	wg.Wait()
 
-	res := Result{RunID: runID, Status: Succeeded, Duration: now().Sub(started), Counts: map[string]Counts{}, Rows: results}
+	res := Result{RunID: runID, Status: Succeeded, Duration: now().Sub(started), Counts: map[string]Counts{}, Rows: results,
+		LinkRows: make([]int64, len(linkRows))}
+	for i := range linkRows {
+		res.LinkRows[i] = linkRows[i].Load()
+	}
 	for i, t := range r.p.Transforms {
 		res.Counts[t.ID] = Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load()}
 	}

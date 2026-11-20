@@ -509,6 +509,13 @@ links:
 	if e := finished(events, "check"); e.Counts.Errors != 10 {
 		t.Errorf("event counts %+v", e.Counts)
 	}
+	// Records per link, in the result and at the end of the transform before (S25a3).
+	if got := fmt.Sprint(res.LinkRows); got != "[20 10 10 10]" {
+		t.Errorf("link rows %s", got)
+	}
+	if e := finished(events, "check"); fmt.Sprint(e.LinkRows) != "map[1:10 2:10 3:10]" {
+		t.Errorf("event link rows %v", e.LinkRows)
+	}
 	if len(c.recs["good"]) != 10 || len(c.recs["bad"]) != 10 || len(c.recs["bad2"]) != 10 {
 		t.Fatalf("good %d, bad %d, bad2 %d", len(c.recs["good"]), len(c.recs["bad"]), len(c.recs["bad2"]))
 	}

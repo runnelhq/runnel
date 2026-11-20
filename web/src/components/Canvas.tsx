@@ -160,7 +160,14 @@ function Graph(props: CanvasProps) {
         target: l.to,
         type: "link",
         selectable: editable,
-        data: { kind: kindOfLink(l), when: l.when, loop: l.loop, disabled: l.disabled, run: pipeline ? undefined : linkRun(run, l) },
+        data: {
+          kind: kindOfLink(l),
+          when: l.when,
+          loop: l.loop,
+          disabled: l.disabled,
+          run: pipeline ? undefined : linkRun(run, l),
+          rows: pipeline ? run?.linkRows[i] : undefined,
+        },
       }));
     return { computed, computedEdges, auto };
   }, [workflow, pipeline, problems, catalog, onShowInYAML, problemsInPanel, run, editable, renaming, onRenaming, finishRename]);

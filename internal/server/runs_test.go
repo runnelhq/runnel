@@ -107,7 +107,7 @@ func TestRunStartErrors(t *testing.T) {
 
 	expect(t, do(t, s, "POST", "/api/v1/runs", `{"path": "workflows/wait.workflow.yaml", "environment": "qa"}`), http.StatusBadRequest, `environment \"qa\" not found`)
 	expect(t, do(t, s, "POST", "/api/v1/runs", `{"path": "workflows/wait.workflow.yaml", "params": {"DELAY": 5}}`), http.StatusBadRequest, "invalid request")
-	expect(t, do(t, s, "POST", "/api/v1/runs", `{"path": "data/in.csv"}`), http.StatusBadRequest, "only workflow files")
+	expect(t, do(t, s, "POST", "/api/v1/runs", `{"path": "data/in.csv"}`), http.StatusBadRequest, "only workflow and pipeline files")
 	expect(t, do(t, s, "POST", "/api/v1/runs", `{"path": "workflows/none.workflow.yaml"}`), http.StatusNotFound, "file not found")
 
 	if err := s.Shutdown(t.Context()); err != nil {
