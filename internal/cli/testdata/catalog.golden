@@ -1,13 +1,13 @@
-general
+actions / general
   core.abort    Abort    Ends the workflow as failed
   core.dummy    Dummy    Does nothing; collects branches into one point
   core.log      Log      Writes a message to the run log
   core.start    Start    Entry point of the workflow
   core.success  Success  Ends the workflow successfully
   core.wait     Wait     Waits for a given time
-execution
+actions / execution
   core.run-workflow  Run Workflow  Runs another workflow with parameters; output: its outputs
-files
+actions / files
   file.copy    Copy Files     Copies files or folders; output: the copied files
   file.delete  Delete Files   Deletes files or folders; output: the deleted paths
   file.exists  File Exists    Checks whether files or folders exist; output: the matching paths
@@ -15,3 +15,9 @@ files
   file.mkdir   Create Folder  Creates a folder with its parent folders; output: the path
   file.move    Move Files     Moves files or folders; output: the new paths
   file.wait    Wait for File  Waits until files exist; output: the matching paths
+transforms / input
+  core.generate-rows  Generate Rows  Creates records with constant fields
+transforms / flow
+  core.dummy  Dummy  Passes all records on unchanged
+transforms / output
+  core.log  Log  Writes records to the run log and passes them on

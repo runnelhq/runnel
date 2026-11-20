@@ -14,6 +14,7 @@ import (
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/server"
+	"github.com/runnelhq/runnel/internal/transforms"
 )
 
 // DefaultPort is the port of "runnel serve" unless --port is given.
@@ -52,7 +53,7 @@ func serve(cmd *cobra.Command, dir string, port int) error {
 	if !found {
 		return fmt.Errorf("no project (%s) found in %s or above", model.ProjectFile, dir)
 	}
-	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin()})
+	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin()})
 	if err != nil {
 		return err
 	}

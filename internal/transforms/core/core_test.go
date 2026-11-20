@@ -13,7 +13,7 @@ import (
 
 func TestGenerateRows(t *testing.T) {
 	tr := transformtest.New(t, generateRowsDefinition, map[string]any{
-		"rows": 3, "rowNumberField": "n",
+		"rows": "3", "rowNumberField": "n",
 		"fields": []any{map[string]any{"name": "status", "value": "new"}, map[string]any{"name": "amount", "value": 1.5}},
 	})
 	out, _, err := transformtest.Run(context.Background(), tr)
@@ -24,10 +24,17 @@ func TestGenerateRows(t *testing.T) {
 		t.Errorf("record %s", got)
 	}
 	for _, with := range []map[string]any{
-		{"rows": -1}, {"rows": 1, "fields": []any{map[string]any{"value": 1}}}, {}, {"rows": "many"},
+		{"rows": "1", "fields": []any{map[string]any{"value": 1}}}, {}, {"rows": 5},
 	} {
 		if _, err := generateRowsDefinition.New(with); err == nil {
 			t.Errorf("%v accepted", with)
+		}
+	}
+	// The number is checked when the pipeline runs: it may be a variable before.
+	for _, rows := range []string{"-1", "many", "${ROWS}"} {
+		tr := transformtest.New(t, generateRowsDefinition, map[string]any{"rows": rows})
+		if _, _, err := transformtest.Run(context.Background(), tr); err == nil || !strings.Contains(err.Error(), "is not a whole number") {
+			t.Errorf("rows %q: %v", rows, err)
 		}
 	}
 }

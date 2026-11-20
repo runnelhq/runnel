@@ -140,6 +140,30 @@ func TestRunSubWorkflowsExample(t *testing.T) {
 	}
 }
 
+func TestRunPipelineExample(t *testing.T) {
+	chdirRepoRoot(t)
+	code, out, errOut := run(t, "run", "--param", "ROWS=100", "examples/pipelines/pipelines/numbers.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		`pipeline "numbers" started, run `,
+		"[numbers] read 0, written 100 in ",
+		"[both] read 200, written 200 in ",
+		"[show] read 200, written 200 in ",
+		`pipeline "numbers" succeeded in `,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	// A value that is not a whole number is reported when the transform runs.
+	code, out, _ = run(t, "run", "--param", "ROWS=-5", "examples/pipelines/pipelines/numbers.pipeline.yaml")
+	if code != 1 || !strings.Contains(out, `[numbers] failed after`) || !strings.Contains(out, `rows: "-5" is not a whole number of 0 or more`) {
+		t.Errorf("exit code %d:\n%s", code, out)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")
@@ -183,7 +207,7 @@ func TestRunNotStarted(t *testing.T) {
 		want string
 	}{
 		{"invalid workflow", []string{"run", "examples/broken/graph.workflow.yaml"}, `unknown action "imprt"`},
-		{"pipeline", []string{"run", "examples/broken/cycle.pipeline.yaml"}, "pipelines cannot be run yet (roadmap S13)"},
+		{"invalid pipeline", []string{"run", "examples/broken/cycle.pipeline.yaml"}, "closes a cycle (read → filter → write → read)"},
 		{"unknown action type", []string{"run", writeWorkflow(t, `
 actions:
   - { id: start, type: core.start }

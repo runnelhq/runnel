@@ -488,7 +488,7 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
 - Pflichtfelder: `kind: Pipeline`, `apiVersion: runnel/v1`, `name`; je Transform `id` und `type`; je Link `from` und `to`.
   Dazu `description`, `parameters` (wie bei Workflows, ohne `outputs`) und je Transform `with`.
 - Transform-IDs wie Action-IDs; Typen `<namespace>.<name>` in einem eigenen Namensraum ([ADR 0013](adr/0013-typnamen-namensraeume.md)).
-  Ob ein Typ existiert und seine Konfiguration passt, wird geprüft, sobald es Transforms gibt (S13).
+  Ob ein Typ existiert und seine Konfiguration passt, prüfen `runnel validate` und der Start eines Laufs (seit S13b).
 - Links sind Daten-Links (`type: data`, Standard). **Fehler werden nur über Links behandelt** (`type: error`, mit S17),
   nicht über ein Feld am Transform – wie die Fehlerpfade (`when: failure`) bei Workflows. `type: info` folgt mit S23;
   bis dahin meldet `runnel validate` beide als „noch nicht unterstützt“ (der Editor zeigt Pipelines bis S25a nur als YAML).
@@ -496,7 +496,8 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
   selbst und **keine Zyklen** (Datensätze fließen nur vorwärts). Warnungen: doppelte Links, Transforms ohne Verbindung.
 - `copies`, `settings` (z. B. `bufferSize`), `disabled`, `layout` und der Verteilmodus kommen mit den Schritten, die sie
   ausführen (S13, S17, S25a); bis dahin sind sie unbekannte Felder.
-- `runnel validate` prüft `*.pipeline.yaml` mit; `runnel run` lehnt Pipelines bis S13 mit einem Hinweis ab.
+- `runnel validate` prüft `*.pipeline.yaml` mit; `runnel run` führt Pipelines aus und zeigt am Ende je Transform, wie viele
+  Records er gelesen und geschrieben hat (seit S13b).
 
 ### 5.3 Trigger
 
