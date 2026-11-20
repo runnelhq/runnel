@@ -1,8 +1,0 @@
-# Errors are handled with links (type: error), not with a field of the transform.
-kind: Pipeline
-apiVersion: runnel/v1
-name: later
-transforms:
-  - id: call
-    type: http.request
-    onError: error-link
