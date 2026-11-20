@@ -7,6 +7,7 @@ import type { SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
 import { ExpressionInput } from "./ExpressionInput";
+import { ExpressionDialog } from "./ExpressionDialog";
 
 /** A value written to a field; null removes the field from the file. */
 export type FieldValue = string | number | boolean | null;
@@ -137,6 +138,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       value={action.with?.[name]}
       problems={at(`with.${name}`, name)}
       ctx={props.ctx}
+      owner={action.id}
       onChange={set(`with.${name}`)}
     />
   ));
@@ -438,6 +440,8 @@ function SchemaField(props: {
   value: unknown;
   problems: Problem[];
   ctx: ExprContext;
+  /** Id of the action, shown in the larger editor. */
+  owner: string;
   onChange: (value: FieldValue) => void;
 }) {
   const { name, schema: s, value } = props;
@@ -509,6 +513,7 @@ function SchemaField(props: {
         placeholder={placeholder}
         multiline={s.format === "runnel-text"}
         ctx={props.ctx}
+        owner={props.owner}
         onCommit={(v) => props.onChange(v === "" ? null : v)}
       />
     );
@@ -559,10 +564,14 @@ function ExpressionField(props: {
   placeholder?: string;
   multiline?: boolean;
   ctx: ExprContext;
+  /** Id of the action or the link, shown in the larger editor. */
+  owner?: string;
   testId?: string;
   onCommit: (value: string) => void;
 }) {
   const { value, ctx, problems } = props;
+  // The larger editor (roadmap S35b) with the text of the field when it was opened.
+  const [expanded, setExpanded] = useState<string | null>(null);
   const located = useMemo(
     () => problems.map((p) => ({ problem: p, at: locate(value, p.message, ctx) })),
     [problems, value, ctx],
@@ -585,17 +594,36 @@ function ExpressionField(props: {
       fixes={fixes}
     >
       {(p) => (
-        <ExpressionInput
-          labelId={p.labelId}
-          invalid={p.invalid}
-          value={value}
-          placeholder={props.placeholder}
-          multiline={props.multiline}
-          problems={marks}
-          ctx={ctx}
-          testId={props.testId}
-          onCommit={props.onCommit}
-        />
+        <>
+          <ExpressionInput
+            labelId={p.labelId}
+            invalid={p.invalid}
+            value={value}
+            placeholder={props.placeholder}
+            multiline={props.multiline}
+            problems={marks}
+            ctx={ctx}
+            testId={props.testId}
+            onCommit={props.onCommit}
+            onExpand={setExpanded}
+          />
+          {expanded !== null && (
+            <ExpressionDialog
+              label={props.label}
+              fieldKey={props.fieldKey}
+              owner={props.owner}
+              value={expanded}
+              multiline={props.multiline ?? false}
+              problems={expanded === value ? marks : []}
+              ctx={ctx}
+              onCancel={() => setExpanded(null)}
+              onApply={(v) => {
+                setExpanded(null);
+                if (v !== value) props.onCommit(v);
+              }}
+            />
+          )}
+        </>
       )}
     </Field>
   );
@@ -808,6 +836,7 @@ function LinkProperties(props: PropertiesProps & { index: number; ctx: ExprConte
           problems={problemsAt(problems, base, "when")}
           value={saved === "expression" ? (l.when ?? "") : "{{  }}"}
           ctx={props.ctx}
+          owner={`${l.from} → ${l.to}`}
           testId="link-expression"
           onCommit={(v) => {
             const when = asExpression(v);
