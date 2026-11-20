@@ -66,7 +66,12 @@ test("shows the properties of the selected action", async ({ page }) => {
   await expect(panel(page)).toContainText("2 elements selected");
   await page.getByRole("button", { name: "Hide properties" }).click();
   await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByTestId("crumbs")).toHaveText("workflows / properties.workflow.yaml");
+  // The file bar stays as it is, with or without the panel and in the YAML view.
+  await expect(page.getByTestId("crumbs")).toHaveText("properties.workflow.yaml");
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  await expect(page.getByTestId("crumbs")).toHaveText("properties.workflow.yaml");
+  await expect(page.getByRole("button", { name: "Copy path" })).toBeVisible();
+  await page.getByRole("button", { name: "Canvas", exact: true }).click();
   await page.getByRole("button", { name: "Show properties" }).click();
   await expect(panel(page)).toBeVisible();
 });
@@ -226,7 +231,10 @@ test("lists the problems below the canvas and jumps to the field", async ({ page
   const bar = page.getByRole("region", { name: "Problems and log" });
   await expect(bar.getByTestId("problem-count")).toHaveText("1");
   await expect(bar.getByRole("table")).toHaveCount(0);
-  await page.getByTestId("error-count").click(); // the badge opens the list
+  // The badge opens the list, also from the YAML view (which switches to the canvas).
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  await page.getByTestId("error-count").click();
+  await expect(page.getByRole("button", { name: "Canvas", exact: true })).toHaveAttribute("aria-pressed", "true");
   const rows = bar.getByRole("table").getByRole("row");
   await expect(rows.nth(1)).toContainText('invalid duration "5 mins"');
   await expect(rows.nth(1)).toContainText("fetch-a · Timeout");

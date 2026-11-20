@@ -23,8 +23,11 @@ test("opens files in tabs and shows them as highlighted YAML", async ({ page }) 
   await page.getByRole("button", { name: "YAML", exact: true }).click();
 
   await expect(page.getByRole("tab", { name: /hello\.workflow\.yaml/ })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("crumbs")).toHaveText("workflows / hello.workflow.yaml");
-  await expect(page.getByTestId("kind")).toHaveText("Workflow");
+  // Workflows have the compact file bar in every view: the path in the tooltip, no kind badge.
+  await expect(page.getByTestId("crumbs")).toHaveText("hello.workflow.yaml");
+  await expect(page.getByTestId("crumbs")).toHaveAttribute("title", "workflows/hello.workflow.yaml");
+  await expect(page.getByTestId("kind")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy path" })).toBeVisible();
   // Workflows are editable (E6a); other files are read-only.
   await expect(page.getByText("Read-only")).toHaveCount(0);
 
