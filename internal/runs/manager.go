@@ -200,6 +200,7 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 	m.order = append(m.order, id)
 	m.prune()
 	out := e.run
+	out.LinkRows = slices.Clone(out.LinkRows) // the events change the entry's slice
 	m.mu.Unlock()
 
 	m.wg.Add(1)
