@@ -159,6 +159,12 @@ export const LayoutIcon = (p: P) => (
   </Icon>
 );
 
+export const PipelineIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M3 7h5l3 5-3 5H3M11 12h10M17 8l4 4-4 4" />
+  </Icon>
+);
+
 export const PanelIcon = (p: P) => (
   <Icon {...p}>
     <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -214,9 +220,28 @@ const actionIcons: Record<string, ReactNode> = {
       <path d="M9 9l6 6M15 9l-6 6" />
     </>
   ),
+  // Transforms (design/mockups/s25a-pipeline.html); core.log and core.dummy as above.
+  "csv.input": <path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6" />,
+  "csv.output": <path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v7M9 15l3 3 3-3" />,
+  "core.generate-rows": <path d="M4 6h16M4 12h16M4 18h16M19 3v6M16 6h6" />,
+  "core.from-result": <path d="M4 12h11M11 8l4 4-4 4M15 4h5v16h-5" />,
+  "core.to-result": <path d="M9 12h11M16 8l4 4-4 4M9 4H4v16h5" />,
+  "core.convert": <path d="M5 8h11l-3-3M19 16H8l3 3" />,
+  "core.filter": <path d="M4 5h16l-6 7v6l-4 2v-8z" />,
+  "core.select-fields": <path d="M5 6h14M5 12h9M5 18h5M17 15l2 2 3-4" />,
+  "core.constant": <path d="M12 5v14M5 12h14" />,
+  "core.switch": <path d="M4 12h6M10 12l8-6M10 12l8 6M10 12h8" />,
+  "core.sort": <path d="M7 4v16M4 17l3 3 3-3M14 6h6M14 12h4M14 18h2" />,
+  "core.group-by": (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="1" />
+      <rect x="13" y="4" width="7" height="7" rx="1" />
+      <path d="M7.5 11v4h9v-4M12 15v5" />
+    </>
+  ),
 };
 
-/** Icon of an action type; known types without an own icon get a generic one, unknown types "?". */
+/** Icon of an action or transform type; known types without an own icon get a generic one, unknown types "?". */
 export function ActionIcon({ type, known, ...p }: P & { type: string; known: boolean }) {
   if (!known) {
     return (
@@ -241,8 +266,9 @@ export function ActionIcon({ type, known, ...p }: P & { type: string; known: boo
 export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
   switch (kind) {
     case "workflow":
-    case "pipeline":
       return <WorkflowIcon {...p} />;
+    case "pipeline":
+      return <PipelineIcon {...p} />;
     case "environment":
       return <LinesIcon {...p} />;
     case "project":

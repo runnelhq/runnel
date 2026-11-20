@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
-import { editWorkflow, problemTarget, validate, type Link, type Problem, type Validation, type WorkflowEdit } from "../workflow";
+import { editWorkflow, graphOf, problemTarget, validate, type GraphKind, type Link, type Problem, type Validation, type WorkflowEdit } from "../workflow";
 import { Canvas, type Selection } from "./Canvas";
 import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { RunDialog } from "./RunDialog";
@@ -8,7 +8,7 @@ import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
 import { Dialog } from "./Dialog";
-import { PropertiesPanel, type FieldValue } from "./PropertiesPanel";
+import { PropertiesPanel, type FieldValue, type LinkChange } from "./PropertiesPanel";
 import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
 import {
@@ -22,6 +22,7 @@ import {
   ReloadIcon,
   SaveIcon,
   StopIcon,
+  PipelineIcon,
   UndoIcon,
   WorkflowIcon,
 } from "./Icons";
@@ -52,7 +53,7 @@ export function fileSummary(path: string, text: string, encoding: string): strin
 const historyLimit = 100;
 
 /**
- * Shows one file. Workflows open as canvas and can be edited there (E6a, E6b): every change
+ * Shows one file. Workflows and pipelines (S25a) open as canvas and can be edited there (E6a, E6b): every change
  * is applied to the text by the server; undo/redo keep text versions; saving uses the
  * ETag and asks what to do when the file was changed elsewhere. Other files are read-only.
  * The view stays mounted while its tab is open, so that unsaved changes survive tab switches.
@@ -73,8 +74,12 @@ export function FileView(props: {
 }) {
   const { path, active, epoch, onSummary, onPalette, onDirty, onRegister, onRun } = props;
   const [state, setState] = useState<State>({ status: "loading" });
-  const isWorkflow = kindOf(path) === "workflow";
-  const [view, setView] = useState<View>(isWorkflow ? "canvas" : "yaml");
+  const fileKind = kindOf(path);
+  const isWorkflow = fileKind === "workflow";
+  // Workflows and pipelines are graphs: shown on the canvas and edited there.
+  const graphKind: GraphKind | null = fileKind === "workflow" || fileKind === "pipeline" ? fileKind : null;
+  const isGraph = graphKind !== null;
+  const [view, setView] = useState<View>(isGraph ? "canvas" : "yaml");
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [undo, setUndo] = useState<string[]>([]);
@@ -127,10 +132,10 @@ export function FileView(props: {
 
   useEffect(() => onDirty(path, dirty), [path, dirty, onDirty]);
 
-  // The server checks the text shown and returns the parsed workflow for the canvas.
+  // The server checks the text shown and returns the parsed workflow or pipeline for the canvas.
   const text = doc?.text;
   useEffect(() => {
-    if (!isWorkflow || text === undefined) return;
+    if (!isGraph || text === undefined) return;
     let cancelled = false;
     validate(path, text).then(
       (v) => !cancelled && setValidation(v),
@@ -139,18 +144,19 @@ export function FileView(props: {
     return () => {
       cancelled = true;
     };
-  }, [isWorkflow, path, text]);
+  }, [isGraph, path, text]);
+  const graph = useMemo(() => graphOf(validation), [validation]);
+  const steps = graphKind === "pipeline" ? "transforms" : "actions";
 
   useEffect(() => {
     if (!active) return;
     if (!doc) return onSummary(null);
-    const wf = validation?.workflow;
     onSummary(
-      view === "canvas" && wf
-        ? `Workflow · ${wf.actions?.length ?? 0} actions · ${wf.links?.length ?? 0} links`
+      view === "canvas" && graph
+        ? `${graph.kind === "pipeline" ? "Pipeline" : "Workflow"} · ${graph.actions?.length ?? 0} ${steps} · ${graph.links?.length ?? 0} links`
         : fileSummary(path, doc.text, doc.encoding),
     );
-  }, [active, doc, path, view, validation, onSummary]);
+  }, [active, doc, path, view, graph, steps, onSummary]);
 
   const docRef = useRef<Doc | null>(null);
   docRef.current = doc;
@@ -186,7 +192,7 @@ export function FileView(props: {
         const current = docRef.current;
         if (!current) return null;
         try {
-          const next = await editWorkflow(path, current.text, edit);
+          const next = await editWorkflow(path, current.text, edit, graphKind ?? "workflow");
           const merge = field !== undefined && lastField.current === field;
           setText(next, merge ? "merge" : "push");
           lastField.current = field ?? null;
@@ -201,27 +207,27 @@ export function FileView(props: {
       pending.current = request;
       return request;
     },
-    [path, setText],
+    [path, setText, graphKind],
   );
 
   type Positions = Record<string, { x: number; y: number }>;
   const onMove = useCallback((positions: Positions) => void applyEdit({ move: positions }), [applyEdit]);
   const onDelete = useCallback(
     async (ids: string[], links: number[]) => {
-      const before = validation?.workflow?.links?.length ?? 0;
+      const before = graph?.links?.length ?? 0;
       const next = await applyEdit({ delete: ids, deleteLinks: links });
       if (next === null) return;
-      const v = await validate(path, next).catch(() => null);
-      const removed = v?.workflow ? before - (v.workflow.links?.length ?? 0) : links.length;
+      const after = graphOf(await validate(path, next).catch(() => null));
+      const removed = after ? before - (after.links?.length ?? 0) : links.length;
       const linkText = `${removed} ${removed === 1 ? "link" : "links"}`;
       if (ids.length === 0) {
         setToast(`Deleted ${linkText}`);
         return;
       }
-      const what = ids.length === 1 ? ids[0] : `${ids.length} actions`;
+      const what = ids.length === 1 ? ids[0] : `${ids.length} ${steps}`;
       setToast(`Deleted ${what}${removed > 0 ? ` and ${linkText}` : ""}`);
     },
-    [applyEdit, validation, path],
+    [applyEdit, graph, path, steps],
   );
   // A new action from the palette; its id can be changed right away (mockup E6b).
   const onAdd = useCallback(
@@ -250,8 +256,7 @@ export function FileView(props: {
     );
   }, []);
   const onLinkChange = useCallback(
-    (index: number, change: { when?: SettableKind | string; loop?: boolean; disabled?: boolean }) =>
-      void applyEdit({ updateLinks: [{ index, ...change }] }),
+    (index: number, change: LinkChange) => void applyEdit({ updateLinks: [{ index, ...change }] }),
     [applyEdit],
   );
   const onSetWorkflow = useCallback(
@@ -263,7 +268,8 @@ export function FileView(props: {
     [applyEdit],
   );
   const onLinkKind = useCallback(
-    (index: number, when: SettableKind) => void applyEdit({ updateLinks: [{ index, when }] }),
+    (index: number, kind: SettableKind) =>
+      void applyEdit({ updateLinks: [kind === "data" || kind === "error" ? { index, type: kind } : { index, when: kind }] }),
     [applyEdit],
   );
 
@@ -350,15 +356,15 @@ export function FileView(props: {
 
   // Keyboard shortcuts of the active tab: Ctrl+S, Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z, F5 (run), Ctrl+. (cancel).
   useEffect(() => {
-    if (!active || !isWorkflow) return;
+    if (!active || !isGraph) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F5" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (isWorkflow && e.key === "F5" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault(); // instead of reloading the page
         requestRun(e.shiftKey);
         return;
       }
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      if (e.key === ".") {
+      if (isWorkflow && e.key === ".") {
         e.preventDefault();
         void cancelRun();
         return;
@@ -380,7 +386,7 @@ export function FileView(props: {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, isWorkflow, save, doUndo, doRedo, requestRun, cancelRun]);
+  }, [active, isGraph, isWorkflow, save, doUndo, doRedo, requestRun, cancelRun]);
 
   useEffect(() => {
     if (!toast) return;
@@ -388,13 +394,12 @@ export function FileView(props: {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // The palette can add actions while an editable canvas is shown.
-  const wf = validation?.workflow;
-  const canEdit = isWorkflow && view === "canvas" && !!wf;
-  const hasStart = !!wf?.actions?.some((a) => a.type === "core.start");
+  // The palette can add actions (transforms) while an editable canvas is shown.
+  const canEdit = isGraph && view === "canvas" && !!graph;
+  const hasStart = !!graph?.actions?.some((a) => a.type === "core.start");
   useEffect(() => {
-    if (active) onPalette(isWorkflow ? { editable: canEdit, hasStart } : null);
-  }, [active, isWorkflow, canEdit, hasStart, onPalette]);
+    if (active) onPalette(graphKind ? { kind: graphKind, editable: canEdit, hasStart } : null);
+  }, [active, graphKind, canEdit, hasStart, onPalette]);
 
   const showInYAML = useCallback((line: number) => {
     setView("yaml");
@@ -404,8 +409,7 @@ export function FileView(props: {
   // A click on a problem selects what it belongs to and shows the field in the properties panel.
   const openProblem = useCallback(
     (p: Problem) => {
-      const wf = validation?.workflow;
-      const target = wf ? problemTarget(wf, p) : null;
+      const target = graph ? problemTarget(graph, p) : null;
       if (!target) {
         if (p.line) showInYAML(p.line);
         return;
@@ -414,7 +418,7 @@ export function FileView(props: {
       setPanel(true);
       if (target.field) setFocusField((f) => ({ key: target.field!, seq: (f?.seq ?? 0) + 1 }));
     },
-    [validation, showInYAML],
+    [graph, showInYAML],
   );
 
   if (!active) return null;
@@ -443,12 +447,12 @@ export function FileView(props: {
   }
 
   const slash = path.lastIndexOf("/");
-  const editable = isWorkflow && !!validation?.workflow;
+  const editable = isGraph && !!graph;
   const showPanel = editable && view === "canvas" && panel;
   // Workflows have the compact file bar of mockups E7/E8 in every view, with or without the
   // properties panel, so that nothing moves when switching between canvas and YAML: the
   // name with the path in its tooltip, "Copy path" as a symbol next to it, no kind badge.
-  const compact = isWorkflow;
+  const compact = isGraph;
   // The badges open the list of problems below the canvas, also from the YAML view.
   const openProblems = editable
     ? () => {
@@ -468,8 +472,8 @@ export function FileView(props: {
         ) : (
           <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
         )}
-        {!isWorkflow && (
-          <Badge title="Only workflows can be edited in this version">
+        {!isGraph && (
+          <Badge title="Only workflows and pipelines can be edited in this version">
             <LockIcon width={12} height={12} />
             Read-only
           </Badge>
@@ -530,7 +534,7 @@ export function FileView(props: {
               </button>
             </span>
           ))}
-        {isWorkflow && (
+        {isGraph && (
           <>
             <div className="inline-flex gap-1">
               <IconButton title="Undo (Ctrl+Z)" disabled={undo.length === 0} onClick={doUndo}>
@@ -550,7 +554,7 @@ export function FileView(props: {
               <SaveIcon width={14} height={14} />
               Save
             </button>
-            <ViewSwitch view={view} onView={setView} />
+            <ViewSwitch view={view} onView={setView} pipeline={graphKind === "pipeline"} />
             {editable && view === "canvas" && !panel && (
               <IconButton title="Show properties" onClick={() => setPanel(true)}>
                 <PanelIcon width={14} height={14} />
@@ -574,10 +578,10 @@ export function FileView(props: {
           <div className="flex-1" aria-busy="true" />
         ) : view === "yaml" ? (
           <CodeView text={doc.text} yaml={isYAML(path)} focusLine={focusLine} />
-        ) : validation?.workflow ? (
+        ) : graph ? (
           <Canvas
-            workflow={validation.workflow}
-            problems={validation.problems}
+            workflow={graph}
+            problems={validation?.problems ?? []}
             onShowInYAML={showInYAML}
             onMove={editable ? onMove : undefined}
             onDelete={editable ? onDelete : undefined}
@@ -593,14 +597,14 @@ export function FileView(props: {
             run={shownRun}
           />
         ) : validation ? (
-          <NotAGraph path={path} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
+          <NotAGraph path={path} kind={graphKind ?? "workflow"} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
         ) : (
           <div className="runnel-canvas flex-1" aria-busy="true" />
         )}
-        {editable && view === "canvas" && validation?.workflow && (
+        {editable && view === "canvas" && graph && (
           <BottomPanel
-            workflow={validation.workflow}
-            problems={validation.problems}
+            workflow={graph}
+            problems={validation?.problems ?? []}
             tab={bottomTab}
             onTab={setBottomTab}
             onOpen={openProblem}
@@ -630,11 +634,11 @@ export function FileView(props: {
           </div>
         )}
       </div>
-      {showPanel && validation?.workflow && (
+      {showPanel && graph && (
         <PropertiesPanel
-          workflow={validation.workflow}
+          workflow={graph}
           selected={selection}
-          problems={validation.problems}
+          problems={validation?.problems ?? []}
           focus={focusField}
           run={shownRun}
           onShowInLog={(actionId) => {
@@ -743,9 +747,9 @@ const problemList = (v: Validation, severity: "error" | "warning") =>
     .map((p) => (p.line ? `${p.line}:${p.column ?? 1} ${p.message}` : p.message))
     .join("\n");
 
-function ViewSwitch(props: { view: View; onView: (v: View) => void }) {
+function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean }) {
   const views: [View, string, typeof CodeIcon][] = [
-    ["canvas", "Canvas", WorkflowIcon],
+    ["canvas", "Canvas", props.pipeline ? PipelineIcon : WorkflowIcon],
     ["yaml", "YAML", CodeIcon],
   ];
   return (
@@ -767,7 +771,7 @@ function ViewSwitch(props: { view: View; onView: (v: View) => void }) {
 }
 
 /** Shown instead of the canvas when the file cannot be read as a workflow. */
-function NotAGraph(props: { path: string; validation: Validation; onShowYAML: () => void }) {
+function NotAGraph(props: { path: string; kind: GraphKind; validation: Validation; onShowYAML: () => void }) {
   const first = props.validation.problems.find((p) => p.severity === "error");
   return (
     <div className="runnel-canvas grid flex-1 place-items-center p-8" role="alert">
@@ -775,7 +779,7 @@ function NotAGraph(props: { path: string; validation: Validation; onShowYAML: ()
         <span className="inline-grid size-10 place-items-center rounded-full bg-danger-soft text-lg font-bold text-destructive">
           ✖
         </span>
-        <h2 className="mt-3 mb-1 text-md font-semibold">This workflow can’t be shown as a graph</h2>
+        <h2 className="mt-3 mb-1 text-md font-semibold">This {props.kind} can’t be shown as a graph</h2>
         <p className="mt-0 mb-3 text-muted-foreground">The file has errors. Fix them in the YAML view or in your text editor.</p>
         {first && (
           <pre className="mt-0 mb-4 rounded-md bg-muted px-2.5 py-2 text-left text-xs whitespace-pre-wrap">

@@ -16,10 +16,10 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
-import { categoryColor, paletteDrag, paletteMime, useCatalog } from "../catalog";
+import { categoryColor, paletteDrag, paletteMime, tileColor, useCatalog } from "../catalog";
 import {
   closesCycle,
-  linkKind,
+  kindOfLink,
   newActionId,
   nodeHeight,
   nodeWidth,
@@ -32,7 +32,7 @@ import {
 import type { RunView } from "../run";
 import { ActionNode, type ActionNodeType } from "./ActionNode";
 import { ActionIcon, FitIcon, LayoutIcon, MinusIcon, PlusIcon } from "./Icons";
-import { LinkEdge, linkPath, type LinkEdgeType, type SettableKind } from "./LinkEdge";
+import { LinkEdge, linkPath, pipelineKinds, type LinkEdgeType, type SettableKind } from "./LinkEdge";
 
 const nodeTypes: NodeTypes = { action: ActionNode };
 const edgeTypes: EdgeTypes = { link: LinkEdge };
@@ -101,7 +101,8 @@ export function Canvas(props: CanvasProps) {
 function Graph(props: CanvasProps) {
   const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel, run } =
     props;
-  const catalog = useCatalog();
+  const pipeline = workflow.kind === "pipeline";
+  const catalog = useCatalog(workflow.kind);
   const editable = onMove !== undefined;
   const { screenToFlowPosition } = useReactFlow();
   const [menu, setMenu] = useState<string | null>(null);
@@ -137,7 +138,9 @@ function Graph(props: CanvasProps) {
           id: a.id,
           type: a.type,
           join: a.join,
-          color: d ? (categoryColor[d.category] ?? categoryColor.general) : catalog.size === 0 ? categoryColor.general : undefined,
+          copies: a.copies,
+          noInput: pipeline && d?.category === "input",
+          color: d ? tileColor(d) : catalog.size === 0 ? categoryColor.general : undefined,
           problems: byAction.get(a.id) ?? [],
           onShowInYAML,
           problemsInPanel,
@@ -157,10 +160,10 @@ function Graph(props: CanvasProps) {
         target: l.to,
         type: "link",
         selectable: editable,
-        data: { kind: linkKind(l.when), when: l.when, loop: l.loop, disabled: l.disabled, run: linkRun(run, l) },
+        data: { kind: kindOfLink(l), when: l.when, loop: l.loop, disabled: l.disabled, run: pipeline ? undefined : linkRun(run, l) },
       }));
     return { computed, computedEdges, auto };
-  }, [workflow, problems, catalog, onShowInYAML, problemsInPanel, run, editable, renaming, onRenaming, finishRename]);
+  }, [workflow, pipeline, problems, catalog, onShowInYAML, problemsInPanel, run, editable, renaming, onRenaming, finishRename]);
 
   // Local node and edge state for dragging and selection; it follows the workflow and keeps the selection.
   // The nodes start with the current selection, so that React Flow does not report an empty one first.
@@ -259,18 +262,24 @@ function Graph(props: CanvasProps) {
   };
 
   const isValidConnection = useCallback(
-    (c: Connection | LinkEdgeType) =>
-      c.source !== c.target &&
-      !(workflow.links ?? []).some((l) => l.from === c.source && l.to === c.target && linkKind(l.when) === "success"),
-    [workflow],
+    (c: Connection | LinkEdgeType) => {
+      if (c.source === c.target) return false;
+      const links = workflow.links ?? [];
+      // Records only flow forward: a pipeline takes one link per pair and no link that closes a cycle.
+      if (pipeline) return !links.some((l) => l.from === c.source && l.to === c.target) && !closesCycle(workflow, c.source, c.target);
+      return !links.some((l) => l.from === c.source && l.to === c.target && kindOfLink(l) === "success");
+    },
+    [workflow, pipeline],
   );
   const connect = useCallback(
     (c: Connection) => {
       if (!onConnect || !c.source || !c.target) return;
+      // New pipeline links are data links; their type is changed in the link menu.
+      if (pipeline) return onConnect({ from: c.source, to: c.target, type: "data" });
       // A link back to an earlier action is a loop link (decision for mockup E6b).
       onConnect({ from: c.source, to: c.target, ...(closesCycle(workflow, c.source, c.target) ? { loop: true } : {}) });
     },
-    [onConnect, workflow],
+    [onConnect, workflow, pipeline],
   );
 
   const openMenu = useCallback(
@@ -282,10 +291,19 @@ function Graph(props: CanvasProps) {
   );
   useEffect(() => {
     if (!menu) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return setMenu(null);
+      // In a pipeline, D and E choose the type of the link (mockup S25a, state "link").
+      const kind = pipeline && !e.ctrlKey && !e.metaKey && !e.altKey && pipelineKinds.find(([, , key]) => key?.toLowerCase() === e.key.toLowerCase())?.[0];
+      if (!kind) return;
+      e.preventDefault();
+      setMenu(null);
+      const edge = edges.find((x) => x.id === menu);
+      if (edge && edge.data?.kind !== kind) onLinkKind?.(Number(menu), kind);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [menu]);
+  }, [menu, pipeline, edges, onLinkKind]);
 
   const shownEdges = useMemo(
     () =>
@@ -335,7 +353,7 @@ function Graph(props: CanvasProps) {
         }}
         onConnect={connect}
         isValidConnection={isValidConnection}
-        connectionLineComponent={ConnectionLine}
+        connectionLineComponent={pipeline ? DataConnectionLine : ConnectionLine}
         onEdgeClick={(_, e) => editable && openMenu(e.id)}
         onPaneClick={() => setMenu(null)}
         onNodeClick={() => setMenu(null)}
@@ -357,7 +375,7 @@ function Graph(props: CanvasProps) {
         <Controls />
         {ghost && (
           <ViewportPortal>
-            <Ghost {...ghost} color={categoryColor[catalog.get(ghost.type)?.category ?? "general"]} id={newActionId(workflow, ghost.type)} />
+            <Ghost {...ghost} color={categoryColor[catalog.get(ghost.type)?.category ?? "general"] ?? categoryColor.general} id={newActionId(workflow, ghost.type)} />
           </ViewportPortal>
         )}
         {auto !== "none" && (
@@ -369,7 +387,7 @@ function Graph(props: CanvasProps) {
               <LayoutIcon width={14} height={14} />
               {auto === "all"
                 ? "Arranged automatically – the file has no layout yet"
-                : "Some actions have no position and were arranged automatically"}
+                : `Some ${pipeline ? "transforms" : "actions"} have no position and were arranged automatically`}
             </span>
           </Panel>
         )}
@@ -387,7 +405,7 @@ function linkRun(run: RunView | null | undefined, l: Link): "flow" | "dead" | un
   const from = run.actions[l.from]?.status;
   const to = run.actions[l.to]?.status;
   if (!from || from === "pending" || from === "running") return undefined;
-  const kind = linkKind(l.when);
+  const kind = kindOfLink(l);
   if (kind === "expression") return undefined;
   const applies =
     (kind === "success" && from === "succeeded") ||
@@ -427,6 +445,11 @@ function ConnectionLine({ fromX, fromY, toX, toY }: ConnectionLineComponentProps
       strokeDasharray="6 4"
     />
   );
+}
+
+/** Preview of a new pipeline link: a data link (grey). */
+function DataConnectionLine({ fromX, fromY, toX, toY }: ConnectionLineComponentProps) {
+  return <path d={linkPath(fromX, fromY, toX, toY).path} fill="none" stroke="var(--link-always)" strokeWidth={2} strokeDasharray="6 4" />;
 }
 
 /** Zoom buttons and zoom level, bottom left. */

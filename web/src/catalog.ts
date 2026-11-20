@@ -14,25 +14,34 @@ export interface Schema {
   items?: Schema;
 }
 
-/** Descriptor of an action type (GET /catalog, ADR 0014). */
+/** Descriptor of an action or transform type (GET /catalog, ADR 0014). */
 export interface Descriptor {
   type: string;
   category: string;
   label: string;
   description: string;
   schema?: Schema;
+  /** Transforms: can pass records to an error link. */
+  recordErrors?: boolean;
+  /** Transforms: can run in several copies. */
+  parallel?: boolean;
 }
 
-/** Category colours of the tiles (design/README.md, chapter 3.3). */
+/** Category colours of the tiles (design/README.md, chapter 3.3); transforms: KONZEPT 12.2. */
 export const categoryColor: Record<string, string> = {
   general: "var(--rn-kategorie-allgemein)",
   execution: "var(--rn-kategorie-ausfuehrung)",
   files: "var(--rn-kategorie-dateien)",
   network: "var(--rn-kategorie-netzwerk)",
   database: "var(--rn-kategorie-datenbank)",
+  input: "var(--rn-kategorie-eingabe)",
+  transform: "var(--rn-kategorie-transformation)",
+  flow: "var(--rn-kategorie-fluss)",
+  combine: "var(--rn-kategorie-transformation)",
+  output: "var(--rn-kategorie-ausgabe)",
 };
 
-/** Names of the categories in the palette, in this order (ADR 0014). */
+/** Names of the action categories in the palette, in this order (ADR 0014). */
 export const categoryLabel: Record<string, string> = {
   general: "General",
   execution: "Execution",
@@ -40,6 +49,19 @@ export const categoryLabel: Record<string, string> = {
   network: "Network",
   database: "Database",
 };
+
+/** Names of the transform categories in the palette, in this order (KONZEPT 12.2). */
+export const transformCategoryLabel: Record<string, string> = {
+  input: "Input",
+  transform: "Transform",
+  flow: "Flow",
+  execution: "Execution",
+  combine: "Combine",
+  output: "Output",
+};
+
+/** Colour of the tile of a type; general for an unknown category. */
+export const tileColor = (d: Descriptor) => categoryColor[d.category] ?? categoryColor.general;
 
 /**
  * The action type being dragged from the palette. During a drag, the browser does not
@@ -51,12 +73,21 @@ export const paletteDrag: { type: string | null } = { type: null };
 /** Data type of a palette entry in a drag-and-drop transfer. */
 export const paletteMime = "application/x-runnel-action";
 
-let cache: Promise<Map<string, Descriptor>> | null = null;
+/** Actions and transforms have separate namespaces (ADR 0013). */
+export type CatalogKind = "workflow" | "pipeline";
+type Catalogs = Record<CatalogKind, Map<string, Descriptor>>;
 
-function load(): Promise<Map<string, Descriptor>> {
+let cache: Promise<Catalogs> | null = null;
+
+function load(): Promise<Catalogs> {
   cache ??= fetch(`${apiBase}/catalog`)
-    .then((r) => (r.ok ? (r.json() as Promise<{ actions: Descriptor[] }>) : Promise.reject(new Error(r.statusText))))
-    .then((c) => new Map(c.actions.map((d) => [d.type, d])))
+    .then((r) =>
+      r.ok ? (r.json() as Promise<{ actions?: Descriptor[]; transforms?: Descriptor[] }>) : Promise.reject(new Error(r.statusText)),
+    )
+    .then((c) => ({
+      workflow: new Map((c.actions ?? []).map((d) => [d.type, d])),
+      pipeline: new Map((c.transforms ?? []).map((d) => [d.type, d])),
+    }))
     .catch((err: unknown) => {
       cache = null; // retry on the next use
       throw err;
@@ -64,11 +95,16 @@ function load(): Promise<Map<string, Descriptor>> {
   return cache;
 }
 
-/** useCatalog returns the action descriptors by type (empty until loaded). */
-export function useCatalog(): Map<string, Descriptor> {
-  const [catalog, setCatalog] = useState<Map<string, Descriptor>>(new Map());
+const none = new Map<string, Descriptor>();
+
+/**
+ * useCatalog returns the descriptors by type (empty until loaded): of the actions for a
+ * workflow, of the transforms for a pipeline.
+ */
+export function useCatalog(kind: CatalogKind = "workflow"): Map<string, Descriptor> {
+  const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
   useEffect(() => {
-    load().then(setCatalog, () => setCatalog(new Map()));
+    load().then(setCatalogs, () => setCatalogs(null));
   }, []);
-  return catalog;
+  return catalogs?.[kind] ?? none;
 }

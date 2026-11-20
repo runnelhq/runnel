@@ -2,8 +2,11 @@ import { BaseEdge, EdgeLabelRenderer, type Edge, type EdgeProps } from "@xyflow/
 import type { LinkKind } from "../workflow";
 import { TrashIcon } from "./Icons";
 
-/** Kinds that can be chosen in the link menu; expressions follow with the properties dialog (E7). */
-export type SettableKind = "success" | "failure" | "always";
+/**
+ * Kinds that can be chosen in the link menu: conditions of workflow links (expressions
+ * are written in the properties panel), types of pipeline links.
+ */
+export type SettableKind = "success" | "failure" | "always" | "data" | "error";
 
 export interface LinkEdgeData extends Record<string, unknown> {
   kind: LinkKind;
@@ -21,18 +24,27 @@ export interface LinkEdgeData extends Record<string, unknown> {
 
 export type LinkEdgeType = Edge<LinkEdgeData, "link">;
 
-const symbols: Record<LinkKind, string> = { success: "✔", failure: "✖", always: "∞", expression: "ƒ" };
-const colors: Record<LinkKind, string> = {
+/** Symbols of the kinds; data links have none (decision for mockup S25a). */
+export const linkSymbols: Record<LinkKind, string> = { success: "✔", failure: "✖", always: "∞", expression: "ƒ", data: "", error: "✖" };
+export const linkColors: Record<LinkKind, string> = {
   success: "var(--link-success)",
   failure: "var(--link-failure)",
   always: "var(--link-always)",
   expression: "var(--link-expression)",
+  data: "var(--link-always)",
+  error: "var(--link-failure)",
 };
-const menuKinds: [SettableKind, string][] = [
+const workflowKinds: [SettableKind, string, string?][] = [
   ["success", "On success"],
   ["failure", "On failure"],
   ["always", "Always"],
 ];
+/** Pipeline links, with the key that chooses them while the menu is open. */
+export const pipelineKinds: [SettableKind, string, string?][] = [
+  ["data", "Data", "D"],
+  ["error", "Error", "E"],
+];
+const isPipelineKind = (k: LinkKind) => k === "data" || k === "error";
 
 /** Horizontal Bézier curve between two ports and the point at 35 % of the way from the source. */
 export function linkPath(sourceX: number, sourceY: number, targetX: number, targetY: number) {
@@ -56,10 +68,12 @@ export function linkPath(sourceX: number, sourceY: number, targetX: number, targ
 export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selected }: EdgeProps<LinkEdgeType>) {
   const kind = data?.kind ?? "success";
   const { path, x, y } = linkPath(sourceX, sourceY, targetX, targetY);
-  const color = data?.disabled ? "var(--link-disabled)" : colors[kind];
-  const title = [data?.when ? `when: ${data.when}` : "when: success", data?.loop && "loop", data?.disabled && "disabled"]
-    .filter(Boolean)
-    .join(", ");
+  const color = data?.disabled ? "var(--link-disabled)" : linkColors[kind];
+  const pipeline = isPipelineKind(kind);
+  const title = pipeline
+    ? `${kind === "error" ? "Error" : "Data"} link`
+    : [data?.when ? `when: ${data.when}` : "when: success", data?.loop && "loop", data?.disabled && "disabled"].filter(Boolean).join(", ");
+  const symbol = linkSymbols[kind];
 
   return (
     <>
@@ -71,7 +85,7 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
         style={{
           stroke: color,
           strokeWidth: selected ? 3.5 : 2,
-          strokeDasharray: data?.disabled ? "5 4" : undefined,
+          strokeDasharray: data?.disabled ? "5 4" : kind === "error" ? "7 4" : undefined,
           opacity: data?.run === "dead" ? 0.3 : undefined,
         }}
       />
@@ -84,15 +98,18 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
           aria-haspopup={data?.onOpenMenu ? "menu" : undefined}
           aria-expanded={data?.onOpenMenu ? !!data.menu : undefined}
           onClick={data?.onOpenMenu}
+          aria-label={symbol ? undefined : title}
           className={
-            "nodrag nopan pointer-events-auto absolute grid h-5 min-w-5 place-items-center rounded-full border-[1.5px] border-current bg-card px-[5px] text-[11px] leading-none font-bold" +
+            "nodrag nopan pointer-events-auto absolute grid h-5 min-w-5 place-items-center rounded-full text-[11px] leading-none font-bold" +
+            // A data link has no symbol: an invisible spot to click on, outlined when selected.
+            (symbol ? " border-[1.5px] border-current bg-card px-[5px]" : "") +
             (data?.onOpenMenu ? " cursor-pointer" : "") +
             (selected ? " outline-2 outline-offset-2 outline-node-selected" : "")
           }
           data-run={data?.run}
           style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`, color, opacity: data?.run === "dead" ? 0.45 : undefined }}
         >
-          {symbols[kind]}
+          {symbol}
           {data?.loop ? " ↻" : ""}
         </span>
         {data?.menu && (
@@ -102,7 +119,7 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
             className="nodrag nopan pointer-events-auto absolute z-10 w-[196px] rounded-lg border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md"
             style={{ transform: `translate(-50%, 0) translate(${x}px, ${y + 16}px)` }}
           >
-            {menuKinds.map(([k, label]) => (
+            {(pipeline ? pipelineKinds : workflowKinds).map(([k, label, key]) => (
               <button
                 key={k}
                 type="button"
@@ -113,12 +130,13 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
               >
                 <span
                   className="grid size-[18px] place-items-center rounded-full border-[1.5px] border-current bg-card text-[10px] font-bold"
-                  style={{ color: colors[k] }}
+                  style={{ color: linkColors[k] }}
                 >
-                  {symbols[k]}
+                  {k === "data" ? "→" : linkSymbols[k]}
                 </span>
                 {label}
                 {kind === k && <span className="ml-auto font-mono text-[10px] text-muted-foreground">✓</span>}
+                {key && <span className={(kind === k ? "ml-2" : "ml-auto") + " font-mono text-[10px] text-muted-foreground"}>{key}</span>}
               </button>
             ))}
             <hr className="mx-0 my-1 border-0 border-t border-border" />

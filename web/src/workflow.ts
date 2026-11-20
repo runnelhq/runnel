@@ -13,6 +13,10 @@ export interface Action {
   continueOnError?: boolean;
   join?: string;
   joinTimeout?: string;
+  /** Pipelines: instances that share the incoming records (0 or missing: 1). */
+  copies?: number;
+  /** Pipelines: copy (default) or distribute, for several outgoing data links. */
+  distribution?: string;
 }
 
 export interface Link {
@@ -21,6 +25,8 @@ export interface Link {
   when?: string;
   loop?: boolean;
   disabled?: boolean;
+  /** Pipelines: data (default) or error. */
+  type?: string;
 }
 
 export interface Parameter {
@@ -39,14 +45,30 @@ export interface Output {
   value: string;
 }
 
+/** Workflows and pipelines are shown on the same canvas; kind tells them apart. */
+export type GraphKind = "workflow" | "pipeline";
+
 export interface Workflow {
+  /** Set by graphOf: a pipeline has transforms as "actions" and data or error links. */
+  kind?: GraphKind;
   name: string;
   description?: string;
   parameters?: Parameter[];
   outputs?: Output[];
-  settings?: { timeout?: string; maxConcurrentRuns?: number };
+  settings?: { timeout?: string; maxConcurrentRuns?: number; batchSize?: number; bufferSize?: number; strict?: boolean };
   actions?: Action[];
   links?: Link[];
+  layout?: Record<string, { x: number; y: number }>;
+}
+
+/** A pipeline as returned by POST /validate (model.Pipeline). */
+export interface Pipeline {
+  name: string;
+  description?: string;
+  parameters?: Parameter[];
+  transforms?: Action[];
+  links?: { from: string; to: string; type?: string }[];
+  settings?: { batchSize?: number; bufferSize?: number; strict?: boolean };
   layout?: Record<string, { x: number; y: number }>;
 }
 
@@ -64,6 +86,18 @@ export interface Validation {
   warnings: number;
   problems: Problem[];
   workflow?: Workflow;
+  pipeline?: Pipeline;
+}
+
+/**
+ * The graph of a validated file for the canvas: a workflow as it is, a pipeline with its
+ * transforms as actions and every link with its type (data if not given).
+ */
+export function graphOf(v: Validation | null): Workflow | undefined {
+  if (v?.workflow) return { ...v.workflow, kind: "workflow" };
+  if (!v?.pipeline) return undefined;
+  const { transforms, links, ...rest } = v.pipeline;
+  return { ...rest, kind: "pipeline", actions: transforms, links: links?.map((l) => ({ ...l, type: l.type || "data" })) };
 }
 
 /** Checks a workflow on the server; content is the text shown in the editor. */
@@ -85,7 +119,7 @@ export async function validate(path: string, content: string): Promise<Validatio
   return (await res.json()) as Validation;
 }
 
-export type LinkKind = "success" | "failure" | "always" | "expression";
+export type LinkKind = "success" | "failure" | "always" | "expression" | "data" | "error";
 
 /** Kind of a link by its condition; no condition means success. */
 export function linkKind(when: string | undefined): LinkKind {
@@ -94,21 +128,30 @@ export function linkKind(when: string | undefined): LinkKind {
   return "expression";
 }
 
+/** Kind of a link of a workflow (by its condition) or of a pipeline (by its type). */
+export function kindOfLink(l: Link): LinkKind {
+  if (l.type !== undefined) return l.type === "error" ? "error" : "data";
+  return linkKind(l.when);
+}
+
 /** Size of an action card on the canvas (design/mockups/e5-canvas.html). */
 export const nodeWidth = 176;
 export const nodeHeight = 52;
 
-/** Index of the action (or link) a YAML path points to, e.g. "$.actions[2].with". */
-export function pathIndex(path: string | undefined, list: "actions" | "links"): number | null {
+/** Name of the list of steps in the file: actions in a workflow, transforms in a pipeline. */
+export const stepsKey = (wf: Workflow) => (wf.kind === "pipeline" ? "transforms" : "actions");
+
+/** Index of the action, transform or link a YAML path points to, e.g. "$.actions[2].with". */
+export function pathIndex(path: string | undefined, list: "actions" | "transforms" | "links"): number | null {
   const m = path?.match(new RegExp(`^\\$\\.'?${list}'?\\[(\\d+)\\]`));
   return m ? Number(m[1]) : null;
 }
 
-/** Problems per action id; problems that belong to no action are returned separately. */
+/** Problems per action (or transform) id; problems that belong to none are not returned. */
 export function problemsByAction(wf: Workflow, problems: Problem[]) {
   const byAction = new Map<string, Problem[]>();
   for (const p of problems) {
-    const i = pathIndex(p.path, "actions");
+    const i = pathIndex(p.path, stepsKey(wf));
     const id = i === null ? undefined : wf.actions?.[i]?.id;
     if (id) byAction.set(id, [...(byAction.get(id) ?? []), p]);
   }
@@ -158,8 +201,8 @@ export interface WorkflowEdit {
   rename?: Record<string, string>;
   addLinks?: Link[];
   deleteLinks?: number[];
-  /** when: success, failure, always or an expression "{{ … }}". */
-  updateLinks?: { index: number; when?: string; loop?: boolean; disabled?: boolean }[];
+  /** when: success, failure, always or an expression "{{ … }}"; type (pipelines): data or error. */
+  updateLinks?: { index: number; when?: string; loop?: boolean; disabled?: boolean; type?: string }[];
   /** Changes one field of an action (properties panel); null removes the field. */
   set?: { id: string; field: string; value: string | number | boolean | null }[];
   /** Changes one field of the workflow itself (name, description, settings.*). */
@@ -178,7 +221,7 @@ export interface ProblemTarget {
 export function problemTarget(wf: Workflow, p: Problem): ProblemTarget | null {
   const path = p.path;
   if (!path) return null;
-  let m = path.match(/^\$\.actions\[(\d+)\](?:\.(.*))?$/);
+  let m = path.match(/^\$\.(?:actions|transforms)\[(\d+)\](?:\.(.*))?$/);
   if (m) {
     const action = wf.actions?.[Number(m[1])]?.id;
     if (!action) return null;
@@ -235,12 +278,42 @@ export function closesCycle(wf: Workflow, from: string, to: string): boolean {
   return false;
 }
 
+/** Changes made on the canvas of a pipeline (see model.PipelineEdit). */
+export interface PipelineEdit {
+  move?: Record<string, { x: number; y: number }>;
+  delete?: string[];
+  add?: { id: string; type: string }[];
+  rename?: Record<string, string>;
+  addLinks?: { from: string; to: string; type?: string }[];
+  deleteLinks?: number[];
+  updateLinks?: { index: number; type: string }[];
+  /** copies, distribution or with.<name>; null removes the field. */
+  set?: { id: string; field: string; value: string | number | boolean | null }[];
+  /** name, description or settings.*. */
+  setPipeline?: { field: string; value: string | number | boolean | null }[];
+}
+
+/**
+ * Translates an edit of the canvas into one of a pipeline: links carry their type
+ * (data links are written without it), and fields of the graph are fields of the pipeline.
+ */
+export function pipelineEdit(edit: WorkflowEdit): PipelineEdit {
+  const { addLinks, updateLinks, setWorkflow, ...rest } = edit;
+  return {
+    ...rest,
+    addLinks: addLinks?.map((l) => ({ from: l.from, to: l.to, ...(l.type === "error" ? { type: "error" } : {}) })),
+    updateLinks: updateLinks?.flatMap((u) => (u.type ? [{ index: u.index, type: u.type }] : [])),
+    setPipeline: setWorkflow,
+  };
+}
+
 /** Applies an edit to the text on the server and returns the new text (not saved). */
-export async function editWorkflow(path: string, content: string, edit: WorkflowEdit): Promise<string> {
-  const res = await fetch(`${apiBase}/workflows/edit`, {
+export async function editWorkflow(path: string, content: string, edit: WorkflowEdit, kind: GraphKind = "workflow"): Promise<string> {
+  const payload = kind === "pipeline" ? pipelineEdit(edit) : edit;
+  const res = await fetch(`${apiBase}/${kind === "pipeline" ? "pipelines" : "workflows"}/edit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path, content, ...edit }),
+    body: JSON.stringify({ path, content, ...payload }),
   });
   const body = (await res.json()) as { content?: string; error?: string };
   if (!res.ok) throw new APIError(body.error ?? `${res.status} ${res.statusText}`, res.status);

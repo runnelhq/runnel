@@ -61,7 +61,7 @@ test("the palette lists the actions of the catalog by category", async ({ page }
   await expect(palette.getByRole("group", { name: "General" })).toBeVisible();
   await expect(palette.getByTestId("palette-core.log")).toContainText("Log");
   await expect(palette.getByRole("group", { name: "Files" }).getByTestId("palette-file.copy")).toContainText("Copy Files");
-  await expect(palette.getByText("Open a workflow on the canvas to add actions.")).toBeVisible();
+  await expect(palette.getByText("Open a workflow or pipeline on the canvas to add steps.")).toBeVisible();
   await expect(palette.getByTestId("palette-core.log")).toHaveAttribute("draggable", "false");
 
   await open(page);

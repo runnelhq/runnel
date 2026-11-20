@@ -68,6 +68,10 @@ export interface ExprContext {
 }
 
 export function exprContext(ref: ExprReference, wf: Workflow): ExprContext {
+  // A pipeline has no results of actions; record follows with the fields of the links (S25a2).
+  if (wf.kind === "pipeline") {
+    return { ref: { ...ref, roots: ref.roots.filter((r) => r.name !== "result" && r.name !== "results") }, params: wf.parameters ?? [], actions: [] };
+  }
   return { ref, params: wf.parameters ?? [], actions: (wf.actions ?? []).map((a) => a.id) };
 }
 
