@@ -64,11 +64,16 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 	if p.Undeclared, err = checkParams(pl.Parameters, spec.Params); err != nil {
 		return p, err
 	}
+	envName := ""
+	if p.Env != nil {
+		envName = p.Env.Name
+	}
 	p.Runner, err = pipeline.Prepare(pl, pipeline.Options{
-		Registry: spec.Registry,
-		Scope:    model.PipelineScope(pl, p.Project, p.Env, spec.Params),
-		Observer: spec.Observer,
-		RunID:    spec.RunID,
+		Registry:    spec.Registry,
+		Scope:       model.PipelineScope(pl, p.Project, p.Env, spec.Params),
+		Environment: envName,
+		Observer:    spec.Observer,
+		RunID:       spec.RunID,
 	})
 	if err == nil {
 		// Warnings of the schemas, e.g. fields that are not known (ADR 0007).

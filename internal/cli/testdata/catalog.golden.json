@@ -421,6 +421,30 @@
       }
     },
     {
+      "type": "core.filter",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Filter",
+      "description": "Passes on the records for which a condition is true",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "condition": {
+            "type": "string",
+            "description": "Expression that must be true for a record to pass, e.g. {{ record.amount \u003e 0 }}; a comparison with an empty value is false",
+            "examples": [
+              "{{ record.amount \u003e 0 }}"
+            ]
+          }
+        },
+        "required": [
+          "condition"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "type": "core.generate-rows",
       "kind": "transform",
       "category": "input",

@@ -438,3 +438,29 @@ links:
 		t.Errorf("check: %v", diags)
 	}
 }
+
+// Expressions per record see vars, params (with their type), env and run (ADR 0006).
+func TestRunPassesValuesToExpressions(t *testing.T) {
+	body := `parameters:
+  - { name: MIN, type: integer, default: "4" }
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - id: keep
+    type: core.filter
+    with: { condition: "{{ record.n > params.MIN && run.pipeline == 'test' && run.id == 'R1' && vars.MIN == '6' }}" }
+  - { id: out, type: test.collect }
+links:
+  - { from: gen, to: keep }
+  - { from: keep, to: out }
+`
+	res, c, _ := run(context.Background(), t, body, func(o *Options) {
+		o.RunID = "R1"
+		o.Scope = model.PipelineScope(parse(t, body), nil, nil, map[string]string{"MIN": "6"})
+	})
+	if res.Status != Succeeded {
+		t.Fatalf("%s: %v", res.Status, res.Err)
+	}
+	if got := len(c.recs["out"]); got != 4 {
+		t.Errorf("%d records passed the filter, want 4 (7 to 10)", got)
+	}
+}

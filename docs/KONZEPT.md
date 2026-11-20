@@ -612,8 +612,10 @@ type Transform interface {
 - **Schema und Werttypen** (S14, ADR 0007 mit Nachtrag): Transforms können `Init(ic) → Schema` umsetzen; die Engine
   leitet die Schemas vor dem Lauf durch den Graphen ab, prüft verwendete Felder (`ic.Use`) und meldet Tippfehler mit
   Datei, Zeile und Spalte – als Fehler bei geschlossenem, als Warnung bei offenem Schema. `Process` bleibt unverändert;
-  vereinfachte Basistypen (`RowMapper`, `RowFilter`) für Transforms, die nur `func(Record) (Record, error)` brauchen,
-  folgen mit den ersten solchen Transforms (S16).
+  einfache Transforms wie `core.filter` (S16a) kommen mit einer Schleife in `Process` aus. Eigene Basistypen
+  (`RowMapper`, `RowFilter`) werden erst eingeführt, wenn sich das Muster in mehreren Transforms wiederholt.
+- **Ausdrücke je Datensatz** (S16a, ADR 0006): `record` und die Werte des Laufs (`vars`, `params`, `env`, `run`);
+  Dezimalzahlen exakt, Rechnen mit `null` ergibt `null`, Größenvergleiche mit `null` sind `false`.
 
 ### 6.3 Datenvorschau & Debugging (Editor)
 
@@ -903,7 +905,12 @@ Workflow des Projekts auf und wartet auf sein Ende.
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
 
-Umgesetzt (Stand S15): `core.generate-rows`, `core.dummy`, `core.log` sowie `csv.input` und `csv.output`:
+Umgesetzt (Stand S16a): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter` sowie `csv.input` und
+`csv.output`:
+
+- **`core.filter`** reicht die Datensätze weiter, für die `condition` wahr ist (`{{ record.betrag > 0 }}`, die
+  Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Ein Ausgang für „falsch“ folgt mit
+  den Link-Typen (S17).
 
 - **`csv.input`** liest alle Spalten als Text (offenes Schema) oder mit `fields:` nur die genannten, mit Typ und Format
   (geschlossenes Schema). Spalten werden über die Kopfzeile gefunden, ohne Kopfzeile über die Position. Ein Wert, der

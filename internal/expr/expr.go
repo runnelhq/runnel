@@ -10,12 +10,16 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	exprlang "github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/ast"
+	"github.com/expr-lang/expr/parser"
 	"github.com/expr-lang/expr/vm"
+	"github.com/shopspring/decimal"
 )
 
 // MaxLength is the longest expression accepted (between the braces).
@@ -26,6 +30,10 @@ const maxNodes = 2000
 
 // WorkflowRoots are the names a workflow expression can refer to (ADR 0006).
 var WorkflowRoots = []string{"vars", "params", "env", "run", "result", "results"}
+
+// RecordRoots are the names an expression evaluated per record of a pipeline can refer
+// to, e.g. the condition of core.filter (ADR 0006).
+var RecordRoots = []string{"record", "vars", "params", "env", "run"}
 
 // Template is a text with {{ … }} expressions, compiled.
 type Template struct {
@@ -125,6 +133,7 @@ func compile(code string, roots []string) (*vm.Program, error) {
 		env[r] = map[string]any{}
 	}
 	opts := append([]exprlang.Option{exprlang.Env(env), exprlang.MaxNodes(maxNodes)}, functions...)
+	opts = append(opts, operators...)
 	return exprlang.Compile(code, opts...)
 }
 
@@ -217,6 +226,8 @@ func Format(v any) string {
 		return v.Format(time.RFC3339Nano)
 	case time.Duration:
 		return v.String()
+	case decimal.Decimal:
+		return v.String()
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64)
 	case float32:
@@ -238,4 +249,41 @@ func IsError(err error) (*Error, bool) {
 	var e *Error
 	ok := errors.As(err, &e)
 	return e, ok
+}
+
+// Members returns the names used after root in the expressions of t, in order of
+// appearance and without duplicates: "record" for {{ record.amount > record.limit }}
+// gives amount and limit. Only fixed names count (record.amount, record["amount"]).
+func (t *Template) Members(root string) []string {
+	var names []string
+	for _, p := range t.parts {
+		if p.prog == nil {
+			continue
+		}
+		tree, err := parser.Parse(p.code)
+		if err != nil {
+			continue
+		}
+		ast.Walk(&tree.Node, memberVisitor{root: root, names: &names})
+	}
+	return names
+}
+
+type memberVisitor struct {
+	root  string
+	names *[]string
+}
+
+func (v memberVisitor) Visit(node *ast.Node) {
+	m, ok := (*node).(*ast.MemberNode)
+	if !ok {
+		return
+	}
+	id, ok := m.Node.(*ast.IdentifierNode)
+	if !ok || id.Value != v.root {
+		return
+	}
+	if s, ok := m.Property.(*ast.StringNode); ok && !slices.Contains(*v.names, s.Value) {
+		*v.names = append(*v.names, s.Value)
+	}
 }

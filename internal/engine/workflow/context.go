@@ -3,8 +3,6 @@ package workflow
 import (
 	"fmt"
 	"maps"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -33,7 +31,7 @@ func (r *Runner) newRunContext(runID string, started time.Time) (*runContext, er
 		scope = model.Scope(r.w, nil, nil, nil)
 	}
 	c := &runContext{
-		env: environ(),
+		env: model.Environ(),
 		run: map[string]any{
 			"id": runID, "workflow": r.w.Name, "environment": r.opts.Environment,
 			"startedAt": started, "lastError": "",
@@ -77,24 +75,7 @@ func (r *Runner) expandWith(scope *vars.Scope) *vars.Scope {
 
 // fill sets vars (all variables, resolved) and params (declared parameters with their type).
 func (c *runContext) fill(scope *vars.Scope, params []model.Parameter) {
-	c.vars = map[string]any{}
-	for _, name := range scope.Names() {
-		if v, err := scope.Expand("${" + name + "}"); err == nil {
-			c.vars[name] = v
-		}
-	}
-	c.params = map[string]any{}
-	for _, p := range params {
-		text, ok := c.vars[p.Name].(string)
-		if !ok {
-			continue
-		}
-		if v, err := p.Type.Parse(text); err == nil {
-			c.params[p.Name] = v
-		} else {
-			c.params[p.Name] = text
-		}
-	}
+	c.vars, c.params = model.ExprValues(scope, params)
 }
 
 // values returns the context for one evaluation; result is the result of the action
@@ -123,16 +104,6 @@ func (c *runContext) record(a *model.Action, status Status, res action.Result, e
 	}
 	c.results[a.ID] = v
 	return v
-}
-
-func environ() map[string]any {
-	env := map[string]any{}
-	for _, kv := range os.Environ() {
-		if k, v, ok := strings.Cut(kv, "="); ok && k != "" {
-			env[k] = v
-		}
-	}
-	return env
 }
 
 // template returns the compiled template of a text; templates are compiled once per runner.

@@ -4,6 +4,8 @@
 #   runnel run --param OUTPUT=C:\out\orders.csv examples/pipelines/pipelines/orders.pipeline.yaml
 # - "read" reads the columns it needs with type and format: 1.234,50 is a decimal number,
 #   19.11.2026 a date. A value that does not fit stops the pipeline with line and column.
+# - "large" keeps the orders of at least MIN_AMOUNT; the amount is compared exactly
+#   as decimal number. Orders without amount would be dropped as well.
 # - "show" writes every record to the log.
 # - "write" writes them with a comma, plain numbers and ISO dates, as UTF-8 with byte
 #   order mark; an existing file is replaced once all records are written.
@@ -17,6 +19,10 @@ parameters:
   - name: OUTPUT
     description: CSV file to write
     default: orders-export.csv
+  - name: MIN_AMOUNT
+    description: Smallest amount of an order to export
+    type: number
+    default: "100"
 transforms:
   - id: read
     type: csv.input
@@ -28,6 +34,10 @@ transforms:
         - { name: Kunde }
         - { name: Betrag, type: decimal, format: "#.##0,00" }
         - { name: Datum, type: date, format: dd.MM.yyyy }
+  - id: large
+    type: core.filter
+    with:
+      condition: "{{ record.Betrag >= params.MIN_AMOUNT }}"
   - id: show
     type: core.log
     with:
@@ -42,5 +52,6 @@ transforms:
         - { name: Kunde }
         - { name: Betrag, format: "0.00" }
 links:
-  - { from: read, to: show }
+  - { from: read, to: large }
+  - { from: large, to: show }
   - { from: show, to: write }

@@ -72,6 +72,9 @@ func (t *upper) Init(ic *transform.InitContext) (record.Schema, error) {
 - Das Ergebnis beschreibt die Ausgabe: **geschlossen**, wenn alle Felder bekannt sind (z. B. Eingaben mit Felddefinition,
   `core.generate-rows`), **offen**, wenn weitere vorkommen können. Transforms, die nur weiterreichen, geben `ic.In` zurück.
 - Ohne `Init` gilt die Ausgabe als offen und unbekannt – für neue Transforms nur, wenn sich wirklich nichts ableiten lässt.
+- Ausdrücke je Datensatz (z. B. eine Bedingung) mit `transform.CompileExpression` in `New` übersetzen, die Felder aus
+  `expr.Fields()` mit `ic.Use` melden und in `Process` mit `expr.Bool(out, r)` auswerten (Beispiel `filter.go`); die
+  Werte des Laufs (`params` …) liefert `out.Values()`. In Tests: `transformtest.RunWithValues`.
 - Konstante Werte aus der Konfiguration mit `record.Normalize` umwandeln (`transform.DecodeConfig` liefert Zahlen als
   `json.Number`).
 
