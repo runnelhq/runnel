@@ -64,3 +64,9 @@ für manuelle Starts, Abbrüche und Dateiänderungen über den Editor. Für fach
 - Kap. 8: Benutzer/Rollen ersetzt durch Zugangsschlüssel im Netzmodus; Audit über Client-Informationen.
 - Kap. 9.2: Tabelle `users` entfällt, `runs` erhält `client_info`.
 - Kap. 15: „Auth/Rollen“ in Phase 0.4 wird zu „Zugangsschlüssel + TLS“; „Windows-Auth“ entfällt aus „später“.
+
+## Nachtrag 2026-11-20 (ADR 0018): HTTP-Trigger
+
+Webhooks sind im Trigger-Typ `http` aufgegangen ([ADR 0018](0018-http-trigger.md)). Sie laufen auf einem eigenen
+Listener, getrennt vom Editor, mit eigenem Token je Trigger (HMAC später); für den Zugriff aus dem Netz genügt TLS für
+diesen Listener (S40a) – der Zugangsschlüssel des Editors (S40b) ist dafür nicht nötig.

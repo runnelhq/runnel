@@ -13,6 +13,12 @@ Erledigte Schritte sind mit ✅ markiert.
 > Tiefe gebaut. Gute, aber nicht vorrangige Schritte stehen mit ihrer Nummer im [Backlog](#zurückgestellt-tiefe-vor-breite):
 > S10, S19, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48 sowie `core.calculate` (S16), `maxErrors` (S17), `core.dedupe` (S22) und die
 > Aufbewahrung der Historie (S43). E7c war ebenfalls zurückgestellt und ist seit 2026-11-20 wieder eingeplant (Phase 0.4).
+>
+> **Betrieb verschlankt (2026-11-20):** Aus Phase 0.5 stehen jetzt S39 (Secret-Store), S40b (Netzwerkbetrieb des
+> Editors), S42 (Run-Konfigurationen) und S43 (Wartung & Monitoring) im Backlog. Der Webhook-Trigger wurde neu
+> besprochen und ist zum HTTP-Trigger geworden ([ADR 0018](adr/0018-http-trigger.md)): S38a–S38c, dazu S40a
+> (Listener und TLS) aus S40. Reihenfolge: zuerst die Trigger ohne HTTP und der Windows-Dienst (S37, S38, S41),
+> danach alles zum HTTP-Trigger (S38a, S40a, S38b, S38c).
 
 ## Regeln für jeden Schritt
 
@@ -132,14 +138,15 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
 | S37 | Cron-Trigger | Trigger-Dateien, Scheduler im Server, `overlap: skip/queue/allow`, Run-Queue mit Limits | Tests mit simulierter Uhr |
-| S38 | Weitere Trigger | Webhook (Token/HMAC), Datei-Überwachung, Intervall; Trigger für Pipelines | Tests; `curl` auf Webhook |
-| S39 | Secret-Store | Verschlüsselung (AES-GCM), Schlüssel per DPAPI bzw. Master-Key, `${secret:…}`, Maskierung in Logs | Tests; unter Windows DPAPI manuell |
-| S40 | Netzwerkbetrieb | `--listen`, TLS, gemeinsamer Zugangsschlüssel, Client-Infos im Protokoll ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)) | Zugriff von zweitem Rechner |
+| S38 | Weitere Trigger | Datei-Überwachung, Intervall; Trigger für Pipelines | Tests mit temporären Ordnern und simulierter Uhr |
 | S41 | Windows-Dienst | `runnel service install/start/stop/uninstall`, Ereignisanzeige, Recovery-Optionen | Manuell auf Windows |
-| S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | Tests der Rangfolge |
-| S43 | Wartung & Monitoring | Error-Workflow, `/health`, optional `/metrics` (Retention der Historie mit S26) | Tests |
+| S38a | HTTP-Trigger: asynchron | Typ `http` nach [ADR 0018](adr/0018-http-trigger.md): eigener Listener (zunächst nur lokal), Methode und Pfad mit Platzhaltern, Routing-Prüfung, `auth: token \| none`, Pfad/Query/Body → typisierte Parameter (`400` vor dem Start), `response: accepted` mit `202` und Lauf-ID, `maxConcurrent` (`429`), Body-Limit, `trigger = http:<name>`; für Workflows und Pipelines | Tests; `curl` auf `127.0.0.1` |
+| S40a | Listener und TLS | Adresse des Trigger-Listeners frei wählbar, TLS mit eigenem oder selbst erzeugtem Zertifikat (später auch für den Editor, S40b) | Aufruf von einem zweiten Rechner |
+| S38b | HTTP-Trigger: Antwort aus dem Workflow | `response: run` mit `timeout` (`504`), Standardantwort aus `outputs` (`200`/`500`), Action `http.respond` (Status, Header, Body; erste Antwort gilt, ohne Aufrufer wirkungslos), `request` im Ausdruckskontext, `history`, Zwischenspeicher vorbereiteter Workflows, eigenes Limit im Lauf-Speicher | Tests; `curl` mit verschiedenen Statuscodes |
+| S38c | HTTP-Trigger: Antwort aus der Pipeline | Transform `http.response` (Datensätze als JSON, `single`, `whenEmpty`, Status und Header), JSON-Array im Body als Datensätze | Tests; REST-artiges Beispiel |
 
-**Ergebnis 0.5:** Dauerbetrieb auf einem Windows-Server.
+**Ergebnis 0.5:** Dauerbetrieb als Windows-Dienst – zeit- und dateigesteuert und per HTTP von anderen Systemen
+ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der Editor bleibt lokal.
 
 ---
 
@@ -189,8 +196,12 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S22 (Teil) | `core.dedupe` | Duplikate entfernen (zunächst im Speicher) | – |
 | S23 | Lookups & Join | Info-Link, `core.stream-lookup`, `db.lookup`, `core.merge-join` | `db.lookup`: S20; danach Info-Links im Pipeline-Canvas |
 | S25 | Executor & dynamische Ziele | `core.pipeline-executor`, `core.workflow-executor` (pro Datensatz/Gruppe), Pfade mit Variablen, `allowedTargets` | S18, S24 |
-| S43 (Teil) | Retention | Aufbewahrung der Historie | S26 |
 | S45 | Samples | Erste N Records pro Link je Lauf speichern, in Historie anzeigen | S26 |
+| S39 | Secret-Store | Verschlüsselung (AES-GCM), Schlüssel per DPAPI bzw. Master-Key, `${secret:…}`, Maskierung in Logs | bis dahin Umgebungsvariablen (`${env:…}`) |
+| S40b | Netzwerkbetrieb des Editors | `--listen` für Editor und API, gemeinsamer Zugangsschlüssel, Client-Infos im Protokoll ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)) | S40a (TLS); bis dahin Editor nur auf `127.0.0.1` |
+| S38 (Teil) | HMAC für HTTP-Trigger | Signaturprüfung als weitere `auth`-Variante (z. B. GitHub, Shop-Systeme) | S38a |
+| S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | – |
+| S43 | Wartung & Monitoring | Error-Workflow, `/health`, optional `/metrics`, Aufbewahrung der Historie (Retention) | Retention: S26 |
 | S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster; vorher Mockup | – |
 | S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | bis dahin ZIP |
 

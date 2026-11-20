@@ -19,6 +19,7 @@
 | [0015](0015-sprache-oberflaeche.md) | Sprache der Oberfläche – Englisch | Angenommen |
 | [0016](0016-live-events-sse.md) | Live-Events per Server-Sent Events statt WebSocket | Angenommen |
 | [0017](0017-sub-workflows.md) | Sub-Workflows – Aufruf, Parameter, Pfade und Log | Angenommen |
+| [0018](0018-http-trigger.md) | HTTP-Trigger – Läufe per HTTP starten und aus dem Lauf antworten | Angenommen |
 
 Neue ADRs: nächste freie Nummer, Aufbau wie die bestehenden (Kontext, Entscheidung, Konsequenzen).
 Wird eine Entscheidung revidiert, erhält die alte ADR den Status „Ersetzt durch ADR xxxx“.
