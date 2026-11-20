@@ -2,12 +2,15 @@ package model
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -244,6 +247,31 @@ func (w *Workflow) validate() error {
 	add := func(path, format string, args ...any) {
 		errs = append(errs, s.errorf(path, format, args...))
 	}
+	// Expressions {{ … }} are compiled when the file is read, so that mistakes show up
+	// before a run (ADR 0006); they are evaluated by the engine.
+	checkExpr := func(path, label, text string) {
+		if !expr.Contains(text) {
+			return
+		}
+		if _, err := expr.Compile(text, expr.WorkflowRoots); err != nil {
+			add(path, "%s: %v", label, err)
+		}
+	}
+	var checkWith func(path, label string, v any)
+	checkWith = func(path, label string, v any) {
+		switch v := v.(type) {
+		case string:
+			checkExpr(path, label, v)
+		case map[string]any:
+			for _, k := range slices.Sorted(maps.Keys(v)) {
+				checkWith(path+"."+k, label, v[k])
+			}
+		case []any:
+			for i, e := range v {
+				checkWith(fmt.Sprintf("%s[%d]", path, i), label, e)
+			}
+		}
+	}
 	duration := func(path, label string, d Duration) {
 		if _, err := d.Value(); err != nil {
 			add(path, "%s: %v", label, err)
@@ -278,6 +306,7 @@ func (w *Workflow) validate() error {
 				add(path+".default", "parameter %q: default value %v", p.Name, err)
 			}
 		}
+		checkExpr(path+".default", fmt.Sprintf("parameter %q: default value", p.Name), p.Default)
 	}
 
 	outputs := map[string]bool{}
@@ -302,6 +331,8 @@ func (w *Workflow) validate() error {
 			if _, err := o.Type.Parse(o.Value); err != nil {
 				add(path+".value", "output %q: value %v", o.Name, err)
 			}
+		default:
+			checkExpr(path+".value", fmt.Sprintf("output %q", o.Name), o.Value)
 		}
 	}
 
@@ -329,6 +360,7 @@ func (w *Workflow) validate() error {
 		}
 		duration(path+".timeout", label+" timeout", a.Timeout)
 		duration(path+".joinTimeout", label+" joinTimeout", a.JoinTimeout)
+		checkWith(path+".with", label, a.With)
 		switch a.Join {
 		case "", JoinAll, JoinFirst, JoinEach:
 		default:
@@ -356,8 +388,11 @@ func (w *Workflow) validate() error {
 		if l.To == "" {
 			add(path, `%s: missing required field "to"`, label)
 		}
-		if kind, _ := l.Condition(); kind == "" {
+		switch kind, _ := l.Condition(); kind {
+		case "":
 			add(path+".when", `%s: invalid condition %q (expected success, failure, always or an expression "{{ … }}")`, label, l.When)
+		case OnExpression:
+			checkExpr(path+".when", label, l.When)
 		}
 	}
 
