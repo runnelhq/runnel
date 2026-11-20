@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
+	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -83,13 +83,13 @@ func newOutput(with map[string]any) (transform.Transform, error) {
 	return t, nil
 }
 
-// outputCodec takes a pattern of only # 0 . , ' and space as number pattern, any other
-// as date pattern; values of other types are written as they are.
+// outputCodec writes the values of a column with a number or date pattern.
 func outputCodec(f outField) (codec, error) {
-	if f.Format != "" && strings.Trim(f.Format, "#0.,' ") == "" {
-		return newCodec(field{Name: f.Name, Type: string(record.Decimal), Format: f.Format})
+	c, err := format.ForText(f.Format)
+	if err != nil {
+		return c, fmt.Errorf("field %q: %w", f.Name, err)
 	}
-	return newCodec(field{Name: f.Name, Type: string(record.DateTime), Format: f.Format})
+	return c, nil
 }
 
 func checkIfExists(s string) error {
@@ -190,7 +190,7 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 			row = row[:0]
 			for _, c := range cols {
 				v, _ := r.Get(c)
-				s, err := codecs[c].formatValue(v)
+				s, err := codecs[c].Format(v)
 				if err == nil && check != nil {
 					err = check(s)
 				}

@@ -141,7 +141,7 @@ func TestOutputIfExists(t *testing.T) {
 
 	// replace keeps the old file when writing fails, and leaves no temporary file.
 	bad := record.New(record.Field{Name: "a", Value: []byte{1}})
-	if _, _, err := write(t, map[string]any{"path": p}, one, bad); err == nil || !strings.Contains(err.Error(), `record 2, field "a": binary values cannot be written to CSV`) {
+	if _, _, err := write(t, map[string]any{"path": p}, one, bad); err == nil || !strings.Contains(err.Error(), `record 2, field "a": binary values cannot be written as text`) {
 		t.Errorf("binary: %v", err)
 	}
 	golden(t, p, "append.csv")

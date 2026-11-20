@@ -103,7 +103,7 @@ func (t *input) Init(*transform.InitContext) (record.Schema, error) {
 	}
 	var s record.Schema
 	for i, f := range t.Fields {
-		s = s.With(f.Name, t.codecs[i].typ)
+		s = s.With(f.Name, t.codecs[i].Type())
 	}
 	return s, nil
 }
@@ -154,7 +154,7 @@ func (t *input) Process(ctx context.Context, _ <-chan transform.Batch, out *tran
 			if c.index < len(row) {
 				s = row[c.index]
 			}
-			v, err := c.codec.parse(s)
+			v, err := c.codec.Parse(s)
 			if err != nil {
 				line, col := r.FieldPos(c.index)
 				return fmt.Errorf("%s:%d:%d: field %q: %w", t.Path, line, col, c.name, err)
@@ -191,7 +191,7 @@ func (t *input) columns(first []string, header bool) ([]column, error) {
 				return nil, fmt.Errorf("%s:1: the column %q appears twice in the header; set fields: to choose the columns", t.Path, name)
 			}
 			seen[name] = true
-			cols[i] = column{index: i, name: name, codec: codec{typ: record.String}}
+			cols[i] = column{index: i, name: name, codec: textCodec}
 		}
 		return cols, nil
 	}

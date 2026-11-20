@@ -409,6 +409,105 @@
   ],
   "transforms": [
     {
+      "type": "core.constant",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Add Constants",
+      "description": "Adds fields with the same value to every record",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "description": "Fields to add; an existing field of the same name gets the value",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field",
+                  "examples": [
+                    "source"
+                  ]
+                },
+                "value": {
+                  "description": "Value of the field: text, number, true/false, or an expression evaluated once per run, e.g. {{ now() }}"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.convert",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Convert Types",
+      "description": "Converts fields to another type, with a number or date format",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "description": "Fields to convert",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type to convert to",
+                  "enum": [
+                    "string",
+                    "int",
+                    "decimal",
+                    "float",
+                    "bool",
+                    "date",
+                    "datetime",
+                    "json"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Number pattern like #.##0,00 or date pattern like dd.MM.yyyy, to read text or to write text; empty: 1234.5 and ISO dates",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "type": "core.dummy",
       "kind": "transform",
       "category": "flow",
@@ -524,6 +623,54 @@
           "fields": {
             "type": "array",
             "description": "Fields to write, in this order; empty: all fields",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.select-fields",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Select Fields",
+      "description": "Keeps, orders and renames fields, or removes fields",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "description": "Fields to keep, in this order, optionally renamed; all others are removed",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field in the incoming records",
+                  "examples": [
+                    "kdnr"
+                  ]
+                },
+                "rename": {
+                  "type": "string",
+                  "description": "New name of the field; empty: the name stays",
+                  "examples": [
+                    "customerId"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "remove": {
+            "type": "array",
+            "description": "Fields to remove; all others are kept. Use either fields or remove",
             "items": {
               "type": "string"
             }

@@ -67,5 +67,11 @@ func (ic *InitContext) Use(name, path string) {
 		Message: fmt.Sprintf("field %q is not known in the incoming records%s; it is checked when the pipeline runs", name, hint)})
 }
 
+// Warn reports a warning about the configuration at path (within "with"; empty for the
+// configuration as a whole).
+func (ic *InitContext) Warn(path, message string) {
+	ic.problems = append(ic.problems, Problem{Path: path, Message: message, Warning: true})
+}
+
 // Problems returns the problems reported so far.
 func (ic *InitContext) Problems() []Problem { return ic.problems }
