@@ -798,7 +798,7 @@ function NotAGraph(props: { path: string; kind: GraphKind; validation: Validatio
           ✖
         </span>
         <h2 className="mt-3 mb-1 text-md font-semibold">This {props.kind} can’t be shown as a graph</h2>
-        <p className="mt-0 mb-3 text-muted-foreground">The file has errors. Fix them in the YAML view or in your text editor.</p>
+        <p className="mt-0 mb-3 text-muted-foreground">The file has errors. Fix them in your text editor; the YAML view shows the lines.</p>
         {first && (
           <pre className="mt-0 mb-4 rounded-md bg-muted px-2.5 py-2 text-left text-xs whitespace-pre-wrap">
             {props.path}
