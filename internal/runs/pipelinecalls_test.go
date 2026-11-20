@@ -155,3 +155,63 @@ links:
 		t.Errorf("a path with a variable is checked when the action runs:\n%s", got)
 	}
 }
+
+func TestRunPipelineCallWithRows(t *testing.T) {
+	dir := project(t, map[string]string{
+		"pipelines/double.pipeline.yaml": `kind: Pipeline
+apiVersion: runnel/v1
+name: double
+transforms:
+  - { id: in, type: core.from-result }
+  - { id: big, type: core.filter, with: { condition: "{{ record.size > 10 }}" } }
+  - { id: out, type: core.to-result }
+links:
+  - { from: in, to: big }
+  - { from: big, to: out }
+`,
+		"workflows/parent.workflow.yaml": `kind: Workflow
+apiVersion: runnel/v1
+name: parent
+outputs:
+  - { name: COUNT, type: integer, value: "{{ len(results.load.output.rows) }}" }
+  - { name: FIRST, value: "{{ results.load.output.rows[0].name }}" }
+actions:
+  - { id: start, type: core.start }
+  - id: load
+    type: core.run-pipeline
+    with:
+      pipeline: pipelines/double.pipeline.yaml
+      rows: "{{ [{'name': 'a.csv', 'size': 5}, {'name': 'b.csv', 'size': 50}, {'size': 99, 'name': 'c.csv'}] }}"
+links:
+  - { from: start, to: load }
+`,
+	})
+	res, rec, err := start(t, dir, nil)
+	if err != nil || res.Status != workflow.Succeeded {
+		t.Fatalf("status %s: %v %v\n%s", res.Status, err, res.Err, rec.logs())
+	}
+	if res.Outputs["COUNT"] != int64(2) || res.Outputs["FIRST"] != "b.csv" {
+		t.Errorf("outputs %v", res.Outputs)
+	}
+}
+
+func TestRunPipelineCallWithInvalidRows(t *testing.T) {
+	dir := project(t, map[string]string{
+		"pipelines/numbers.pipeline.yaml": childPipeline,
+		"workflows/parent.workflow.yaml": pipelineParent(`      pipeline: pipelines/numbers.pipeline.yaml
+      params: { ROWS: 1 }
+      rows: "{{ 'not a list' }}"`),
+	})
+	res, _, _ := start(t, dir, nil)
+	if res.Err == nil || !strings.Contains(res.Err.Error(), "rows must be a list, e.g. {{ results.files.output }}, not not a list") {
+		t.Errorf("%v", res.Err)
+	}
+	// A list of plain values becomes records with the field value.
+	rows, err := toRecords([]map[string]any{{"value": "x"}, {"b": 2, "a": 1}})
+	if err != nil || len(rows) != 2 || strings.Join(rows[1].Names(), ",") != "a,b" {
+		t.Errorf("%v %v", rows, err)
+	}
+	if _, err := toRecords([]map[string]any{{"x": struct{}{}}}); err == nil || !strings.Contains(err.Error(), "rows[0].x") {
+		t.Errorf("invalid value: %v", err)
+	}
+}

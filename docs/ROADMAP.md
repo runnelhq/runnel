@@ -115,7 +115,8 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | S17c ✅ | Verteilen & Parallelität | `distribution` (`copy`/`distribute`) am Transform, `copies: n` (parallele Instanzen, nur für Transforms mit `Parallel`), `settings` (`batchSize`, `bufferSize`, `strict` nach ADR 0007); Beispiel `parallel.pipeline.yaml` | Tests mit `-race`; 10 Mio. Zeilen über Kopien |
 | S18 ✅ | Workflow ↔ Pipeline | `core.run-pipeline` mit Parametern wie `core.run-workflow` (ADR 0017, Nachtrag); Ergebnis: Zähler je Transform (`output.transforms.<id>.read/written/errors`) und `output.errors`; Prüfung fester Aufrufe in `runnel validate`; Beispiel `examples/pipelines/workflows/import.workflow.yaml` | Beispiel: Workflow ruft CSV-Pipeline; CLI-Test |
 | S22 ✅ | Sortieren & Gruppieren | `core.sort` (stabil, `descending`, `ignoreCase`, leere Werte zuletzt) und `core.group-by` (`count`, `countDistinct`, `sum`, `avg`, `min`, `max`, `first`, `last`, `concat`), beide im Speicher; Vergleich und Gruppenschlüssel in `internal/record`; Werte, die nicht passen, auf den Fehler-Link; Beispiel `daily.pipeline.yaml`; `core.dedupe` zurückgestellt | Unit-Tests; CLI-Test mit erzeugter CSV-Datei |
-| S24 | Ergebnis-Datensätze | `core.to-result`, `core.from-result`, `forEachRow` an `core.run-pipeline`/`core.run-workflow` ([ADR 0008](adr/0008-ausfuehrungsvarianten.md)) | Beispiel: Dateiliste → Pipeline je Datei |
+| S24a ✅ | Ergebnis-Datensätze | `core.from-result` und `core.to-result` (`maxRows`, Standard 100.000); `rows` an `core.run-pipeline` hinein, `output.rows` heraus ([ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag); Beispiel `examples/pipelines/workflows/files.workflow.yaml` | Unit-Tests; CLI-Test |
+| S24b | Wiederholung je Datensatz | `forEach: "{{ … }}"` an `core.run-pipeline`/`core.run-workflow` mit `row`, `parallel`, `stopOnError` | Beispiel: Dateiliste → Pipeline je Datei |
 | S25a | Pipeline-Canvas | Pipelines im Editor anzeigen und bearbeiten: Transform-Palette, Daten- und Fehler-Links (Info-Links mit S23), Eigenschaften aus dem Schema, Ausführen mit Metriken je Transform | Playwright; Beispiel-Pipeline im Editor |
 
 **Ergebnis 0.4:** ETL-Fälle mit CSV per CLI und im Editor, von Workflows gesteuert (auch je Datei bzw. Datensatz).
@@ -176,6 +177,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | S26 |
 | S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | – |
 | S16 (Teil) | `core.calculate` | Felder per Ausdruck berechnen | S08 |
+| S24 (Teil) | Ergebnis-Datensätze auslagern | `resultSpillRows`: große Ergebnisse in eine temporäre Datei statt in den Speicher | S24a |
 | S17 (Teil) | `maxErrors` | Schwelle für Fehler-Links: mehr als n fehlerhafte Datensätze brechen die Pipeline ab | S17a |
 | S19 | JSON | `json.input`, `json.output` (JSON und NDJSON) | danach S46 auch für JSON |
 | S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | – |

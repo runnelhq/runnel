@@ -172,3 +172,21 @@ Technisch: `POST /api/v1/runs` mit `startAt: "<action-id>"` bzw. `only: "<action
   standardmäßig 1.
 - Dynamische Ziele sind statisch nur eingeschränkt prüfbar.
 - Ergebnis-Datensätze im Speicher brauchen ein Auslagerungskonzept (siehe oben).
+
+## Nachtrag 2026-11-20 (S24a): Ergebnis-Datensätze
+
+Abstimmung mit dem Maintainer zur Umsetzung von 3c:
+
+- **Übergabe ausdrücklich:** Eine Pipeline erhält Datensätze über das Feld `rows` von `core.run-pipeline`, eine Liste
+  aus einem Ausdruck (z. B. `rows: "{{ results.list.output }}"`); `core.from-result` gibt sie weiter. Ein implizites
+  Lesen des Ergebnisses der vorherigen Action (wie „Get rows from result“ in Hop) gibt es nicht – es hinge davon ab,
+  über welchen Link die Action erreicht wurde. Objekte werden zu Datensätzen (Felder nach Namen sortiert, da Objekte
+  keine Reihenfolge haben), andere Einträge zu `{value: …}`.
+- **Rückgabe:** `core.to-result` gibt die Datensätze weiter und sammelt sie; `core.run-pipeline` liefert sie als
+  `output.rows` (Liste von Objekten, Datumsfelder wie in Ausdrücken als Zeitpunkt). Ohne Aufrufer bleibt das Ergebnis
+  ungenutzt; ohne `rows` liefert `core.from-result` keine Datensätze und sagt das im Log.
+- **Speicher:** Ergebnis-Datensätze liegen im Speicher, höchstens `maxRows` (Standard 100.000) je `core.to-result`;
+  mehr bricht die Pipeline mit klarer Meldung ab. Das Auslagern in eine temporäre Datei (`resultSpillRows`) ist
+  zurückgestellt (Backlog).
+- **Wiederholung je Datensatz** folgt mit S24b als `forEach: "{{ … }}"` (ausdrückliche Liste, aktueller Eintrag `row`)
+  statt `forEachRow: true`.

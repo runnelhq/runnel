@@ -931,6 +931,9 @@ Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, L
   `output.errors` (alle Datensätze auf Fehler-Links), z. B. `{{ results.prepare.output.transforms.write.written }}` oder
   ein Link mit `when: "{{ results.prepare.output.errors > 0 }}"`.
 - Datensätze auf Fehler-Links lassen die Action nicht scheitern; eine Pipeline, die abbricht, schon.
+- **Datensätze hinein und heraus (S24a, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** `rows: "{{ … }}"`
+  gibt der Pipeline eine Liste mit (z. B. die Dateiliste von `file.list`), die `core.from-result` als Datensätze
+  weitergibt; was `core.to-result` erreicht, kommt als `output.rows` zurück (höchstens `maxRows`, Standard 100.000).
 
 ### 12.2 Pipeline-Transforms
 

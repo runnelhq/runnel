@@ -1,0 +1,31 @@
+# Receives records from the calling workflow and returns some of them (roadmap S24a).
+# Called by workflows/files.workflow.yaml; started on its own, it gets no records.
+# - "in" passes on the records the workflow gave with rows (here: a file list).
+# - "large" keeps files of at least MIN_SIZE bytes, "fields" keeps name and size.
+# - "out" returns them to the workflow as output.rows.
+kind: Pipeline
+apiVersion: runnel/v1
+name: files
+parameters:
+  - name: MIN_SIZE
+    type: integer
+    default: "160"
+transforms:
+  - id: in
+    type: core.from-result
+  - id: large
+    type: core.filter
+    with:
+      condition: "{{ record.size >= params.MIN_SIZE }}"
+  - id: fields
+    type: core.select-fields
+    with:
+      fields:
+        - { name: name }
+        - { name: size }
+  - id: out
+    type: core.to-result
+links:
+  - { from: in, to: large }
+  - { from: large, to: fields }
+  - { from: fields, to: out }

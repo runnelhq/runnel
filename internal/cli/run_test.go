@@ -323,6 +323,28 @@ func TestRunGroupAndSortExample(t *testing.T) {
 	}
 }
 
+func TestRunResultRowsExample(t *testing.T) {
+	chdirRepoRoot(t)
+	code, out, errOut := run(t, "run", "-v", "examples/pipelines/workflows/files.workflow.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		"[check] files/large: kept 1 of 2 records, dropped 1",
+		"[report] 2 file(s), at least 160 bytes: customers.csv",
+		"output LARGE = 1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	// Started on its own, the pipeline gets no records.
+	code, out, _ = run(t, "run", "examples/pipelines/pipelines/files.pipeline.yaml")
+	if code != 0 || !strings.Contains(out, "[in] no records were given to the pipeline") {
+		t.Errorf("exit code %d:\n%s", code, out)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

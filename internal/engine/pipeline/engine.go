@@ -48,6 +48,8 @@ type Options struct {
 	RunID string
 	// Now returns the current time; defaults to time.Now.
 	Now func() time.Time
+	// Rows are records passed to the run, read by core.from-result (S24a).
+	Rows []record.Record
 }
 
 // Status is the final state of a run or a transform.
@@ -78,6 +80,8 @@ type Result struct {
 	Duration time.Duration
 	// Counts by transform id.
 	Counts map[string]Counts
+	// Rows are the result records of the run, written by core.to-result (S24a).
+	Rows []record.Record
 }
 
 // EventKind classifies events of a run.
@@ -450,6 +454,14 @@ func (r *Runner) Run(parent context.Context) Result {
 	}
 	r.emit(Event{Time: started, Kind: RunStarted, RunID: runID, Message: r.p.Name})
 	values := r.values(runID, started)
+	var resultMu sync.Mutex
+	var results []record.Record
+	addResult := func(rec record.Record) error {
+		resultMu.Lock()
+		defer resultMu.Unlock()
+		results = append(results, rec)
+		return nil
+	}
 
 	ctx, cancel := context.WithCancelCause(parent)
 	defer cancel(nil)
@@ -567,7 +579,7 @@ func (r *Runner) Run(parent context.Context) Result {
 						return add(p, rec)
 					}
 					return add(all, rec)
-				}, log).WithValues(values)
+				}, log).WithValues(values).WithResults(r.opts.Rows, addResult)
 				if len(errLinks) > 0 {
 					out.WithErrorLinks(func(rec record.Record) error {
 						counts[i].errors.Add(1)
@@ -633,7 +645,7 @@ func (r *Runner) Run(parent context.Context) Result {
 	}
 	wg.Wait()
 
-	res := Result{RunID: runID, Status: Succeeded, Duration: now().Sub(started), Counts: map[string]Counts{}}
+	res := Result{RunID: runID, Status: Succeeded, Duration: now().Sub(started), Counts: map[string]Counts{}, Rows: results}
 	for i, t := range r.p.Transforms {
 		res.Counts[t.ID] = Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load()}
 	}

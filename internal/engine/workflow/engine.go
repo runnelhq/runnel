@@ -305,8 +305,8 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 		}
 	}
 	if r.opts.Pipelines != nil {
-		ec.RunPipeline = func(ctx context.Context, path string, params map[string]string) (map[string]any, error) {
-			return r.opts.Pipelines(ctx, action.WorkflowCall{Path: path, Params: params, Log: ec.Log})
+		ec.RunPipeline = func(ctx context.Context, path string, params map[string]string, rows []map[string]any) (map[string]any, error) {
+			return r.opts.Pipelines(ctx, action.PipelineCall{WorkflowCall: action.WorkflowCall{Path: path, Params: params, Log: ec.Log}, Rows: rows})
 		}
 	}
 

@@ -87,6 +87,9 @@
             "type": "object",
             "description": "Values for the parameters of the pipeline, by name",
             "additionalProperties": {}
+          },
+          "rows": {
+            "description": "Records for core.from-result in the pipeline: a list, e.g. {{ results.files.output }}; items that are not objects become a record with the field value"
           }
         },
         "required": [
@@ -579,6 +582,18 @@
       "parallel": true
     },
     {
+      "type": "core.from-result",
+      "kind": "transform",
+      "category": "execution",
+      "label": "Records from Workflow",
+      "description": "Passes on the records the calling workflow gave to the pipeline (rows)",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    {
       "type": "core.generate-rows",
       "kind": "transform",
       "category": "input",
@@ -889,6 +904,25 @@
       },
       "recordErrors": true,
       "parallel": true
+    },
+    {
+      "type": "core.to-result",
+      "kind": "transform",
+      "category": "execution",
+      "label": "Records to Workflow",
+      "description": "Returns the records to the calling workflow (output.rows) and passes them on",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxRows": {
+            "type": "string",
+            "description": "Most records to return; more stop the pipeline, as they are held in memory",
+            "default": "100000"
+          }
+        },
+        "additionalProperties": false
+      }
     },
     {
       "type": "csv.input",
