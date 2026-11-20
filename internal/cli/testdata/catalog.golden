@@ -27,6 +27,9 @@ transforms / transform
 transforms / flow
   core.dummy   Dummy   Passes all records on unchanged
   core.switch  Switch  Passes each record to the link of the first case whose condition is true
+transforms / combine
+  core.group-by  Group By  Combines records with the same values into one, with count, sum and other aggregates
+  core.sort      Sort      Sorts the records by fields; keeps all records in memory
 transforms / output
   core.log    Log         Writes records to the run log and passes them on
   csv.output  CSV Output  Writes records to a CSV file and passes them on
