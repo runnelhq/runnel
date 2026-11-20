@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -100,6 +101,11 @@ func (p *Pipeline) Validate() Errors {
 			if !connected[id] {
 				warnf(fmt.Sprintf("$.transforms[%d].id", index[id]), "transform %q is not connected to any other transform", id)
 			}
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(p.Layout)) {
+		if _, ok := index[k]; !ok {
+			warnf(keyPath("$.layout", k), "layout entry for unknown transform %q", k)
 		}
 	}
 	diags.Sort()

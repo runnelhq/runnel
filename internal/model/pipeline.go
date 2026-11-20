@@ -16,7 +16,7 @@ var PipelineRoots = []string{"vars", "params", "env", "run"}
 // Pipeline is the content of a *.pipeline.yaml file: transforms connected by links,
 // through which records flow (KONZEPT, chapter 2.3). The format grows with the
 // roadmap; S12 defines transforms and data links, S17a error links, S17c copies,
-// distribution and settings.
+// distribution and settings, S25a the layout of the editor.
 type Pipeline struct {
 	Kind        string           `yaml:"kind" json:"kind"`
 	APIVersion  string           `yaml:"apiVersion" json:"apiVersion"`
@@ -26,6 +26,8 @@ type Pipeline struct {
 	Transforms  []Transform      `yaml:"transforms,omitempty" json:"transforms,omitempty"`
 	Links       []PipelineLink   `yaml:"links,omitempty" json:"links,omitempty"`
 	Settings    PipelineSettings `yaml:"settings,omitempty" json:"settings,omitzero"`
+	// Layout holds editor coordinates per transform id (S25a); it has no effect on execution.
+	Layout map[string]Point `yaml:"layout,omitempty" json:"layout,omitempty"`
 
 	src *source
 }
@@ -99,6 +101,21 @@ func LoadPipeline(path string) (*Pipeline, error) {
 		return nil, err
 	}
 	return ParsePipeline(filepath.ToSlash(path), data)
+}
+
+// ReadPipeline is like ParsePipeline, but also returns the pipeline when it has field
+// errors (e.g. an invalid link type), so that the editor can show and fix it; it is nil
+// only if the file cannot be decoded at all.
+func ReadPipeline(name string, data []byte) (*Pipeline, error) {
+	src, err := parseSource(name, data)
+	if err != nil {
+		return nil, err
+	}
+	p := &Pipeline{src: src}
+	if err := src.decode(p); err != nil {
+		return nil, err
+	}
+	return p, p.validate()
 }
 
 // ParsePipeline parses a pipeline from YAML. name is used in error messages.
