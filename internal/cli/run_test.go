@@ -228,6 +228,32 @@ func TestRunBasicTransformsExample(t *testing.T) {
 	}
 }
 
+func TestRunSwitchExample(t *testing.T) {
+	chdirRepoRoot(t)
+	dir := t.TempDir()
+	code, out, errOut := run(t, "run", "--param", "OUT_DIR="+dir, "examples/pipelines/pipelines/segments.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		"[read] read 4 rows from examples/pipelines/data/customers.csv, 1 with errors",
+		`[invalid] #1 {kdnr: "4714", name: "Klein KG", umsatz: "k. A.", _error: `,
+		"[segment] key-accounts 1, standard 1, dropped 1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	for file, want := range map[string]string{
+		"customers-key-accounts.csv": "\xEF\xBB\xBFkdnr,name,umsatz\r\n4711,Müller GmbH,12500\r\n",
+		"customers-standard.csv":     "\xEF\xBB\xBFkdnr,name,umsatz\r\n4713,\"Weber, Anna\",980.5\r\n",
+	} {
+		if b, err := os.ReadFile(filepath.Join(dir, file)); err != nil || string(b) != want {
+			t.Errorf("%s: %q %v, want %q", file, b, err, want)
+		}
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

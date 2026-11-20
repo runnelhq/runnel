@@ -74,3 +74,25 @@ func RunWithErrorLink(ctx context.Context, tr transform.Transform, input ...reco
 	err = tr.Process(ctx, in, o)
 	return out, failed, logs, err
 }
+
+// RunRouted is Run for a transform that passes records to single links
+// (transform.Output.EmitTo): it returns the records by target; records passed with
+// Emit are listed under "".
+func RunRouted(ctx context.Context, tr transform.Transform, input ...record.Record) (map[string][]record.Record, []Logged, error) {
+	in := make(chan transform.Batch, len(input))
+	for _, r := range input {
+		in <- transform.Batch{r}
+	}
+	close(in)
+	out := map[string][]record.Record{}
+	var logs []Logged
+	o := transform.NewOutput("t", func(r record.Record) error {
+		out[""] = append(out[""], r)
+		return ctx.Err()
+	}, func(l slog.Level, m string) { logs = append(logs, Logged{l, m}) }).WithTargets(func(target string, r record.Record) error {
+		out[target] = append(out[target], r)
+		return ctx.Err()
+	})
+	err := tr.Process(ctx, in, o)
+	return out, logs, err
+}

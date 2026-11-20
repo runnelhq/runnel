@@ -563,3 +563,48 @@ links:
 		t.Errorf("%d problems:\n%s", len(msgs), got)
 	}
 }
+
+func TestRunSwitchRoutesToSingleLinks(t *testing.T) {
+	body := `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - id: route
+    type: core.switch
+    with:
+      cases:
+        - { when: "{{ record.n <= 3 }}", to: small }
+        - { when: "{{ record.n % 2 == 0 }}", to: even }
+      default: rest
+  - { id: small, type: test.collect }
+  - { id: even, type: test.collect }
+  - { id: rest, type: test.collect }
+links:
+  - { from: gen, to: route }
+  - { from: route, to: small }
+  - { from: route, to: even }
+  - { from: route, to: rest }
+`
+	res, c, _ := run(context.Background(), t, body, nil)
+	if res.Status != Succeeded {
+		t.Fatalf("%s: %v", res.Status, res.Err)
+	}
+	got := fmt.Sprint(len(c.recs["small"]), len(c.recs["even"]), len(c.recs["rest"]))
+	if got != "3 4 3" { // 1-3; 4, 6, 8, 10; 5, 7, 9
+		t.Errorf("small, even, rest = %s, want 3 4 3", got)
+	}
+	if got := res.Counts["route"]; got != (Counts{Read: 10, Written: 10}) {
+		t.Errorf("counts %+v", got)
+	}
+	if got := res.Counts["even"]; got.Read != 4 {
+		t.Errorf("even read %d", got.Read)
+	}
+
+	// A target without a link is found before the run, with its position.
+	p := parse(t, strings.Replace(body, "default: rest", "default: rst", 1))
+	diags := Check(p, Options{Registry: testRegistry(c)})
+	got = diags.Error()
+	if len(diags) != 2 || !diags.HasErrors() ||
+		!strings.Contains(got, `test.pipeline.yaml:12:16: transform "route": no data link leads to "rst" (did you mean "rest"?) (links to: small, even, rest)`) ||
+		!strings.Contains(got, `test.pipeline.yaml:9:7: warning: transform "route": the link to "rest" gets no records`) {
+		t.Errorf("diags:\n%s", got)
+	}
+}

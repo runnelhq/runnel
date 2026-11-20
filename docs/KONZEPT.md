@@ -916,12 +916,18 @@ Workflow des Projekts auf und wartet auf sein Ende.
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
 
-Umgesetzt (Stand S16b): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
-`core.constant`, `core.convert` sowie `csv.input` und `csv.output`:
+Umgesetzt (Stand S17b): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
+`core.constant`, `core.convert`, `core.switch` sowie `csv.input` und `csv.output`:
+
+- **`core.switch`** gibt jeden Datensatz an genau einen Daten-Link weiter: `cases: [{ when: "{{ … }}", to: <id> }]` in
+  Reihenfolge, der erste wahre Fall entscheidet, sonst `default`; ohne `default` werden die übrigen verworfen und im Log
+  gezählt (`key-accounts 1, standard 1, dropped 1`). `runnel validate` prüft, dass zu jedem `to` und zum `default` ein
+  Daten-Link führt (mit Vorschlag), und warnt bei Links, zu denen kein Fall führt. Lässt sich eine Bedingung nicht
+  auswerten, geht der Datensatz auf den Fehler-Link.
 
 - **`core.filter`** reicht die Datensätze weiter, für die `condition` wahr ist (`{{ record.betrag > 0 }}`, die
-  Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Ein Ausgang für „falsch“ folgt mit
-  `core.switch` (S17b). Lässt sich die Bedingung nicht auswerten, geht der Datensatz auf den Fehler-Link.
+  Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Für einen Ausgang „falsch“
+  `core.switch` mit `default` verwenden. Lässt sich die Bedingung nicht auswerten, geht der Datensatz auf den Fehler-Link.
 - **`core.select-fields`** behält mit `fields:` nur die genannten Felder, in dieser Reihenfolge, wahlweise umbenannt
   (`{ name: kdnr, rename: externalId }`, geschlossenes Schema); fehlt ein Feld im Datensatz, ist es leer. Mit `remove:`
   werden die genannten Felder entfernt und alle anderen behalten. Beides zusammen ist ein Fehler.
