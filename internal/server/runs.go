@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -50,6 +51,7 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 	}
 	run, _, err := s.runs.Start(name, runs.Spec{
 		Name:       name,
+		File:       filepath.Join(s.dir, filepath.FromSlash(name)),
 		Data:       data,
 		ProjectDir: s.dir,
 		Env:        req.Environment,

@@ -849,6 +849,26 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 - **Warten:** `file.wait` prüft alle `interval` (Standard 5 s), gibt nach `maxWait` auf und wartet mit `stableFor`,
   bis sich die Größe nicht mehr ändert (Datei fertig geschrieben).
 
+**Sub-Workflows (umgesetzt mit S11, [ADR 0017](adr/0017-sub-workflows.md)):** `core.run-workflow` ruft einen anderen
+Workflow des Projekts auf und wartet auf sein Ende.
+
+```yaml
+- id: north
+  type: core.run-workflow
+  with:
+    workflow: workflows/import-region.workflow.yaml   # relativ zum Projektordner
+    params:
+      REGION: north
+      ORDERS: "{{ params.LIMIT }}"
+```
+
+- Das Kind erhält nur die Werte aus `params` (nicht deklarierte sind ein Fehler) sowie die Variablen von Projekt und
+  Environment; seine `outputs` sind `result.output` der Action, z. B. `{{ results.north.output.IMPORTED }}`.
+- Scheitert das Kind, scheitert die Action; ein Abbruch bricht auch das Kind ab.
+- Meldungen des Kinds erscheinen im Log der Action als `import-region/check: …`.
+- Feste Aufrufe prüft schon `runnel validate` (Datei, Parameter, Typen, Selbstaufruf); Pfade mit `${…}`/`{{ … }}` erst
+  beim Lauf. `runConfig:` und `forEachRow` folgen mit S24.
+
 ### 12.2 Pipeline-Transforms
 
 | Kategorie | Transforms |

@@ -1,0 +1,49 @@
+# Called by nightly.workflow.yaml (core.run-workflow). It gets only the parameters
+# given by the caller; its outputs are returned to the calling action.
+# It can also run on its own:
+#   runnel run -v --param REGION=north examples/sub-workflows/workflows/import-region.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: import-region
+description: Imports the orders of one region
+parameters:
+  - name: REGION
+    required: true
+    enum: [north, south, east, west]
+  - name: ORDERS
+    type: integer
+    default: "10"
+outputs:
+  - name: IMPORTED
+    type: integer
+    value: "{{ params.ORDERS }}"
+  - name: SUMMARY
+    value: "{{ params.REGION }}: {{ params.ORDERS }} orders"
+actions:
+  - id: start
+    type: core.start
+  - id: check
+    type: core.log
+    with:
+      message: Importing {{ params.ORDERS }} orders of region {{ params.REGION }}
+  - id: load
+    type: core.wait
+    with:
+      duration: 200ms
+  - id: too-many
+    type: core.abort
+    with:
+      message: "{{ params.ORDERS }} orders in region {{ params.REGION }} – more than 100, please check"
+  - id: done
+    type: core.success
+links:
+  - { from: start, to: check }
+  - { from: check, to: load, when: "{{ params.ORDERS <= 100 }}" }
+  - { from: check, to: too-many, when: "{{ params.ORDERS > 100 }}" }
+  - { from: load, to: done }
+layout:
+  start:    { x: 40, y: 120 }
+  check:    { x: 280, y: 120 }
+  load:     { x: 520, y: 120 }
+  too-many: { x: 520, y: 260 }
+  done:     { x: 760, y: 120 }

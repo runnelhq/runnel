@@ -117,6 +117,29 @@ func TestRunFilesExample(t *testing.T) {
 	}
 }
 
+func TestRunSubWorkflowsExample(t *testing.T) {
+	chdirRepoRoot(t)
+	code, out, errOut := run(t, "run", "examples/sub-workflows/workflows/nightly.workflow.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		"[north] import-region/check: Importing 12 orders of region north",
+		"[south] import-region/check: Importing 25 orders of region south",
+		"[report] north: 12 orders, south: 25 orders",
+		"output TOTAL = 37",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+
+	code, out, _ = run(t, "run", "--param", "SOUTH_ORDERS=500", "examples/sub-workflows/workflows/nightly.workflow.yaml")
+	if code != 1 || !strings.Contains(out, "[failed] Import failed: workflow workflows/import-region.workflow.yaml failed: 500 orders in region south") {
+		t.Errorf("too many orders: exit code %d:\n%s", code, out)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

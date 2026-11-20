@@ -16,6 +16,7 @@ import (
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -119,10 +120,15 @@ func (v *validator) file(file string) error {
 		}
 		diags = append(diags, w.CheckVariables(contexts)...)
 	}
-	// Action types and configurations are only checked on an otherwise valid workflow,
-	// like before a run.
+	// Action types, configurations and calls of other workflows are only checked on an
+	// otherwise valid workflow, like before a run.
 	if !diags.HasErrors() {
 		diags = append(diags, workflow.Check(w, workflow.Options{Registry: v.registry})...)
+		projectDir := ""
+		if root, found, _ := model.FindProjectDir(filepath.Dir(file)); found {
+			projectDir = root
+		}
+		diags = append(diags, runs.CheckCalls(w, projectDir, file)...)
 	}
 	diags.Sort()
 	v.report(diags)

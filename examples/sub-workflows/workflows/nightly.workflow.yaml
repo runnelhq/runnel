@@ -1,0 +1,66 @@
+# Sub-workflows. Run it with:
+#   runnel run -v examples/sub-workflows/workflows/nightly.workflow.yaml
+#   runnel run -v --param SOUTH_ORDERS=500 examples/sub-workflows/workflows/nightly.workflow.yaml
+# - "north" and "south" call import-region.workflow.yaml, each with its own parameters;
+#   the path is relative to the project folder.
+# - "report" and the output TOTAL use the outputs of the called workflows.
+# - With more than 100 orders the called workflow aborts, "south" fails and the
+#   failure link reports it.
+kind: Workflow
+apiVersion: runnel/v1
+name: nightly
+parameters:
+  - name: SOUTH_ORDERS
+    type: integer
+    default: "25"
+outputs:
+  - name: TOTAL
+    type: integer
+    value: "{{ results.north.output.IMPORTED + results.south.output.IMPORTED }}"
+actions:
+  - id: start
+    type: core.start
+  - id: north
+    type: core.run-workflow
+    with:
+      workflow: workflows/import-region.workflow.yaml
+      params:
+        REGION: north
+        ORDERS: 12
+  - id: south
+    type: core.run-workflow
+    with:
+      workflow: workflows/import-region.workflow.yaml
+      params:
+        REGION: south
+        ORDERS: ${SOUTH_ORDERS}
+  - id: report
+    type: core.log
+    with:
+      message: "{{ results.north.output.SUMMARY }}, {{ results.south.output.SUMMARY }}"
+  - id: failed
+    type: core.log
+    with:
+      message: "Import failed: {{ run.lastError }}"
+      level: error
+  - id: done
+    type: core.success
+  - id: abort
+    type: core.abort
+    join: first
+links:
+  - { from: start, to: north }
+  - { from: north, to: south }
+  - { from: south, to: report }
+  - { from: report, to: done }
+  - { from: north, to: failed, when: failure }
+  - { from: south, to: failed, when: failure }
+  - { from: failed, to: abort }
+layout:
+  start:  { x: 40, y: 120 }
+  north:  { x: 280, y: 120 }
+  south:  { x: 520, y: 120 }
+  report: { x: 760, y: 120 }
+  done:   { x: 1000, y: 120 }
+  failed: { x: 760, y: 280 }
+  abort:  { x: 1000, y: 280 }

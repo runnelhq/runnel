@@ -42,6 +42,8 @@ type Options struct {
 	RunID string
 	// Environment is the name of the environment of the run (run.environment in expressions).
 	Environment string
+	// Workflows runs workflows called by actions (core.run-workflow); nil if not supported.
+	Workflows action.WorkflowRunner
 }
 
 // Status is the final state of a run.
@@ -294,6 +296,11 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 		RunID:    runID,
 		ActionID: a.ID,
 		Log:      func(level slog.Level, msg string) { r.log(runID, a, level, msg) },
+	}
+	if r.opts.Workflows != nil {
+		ec.RunWorkflow = func(ctx context.Context, path string, params map[string]string) (map[string]any, error) {
+			return r.opts.Workflows(ctx, action.WorkflowCall{Path: path, Params: params, Log: ec.Log})
+		}
 	}
 	res, err := act.Execute(ctx, ec)
 	if err != nil && errors.Is(context.Cause(ctx), errActionTimeout) {
