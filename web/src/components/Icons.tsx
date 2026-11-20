@@ -159,6 +159,18 @@ export const LayoutIcon = (p: P) => (
   </Icon>
 );
 
+export const ArrowUpIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </Icon>
+);
+
+export const ArrowDownIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 5v14M6 13l6 6 6-6" />
+  </Icon>
+);
+
 export const PipelineIcon = (p: P) => (
   <Icon {...p}>
     <path d="M3 7h5l3 5-3 5H3M11 12h10M17 8l4 4-4 4" />
