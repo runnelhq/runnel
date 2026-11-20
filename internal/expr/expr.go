@@ -109,6 +109,16 @@ func Compile(s string, roots []string) (*Template, error) {
 	return t, nil
 }
 
+var varRef = regexp.MustCompile(`\$\{[^}]*\}`)
+
+// Check compiles the expressions of s as they will be after ${…} references have been
+// resolved (ADR 0006). A reference outside quotes can only stand for a number or a
+// boolean, inside quotes it is text; the check uses 0, which fits both.
+func Check(s string, roots []string) error {
+	_, err := Compile(varRef.ReplaceAllString(s, "0"), roots)
+	return err
+}
+
 func compile(code string, roots []string) (*vm.Program, error) {
 	env := make(map[string]any, len(roots))
 	for _, r := range roots {

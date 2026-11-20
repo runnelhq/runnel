@@ -1,0 +1,7 @@
+# Example for expressions {{ … }} (ADR 0006). Check it with:  runnel validate examples/expressions
+kind: Project
+apiVersion: runnel/v1
+name: expressions
+description: Condition links, computed defaults and outputs from the results of actions
+variables:
+  THRESHOLD: "10"

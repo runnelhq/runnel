@@ -21,6 +21,7 @@ import (
 //	test.ok    succeeds and logs its "value"
 //	test.fail  fails with "failed: <value>"
 //	test.flaky fails the first <n> times, then succeeds
+//	test.out   succeeds with its "value" as output (result.output)
 func testRegistry(t *testing.T) *action.Registry {
 	t.Helper()
 	r := action.NewRegistry()
@@ -30,6 +31,11 @@ func testRegistry(t *testing.T) *action.Registry {
 	}})
 	r.Register(action.Definition{Type: "test.fail", New: func(with map[string]any) (action.Action, error) {
 		return testAction{value: fmt.Sprint(with["value"]), fail: true}, nil
+	}})
+	r.Register(action.Definition{Type: "test.out", New: func(with map[string]any) (action.Action, error) {
+		return action.Func(func(context.Context, *action.ExecContext) (action.Result, error) {
+			return action.Result{Output: with["value"]}, nil
+		}), nil
 	}})
 	var mu sync.Mutex
 	calls := map[string]int{}
@@ -377,7 +383,6 @@ links:
 		// The list of available types grows with every new action; only check that it is shown.
 		`9:20: action "a": unknown action type "file.copy" (available: [core.abort `,
 		`10:38: action "b" (core.log): unknown field "mesage"`,
-		`15:29: link #2: an expression condition is not supported`,
 	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("missing %q in:\n%v", want, err)
@@ -455,37 +460,97 @@ links:
 	}
 }
 
-func TestPrepareOutputExpression(t *testing.T) {
+func TestExpressions(t *testing.T) {
 	w := parse(t, `
+parameters:
+  - { name: LIMIT, type: integer, default: "{{ 1 + 1 }}" }
+  - { name: DAY, default: "{{ formatDate(addDays(parseDate('2026-11-19', 'yyyy-MM-dd'), 1), 'dd.MM.yyyy') }}" }
 outputs:
-  - { name: X, value: "{{ results.start }}" }
+  - { name: FILES, type: integer, value: "{{ len(results.list.output) }}" }
+  - { name: SUMMARY, value: "{{ results.list.status }}: {{ results.list.output }}" }
 actions:
   - { id: start, type: core.start }
+  - { id: list, type: test.out, with: { value: [a.csv, b.csv, c.csv] } }
+  - { id: many, type: test.ok, with: { value: "{{ len(result.output) }} files from {{ result.id }} on {{ params.DAY }}" } }
+  - { id: few, type: test.ok, with: { value: few } }
+  - { id: typed, type: test.ok, with: { value: "{{ params.LIMIT * 10 }}" } }
+links:
+  - { from: start, to: list }
+  - { from: list, to: many, when: "{{ len(result.output) > params.LIMIT }}" }
+  - { from: list, to: few, when: "{{ len(result.output) <= params.LIMIT }}" }
+  - { from: many, to: typed, when: "{{ results.list.success && run.workflow == 'test' }}" }
 `)
-	if _, err := Prepare(w, Options{Registry: testRegistry(t)}); err == nil ||
-		!strings.Contains(err.Error(), `output "X": an expression is not supported`) {
-		t.Errorf("error = %v", err)
+	res, trace := runWorkflow(t, w, nil)
+	if res.Status != Succeeded {
+		t.Fatalf("status %s: %v\n%s", res.Status, res.Err, strings.Join(trace, "\n"))
+	}
+	got := strings.Join(trace, "\n")
+	for _, want := range []string{"log many: 3 files from list on 20.11.2026", "log typed: 20"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "started few") {
+		t.Errorf("few must not run:\n%s", got)
+	}
+	if res.Outputs["FILES"] != int64(3) || res.Outputs["SUMMARY"] != `succeeded: ["a.csv","b.csv","c.csv"]` {
+		t.Errorf("outputs %#v", res.Outputs)
 	}
 }
 
-func TestPrepareExpressionsNotYetSupported(t *testing.T) {
-	// Expressions are checked when the file is read (S08a); the engine evaluates them with S08b.
+func TestExpressionsWithVariablesAndFailures(t *testing.T) {
 	w := parse(t, `
 parameters:
-  - { name: DAY, default: "{{ formatDate(today(), 'yyyy-MM-dd') }}" }
+  - { name: NAME, default: World }
 actions:
   - { id: start, type: core.start }
-  - { id: a, type: test.ok, with: { note: "rows: {{ result.rows }}" } }
+  - { id: bad, type: test.fail, with: { value: "${NAME}" } }
+  - { id: report, type: test.ok, with: { value: "{{ result.id }} failed: {{ result.error }} ({{ run.lastError }})" } }
+links:
+  - { from: start, to: bad }
+  - { from: bad, to: report, when: "{{ !result.success && '${NAME}' == 'World' }}" }
+`)
+	res, trace := runWorkflow(t, w, vars.NewScope(vars.Layer{Name: model.ParameterDefaultsLayer, Values: map[string]string{"NAME": "World"}}))
+	got := strings.Join(trace, "\n")
+	if res.Status != Succeeded || !strings.Contains(got, "log report: bad failed: failed: World (failed: World)") {
+		t.Errorf("status %s: %v\n%s", res.Status, res.Err, got)
+	}
+}
+
+func TestExpressionErrorsFailTheRun(t *testing.T) {
+	for _, tt := range []struct{ name, yaml, want string }{
+		{"condition not boolean", `
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: test.ok }
+links:
+  - { from: start, to: a, when: "{{ result.id }}" }
+`, `link #1 (start → a): expression {{ result.id }}: the result must be true or false, got start`},
+		{"error in configuration", `
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: test.ok, with: { value: "{{ result.output.x.y }}" } }
 links:
   - { from: start, to: a }
-`)
-	_, err := Prepare(w, Options{Registry: testRegistry(t)})
-	for _, want := range []string{
-		`parameter "DAY": an expression as default value is not supported`,
-		`action "a": an expression in the configuration is not supported`,
+`, `action "a" failed: value: expression {{ result.output.x.y }}`},
+		{"error in parameter default", `
+parameters:
+  - { name: D, default: "{{ parseDate('x', 'yyyy') }}" }
+actions:
+  - { id: start, type: core.start }
+`, `parameter "D": default value: expression {{ parseDate('x', 'yyyy') }}`},
+		{"error in output", `
+outputs:
+  - { name: N, type: integer, value: "{{ 'x' }}" }
+actions:
+  - { id: start, type: core.start }
+`, `output "N"`},
 	} {
-		if err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("error = %v, want containing %q", err, want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			res, _ := runWorkflow(t, parse(t, tt.yaml), nil)
+			if res.Status != Failed || res.Err == nil || !strings.Contains(res.Err.Error(), tt.want) {
+				t.Errorf("status %s, err %v, want containing %q", res.Status, res.Err, tt.want)
+			}
+		})
 	}
 }

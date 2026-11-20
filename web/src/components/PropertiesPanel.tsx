@@ -688,7 +688,8 @@ function LinkProperties(props: PropertiesProps & { index: number }) {
         }
       </Field>
       <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
-        ƒ Conditions with expressions <span className="font-mono">{"{{ … }}"}</span> follow with expressions (roadmap S08).
+        ƒ Conditions with expressions <span className="font-mono">{"{{ … }}"}</span> are written in the YAML view, e.g.{" "}
+        <span className="font-mono">{"when: \"{{ result.success && params.N > 10 }}\""}</span>.
       </p>
       <Check
         fieldKey="loop"

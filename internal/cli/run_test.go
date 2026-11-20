@@ -65,6 +65,31 @@ func TestRunVerbose(t *testing.T) {
 	}
 }
 
+func TestRunExpressionsExample(t *testing.T) {
+	chdirRepoRoot(t)
+	for _, tt := range []struct {
+		orders string
+		want   []string
+	}{
+		{"", []string{"[few] 7 orders – importing at once", `output SIZE = "small"`}},
+		{"25", []string{"[many] 25 orders – more than 10, splitting the import", `output SIZE = "large"`}},
+	} {
+		args := []string{"run", "examples/expressions/workflows/orders.workflow.yaml"}
+		if tt.orders != "" {
+			args = []string{"run", "--param", "ORDERS=" + tt.orders, args[1]}
+		}
+		code, out, _ := run(t, args...)
+		if code != 0 {
+			t.Fatalf("exit code %d:\n%s", code, out)
+		}
+		for _, want := range append(tt.want, "Checking", `output CHECKED = "succeeded after`) {
+			if !strings.Contains(out, want) {
+				t.Errorf("ORDERS=%q: missing %q in:\n%s", tt.orders, want, out)
+			}
+		}
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

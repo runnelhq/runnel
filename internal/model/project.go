@@ -226,6 +226,10 @@ func (p *Project) EnvironmentNames() []string {
 	return sortedKeys(p.Environments)
 }
 
+// ParameterDefaultsLayer is the name of the variable layer with the default values of
+// the workflow parameters (the lowest layer of Scope).
+const ParameterDefaultsLayer = "workflow parameters"
+
 // Scope returns the variables available to a workflow, from lowest to highest priority:
 // defaults of the workflow parameters, project variables, environment variables and
 // parameter values passed at start (see docs/KONZEPT.md, chapter 2.5).
@@ -235,7 +239,7 @@ func Scope(w *Workflow, p *Project, env *Environment, params map[string]string) 
 	for _, param := range w.Parameters {
 		defaults[param.Name] = param.Default
 	}
-	layers := []vars.Layer{{Name: "workflow parameters", Values: defaults}}
+	layers := []vars.Layer{{Name: ParameterDefaultsLayer, Values: defaults}}
 	if p != nil {
 		layers = append(layers, vars.Layer{Name: "project", Values: p.Variables})
 	}

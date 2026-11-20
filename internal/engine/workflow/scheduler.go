@@ -35,6 +35,11 @@ type scheduler struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	runID  string
+	// rc holds the context of expressions: variables, parameters, results so far.
+	rc *runContext
+	// trigger is, per action, the action whose link fired last; its result is "result"
+	// in the expressions of the action's configuration.
+	trigger map[string]string
 
 	links     []linkState     // by link index; only non-loop links are used
 	activated map[string]bool // for join all/first: action started (or skipped) in the current iteration
@@ -54,13 +59,15 @@ type scheduler struct {
 	endErr    error
 }
 
-func newScheduler(ctx context.Context, r *Runner, runID string) *scheduler {
+func newScheduler(ctx context.Context, r *Runner, runID string, rc *runContext) *scheduler {
 	ctx, cancel := context.WithCancel(ctx)
 	return &scheduler{
 		r:          r,
 		ctx:        ctx,
 		cancel:     cancel,
 		runID:      runID,
+		rc:         rc,
+		trigger:    map[string]string{},
 		links:      make([]linkState, len(r.w.Links)),
 		activated:  map[string]bool{},
 		runs:       map[string]int{},
@@ -133,8 +140,10 @@ func (s *scheduler) activate(id string) {
 	start := s.r.opts.Now()
 	s.r.emit(Event{Time: start, Kind: ActionStarted, RunID: s.runID, ActionID: a.ID, ActionType: a.Type})
 	s.running++
+	// The context is taken now: later results do not change what this action sees.
+	values := s.rc.values(s.rc.results[s.trigger[id]])
 	go func() {
-		res, err := s.r.executeAction(s.ctx, s.runID, a)
+		res, err := s.r.executeAction(s.ctx, s.runID, a, s.rc.scope, values)
 		s.done <- completion{actionID: id, res: res, err: err, start: start}
 	}()
 }
@@ -152,6 +161,7 @@ func (s *scheduler) finished(c completion) {
 	end := s.r.opts.Now()
 	s.r.emit(Event{Time: end, Kind: ActionFinished, RunID: s.runID, ActionID: a.ID, ActionType: a.Type,
 		Status: status, Err: c.err, Message: c.res.Message, Duration: end.Sub(c.start)})
+	result := s.rc.record(a, status, c.res, c.err, end.Sub(c.start))
 
 	if s.ended {
 		return // run already decided; results of cancelled branches are ignored
@@ -173,7 +183,7 @@ func (s *scheduler) finished(c completion) {
 
 	anyFired := false
 	for _, li := range s.r.out[a.ID] {
-		if follows(s.r.w.Links[li], ok) {
+		if s.follows(li, ok, result) {
 			anyFired = true
 			s.fire(li)
 		} else {
@@ -186,7 +196,10 @@ func (s *scheduler) finished(c completion) {
 }
 
 // follows reports whether a link is taken after an action with the given outcome.
-func follows(l model.Link, ok bool) bool {
+// An expression condition sees the action's result as "result" (ADR 0006); if it
+// cannot be evaluated, the link is not taken and the run fails.
+func (s *scheduler) follows(li int, ok bool, result map[string]any) bool {
+	l := s.r.w.Links[li]
 	switch kind, _ := l.Condition(); kind {
 	case model.OnSuccess:
 		return ok
@@ -194,6 +207,13 @@ func follows(l model.Link, ok bool) bool {
 		return !ok
 	case model.Always:
 		return true
+	case model.OnExpression:
+		taken, err := s.r.condition(l.When, s.rc.scope, s.rc.values(result))
+		if err != nil {
+			s.unhandled = append(s.unhandled, fmt.Errorf("link #%d (%s → %s): %w", li+1, l.From, l.To, err))
+			return false
+		}
+		return taken
 	}
 	return false
 }
@@ -202,6 +222,7 @@ func follows(l model.Link, ok bool) bool {
 // other links count towards the join of their target.
 func (s *scheduler) fire(li int) {
 	l := s.r.w.Links[li]
+	s.trigger[l.To] = l.From
 	if l.Loop {
 		s.resetIteration(l.To)
 		s.activated[l.To] = true
@@ -295,6 +316,8 @@ func (s *scheduler) skip(id string) {
 	s.activated[id] = true
 	a := s.r.actions[id]
 	s.r.emit(Event{Time: s.r.opts.Now(), Kind: ActionSkipped, RunID: s.runID, ActionID: a.ID, ActionType: a.Type, Status: Skipped})
+	s.rc.results[a.ID] = map[string]any{"id": a.ID, "type": a.Type, "status": string(Skipped), "success": false,
+		"output": nil, "durationMs": int64(0), "error": ""}
 	for _, li := range s.r.out[id] {
 		s.kill(li)
 	}

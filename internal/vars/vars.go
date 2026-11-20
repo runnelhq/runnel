@@ -14,8 +14,10 @@ package vars
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -223,4 +225,28 @@ func (s *Scope) resolve(r Ref, chain []string) (string, error) {
 		return "", fmt.Errorf("variable %q is %w", r.Name, ErrUndefined)
 	}
 	return s.expand(v, append(chain, r.Name))
+}
+
+// Names returns the names of all variables of all layers, sorted.
+func (s *Scope) Names() []string {
+	seen := map[string]bool{}
+	for _, l := range s.layers {
+		for k := range l.Values {
+			seen[k] = true
+		}
+	}
+	return slices.Sorted(maps.Keys(seen))
+}
+
+// ReplaceLayer returns a copy of the scope in which the values of the layer with the
+// given name are replaced (e.g. parameter defaults computed at the start of a run).
+func (s *Scope) ReplaceLayer(name string, values map[string]string) *Scope {
+	c := *s
+	c.layers = slices.Clone(s.layers)
+	for i, l := range c.layers {
+		if l.Name == name {
+			c.layers[i].Values = values
+		}
+	}
+	return &c
 }
