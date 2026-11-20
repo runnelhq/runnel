@@ -86,7 +86,7 @@ my-project/
 ├─ connections/
 │   └─ erp-sql.yaml          # DB-/HTTP-/SMTP-/SFTP-Verbindungen (ohne Klartext-Secrets)
 ├─ triggers/
-│   └─ nightly-import.yaml   # Cron, Webhook, File-Watch
+│   └─ nightly-import.yaml   # Cron, HTTP, Datei-Überwachung, Intervall
 ├─ run-configs/
 │   └─ local-fast.yaml       # Wie wird ausgeführt (Puffer, Logging, Sampling …)
 ├─ workflows/
@@ -132,7 +132,7 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
   1. Standardwerte der Workflow-Parameter (`parameters[].default`)
   2. Project (`project.yaml`, Abschnitt `variables`)
   3. Environment (`environments/<name>.yaml`; Auswahl per `--env`, sonst `defaultEnvironment` des Projekts)
-  4. Beim Start übergebene Parameter (CLI `--param KEY=VALUE`, Webhook-Body, Trigger, aufrufende Action)
+  4. Beim Start übergebene Parameter (CLI `--param KEY=VALUE`, HTTP-Anfrage, Trigger, aufrufende Action)
   5. Zur Laufzeit gesetzte Variablen (Action „Set Variables“, ab S08)
 - Syntax:
   - `${NAME}` – Variable aus den Ebenen oben (kompatibel zu Apache Hop); Werte dürfen selbst Variablen enthalten
@@ -177,7 +177,7 @@ Der Secret-Store ist lokal verschlüsselt (siehe Kap. 8).
 |---|---|
 | `manual` | Start über UI oder CLI |
 | `cron` | Zeitplan (Cron-Syntax + Zeitzone), Optionen: kein paralleler Lauf, Nachholen verpasster Läufe |
-| `webhook` | HTTP-Endpunkt `/hooks/{name}`, Body/Query werden zu Parametern, synchrone oder asynchrone Antwort |
+| `http` | HTTP-Endpunkt mit Methode und Pfad (`/api/customers/{id}`); Pfad, Query und Body werden zu Parametern. Als Webhook sofort `202` (`response: accepted`) oder als Dienst mit Antwort aus dem Lauf (`response: run`, Action `http.respond` bzw. Transform `http.response`) – [ADR 0018](adr/0018-http-trigger.md) |
 | `file` | Dateisystem-Überwachung (Ordner + Pattern), z. B. neue CSV in Eingangsordner |
 | `interval` | Polling alle n Sekunden/Minuten |
 
@@ -206,7 +206,7 @@ Details: [ADR 0012](adr/0012-ki-faehigkeit.md).
 |---|---|
 | Sprachmodelle | Action `ai.chat`; Anbieter (Anthropic, OpenAI-kompatibel, Ollama lokal) als Connection, Schlüssel per `${secret:…}` |
 | Agenten | Action `ai.agent`: Schleife Modell → Werkzeug → Modell innerhalb der Action; Werkzeuge per Positivliste (`with.tools`) |
-| Werkzeug-Vertrag | Workflows mit typisierten `parameters` (`type`, `enum`, `description`) und `outputs` – gilt für Sub-Workflows, Agenten, MCP und Webhooks |
+| Werkzeug-Vertrag | Workflows mit typisierten `parameters` (`type`, `enum`, `description`) und `outputs` – gilt für Sub-Workflows, Agenten, MCP und HTTP-Trigger |
 | MCP | Server: `runnel mcp` stellt Workflows als Tools bereit; Client: Action `mcp.call-tool`; MCP-Server als Plugin-Quelle |
 | RAG | Pipelines mit `ai.chunk`, `ai.embed` und Vektor-Ausgabe (pgvector, Qdrant) |
 | Leitplanken | Positivliste, Freigabe-Action `core.approval`, Protokollierung jedes Modell-/Werkzeugaufrufs, Maskierung von Secrets, Schritt-, Rate- und Kostenlimits |
@@ -261,7 +261,7 @@ flowchart LR
 | Modus | Befehl | Einsatz |
 |---|---|---|
 | Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v] [--run-config name]` | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet, 130 abgebrochen |
-| Server | `runnel serve [--project D:\flows]` | Editor + Scheduler + Webhooks |
+| Server | `runnel serve [--project D:\flows]` | Editor + Scheduler + HTTP-Trigger (eigener Listener) |
 | Desktop | `runnel desktop` | Server + WebView2-Fenster (Einzelplatz) |
 | Windows-Dienst | `runnel service install/start/stop/uninstall` | Dauerbetrieb auf Server |
 | Validierung | `runnel validate <datei/ordner>` | Lint/Prüfung in CI |
@@ -530,6 +530,9 @@ with:
   overlap: skip            # skip | queue | allow
 ```
 
+Ein HTTP-Trigger (`type: http`) hat statt `schedule` Methode, Pfad, Absicherung und Antwortmodus unter `with:`;
+Format und Verhalten in [ADR 0018](adr/0018-http-trigger.md).
+
 ---
 
 ## 6. Ausführungs-Engine
@@ -647,7 +650,7 @@ type Transform interface {
 ### 6.4 Run-Queue & Ressourcen
 
 - Globales Limit gleichzeitiger Runs (`maxConcurrentRuns`), zusätzlich pro Workflow.
-- Prioritäten (manuell > Webhook > Cron).
+- Prioritäten (manuell > HTTP-Trigger > zeitgesteuerte Trigger).
 - Graceful Shutdown: Dienst-Stopp wartet konfigurierbar auf laufende Runs, danach Abbruch + Status `Cancelled` (resumebar).
 
 ---
@@ -735,7 +738,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
 | Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `RUNNEL_MASTER_KEY` |
 | Secrets im Log | Automatische Maskierung aller bekannten Secret-Werte in Logs und Vorschauen |
-| Webhooks | Pro Webhook eigenes Token (Header/Query) oder HMAC-Signaturprüfung, Rate-Limit |
+| HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal, im Netz mit TLS – S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrent` ([ADR 0018](adr/0018-http-trigger.md)) |
 | Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
 | Dienstkonto | Empfehlung: dedizierter Dienstbenutzer mit minimalen Rechten (bzw. gMSA in Domänen) |
 | Audit | Dateiänderungen über den Editor, manuelle Starts und Abbrüche werden mit Client-Informationen (IP, Rechnername, User-Agent) protokolliert |
@@ -765,7 +768,7 @@ CREATE TABLE runs (
   path          TEXT NOT NULL,             -- relativer Pfad im Projekt
   file_hash     TEXT NOT NULL,             -- Version der ausgeführten Definition
   environment   TEXT,
-  trigger       TEXT,                      -- manual | cron:<name> | webhook:<name> | cli
+  trigger       TEXT,                      -- manual | cron:<name> | http:<name> | cli
   parent_run_id TEXT REFERENCES runs(id),  -- Sub-Workflow / Pipeline aus Workflow
   status        TEXT NOT NULL,             -- queued|running|succeeded|failed|cancelled
   params_json   TEXT,
@@ -817,7 +820,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | POST | `/preview` | Pipeline-Vorschau bis Transform X |
 | GET/PUT | `/secrets/{name}` | Secrets setzen (Wert nie lesbar zurück) |
 | GET/POST | `/triggers`, `/triggers/{name}/enable` | Trigger verwalten |
-| ANY | `/hooks/{name}` | Webhook-Endpunkte |
+| ANY | Pfade der HTTP-Trigger | auf dem eigenen Listener der Trigger, nicht unter `/api/v1` ([ADR 0018](adr/0018-http-trigger.md)) |
 | GET | `/events?since=&run=` | Live-Events als Server-Sent Events ([ADR 0016](adr/0016-live-events-sse.md)): `run.started`, `run.finished`, `action.started`, `action.finished`, `action.skipped`, `log`; später Metriken und `file.changed` |
 
 ---
@@ -1098,11 +1101,11 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.2 – Editor-Grundlage** ✅ | E1–E8: Action-Descriptor & Schema, Server mit Datei- und Run-API, Live-Events, Editor (Canvas, Bearbeiten, Eigenschaften, Ausführen) | Workflows visuell bauen und testen |
 | **0.3 – Workflow-Ausbau** | S08, S09, S11, S35: Ausdrücke, Datei-Actions, Sub-Workflows, Ausdruckseditor | Praxistaugliche Workflows |
 | **0.4 – Pipelines** | S12–S18, S22, S24, S25a: Pipeline-Engine, Typsystem, CSV, Transforms, Workflow ↔ Pipeline, Ausführung pro Datensatz, Pipeline-Canvas | ETL per CLI und Editor |
-| **0.5 – Betrieb** | S37, S38, S41: Cron-, Datei- und Intervall-Trigger, Windows-Dienst | Zeit- und dateigesteuerter Dauerbetrieb auf einem Windows-Rechner |
+| **0.5 – Betrieb** | S37, S38, S38a–c, S40a, S41: Cron-, Datei-, Intervall- und HTTP-Trigger (auch als Dienst mit Antwort aus dem Lauf), Listener mit TLS, Windows-Dienst | Dauerbetrieb auf einem Windows-Rechner, von anderen Systemen per HTTP ansprechbar |
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S10, S19–S21, S23, S25, S26, S29, S36, S45, S47, S48, `core.calculate`, `maxErrors`, `core.dedupe`; aus dem Betrieb Webhook-Trigger (Konzept wird neu besprochen), Secret-Store (S39), Netzwerkbetrieb (S40), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S10, S19–S21, S23, S25, S26, S29, S36, S45, S47, S48, `core.calculate`, `maxErrors`, `core.dedupe`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 
