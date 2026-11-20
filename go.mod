@@ -1,6 +1,6 @@
 module github.com/runnelhq/runnel
 
-go 1.26
+go 1.26.0
 
 toolchain go1.26.11
 
@@ -9,6 +9,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/shopspring/decimal v1.6.0
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/text v0.43.0
 )
 
 require (

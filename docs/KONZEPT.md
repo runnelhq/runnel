@@ -306,7 +306,7 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 | Oracle | `sijms/go-ora` (pure Go) |
 | ODBC (optional, Access, Legacy) | `alexbrainman/odbc` |
 | Excel | `xuri/excelize/v2` |
-| CSV | `encoding/csv` (+ eigene Typ-Erkennung) |
+| CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
 | SFTP | `pkg/sftp` + `x/crypto/ssh` |
 | Mail | `wneessen/go-mail` |
 | Logging | `log/slog` (strukturiert, JSON) |
@@ -902,6 +902,19 @@ Workflow des Projekts auf und wartet auf sein Ende.
 | Ausführung | Pipeline Executor, Workflow Executor, In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
+
+Umgesetzt (Stand S15): `core.generate-rows`, `core.dummy`, `core.log` sowie `csv.input` und `csv.output`:
+
+- **`csv.input`** liest alle Spalten als Text (offenes Schema) oder mit `fields:` nur die genannten, mit Typ und Format
+  (geschlossenes Schema). Spalten werden über die Kopfzeile gefunden, ohne Kopfzeile über die Position. Ein Wert, der
+  nicht passt, hält die Pipeline mit Datei, Zeile und Spalte an. `encoding: auto` erkennt UTF-8 und UTF-16 am BOM und
+  liest sonst UTF-8; ungültiges UTF-8 wird mit dem Hinweis auf `windows-1252` gemeldet.
+- **`csv.output`** schreibt die Felder aus `fields:` (Reihenfolge, Format), sonst die des geschlossenen Schemas oder des
+  ersten Records; Zeilenende CRLF, Standard-Kodierung UTF-8 mit BOM (damit Excel Umlaute erkennt). `ifExists: replace`
+  schreibt in eine temporäre Datei und ersetzt die alte erst am Ende – bei einem Fehler bleibt sie unverändert;
+  `append` hängt ohne zweite Kopfzeile an, `fail` bricht ab. Zeichen, die es in Windows-1252 nicht gibt, sind ein Fehler.
+- **Formate:** Zahlenmuster aus `#`, `0` und Trennzeichen (`#.##0,00`, `#,##0.00`, `#'##0.00`); Datumsmuster wie bei
+  `formatDate` (`dd.MM.yyyy HH:mm`). Ohne Format: `1234.5` und ISO-Daten. Leere Werte sind `null`, außer bei Text.
 
 Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dateien bei Überschreiten eines Speicherlimits.
 

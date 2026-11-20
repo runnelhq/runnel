@@ -5,7 +5,8 @@ Diese Anleitung ergänzt [ACTIONS.md](ACTIONS.md) – Namensräume, Konfiguratio
 Besonderheiten und Dokumentation gelten genauso. Hier steht nur, was bei Transforms anders ist.
 
 Beispiele: [`internal/transforms/core/`](../../internal/transforms/core/) – `generate.go` (Eingabe ohne eingehende Links),
-`dummy.go` (reicht weiter), `log.go` (Konfiguration, Log).
+`dummy.go` (reicht weiter), `log.go` (Konfiguration, Log); [`internal/transforms/csv/`](../../internal/transforms/csv/) –
+Datei lesen und schreiben (Positionen in Fehlern, temporäre Datei, Kodierungen).
 
 ## 1. Aufbau
 

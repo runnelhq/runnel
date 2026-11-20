@@ -6,10 +6,12 @@ package transforms
 import (
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/transforms/core"
+	"github.com/runnelhq/runnel/internal/transforms/csv"
 )
 
 var namespaces = []func(*transform.Registry){
 	core.Register,
+	csv.Register,
 }
 
 // Builtin returns a new registry with all built-in transforms.

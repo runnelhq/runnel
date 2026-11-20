@@ -17,7 +17,9 @@ actions / files
   file.wait    Wait for File  Waits until files exist; output: the matching paths
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
+  csv.input           CSV Input      Reads the rows of a CSV file as records
 transforms / flow
   core.dummy  Dummy  Passes all records on unchanged
 transforms / output
-  core.log  Log  Writes records to the run log and passes them on
+  core.log    Log         Writes records to the run log and passes them on
+  csv.output  CSV Output  Writes records to a CSV file and passes them on
