@@ -15,6 +15,7 @@ import (
 // core.switch passes each record to one of its outgoing links: the first case whose
 // condition is true decides, else the default.
 var switchDefinition = transform.Definition{
+	Parallel:     true,
 	Type:         "core.switch",
 	Category:     transform.CategoryFlow,
 	Label:        "Switch",

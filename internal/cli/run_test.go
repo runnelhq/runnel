@@ -254,6 +254,26 @@ func TestRunSwitchExample(t *testing.T) {
 	}
 }
 
+func TestRunParallelExample(t *testing.T) {
+	chdirRepoRoot(t)
+	code, out, errOut := run(t, "run", "--param", "ROWS=3000", "examples/pipelines/pipelines/parallel.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		"[check] read 3000, written 1000 in ",
+		"[left] read 500, written 500 in ",
+		"[right] read 500, written 500 in ",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if n := strings.Count(out, "[check] kept "); n != 4 {
+		t.Errorf("%d log lines of the copies, want 4:\n%s", n, out)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

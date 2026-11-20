@@ -28,14 +28,17 @@
       "type": "core.filter",
       "with": {
         "condition": "{{ record.sales \u003e params.MIN_SALES }}"
-      }
+      },
+      "copies": 4,
+      "distribution": "copy"
     },
     {
       "id": "write",
       "type": "csv.output",
       "with": {
         "path": "active.csv"
-      }
+      },
+      "copies": 1
     }
   ],
   "links": [
@@ -48,5 +51,9 @@
       "to": "write",
       "type": "data"
     }
-  ]
+  ],
+  "settings": {
+    "bufferSize": 20000,
+    "batchSize": 1000
+  }
 }

@@ -15,19 +15,47 @@ var PipelineRoots = []string{"vars", "params", "env", "run"}
 
 // Pipeline is the content of a *.pipeline.yaml file: transforms connected by links,
 // through which records flow (KONZEPT, chapter 2.3). The format grows with the
-// roadmap; S12 defines transforms and data links, S17a error links; further fields
-// follow with the steps that execute them (copies and settings with S17c).
+// roadmap; S12 defines transforms and data links, S17a error links, S17c copies,
+// distribution and settings.
 type Pipeline struct {
-	Kind        string         `yaml:"kind" json:"kind"`
-	APIVersion  string         `yaml:"apiVersion" json:"apiVersion"`
-	Name        string         `yaml:"name" json:"name"`
-	Description string         `yaml:"description,omitempty" json:"description,omitempty"`
-	Parameters  []Parameter    `yaml:"parameters,omitempty" json:"parameters,omitempty"`
-	Transforms  []Transform    `yaml:"transforms,omitempty" json:"transforms,omitempty"`
-	Links       []PipelineLink `yaml:"links,omitempty" json:"links,omitempty"`
+	Kind        string           `yaml:"kind" json:"kind"`
+	APIVersion  string           `yaml:"apiVersion" json:"apiVersion"`
+	Name        string           `yaml:"name" json:"name"`
+	Description string           `yaml:"description,omitempty" json:"description,omitempty"`
+	Parameters  []Parameter      `yaml:"parameters,omitempty" json:"parameters,omitempty"`
+	Transforms  []Transform      `yaml:"transforms,omitempty" json:"transforms,omitempty"`
+	Links       []PipelineLink   `yaml:"links,omitempty" json:"links,omitempty"`
+	Settings    PipelineSettings `yaml:"settings,omitempty" json:"settings,omitzero"`
 
 	src *source
 }
+
+// PipelineSettings control the execution of a pipeline as a whole (KONZEPT, chapter 6.2).
+type PipelineSettings struct {
+	// BufferSize is the number of records a link holds before the transform before it
+	// waits (backpressure); 0: 10000.
+	BufferSize int `yaml:"bufferSize,omitempty" json:"bufferSize,omitempty"`
+	// BatchSize is the number of records passed over a link at once; 0: 500.
+	BatchSize int `yaml:"batchSize,omitempty" json:"batchSize,omitempty"`
+	// Strict requires a closed schema on every link; warnings about unknown fields
+	// become errors (ADR 0007).
+	Strict bool `yaml:"strict,omitempty" json:"strict,omitempty"`
+}
+
+// Limits of the settings, so that a typo does not take all memory.
+const (
+	MaxBatchSize  = 100_000
+	MaxBufferSize = 10_000_000
+	MaxCopies     = 64
+)
+
+// Distribution modes of a transform with several outgoing data links.
+const (
+	// DistributeCopy passes every record to every data link (the default).
+	DistributeCopy = "copy"
+	// DistributeRoundRobin passes each record to one data link, in turn.
+	DistributeRoundRobin = "distribute"
+)
 
 // Transform is a step of a pipeline.
 type Transform struct {
@@ -35,6 +63,12 @@ type Transform struct {
 	Type string `yaml:"type" json:"type"`
 	// With is the type-specific configuration of the transform.
 	With map[string]any `yaml:"with,omitempty" json:"with,omitempty"`
+	// Copies is the number of instances that run in parallel, sharing the incoming
+	// records; 0: 1.
+	Copies int `yaml:"copies,omitempty" json:"copies,omitempty"`
+	// Distribution is copy (default) or distribute: how records are passed to several
+	// outgoing data links.
+	Distribution string `yaml:"distribution,omitempty" json:"distribution,omitempty"`
 }
 
 // LinkType is the kind of a pipeline link.
@@ -111,6 +145,24 @@ func (p *Pipeline) validate() error {
 		case !actionTypePattern.MatchString(t.Type):
 			add(path+".type", `%s: invalid type %q (expected "<namespace>.<name>", e.g. "csv.input")`, label, t.Type)
 		}
+		if t.Copies < 0 || t.Copies > MaxCopies {
+			add(path+".copies", "%s: copies must be between 1 and %d", label, MaxCopies)
+		}
+		switch t.Distribution {
+		case "", DistributeCopy, DistributeRoundRobin:
+		default:
+			add(path+".distribution", "%s: invalid distribution %q (expected copy or distribute)", label, t.Distribution)
+		}
+	}
+	st := p.Settings
+	if st.BatchSize < 0 || st.BatchSize > MaxBatchSize {
+		add("$.settings.batchSize", "settings.batchSize must be between 1 and %d", MaxBatchSize)
+	}
+	if st.BufferSize < 0 || st.BufferSize > MaxBufferSize {
+		add("$.settings.bufferSize", "settings.bufferSize must be between 1 and %d", MaxBufferSize)
+	}
+	if st.BatchSize > 0 && st.BufferSize > 0 && st.BufferSize < st.BatchSize {
+		add("$.settings.bufferSize", "settings.bufferSize (%d) must be at least settings.batchSize (%d)", st.BufferSize, st.BatchSize)
 	}
 
 	for i, l := range p.Links {

@@ -608,3 +608,143 @@ links:
 		t.Errorf("diags:\n%s", got)
 	}
 }
+
+func TestRunCopies(t *testing.T) {
+	body := `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1000, rowNumberField: n } }
+  - id: even
+    type: core.filter
+    copies: 4
+    with: { condition: "{{ record.n % 2 == 0 }}" }
+  - { id: out, type: test.collect }
+links:
+  - { from: gen, to: even }
+  - { from: even, to: out }
+`
+	res, c, events := run(context.Background(), t, body, nil)
+	if res.Status != Succeeded {
+		t.Fatalf("%s: %v", res.Status, res.Err)
+	}
+	// The copies share the records: each is filtered once, in any order.
+	seen := map[int64]bool{}
+	for _, rec := range c.recs["out"] {
+		n, _ := rec.Get("n")
+		if seen[n.(int64)] || n.(int64)%2 != 0 {
+			t.Fatalf("record %d twice or not even", n)
+		}
+		seen[n.(int64)] = true
+	}
+	if len(seen) != 500 || res.Counts["even"] != (Counts{Read: 1000, Written: 500}) {
+		t.Errorf("%d records, counts %+v", len(seen), res.Counts["even"])
+	}
+	// One event per transform, whatever the number of copies; each copy logs on its own.
+	started, logs := 0, 0
+	for _, e := range events {
+		if e.TransformID == "even" && e.Kind == TransformStarted {
+			started++
+		}
+		if e.TransformID == "even" && e.Kind == Log {
+			logs++
+		}
+	}
+	if started != 1 || logs != 4 {
+		t.Errorf("started %d, logs %d; want 1 and 4", started, logs)
+	}
+}
+
+func TestRunCopyFailureStopsAll(t *testing.T) {
+	body := `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 100, rowNumberField: n, fields: [{ name: s, value: a }] } }
+  - id: check
+    type: core.filter
+    copies: 3
+    with: { condition: "{{ record.n > 50 && record.s > 1 }}" }
+links:
+  - { from: gen, to: check }
+`
+	res, _, _ := run(context.Background(), t, body, nil)
+	if res.Status != Failed || !strings.Contains(res.Err.Error(), `transform "check": record`) || !strings.Contains(res.Err.Error(), "invalid operation: string > int") {
+		t.Errorf("%s: %v", res.Status, res.Err)
+	}
+}
+
+func TestRunDistribute(t *testing.T) {
+	body := `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 9, rowNumberField: n } }
+  - { id: split, type: core.dummy, distribution: distribute }
+  - { id: a, type: test.collect }
+  - { id: b, type: test.collect }
+  - { id: c, type: test.collect }
+  - { id: errs, type: test.collect }
+links:
+  - { from: gen, to: split }
+  - { from: split, to: a }
+  - { from: split, to: b }
+  - { from: split, to: c }
+`
+	res, c, _ := run(context.Background(), t, body, nil)
+	if res.Status != Succeeded {
+		t.Fatalf("%s: %v", res.Status, res.Err)
+	}
+	// In turn: a gets 1, 4, 7; b 2, 5, 8; c 3, 6, 9 – each record once.
+	for target, want := range map[string]string{"a": "[1 4 7]", "b": "[2 5 8]", "c": "[3 6 9]"} {
+		var ns []int64
+		for _, rec := range c.recs[target] {
+			n, _ := rec.Get("n")
+			ns = append(ns, n.(int64))
+		}
+		if fmt.Sprint(ns) != want {
+			t.Errorf("%s: %v, want %s", target, ns, want)
+		}
+	}
+	if res.Counts["split"] != (Counts{Read: 9, Written: 9}) {
+		t.Errorf("counts %+v", res.Counts["split"])
+	}
+}
+
+func TestPrepareSettingsAndCopies(t *testing.T) {
+	c := &collected{recs: map[string][]record.Record{}}
+	p := parse(t, `settings: { batchSize: 50, bufferSize: 200 }
+transforms:
+  - { id: gen, type: core.generate-rows, copies: 2, with: { rows: 1 } }
+`)
+	diags := Check(p, Options{Registry: testRegistry(c)})
+	if len(diags) != 1 || !strings.Contains(diags[0].Error(), `test.pipeline.yaml:6:50: transform "gen": core.generate-rows cannot run in several copies`) {
+		t.Errorf("copies of an input: %v", diags)
+	}
+	p = parse(t, "settings: { batchSize: 50, bufferSize: 200 }\ntransforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 1 } }\n")
+	r, err := Prepare(p, Options{Registry: testRegistry(c)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.opts.BatchSize != 50 || r.opts.BufferSize != 200 {
+		t.Errorf("batch %d, buffer %d", r.opts.BatchSize, r.opts.BufferSize)
+	}
+}
+
+func TestPrepareStrict(t *testing.T) {
+	c := &collected{recs: map[string][]record.Record{}}
+	body := `settings: { strict: true }
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: open, type: test.open }
+  - { id: log, type: core.log, with: { fields: [n, m] } }
+links:
+  - { from: gen, to: open }
+  - { from: open, to: log }
+`
+	got := Check(parse(t, body), Options{Registry: testRegistry(c)}).Error()
+	for _, want := range []string{
+		`test.pipeline.yaml:7:7: transform "open": the fields of its records are not all known, but settings.strict requires it`,
+		`transform "log": field "m" does not exist in the incoming records`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	// Without strict mode: only a warning for m.
+	diags := Check(parse(t, strings.Replace(body, "strict: true", "strict: false", 1)), Options{Registry: testRegistry(c)})
+	if len(diags) != 1 || diags.HasErrors() {
+		t.Errorf("not strict: %v", diags)
+	}
+}

@@ -1,0 +1,16 @@
+# Invalid copies, distribution and settings (S17c).
+kind: Pipeline
+apiVersion: runnel/v1
+name: settings
+settings:
+  batchSize: 1000
+  bufferSize: 500
+transforms:
+  - id: a
+    type: core.dummy
+    copies: 100
+  - id: b
+    type: core.dummy
+    distribution: random
+links:
+  - { from: a, to: b }

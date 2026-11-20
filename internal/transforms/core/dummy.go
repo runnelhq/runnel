@@ -10,6 +10,7 @@ import (
 
 // core.dummy passes all records on unchanged, e.g. as a collection point of branches.
 var dummyDefinition = transform.Definition{
+	Parallel:    true,
 	Type:        "core.dummy",
 	Category:    transform.CategoryFlow,
 	Label:       "Dummy",

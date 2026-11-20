@@ -55,6 +55,7 @@ func (t *upper) Process(ctx context.Context, in <-chan transform.Batch, out *tra
 | Records | geordnete Felder (`internal/record`): `Get`, `Set`, `Delete`, `Clone`; Namen mit `_` sind für Metadaten reserviert ([ADR 0007](../adr/0007-typsystem-pipelines.md)). Werte in der Go-Darstellung ihres Typs: `string`, `int64`, `decimal.Decimal`, `float64`, `bool`, `record.Date`, `time.Time`, `[]byte`, `map[string]any`/`[]any`; fremde Werte mit `record.Normalize` umwandeln |
 | Log | `out.Logf`: `Info` für Ergebnisse, `Debug` für Details; bei großen Datenmengen nie je Record auf `Info` |
 | Zustand | Ein Transform-Objekt läuft in genau einer Goroutine; Zustand im Objekt ist erlaubt, globaler nicht |
+| Kopien | Mit `Parallel: true` in der Definition darf der Transform mit `copies: n` laufen: die Engine erzeugt n Objekte (je `New` und `Init`), die sich die Eingabe teilen. Nur setzen, wenn jeder Record für sich verarbeitet wird und nichts doppelt gelesen oder geschrieben wird (nicht bei Ein- und Ausgaben) |
 
 ## 3. Schema (`Init`)
 

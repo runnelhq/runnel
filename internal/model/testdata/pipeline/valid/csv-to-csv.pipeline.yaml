@@ -17,12 +17,19 @@ transforms:
       delimiter: ";"
   - id: only-active
     type: core.filter
+    copies: 4
+    distribution: copy
     with:
       condition: "{{ record.sales > params.MIN_SALES }}"
   - id: write
     type: csv.output
     with:
       path: active.csv
+    copies: 1
 links:
   - { from: read, to: only-active }
   - { from: only-active, to: write, type: data }
+settings:
+  bufferSize: 20000
+  batchSize: 1000
+  strict: false

@@ -23,7 +23,10 @@ type InitContext struct {
 	In record.Schema
 	// Targets are the ids of the transforms the data links of the transform lead to,
 	// in the order of the links (for Output.EmitTo).
-	Targets  []string
+	Targets []string
+	// Strict is set in the strict mode of a pipeline (ADR 0007): a field that is not
+	// known is an error also in an open schema.
+	Strict   bool
 	problems []Problem
 }
 
@@ -53,11 +56,11 @@ func (ic *InitContext) Use(name, path string) {
 		return
 	}
 	names := ic.In.Names()
-	if ic.In.Open && len(names) == 0 {
+	if ic.In.Open && len(names) == 0 && !ic.Strict {
 		return
 	}
 	hint := model.Suggest(name, names)
-	if !ic.In.Open {
+	if !ic.In.Open || ic.Strict {
 		known := "none"
 		if len(names) > 0 {
 			known = strings.Join(names, ", ")

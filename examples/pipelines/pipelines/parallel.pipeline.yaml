@@ -1,0 +1,43 @@
+# Parallel copies and distribution (roadmap S17c). Run it with:
+#   runnel run examples/pipelines/pipelines/parallel.pipeline.yaml
+#   runnel run --param ROWS=10000000 examples/pipelines/pipelines/parallel.pipeline.yaml
+# - "check" runs in 4 copies that share the records; the order of the records is no
+#   longer fixed after it. Inputs and outputs cannot run in copies.
+# - "split" passes the records in turn to "left" and "right" (distribute) instead of
+#   giving every record to both (copy, the default).
+# - settings: larger batches and buffers; strict mode requires that the fields of all
+#   links are known, so a typo in a field name is always an error.
+kind: Pipeline
+apiVersion: runnel/v1
+name: parallel
+parameters:
+  - name: ROWS
+    type: integer
+    default: "100000"
+settings:
+  batchSize: 1000
+  bufferSize: 50000
+  strict: true
+transforms:
+  - id: numbers
+    type: core.generate-rows
+    with:
+      rows: ${ROWS}
+      rowNumberField: n
+  - id: check
+    type: core.filter
+    copies: 4
+    with:
+      condition: "{{ record.n % 3 == 0 }}"
+  - id: split
+    type: core.dummy
+    distribution: distribute
+  - id: left
+    type: core.dummy
+  - id: right
+    type: core.dummy
+links:
+  - { from: numbers, to: check }
+  - { from: check, to: split }
+  - { from: split, to: left }
+  - { from: split, to: right }

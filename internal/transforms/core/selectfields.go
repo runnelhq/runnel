@@ -13,6 +13,7 @@ import (
 // core.select-fields keeps the listed fields (in this order, optionally renamed) or
 // removes the listed fields.
 var selectFieldsDefinition = transform.Definition{
+	Parallel:    true,
 	Type:        "core.select-fields",
 	Category:    transform.CategoryTransform,
 	Label:       "Select Fields",

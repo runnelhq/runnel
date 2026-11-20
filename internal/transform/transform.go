@@ -146,6 +146,10 @@ type Definition struct {
 	// RecordErrors is set for transforms that pass records they cannot process to an
 	// error link (Output.Fail); an error link from another transform is never used.
 	RecordErrors bool
+	// Parallel is set for transforms that can run in several copies at once (copies: n)
+	// because each record is handled on its own; not for inputs and outputs, which would
+	// read or write twice.
+	Parallel bool
 }
 
 // Descriptor describes a transform type for the editor, the API and tools (ADR 0014).
@@ -158,6 +162,8 @@ type Descriptor struct {
 	Schema      *schema.Schema `json:"schema"`
 	// RecordErrors: the transform can pass records to an error link (Definition.RecordErrors).
 	RecordErrors bool `json:"recordErrors,omitempty"`
+	// Parallel: the transform can run in several copies (Definition.Parallel).
+	Parallel bool `json:"parallel,omitempty"`
 }
 
 // Registry holds the available transform types.
@@ -188,7 +194,7 @@ func (r *Registry) Register(d Definition) {
 		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
 	}
 	r.defs[d.Type] = d
-	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, RecordErrors: d.RecordErrors}
+	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, RecordErrors: d.RecordErrors, Parallel: d.Parallel}
 }
 
 // Lookup returns the definition of a transform type.

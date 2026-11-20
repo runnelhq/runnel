@@ -1,5 +1,5 @@
-# copies and onError are not part of the format (copies with S17; errors via links).
-# Both are reported, in the order of the file.
+# onError and parallel are not part of the format (errors via links, parallel
+# instances with copies). Both are reported, in the order of the file.
 kind: Pipeline
 apiVersion: runnel/v1
 name: later
@@ -7,4 +7,4 @@ transforms:
   - id: call
     type: http.request
     onError: error-link
-    copies: 4
+    parallel: 4

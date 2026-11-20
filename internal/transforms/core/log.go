@@ -16,6 +16,7 @@ import (
 
 // core.log writes records to the run log and passes them on unchanged.
 var logDefinition = transform.Definition{
+	Parallel:    true,
 	Type:        "core.log",
 	Category:    transform.CategoryOutput,
 	Label:       "Log",
