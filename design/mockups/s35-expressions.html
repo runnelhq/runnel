@@ -1,0 +1,754 @@
+<!doctype html>
+<!--
+  Mockup S35 – Expression editor: text fields of the properties panel (E7) and link
+  conditions become small code editors with highlighting of ${…} and {{ … }},
+  autocomplete for the context (params, vars, env, run, result, results), the fields
+  of results and the functions, signature help, and errors at the exact position.
+  A larger editor with a reference opens with ⤢. Builds on the approved mockups E5–E8.
+  Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                             (default light)
+    state = complete | functions | error | condition | expanded      (default complete)
+    controls = 0                                        hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runnel – expressions</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5;
+    color: var(--foreground); background: var(--background); -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  code, .mono { font-family: var(--rn-font-mono); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
+          stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (as approved in mockup E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 248px 1fr; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4);
+           border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border);
+               border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent;
+                      padding: 3px 8px; border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs);
+                      color: var(--muted-foreground); cursor: pointer; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { background: var(--sidebar); color: var(--sidebar-foreground); border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; height: 36px; padding: 0 16px; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .k { color: var(--muted-foreground); }
+  .row.selected .k { color: var(--accent-foreground); }
+  .row .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); }
+  .badge svg.i { width: 12px; height: 12px; }
+  .badge.err { background: var(--danger-soft); color: var(--destructive); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; }
+  .btn svg.i { width: 14px; height: 14px; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+
+  /* Canvas (design/README.md, 6.1 "Canvas-Konventionen") */
+  .canvas {
+    position: relative; flex: 1; overflow: hidden; background-color: var(--canvas);
+    background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1.2px);
+    background-size: 16px 16px;
+  }
+  .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  svg.edges { position: absolute; left: 0; top: 0; overflow: visible; }
+  .edge { fill: none; stroke-width: 2; }
+  .edge.success { stroke: var(--link-success); }
+  .edge.failure { stroke: var(--link-failure); }
+  .edge.always { stroke: var(--link-always); }
+  .edge.expression { stroke: var(--link-expression); }
+  .edge.disabled { stroke: var(--link-disabled); stroke-dasharray: 5 4; }
+  .edge-label {
+    position: absolute; transform: translate(-50%, -50%);
+    display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: var(--rn-radius-full); background: var(--card); border: 1.5px solid currentColor;
+    font-size: 11px; font-weight: 700; line-height: 1;
+  }
+  .edge-label.success { color: var(--link-success); }
+  .edge-label.failure { color: var(--link-failure); }
+  .edge-label.always { color: var(--link-always); }
+  .edge-label.expression { color: var(--link-expression); }
+
+  .node {
+    position: absolute; width: 176px; height: 52px; display: flex; align-items: center; gap: 10px;
+    padding: 0 12px 0 10px; background: var(--node); border: 1px solid var(--node-border);
+    border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-sm);
+  }
+  .node.selected { outline: 2px solid var(--node-selected); outline-offset: 1px; }
+  .node.has-error { border-color: var(--destructive); }
+  .node.has-warning { border-color: var(--warning); }
+  .tile { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-allgemein); color: var(--rn-tiefe-0); flex: none; }
+  .tile.unknown { background: var(--rn-tiefe-300); color: var(--rn-tiefe-800); }
+  .node .text { min-width: 0; line-height: 1.25; }
+  .node .id { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .type { font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .port { position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+          background: var(--node); border: 1.5px solid var(--node-border); }
+  .port.in { left: -5px; }
+  .port.out { right: -5px; }
+  .marker { position: absolute; top: -9px; right: -9px; display: grid; place-items: center; width: 20px; height: 20px;
+            border-radius: 50%; font-size: 11px; font-weight: 700; color: var(--rn-tiefe-0); box-shadow: var(--rn-shadow-sm); }
+  .marker.err { background: var(--destructive); }
+  .marker.warn { background: var(--rn-warnung-600); }
+  .join { position: absolute; left: -2px; top: -22px; padding: 0 6px; height: 18px; display: inline-flex; align-items: center;
+          border-radius: var(--rn-radius-sm); border: 1px solid var(--border); background: var(--card);
+          font: 500 10px/1 var(--rn-font-mono); color: var(--muted-foreground); }
+
+  .popover {
+    position: absolute; width: 288px; padding: 12px 14px; background: var(--popover); color: var(--popover-foreground);
+    border: 1px solid var(--border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md);
+    font-size: var(--rn-text-xs);
+  }
+  .popover h4 { margin: 0 0 6px; font-size: var(--rn-text-xs); font-weight: 600; }
+  .problem { display: grid; grid-template-columns: 16px 1fr; gap: 6px; margin-top: 6px; }
+  .problem .sym.err { color: var(--destructive); }
+  .problem .sym.warn { color: var(--warning); }
+  .problem .where { font-family: var(--rn-font-mono); color: var(--muted-foreground); }
+
+  .controls-panel { position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column;
+                    background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-md);
+                    box-shadow: var(--rn-shadow-sm); overflow: hidden; }
+  .controls-panel button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; background: transparent;
+                           color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+  .controls-panel button:last-child { border-bottom: 0; }
+  .zoom { position: absolute; left: 56px; bottom: 16px; height: 22px; padding: 0 8px; display: inline-flex; align-items: center;
+          background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-sm);
+          font: 11px var(--rn-font-mono); color: var(--muted-foreground); }
+  .hint { position: absolute; right: 16px; top: 16px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+          background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-full);
+          font-size: var(--rn-text-xs); color: var(--muted-foreground); box-shadow: var(--rn-shadow-sm); }
+  .hint svg.i { width: 14px; height: 14px; }
+
+  .blocked { position: absolute; inset: 0; display: grid; place-items: center; }
+  .blocked .box { max-width: 440px; text-align: center; background: var(--card); border: 1px solid var(--border);
+                  border-radius: var(--rn-radius-xl); padding: 24px 28px; box-shadow: var(--rn-shadow-md); }
+  .blocked .symbol { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+                     background: var(--danger-soft); color: var(--destructive); font-size: var(--rn-text-lg); font-weight: 700; }
+  .blocked h2 { font-size: var(--rn-text-md); margin: 12px 0 4px; }
+  .blocked p { color: var(--muted-foreground); margin: 0 0 12px; }
+  .blocked pre { text-align: left; margin: 0 0 16px; padding: 8px 10px; border-radius: var(--rn-radius-md);
+                 background: var(--muted); font-size: var(--rn-text-xs); white-space: pre-wrap; }
+
+  /* Creating (E6b) */
+  aside.split { display: flex; flex-direction: column; min-height: 0; }
+  aside.split .tree { flex: none; }
+  .palette { margin-top: 8px; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; min-height: 0; }
+  .search { display: flex; align-items: center; gap: 6px; margin: 0 12px 8px; height: 28px; padding: 0 8px;
+            border: 1px solid var(--input); border-radius: var(--rn-radius-md); background: var(--background); color: var(--muted-foreground); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--foreground); }
+  .search kbd { font: 10px var(--rn-font-mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
+  .palette .group { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 16px; font-weight: 600; font-size: var(--rn-text-xs); }
+  .palette .group .count { margin-left: auto; }
+  .items { list-style: none; margin: 0; padding: 0 8px; }
+  .item { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: var(--rn-radius-md); cursor: grab; }
+  .item:hover, .item.dragging { background: var(--sidebar-accent); }
+  .item.dragging { outline: 1px dashed var(--node-selected); }
+  .item.disabled { opacity: .45; cursor: not-allowed; }
+  .item .tile { width: 22px; height: 22px; border-radius: var(--rn-radius-sm); }
+  .item .tile svg.i { width: 13px; height: 13px; }
+  .item .t { line-height: 1.2; }
+  .item .t small { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .palette-hint { margin: 8px 16px; font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .ghost { position: absolute; opacity: .7; border-style: dashed !important; border-color: var(--node-selected) !important; box-shadow: var(--rn-shadow-md); pointer-events: none; }
+  .cursor { position: absolute; width: 18px; height: 18px; pointer-events: none; color: var(--foreground); }
+  .rename { width: 104px; height: 22px; margin: -2px 0 0 -4px; padding: 0 4px; font: 600 var(--rn-text-sm) var(--rn-font-sans);
+            color: var(--foreground); background: var(--background); border: 1px solid var(--ring); border-radius: var(--rn-radius-sm); outline: 2px solid color-mix(in srgb, var(--ring) 25%, transparent); }
+  .field-hint { position: absolute; font-size: var(--rn-text-2xs); color: var(--muted-foreground); background: var(--card); border: 1px solid var(--border);
+                border-radius: var(--rn-radius-sm); padding: 2px 6px; white-space: nowrap; box-shadow: var(--rn-shadow-sm); }
+  .edge.preview { stroke-dasharray: 6 4; }
+  .port.target { width: 14px; height: 14px; margin-top: -7px; left: -8px; border: 2px solid var(--node-selected); background: var(--accent); }
+  .port.source { border-color: var(--node-selected); background: var(--node-selected); }
+  .edge.selected { stroke-width: 3.5; }
+  .edge-label.selected { outline: 2px solid var(--node-selected); outline-offset: 2px; }
+  .menu { position: absolute; width: 196px; padding: 4px; background: var(--popover); color: var(--popover-foreground);
+          border: 1px solid var(--border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-sm); }
+  .menu .mi { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: var(--rn-radius-sm); }
+  .menu .mi.active { background: var(--accent); color: var(--accent-foreground); }
+  .menu .mi .sym { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font-size: 10px; font-weight: 700; background: var(--card); }
+  .menu .mi .k { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+  .menu .danger { color: var(--destructive); }
+
+  /* Editing (E6a) */
+  .tab .dirty { width: 18px; text-align: center; color: var(--foreground); font-size: 10px; }
+  .icon-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--input);
+              border-radius: var(--rn-radius-md); background: var(--background); color: var(--foreground); }
+  .icon-btn[disabled] { color: var(--muted-foreground); opacity: .5; }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn kbd { font: 10px var(--rn-font-mono); opacity: .75; }
+  .group { display: inline-flex; gap: 4px; }
+  footer .dirty { color: var(--foreground); }
+  .node { cursor: grab; }
+  .node.moved { box-shadow: var(--rn-shadow-md); }
+  .toast { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: inline-flex; align-items: center;
+           gap: 12px; height: 36px; padding: 0 6px 0 14px; background: var(--card); color: var(--card-foreground);
+           border: 1px solid var(--border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-sm); }
+  .toast .btn { height: 26px; }
+  .overlay { position: fixed; inset: 0; background: rgb(14 21 29 / .45); display: grid; place-items: center; z-index: 10; }
+  .dialog { width: 480px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border);
+            border-radius: var(--rn-radius-xl); box-shadow: var(--rn-shadow-lg); padding: 20px 24px; }
+  .dialog h2 { margin: 0 0 8px; font-size: var(--rn-text-md); display: flex; align-items: center; gap: 10px; }
+  .dialog h2 .sym { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+                    background: var(--warning-soft); color: var(--warning); font-size: 14px; }
+  .dialog p { margin: 0 0 10px; color: var(--muted-foreground); }
+  .dialog ul { margin: 0 0 16px; padding-left: 18px; color: var(--muted-foreground); }
+  .dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .btn.danger { color: var(--destructive); border-color: var(--destructive); }
+
+    /* Properties (E7) */
+  .filebar .crumbs, .filebar .badge { white-space: nowrap; }
+  .input { white-space: nowrap; overflow: hidden; }
+  .body { grid-template-columns: 248px 1fr 320px; }
+  .work { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .props { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--background); }
+  .props .panel-title { justify-content: space-between; padding-right: 8px; border-bottom: 1px solid var(--border); flex: none; }
+  .props-scroll { overflow: auto; flex: 1; padding: 0 0 16px; }
+  .ph { display: flex; gap: 10px; align-items: center; padding: 14px 16px 6px; }
+  .ph .tile { width: 32px; height: 32px; }
+  .ph h3 { margin: 0; font-size: var(--rn-text-base); font-weight: 600; line-height: 1.2; }
+  .ph .t { font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .ph-desc { margin: 0 16px 8px; color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .section { border-top: 1px solid var(--border); margin-top: 8px; }
+  .section > h4 { display: flex; align-items: center; gap: 6px; margin: 0; height: 34px; padding: 0 16px;
+                  font-size: var(--rn-text-xs); font-weight: 600; }
+  .section > h4 .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .section > h4 .sum { margin-left: auto; font-weight: 400; color: var(--muted-foreground); font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); }
+  .field { padding: 0 16px; margin-bottom: 12px; }
+  .field > label { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; font-size: var(--rn-text-xs); font-weight: 500; }
+  .field > label .req { color: var(--destructive); }
+  .field > label .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); font-weight: 400; }
+  .input { display: flex; align-items: center; width: 100%; min-height: 30px; padding: 0 8px; border: 1px solid var(--input);
+           border-radius: var(--rn-radius-md); background: var(--background); color: var(--foreground); font: inherit; }
+  .input.mono { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); }
+  .input.placeholder { color: var(--muted-foreground); }
+  .input.area { align-items: flex-start; min-height: 64px; padding: 6px 8px; white-space: pre-wrap; }
+  .input.focus { border-color: var(--ring); outline: 2px solid color-mix(in srgb, var(--ring) 25%, transparent); }
+  .input.invalid { border-color: var(--destructive); outline: 2px solid var(--danger-soft); }
+  .input.disabled { background: var(--muted); color: var(--muted-foreground); }
+  .input .caret { width: 1px; height: 15px; background: var(--foreground); margin-left: 1px; }
+  .input .var { color: var(--expression); }
+  .select { justify-content: space-between; }
+  .select svg.i { width: 14px; height: 14px; color: var(--muted-foreground); }
+  .help { margin-top: 4px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .help.err { color: var(--destructive); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .check { display: flex; align-items: flex-start; gap: 8px; font-size: var(--rn-text-xs); }
+  .check .box { flex: none; width: 16px; height: 16px; margin-top: 1px; border: 1px solid var(--input); border-radius: var(--rn-radius-sm);
+                display: grid; place-items: center; background: var(--background); font-size: 11px; color: var(--primary-foreground); }
+  .check .box.on { background: var(--primary); border-color: var(--primary); }
+  .check small { display: block; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .seg { display: flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .seg button { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 5px; border: 0; background: transparent;
+                padding: 3px 6px; border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .seg button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .seg button[disabled] { opacity: .5; }
+  .seg .sym { font-weight: 700; font-size: 11px; }
+  .note { margin: 0 16px 12px; padding: 8px 10px; border-radius: var(--rn-radius-md); background: var(--muted);
+          font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .readonly { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); }
+  .list { margin: 0 16px 12px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); }
+  .list .li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: var(--rn-text-xs); }
+  .list .li:last-child { border-bottom: 0; }
+  .list .li small { grid-column: 1 / -1; color: var(--muted-foreground); font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); }
+
+  /* Problems panel below the canvas */
+  .bottom { flex: none; border-top: 1px solid var(--border); background: var(--background); }
+  .bottom .tabs2 { display: flex; align-items: center; height: 32px; padding: 0 8px; gap: 2px; }
+  .bottom .tabs2 .t2 { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--rn-radius-sm);
+                       font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .bottom .tabs2 .t2.active { background: var(--muted); color: var(--foreground); font-weight: 500; }
+  .bottom .tabs2 .n { display: inline-grid; place-items: center; min-width: 18px; height: 16px; padding: 0 5px; border-radius: var(--rn-radius-full);
+                      font-size: 10px; font-weight: 600; background: var(--danger-soft); color: var(--destructive); }
+  .bottom .tabs2 .n.warn { background: var(--warning-soft); color: var(--warning); }
+  .bottom .tabs2 .collapse { margin-left: auto; color: var(--muted-foreground); }
+  .ptable { border-top: 1px solid var(--border); height: 132px; overflow: auto; font-size: var(--rn-text-xs); }
+  .prow { display: grid; grid-template-columns: 20px 1fr 150px 90px; align-items: center; gap: 8px; height: 30px; padding: 0 12px;
+          border-bottom: 1px solid var(--border); }
+  .prow.sel { background: var(--accent); color: var(--accent-foreground); }
+  .prow .sym.err { color: var(--destructive); font-weight: 700; }
+  .prow .sym.warn { color: var(--warning); font-weight: 700; }
+  .prow .where, .prow .line { font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .prow.sel .where, .prow.sel .line { color: inherit; }
+  .phead { color: var(--muted-foreground); font-size: var(--rn-text-2xs); height: 24px; background: var(--muted); }
+  .field.flash .input { box-shadow: 0 0 0 3px var(--danger-soft); }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+
+  /* Expression editor (S35) */
+  .ed { position: relative; display: block; width: 100%; min-height: 30px; padding: 6px 30px 6px 8px; border: 1px solid var(--input);
+        border-radius: var(--rn-radius-md); background: var(--background); color: var(--foreground);
+        font: var(--rn-text-xs)/1.55 var(--rn-font-mono); white-space: pre-wrap; word-break: break-word; }
+  .ed.area { min-height: 56px; }
+  .ed.focus { border-color: var(--ring); outline: 2px solid color-mix(in srgb, var(--ring) 25%, transparent); }
+  .ed.invalid { border-color: var(--destructive); outline: 2px solid var(--danger-soft); }
+  .ed .caret { display: inline-block; width: 1px; height: 14px; margin: 0 0 -2px 0; background: var(--foreground); }
+  .ed .expand { position: absolute; right: 4px; top: 4px; display: grid; place-items: center; width: 22px; height: 22px;
+                border-radius: var(--rn-radius-sm); color: var(--muted-foreground); font-size: 13px; }
+  .ed .expand:hover { background: var(--muted); }
+  /* Tokens: the whole ${…} / {{ … }} in the expression colour (decision E4), inside them roots, functions, strings and numbers. */
+  .tk-x { background: var(--expression-soft); border-radius: 3px; }
+  .tk-b { color: var(--expression); font-weight: 600; }
+  .tk-v { color: var(--expression); }
+  .tk-root { color: var(--expression); font-weight: 600; }
+  .tk-fn { color: var(--rn-strom-700); }
+  [data-theme="dark"] .tk-fn { color: var(--rn-strom-300); }
+  .tk-str { color: var(--code-string); }
+  .tk-num { color: var(--code-number, var(--code-string)); }
+  .tk-op { color: var(--muted-foreground); }
+  .tk-err { text-decoration: underline wavy var(--destructive); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+  .tk-match { outline: 1px solid var(--expression); border-radius: 2px; }
+
+  .complete { position: absolute; z-index: 5; display: flex; align-items: flex-start; gap: 6px; }
+  .clist { width: 272px; padding: 4px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border);
+           border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); }
+  .ci { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 6px; height: 26px; padding: 0 6px; border-radius: var(--rn-radius-sm); }
+  .ci.active { background: var(--accent); color: var(--accent-foreground); }
+  .ci .kind { display: grid; place-items: center; width: 18px; height: 18px; border-radius: var(--rn-radius-sm); font: 600 10px var(--rn-font-mono);
+              background: var(--expression-soft); color: var(--expression); }
+  .ci .kind.fn { background: var(--secondary); color: var(--secondary-foreground); }
+  .ci .name { font-family: var(--rn-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ci .name b { color: var(--expression); }
+  .ci .t { font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .ci.active .t { color: inherit; opacity: .8; }
+  .cfoot { display: flex; gap: 10px; padding: 5px 6px 2px; margin-top: 2px; border-top: 1px solid var(--border); font-size: 10px; color: var(--muted-foreground); }
+  .cfoot kbd { font: 10px var(--rn-font-mono); padding: 0 3px; border: 1px solid var(--border); border-radius: 3px; }
+  .cdoc { width: 252px; padding: 10px 12px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border);
+          border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); }
+  .cdoc .sig { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); margin-bottom: 6px; }
+  .cdoc .sig .cur { color: var(--expression); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .cdoc p { margin: 0 0 6px; color: var(--muted-foreground); }
+  .cdoc pre { margin: 0; padding: 6px 8px; border-radius: var(--rn-radius-md); background: var(--muted); font: var(--rn-text-2xs)/1.5 var(--rn-font-mono); white-space: pre-wrap; }
+  .cdoc .pat { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-size: var(--rn-text-2xs); }
+  .cdoc .pat code { color: var(--expression); }
+  .sighelp { width: 300px; padding: 8px 10px; background: var(--popover); color: var(--popover-foreground);
+             border: 1px solid var(--border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); }
+  .tip { min-width: 220px; max-width: 300px; padding: 7px 10px; background: var(--popover); color: var(--popover-foreground);
+         border: 1px solid var(--border); border-radius: var(--rn-radius-md); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); }
+  .tip .k { font-family: var(--rn-font-mono); color: var(--expression); font-weight: 600; }
+  .tip small { display: block; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .fix { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding: 0 6px; height: 18px; border-radius: var(--rn-radius-sm);
+         border: 1px solid var(--border); background: var(--background); color: var(--foreground); font-size: var(--rn-text-2xs); }
+  .xhint { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .xhint kbd { font: 10px var(--rn-font-mono); padding: 0 3px; border: 1px solid var(--border); border-radius: 3px; }
+
+  /* Larger editor */
+  .xdialog { width: 860px; height: 520px; display: grid; grid-template-rows: auto 1fr auto; background: var(--popover); color: var(--popover-foreground);
+             border: 1px solid var(--border); border-radius: var(--rn-radius-xl); box-shadow: var(--rn-shadow-lg); overflow: hidden; }
+  .xdialog .xh { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .xdialog .xh h2 { margin: 0; font-size: var(--rn-text-md); }
+  .xdialog .xh .k { font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .xdialog .xb { display: grid; grid-template-columns: 1fr 280px; min-height: 0; }
+  .xdialog .xe { position: relative; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .xdialog .lines { flex: 1; display: grid; grid-template-columns: 28px 1fr; border: 1px solid var(--ring); border-radius: var(--rn-radius-md);
+                    outline: 2px solid color-mix(in srgb, var(--ring) 25%, transparent); font: var(--rn-text-sm)/1.7 var(--rn-font-mono); overflow: hidden; }
+  .xdialog .ln { padding: 8px 6px 0 0; text-align: right; color: var(--muted-foreground); background: var(--muted); font-size: var(--rn-text-xs); line-height: 1.95; }
+  .xdialog .code { padding: 8px 10px; white-space: pre-wrap; }
+  .xdialog .ref { border-left: 1px solid var(--border); background: var(--sidebar); display: flex; flex-direction: column; min-height: 0; }
+  .xdialog .ref .search { margin: 12px 12px 8px; }
+  .xdialog .ref .rs { overflow: auto; padding: 0 8px 12px; font-size: var(--rn-text-xs); }
+  .xdialog .ref h5 { margin: 10px 8px 4px; font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .xdialog .ref .ri { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 4px 8px; border-radius: var(--rn-radius-sm); }
+  .xdialog .ref .ri:hover, .xdialog .ref .ri.active { background: var(--sidebar-accent); }
+  .xdialog .ref .ri .n { font-family: var(--rn-font-mono); }
+  .xdialog .ref .ri small { grid-column: 1 / -1; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .xdialog .ref .ri .t { font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .xdialog .xf { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+  .xdialog .xf .info { font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .xdialog .xf .ok { color: var(--success); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup S35</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="complete" href="#">complete</a> <a data-state="functions" href="#">functions</a> <a data-state="error" href="#">error</a>
+  <a data-state="condition" href="#">condition</a> <a data-state="expanded" href="#">expanded</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>expressions</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\expressions</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside class="split">
+      <div class="panel-title label">Explorer</div>
+      <ul class="tree" id="tree"></ul>
+      <section class="palette" aria-label="Palette">
+        <div class="panel-title label">Palette</div>
+        <label class="search">
+          <svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+          <input placeholder="Search actions" aria-label="Search actions">
+          <kbd>/</kbd>
+        </label>
+        <div id="groups"></div>
+      </section>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div class="work">
+        <div class="canvas" id="canvas"></div>
+        <div class="bottom" id="bottom"></div>
+      </div>
+    </main>
+    <section class="props" aria-label="Properties" style="position:relative">
+      <div class="panel-title"><span class="label">Properties</span>
+        <button class="icon-btn" style="border:0" title="Hide properties" aria-label="Hide properties">×</button></div>
+      <div class="props-scroll" id="props"></div>
+    </section>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "complete";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+
+  const icons = {
+    "core.start": '<path d="M8 5l11 7-11 7z" fill="currentColor"/>',
+    "core.wait": '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    "core.log": '<path d="M5 6h14M5 12h14M5 18h9"/>',
+    "core.success": '<circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+  };
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const symbols = { success: "✔", failure: "✖", always: "∞", expression: "ƒ" };
+
+  // Highlighting of ${…} and {{ … }} as in the editor fields (simplified tokenizer).
+  const roots = ["params", "vars", "env", "run", "results", "result"];
+  const fns = ["formatDate", "addDays", "addHours", "addMonths", "parseDate", "today", "now", "dayOfWeek", "diffDays",
+               "padLeft", "padRight", "substr", "left", "right", "normalize", "coalesce", "isEmpty", "upper", "lower", "trim", "len"];
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  function code(src) {
+    // markers: ⟦err⟧…⟦/⟧ wavy underline, ⟦m⟧…⟦/⟧ matching bracket, | caret
+    let out = "", i = 0;
+    const inner = s => esc(s)
+      .replace(/'[^']*'?/g, m => `<span class="tk-str">${m}</span>`)
+      .replace(/\b(\d+(\.\d+)?)\b/g, '<span class="tk-num">$1</span>')
+      .replace(new RegExp(`\\b(${fns.join("|")})(?=\\()`, "g"), '<span class="tk-fn">$1</span>')
+      .replace(new RegExp(`(^|[^.\\w])(${roots.join("|")})\\b`, "g"), '$1<span class="tk-root">$2</span>');
+    while (i < src.length) {
+      const a = src.indexOf("{{", i), b = src.indexOf("${", i);
+      const next = [a, b].filter(x => x >= 0).sort((x, y) => x - y)[0];
+      if (next === undefined) { out += esc(src.slice(i)); break; }
+      out += esc(src.slice(i, next));
+      if (next === b) {
+        const e = src.indexOf("}", b); const end = e < 0 ? src.length : e + 1;
+        out += `<span class="tk-x tk-v">${esc(src.slice(b, end))}</span>`; i = end;
+      } else {
+        const e = src.indexOf("}}", a + 2);
+        const end = e < 0 ? src.length : e + 2;
+        const body = src.slice(a + 2, e < 0 ? src.length : e);
+        out += `<span class="tk-x"><span class="tk-b">{{</span>${inner(body)}${e < 0 ? "" : '<span class="tk-b">}}</span>'}</span>`;
+        i = end;
+      }
+    }
+    return out.replace(/⟦err⟧/g, '<span class="tk-err">').replace(/⟦m⟧/g, '<span class="tk-match">').replace(/⟦\/⟧/g, "</span>")
+              .replace(/\|/g, '<span class="caret"></span>');
+  }
+
+  // orders.workflow.yaml from examples/expressions.
+  const wf = {
+    file: "orders.workflow.yaml",
+    nodes: [
+      { id: "start", type: "core.start", x: 40, y: 200 },
+      { id: "check", type: "core.log", x: 280, y: 200 },
+      { id: "many", type: "core.log", x: 540, y: 90 },
+      { id: "few", type: "core.log", x: 540, y: 310 },
+      { id: "done", type: "core.success", x: 800, y: 200, join: "first" },
+    ],
+    edges: [
+      ["start", "check", "success"], ["check", "many", "expression"], ["check", "few", "expression"],
+      ["many", "done", "success"], ["few", "done", "success"],
+    ],
+  };
+  if (state === "condition") wf.edges[1][3] = "selected";
+  else wf.nodes[1].selected = true;
+  if (state === "error") wf.nodes[1].problem = "err";
+
+  const files = [["folder", "workflows", 0, "1"], ["wf", "orders.workflow.yaml", 1], ["proj", "project.yaml", 0]];
+  const kind = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  };
+  document.getElementById("tree").innerHTML = files.map(([k, n, d, c]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === wf.file ? "selected" : ""}">` +
+    (k === "folder" ? chev : `<span style="width:12px"></span>`) +
+    `<span class="k">${icon(kind[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}</div></li>`).join("");
+  document.getElementById("groups").innerHTML = [["General", 6], ["Execution", 1], ["Files", 7]].map(([g, n]) =>
+    `<div class="group">${chevRight}${g} <span class="count">${n}</span></div>`).join("");
+  document.getElementById("tabs").innerHTML =
+    `<div class="tab active" title="Unsaved changes">${icon(kind.wf)} ${wf.file} <span class="dirty">●</span></div>`;
+  const errors = state === "error" ? 1 : 0;
+  document.getElementById("filebar").innerHTML = `
+    <span class="crumbs" title="workflows/${wf.file}"><b>${wf.file}</b></span>
+    <span class="badge">Workflow</span>
+    ${errors ? `<span class="badge err" title="1 error">✖ 1</span>` : ""}
+    <div class="spacer"></div>
+    <div class="group">
+      <button class="icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo">${icon('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>', 14)}</button>
+      <button class="icon-btn" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>${icon('<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>', 14)}</button>
+    </div>
+    <button class="btn" title="Run (F5)">${icon('<path d="M8 5l11 7-11 7z" fill="currentColor"/>', 14)}Run</button>
+    <button class="btn primary" title="Save (Ctrl+S)">${icon('<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/>', 14)}Save</button>
+    <div class="segmented" role="group" aria-label="View">
+      <button aria-pressed="true">${icon(kind.wf, 14)}Canvas</button>
+      <button aria-pressed="false">${icon('<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>', 14)}YAML</button>
+    </div>`;
+  document.getElementById("status").innerHTML =
+    `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>` +
+    `<span>Workflow · ${wf.nodes.length} actions · ${wf.edges.length} links</span>` +
+    `<span class="dirty">● Unsaved changes</span><span class="spacer"></span><span>Runnel v0.3.0</span>`;
+
+  // Canvas.
+  const canvas = document.getElementById("canvas");
+  const W = 176, H = 52, zoom = 0.62;
+  const byId = Object.fromEntries(wf.nodes.map(n => [n.id, n]));
+  const stage = document.createElement("div");
+  stage.className = "stage";
+  stage.style.transform = `translate(8px, 60px) scale(${zoom})`;
+  let svg = `<svg class="edges" width="1100" height="600">`, labels = "";
+  for (const [from, to, type, mark] of wf.edges) {
+    const a = byId[from], b = byId[to];
+    const x1 = a.x + W + 4, y1 = a.y + H / 2, x2 = b.x - 4, y2 = b.y + H / 2;
+    const dx = Math.max(40, (x2 - x1) / 2);
+    svg += `<path class="edge ${type} ${mark ?? ""}" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}"/>`;
+    const t = 0.35, u = 1 - t;
+    const mx = u*u*u*x1 + 3*u*u*t*(x1 + dx) + 3*u*t*t*(x2 - dx) + t*t*t*x2;
+    const my = u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2;
+    labels += `<span class="edge-label ${type} ${mark ?? ""}" style="left:${mx}px;top:${my}px">${symbols[type]}</span>`;
+  }
+  svg += `</svg>`;
+  stage.innerHTML = svg + labels + wf.nodes.map(n => `
+    <div class="node ${n.selected ? "selected" : ""} ${n.problem === "err" ? "has-error" : ""}" style="left:${n.x}px;top:${n.y}px">
+      ${n.join ? `<span class="join">join: ${n.join}</span>` : ""}
+      ${n.type !== "core.start" ? `<span class="port in"></span>` : ""}
+      <span class="tile">${icon(icons[n.type])}</span>
+      <span class="text"><div class="id">${n.id}</div><div class="type">${n.type}</div></span>
+      ${n.type !== "core.success" ? `<span class="port out"></span>` : ""}
+      ${n.problem ? `<span class="marker err">✖</span>` : ""}
+    </div>`).join("");
+  canvas.append(stage);
+  canvas.insertAdjacentHTML("beforeend", `<div class="controls-panel">
+      <button title="Zoom in">${icon('<path d="M12 5v14M5 12h14"/>', 14)}</button>
+      <button title="Zoom out">${icon('<path d="M5 12h14"/>', 14)}</button>
+      <button title="Fit to view">${icon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>', 14)}</button>
+    </div><span class="zoom">${Math.round(zoom * 100)} %</span>`);
+
+  // Problems panel (open in state "error").
+  const open = state === "error";
+  document.getElementById("bottom").innerHTML = `
+    <div class="tabs2">
+      <span class="t2 ${open ? "active" : ""}">${open ? chev : chevRight}Problems ${errors ? '<span class="n">1</span>' : ""}</span>
+      <span class="t2">Log</span>
+      ${open ? `<span class="collapse">${icon('<path d="M6 9l6 6 6-6"/>', 14)}</span>` : ""}
+    </div>
+    ${open ? `<div class="ptable" role="table" aria-label="Problems" style="height:92px">
+      <div class="prow phead"><span></span><span>Message</span><span>Where</span><span>Line</span></div>
+      <div class="prow sel"><span class="sym err">✖</span><span>expression {{ reslt.output }}: unknown name reslt (did you mean result?)</span><span class="where">check · Message</span><span class="line">line 24:16</span></div>
+    </div>` : ""}`;
+
+  // Properties panel.
+  const field = (label, body, opts = {}) => `<div class="field">
+      <label>${label}${opts.req ? '<span class="req" title="Required">*</span>' : ""}${opts.key ? `<span class="key">${opts.key}</span>` : ""}</label>
+      ${body}${opts.help ? `<div class="help ${opts.err ? "err" : ""}">${opts.help}</div>` : ""}</div>`;
+  const input = (value, cls = "", ph = false) => `<div class="input ${cls} ${ph ? "placeholder" : ""}">${value}</div>`;
+  const down = icon('<path d="M6 9l6 6 6-6"/>', 14);
+  const sel = (value, ph) => `<div class="input select ${ph ? "placeholder" : ""}"><span>${value}</span>${down}</div>`;
+  const ed = (src, cls = "", title = "Open the larger editor (Ctrl+Shift+E)") =>
+    `<div class="ed ${cls}">${code(src)}<span class="expand" title="${title}">⤢</span></div>`;
+  const keys = `<div class="xhint"><span><kbd>{{</kbd> expression</span><span><kbd>\${</kbd> variable</span><span><kbd>Ctrl</kbd>+<kbd>Space</kbd> suggestions</span></div>`;
+  const header = (type, label, desc) => `<div class="ph"><span class="tile">${icon(icons[type])}</span>
+      <div><h3>${label}</h3><div class="t">${type}</div></div></div><p class="ph-desc">${desc}</p>`;
+  const section = (title, body, sum, closed) => `<div class="section"><h4>${closed ? chevRight : chev}${title}${sum ? `<span class="sum">${sum}</span>` : ""}</h4>${closed ? "" : body}</div>`;
+  const execution = section("Execution", "", "defaults", true);
+
+  const props = document.getElementById("props");
+  const panel = document.querySelector(".props");
+  const msg = {
+    complete: "Checking {{ params.| }} orders",
+    functions: "Checking {{ params.ORDERS }} orders of {{ formatDate(addDays(today(), -1), '|') }}",
+    error: "Checking {{ params.ORDERS }} orders (last: {{ ⟦err⟧reslt⟦/⟧.output }})",
+  };
+  if (state === "complete" || state === "functions" || state === "error") {
+    props.innerHTML = header("core.log", "Log", "Writes a message to the run log") +
+      field("ID", input("check"), { key: "id" }) +
+      field("Description", input("Optional note shown in the run log", "", true), { key: "description" }) +
+      section("Configuration",
+        field("Message", ed(msg[state], `area ${state === "error" ? "invalid" : "focus"}`), { req: true, key: "with.message", err: state === "error",
+          help: state === "error"
+            ? `✖ unknown name <b class="mono">reslt</b> – did you mean <b class="mono">result</b>? <span class="fix">Replace with result</span>`
+            : "Text to write; may span several lines" }) +
+        (state === "error" ? "" : `<div class="field" style="margin-top:-8px">${keys}</div>`) +
+        field("Level", sel("info (default)", true), { key: "with.level", help: "Log level of the message" })) +
+      execution;
+  }
+
+  // Popups are placed at the cursor: suggestions below the cursor line, help to the left of the panel.
+  const caretBox = () => {
+    const c = document.querySelector(".ed .caret") || document.querySelector(".tk-err");
+    const r = c.getBoundingClientRect(), pr = panel.getBoundingClientRect();
+    return { x: r.left - pr.left, y: r.top - pr.top, h: r.height };
+  };
+  const pop = (html, dx = -24) => {
+    const c = caretBox();
+    const x = Math.max(8, Math.min(c.x + dx, panel.clientWidth - 296));
+    panel.insertAdjacentHTML("beforeend", `<div style="position:absolute;left:${x}px;top:${c.y + c.h + 6}px;z-index:5">${html}</div>`);
+  };
+  const side = (html, cls) => {
+    const c = caretBox();
+    panel.insertAdjacentHTML("beforeend", `<div class="${cls}" style="position:absolute;right:${panel.clientWidth + 8}px;top:${c.y - 8}px;z-index:5">${html}</div>`);
+  };
+  const item = (k, name, type, active) => `<div class="ci ${active ? "active" : ""}"><span class="kind ${k === "ƒ" ? "fn" : ""}">${k}</span><span class="name">${name}</span><span class="t">${type}</span></div>`;
+  const foot = `<div class="cfoot"><span><kbd>↑</kbd><kbd>↓</kbd> select</span><span><kbd>Enter</kbd> insert</span><span><kbd>Esc</kbd> close</span></div>`;
+
+  if (state === "complete") {
+    // After "params." – parameters of the workflow with type and default; the context roots and functions come after "{{ ".
+    pop(`<div class="complete" style="flex-direction:column">
+      <div class="clist">
+        ${item("P", "<b>ORDERS</b>", "integer", true)}
+        ${item("P", "<b>DAY</b>", "string")}
+        ${foot}
+      </div></div>`);
+    side(`
+        <div class="sig"><span class="tk-root">params</span>.<b>ORDERS</b> <span style="color:var(--muted-foreground)">integer</span></div>
+        <p>Parameter of this workflow · default <span class="mono">7</span></p>
+        <pre>{{ params.ORDERS > 10 }}</pre>
+        <p style="margin:6px 0 0">As a variable: <span class="mono tk-v">\${ORDERS}</span> (always text)</p>`, "cdoc");
+  }
+  if (state === "functions") {
+    // Signature help inside the call, with the pattern letters of the current argument.
+    side(`
+        <div class="sig mono" style="margin-bottom:6px">formatDate(date, <span class="tk-b" style="text-decoration:underline;text-underline-offset:3px">pattern</span>) → string</div>
+        <p style="margin:0 0 6px;color:var(--muted-foreground)">Writes a date as text. Letters in the pattern:</p>
+        <div class="cdoc" style="width:auto;padding:0;border:0;box-shadow:none;background:transparent">
+          <div class="pat"><code>yyyy</code><span>year · 2026</span><code>MM</code><span>month · 11</span><code>dd</code><span>day · 19</span>
+          <code>HH:mm:ss</code><span>time · 14:30:00</span><code>EEE</code><span>weekday · Thu</span><code>MMMM</code><span>month · November</span>
+          <code>'text'</code><span>literal text in quotes</span></div>
+        </div>`, "sighelp");
+    pop(`<div class="clist" style="width:200px">
+        ${item("“", "'dd.MM.yyyy'", "19.11.2026", true)}${item("“", "'yyyy-MM-dd'", "2026-11-19")}${item("“", "'yyyyMMdd'", "20261119")}
+        <div class="cfoot"><span>Common patterns · or type your own</span></div></div>`, -8);
+  }
+  if (state === "condition") {
+    props.innerHTML = `<div class="ph"><span class="edge-label expression selected" style="position:static;transform:none">ƒ</span>
+        <div><h3>Link</h3><div class="t">links[1]</div></div></div>
+      <p class="ph-desc"><span class="readonly">check</span> → <span class="readonly">many</span></p>` +
+      field("Condition", `<div class="seg">
+          <button aria-pressed="false"><span class="sym" style="color:var(--link-success)">✔</span>Success</button>
+          <button aria-pressed="false"><span class="sym" style="color:var(--link-failure)">✖</span>Failure</button>
+          <button aria-pressed="false"><span class="sym" style="color:var(--link-always)">∞</span>Always</button>
+          <button aria-pressed="true"><span class="sym" style="color:var(--link-expression)">ƒ</span>Expr.</button></div>`, { key: "when" }) +
+      field("Expression", ed("{{ params.ORDERS > ${THRESHOLD} && results.check.| }}", "focus"),
+        { key: "when", help: "Followed when the expression is true. <span class='tk-v'>${…}</span> is replaced before the expression runs" }) +
+      `<div class="field" style="margin-top:-8px">${keys}</div>` +
+      `<div class="field"><div class="check"><span class="box"></span><span>Loop link<small>Leads back to an earlier action</small></span></div></div>` +
+      `<div class="field"><div class="check"><span class="box"></span><span>Disabled<small>Kept in the file, but never followed</small></span></div></div>`;
+    // After "results.check." – the fields every result has.
+    pop(`<div class="complete">
+      <div class="clist" style="width:236px">
+        ${item("R", "<b>success</b>", "bool", true)}${item("R", "<b>status</b>", "string")}${item("R", "<b>output</b>", "any")}
+        ${item("R", "<b>error</b>", "string")}${item("R", "<b>durationMs</b>", "integer")}${item("R", "<b>id</b>", "string")}${item("R", "<b>type</b>", "string")}
+        ${foot}
+      </div></div>`, -60);
+    side(`<span class="k">\${THRESHOLD}</span> = <b class="mono">10</b><small>Project variable · project.yaml<br>Shown when pointing at a variable</small>`, "tip");
+  }
+
+  if (state === "expanded") {
+    props.innerHTML = header("core.log", "Log", "Writes a message to the run log") +
+      field("ID", input("check"), { key: "id" }) +
+      section("Configuration", field("Message", ed("Checking {{ params.ORDERS }} orders …"), { req: true, key: "with.message" }));
+    const ref = (h, items) => `<h5>${h}</h5>` + items.map(([n, t, d, a]) =>
+      `<div class="ri ${a ? "active" : ""}"><span class="n">${n}</span><span class="t">${t}</span><small>${d}</small></div>`).join("");
+    document.body.insertAdjacentHTML("beforeend", `<div class="overlay"><div class="xdialog" role="dialog" aria-label="Edit expression">
+      <div class="xh"><span class="edge-label expression" style="position:static;transform:none">ƒ</span>
+        <h2>Message</h2><span class="k">check · with.message</span><span class="spacer"></span>
+        <button class="icon-btn" style="border:0" aria-label="Close">×</button></div>
+      <div class="xb">
+        <div class="xe">
+          <div class="lines"><div class="ln">1<br>2<br>3</div><div class="code">${code("Checking {{ params.ORDERS }} orders of {{ params.DAY }}\n(run {{ run.id }}, {{ coalesce(run.environment, 'none') }})\nThreshold: ${THRESHOLD}|")}</div></div>
+          <div class="xhint" style="margin:0"><span><kbd>{{</kbd> expression</span><span><kbd>\${</kbd> variable</span><span><kbd>Ctrl</kbd>+<kbd>Space</kbd> suggestions</span><span>Click an entry on the right to insert it</span></div>
+        </div>
+        <div class="ref">
+          <label class="search"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><input placeholder="Search names and functions" aria-label="Search"></label>
+          <div class="rs">
+            ${ref("Context", [["params.ORDERS", "integer", "Parameter · default 7"], ["params.DAY", "string", "Parameter · default {{ formatDate(…) }}"],
+                              ["vars.THRESHOLD", "string", "Project variable · 10"], ["run.id", "string", "Id of the run"], ["run.environment", "string", "Environment of the run"],
+                              ["results.&lt;action&gt;", "object", "Result of an earlier action: success, status, output …"]])}
+            ${ref("Date", [["formatDate(date, pattern)", "string", "Writes a date as text, e.g. 'dd.MM.yyyy'", true], ["addDays(date, n)", "date", "Adds days; negative to go back"],
+                           ["today()", "date", "Today, 00:00"], ["diffDays(a, b)", "integer", "Days from a to b"]])}
+            ${ref("Text", [["padLeft(text, n, fill)", "string", "Fills on the left, e.g. 007"], ["normalize(text)", "string", "Umlauts and spaces for file names"]])}
+            ${ref("Empty values", [["coalesce(a, b, …)", "any", "First value that is not empty"], ["isEmpty(v)", "bool", "Empty text, list or nothing"]])}
+          </div>
+        </div>
+      </div>
+      <div class="xf"><span class="info"><span class="ok">✔</span> No problems · result is text</span><span class="spacer"></span>
+        <button class="btn">Cancel</button><button class="btn primary">Apply <kbd>Ctrl+Enter</kbd></button></div>
+    </div></div>`);
+  }
+</script>
+</body>
+</html>
