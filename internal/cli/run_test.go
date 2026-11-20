@@ -164,6 +164,34 @@ func TestRunPipelineExample(t *testing.T) {
 	}
 }
 
+func TestRunCSVExample(t *testing.T) {
+	chdirRepoRoot(t)
+	target := filepath.Join(t.TempDir(), "orders.csv")
+	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "examples/pipelines/pipelines/orders.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		"[read] read 3 rows from examples/pipelines/data/orders.csv",
+		"[show] #1 {Nr: 1001, Betrag: 1234.5}",
+		"[write] wrote 3 rows to " + target,
+		`pipeline "orders" succeeded in `,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "\xEF\xBB\xBFNr,Datum,Kunde,Betrag\r\n1001,2026-11-19,Müller GmbH,1234.50\r\n" +
+		"1002,2026-11-19,Schmidt & Söhne,89.90\r\n1003,2026-11-20,\"Weber, Anna\",12500.00\r\n"
+	if string(b) != want {
+		t.Errorf("written file %q, want %q", b, want)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

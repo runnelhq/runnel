@@ -507,6 +507,177 @@
         },
         "additionalProperties": false
       }
+    },
+    {
+      "type": "csv.input",
+      "kind": "transform",
+      "category": "input",
+      "label": "CSV Input",
+      "description": "Reads the rows of a CSV file as records",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "CSV file to read; relative paths refer to the working directory of runnel",
+            "examples": [
+              "C:\\in\\orders.csv"
+            ]
+          },
+          "delimiter": {
+            "type": "string",
+            "description": "Character between the values, e.g. ; or \\t for tab; empty: comma",
+            "examples": [
+              ";"
+            ]
+          },
+          "header": {
+            "type": "boolean",
+            "description": "Whether the first row holds the names of the columns",
+            "default": true
+          },
+          "encoding": {
+            "type": "string",
+            "description": "Encoding of the file; auto recognizes UTF-8 and UTF-16 by their byte order mark and reads UTF-8 otherwise",
+            "enum": [
+              "auto",
+              "utf-8",
+              "windows-1252",
+              "utf-16"
+            ],
+            "default": "auto"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Columns to read, with type and format, matched by name in the header or else by position; empty: all columns as text",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field (and of the column in the header)",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type of the value; empty: text",
+                  "enum": [
+                    "string",
+                    "int",
+                    "decimal",
+                    "float",
+                    "bool",
+                    "date",
+                    "datetime",
+                    "json"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Number pattern like #.##0,00 or date pattern like dd.MM.yyyy; empty: 1234.5 and ISO dates",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "csv.output",
+      "kind": "transform",
+      "category": "output",
+      "label": "CSV Output",
+      "description": "Writes records to a CSV file and passes them on",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "CSV file to write; relative paths refer to the working directory of runnel",
+            "examples": [
+              "C:\\out\\orders.csv"
+            ]
+          },
+          "delimiter": {
+            "type": "string",
+            "description": "Character between the values, e.g. ; or \\t for tab; empty: comma",
+            "examples": [
+              ";"
+            ]
+          },
+          "header": {
+            "type": "boolean",
+            "description": "Whether the first row holds the names of the columns",
+            "default": true
+          },
+          "encoding": {
+            "type": "string",
+            "description": "Encoding of the file; utf-8-bom lets Excel recognize umlauts",
+            "enum": [
+              "utf-8-bom",
+              "utf-8",
+              "windows-1252"
+            ],
+            "default": "utf-8-bom"
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "What happens if the file exists: replace it once all records are written, append to it, or fail",
+            "enum": [
+              "replace",
+              "append",
+              "fail"
+            ],
+            "default": "replace"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Columns to write, in this order, with a format; empty: all fields of the records",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field to write (and of the column in the header)",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Number pattern like #.##0,00 or date pattern like dd.MM.yyyy; empty: 1234.5 and ISO dates",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

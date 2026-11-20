@@ -3,3 +3,5 @@
 *.exe binary
 *.png binary
 *.ico binary
+# CSV test files are compared byte for byte (CRLF, byte order mark, Windows-1252).
+internal/transforms/csv/testdata/*.csv -text
