@@ -48,7 +48,7 @@ test("shows the properties of the selected action", async ({ page }) => {
   await select(page, "combine");
   await expect(panel(page)).toContainText("Log");
   await expect(panel(page)).toContainText("Writes a message to the run log");
-  await expect(field(page, "with.message").getByRole("textbox")).toHaveValue("Both branches are done");
+  await expect(field(page, "with.message").getByRole("textbox")).toHaveText("Both branches are done");
   await expect(field(page, "with.message")).toContainText("*"); // required
   await expect(field(page, "with.level").getByRole("combobox")).toHaveValue("");
   await expect(field(page, "with.level").getByRole("combobox").locator("option").first()).toHaveText("info (default)");
@@ -56,8 +56,9 @@ test("shows the properties of the selected action", async ({ page }) => {
 
   await select(page, "fetch-b");
   await expect(panel(page)).toContainText("Waits for a given time");
-  await expect(field(page, "with.duration").getByRole("textbox")).toHaveValue("${DELAY_B}");
-  await expect(field(page, "with.duration").getByRole("textbox")).toHaveClass(/text-expression/);
+  await expect(field(page, "with.duration").getByRole("textbox")).toHaveText("${DELAY_B}");
+  // Variables in the expression colour (decision for mockup E4, editor S35a).
+  await expect(field(page, "with.duration").locator(".rx-var")).toHaveText("${DELAY_B}");
   await expect(panel(page).getByRole("group", { name: "Join" }).getByRole("button").first()).toBeDisabled();
 
   // Several actions selected; hiding and showing the panel.

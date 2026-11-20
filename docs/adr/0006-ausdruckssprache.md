@@ -137,6 +137,10 @@ when:      "{{ result.rows > 0 }}"
   Feldnamen (aus [ADR 0007](0007-typsystem-pipelines.md)) und Bibliotheksfunktionen inkl. Signatur und Beschreibung.
 - Fehler werden beim Tippen angezeigt (Kompilierung über `/api/v1/validate`).
 - „Ausdruck testen“: Auswertung gegen einen Datensatz aus der Vorschau.
+- **Nachtrag 2026-11-20 (S35):** Umgesetzt mit **CodeMirror 6** statt Monaco (Entscheidung zum Mockup S35, PR #43):
+  für viele kleine Felder im Eigenschaften-Panel gebaut und ein Bruchteil der Größe. Funktionen mit Signatur und
+  Beschreibung liefert der Server (`GET /api/v1/expressions`). Für Skript-Editoren (JavaScript, PowerShell) wird die
+  Bibliothek mit dem jeweiligen Schritt erneut geprüft.
 
 ## Konsequenzen
 
