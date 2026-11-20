@@ -6,7 +6,7 @@
 | [`expressions/`](expressions/) | Ausdrücke `{{ … }}` (ADR 0006): Bedingungs-Links abhängig von einem Parameter und einer Projektvariable, Standardwert per Ausdruck (gestriges Datum), Outputs aus den Ergebnissen der Actions |
 | [`files/`](files/) | Datei-Actions (S09): Bestellungen aus `inbox/` (nur `*.csv`) in einen Archivordner je Tag kopieren, Dateiliste mit Größen auswerten, leeren Eingang über einen Fehler-Link melden |
 | [`sub-workflows/`](sub-workflows/) | Sub-Workflows (S11): `nightly` ruft `import-region` je Region mit eigenen Parametern auf und summiert dessen Outputs; zu viele Bestellungen lassen das Kind abbrechen, der Fehler-Link meldet es |
-| [`broken/`](broken/) | Absichtlich fehlerhafte Workflows, um die Meldungen von `runnel validate` zu zeigen |
+| [`broken/`](broken/) | Absichtlich fehlerhafte Workflows und eine Pipeline (Tippfehler, Zyklus), um die Meldungen von `runnel validate` zu zeigen |
 
 ```bash
 runnel validate examples/hello

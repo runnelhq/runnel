@@ -1,0 +1,6 @@
+testdata/pipeline/graph/references.pipeline.yaml:8:11: duplicate transform id "write" (first defined at line 7)
+testdata/pipeline/graph/references.pipeline.yaml:9:11: warning: transform "lonely" is not connected to any other transform
+testdata/pipeline/graph/references.pipeline.yaml:11:23: link #1 (read → filtr): unknown transform "filtr" (did you mean "filter"?)
+testdata/pipeline/graph/references.pipeline.yaml:12:13: link #2 (raed → write): unknown transform "raed" (did you mean "read"?)
+testdata/pipeline/graph/references.pipeline.yaml:14:7: warning: link #4 (read → filter): same link as link #3
+testdata/pipeline/graph/references.pipeline.yaml:15:7: link #5 (filter → filter): a transform cannot pass records to itself

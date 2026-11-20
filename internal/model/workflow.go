@@ -280,34 +280,7 @@ func (w *Workflow) validate() error {
 
 	errs = append(errs, checkHeader(s, w.Kind, KindWorkflow, w.APIVersion, w.Name)...)
 
-	params := map[string]bool{}
-	for i, p := range w.Parameters {
-		path := fmt.Sprintf("$.parameters[%d]", i)
-		switch {
-		case p.Name == "":
-			add(path, `parameter: missing required field "name"`)
-		case !vars.ValidName(p.Name):
-			add(path+".name", "invalid parameter name %q (letters, digits and _, not starting with a digit)", p.Name)
-		case params[p.Name]:
-			add(path+".name", "duplicate parameter %q", p.Name)
-		}
-		params[p.Name] = true
-		if !p.Type.Valid() {
-			add(path+".type", "parameter %q: invalid type %q (expected %s)", p.Name, p.Type, typeNames())
-			continue
-		}
-		for j, e := range p.Enum {
-			if _, err := p.Type.Parse(e); err != nil {
-				add(fmt.Sprintf("%s.enum[%d]", path, j), "parameter %q: allowed value %v", p.Name, err)
-			}
-		}
-		if p.Default != "" && !hasReferences(p.Default) {
-			if _, err := p.CheckValue(p.Default); err != nil {
-				add(path+".default", "parameter %q: default value %v", p.Name, err)
-			}
-		}
-		checkExpr(path+".default", fmt.Sprintf("parameter %q: default value", p.Name), p.Default)
-	}
+	errs = append(errs, checkParameters(s, w.Parameters, expr.WorkflowRoots)...)
 
 	outputs := map[string]bool{}
 	for i, o := range w.Outputs {

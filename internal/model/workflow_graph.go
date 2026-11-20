@@ -239,10 +239,20 @@ func (v *graphValidator) checkLayout() {
 
 // suggest returns a hint for a similar existing action id, e.g. for typos.
 func (v *graphValidator) suggest(id string) string {
-	best, bestDist := "", 3 // suggest only for up to 2 edits
-	for _, a := range v.w.Actions {
-		if d := editDistance(id, a.ID); d < bestDist {
-			best, bestDist = a.ID, d
+	ids := make([]string, len(v.w.Actions))
+	for i, a := range v.w.Actions {
+		ids[i] = a.ID
+	}
+	return suggestID(id, ids)
+}
+
+// suggestID returns " (did you mean …?)" for the most similar of the ids, if one is
+// at most two edits away; otherwise "".
+func suggestID(id string, ids []string) string {
+	best, bestDist := "", 3
+	for _, other := range ids {
+		if d := editDistance(id, other); d < bestDist {
+			best, bestDist = other, d
 		}
 	}
 	if best == "" {

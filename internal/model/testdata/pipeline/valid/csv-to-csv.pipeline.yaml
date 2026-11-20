@@ -1,0 +1,28 @@
+# Reads customers, keeps the active ones and writes them again (KONZEPT, chapter 5.2).
+kind: Pipeline
+apiVersion: runnel/v1
+name: active-customers
+description: Copies the active customers into a new file
+parameters:
+  - name: FILE
+    required: true
+  - name: MIN_SALES
+    type: number
+    default: "0"
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: ${FILE}
+      delimiter: ";"
+  - id: only-active
+    type: core.filter
+    with:
+      condition: "{{ record.sales > params.MIN_SALES }}"
+  - id: write
+    type: csv.output
+    with:
+      path: active.csv
+links:
+  - { from: read, to: only-active }
+  - { from: only-active, to: write, type: data }

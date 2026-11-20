@@ -99,7 +99,7 @@ links:
 
 func TestValidateNoFiles(t *testing.T) {
 	code, _, errOut := run(t, "validate", t.TempDir())
-	if code != 1 || !strings.Contains(errOut, "no workflow files") {
+	if code != 1 || !strings.Contains(errOut, "no workflow or pipeline files (*.workflow.yaml, *.pipeline.yaml)") {
 		t.Errorf("exit code %d, stderr %q", code, errOut)
 	}
 
@@ -127,7 +127,7 @@ func TestFindWorkflowFiles(t *testing.T) {
 	}
 	explicit := filepath.Join(dir, "sub", "notes.yaml")
 
-	got, err := findWorkflowFiles([]string{dir, explicit, filepath.Join(dir, "a.workflow.yaml")})
+	got, err := findFiles([]string{dir, explicit, filepath.Join(dir, "a.workflow.yaml")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,6 +161,38 @@ func TestValidateProject(t *testing.T) {
 		all.WriteString("exit code " + strconv.Itoa(code) + "\n\n")
 	}
 	compareGoldenFile(t, golden, all.String())
+}
+
+func TestValidatePipelines(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("kind: Pipeline\napiVersion: runnel/v1\nname: p\n"+body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	write("ok.pipeline.yaml", "transforms:\n  - { id: read, type: csv.input }\n  - { id: write, type: csv.output }\nlinks:\n  - { from: read, to: write }\n")
+	code, out, errOut := run(t, "validate", dir)
+	if code != 0 || out != "1 pipeline file checked: 0 errors, 0 warnings\n" {
+		t.Errorf("valid: exit code %d, stdout %q, stderr %q", code, out, errOut)
+	}
+
+	bad := write("bad.pipeline.yaml", "transforms:\n  - { id: read, type: csv.input, copies: 2 }\n")
+	code, out, _ = run(t, "validate", bad)
+	if code != 1 || !strings.Contains(out, `bad.pipeline.yaml:5:34: error: unknown field "copies"`) {
+		t.Errorf("invalid: exit code %d, stdout %q", code, out)
+	}
+
+	// Workflows and pipelines together; the summary names both.
+	wf := filepath.Join(dir, "w.workflow.yaml")
+	if err := os.WriteFile(wf, []byte("kind: Workflow\napiVersion: runnel/v1\nname: w\nactions:\n  - { id: start, type: core.start }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, out, _ = run(t, "validate", dir)
+	if !strings.Contains(out, "1 workflow file and 2 pipeline files checked: 1 error, 0 warnings") {
+		t.Errorf("mixed: %q", out)
+	}
 }
 
 func TestValidateFlagErrors(t *testing.T) {
