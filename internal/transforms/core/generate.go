@@ -71,7 +71,7 @@ func (t *generateRows) Process(ctx context.Context, _ <-chan transform.Batch, ou
 		return fmt.Errorf("rows: %q is not a whole number of 0 or more", t.Rows)
 	}
 	for n := int64(1); n <= rows; n++ {
-		var r record.Record
+		r := record.Make(len(t.Fields) + 1)
 		if t.RowNumber != "" {
 			r.Set(t.RowNumber, n)
 		}

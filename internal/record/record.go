@@ -27,6 +27,16 @@ func New(fields ...Field) Record {
 	return r
 }
 
+// Make returns an empty record with room for n fields, so that adding them with Set
+// does not grow it step by step.
+func Make(n int) Record { return Record{fields: make([]Field, 0, n)} }
+
+// FromFields returns a record of the fields, which must have unique names (e.g. the
+// columns of a file, checked once). The slice is taken over and must not be changed
+// afterwards. Unlike New, it does not look for duplicates, which costs time for every
+// field of every record.
+func FromFields(fields []Field) Record { return Record{fields: fields} }
+
 // Len returns the number of fields.
 func (r Record) Len() int { return len(r.fields) }
 
@@ -57,6 +67,15 @@ func (r Record) Get(name string) (any, bool) {
 		return r.fields[i].Value, true
 	}
 	return nil, false
+}
+
+// GetAt is Get for a field that is usually at position i, e.g. a column of a file whose
+// records all have the same fields in the same order: it looks there first.
+func (r Record) GetAt(i int, name string) (any, bool) {
+	if i >= 0 && i < len(r.fields) && r.fields[i].Name == name {
+		return r.fields[i].Value, true
+	}
+	return r.Get(name)
 }
 
 // Set changes the value of a field; a new field is added at the end.

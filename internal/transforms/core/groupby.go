@@ -186,7 +186,7 @@ func (t *groupBy) Process(ctx context.Context, in <-chan transform.Batch, out *t
 	}
 	out.Logf(slog.LevelInfo, "%d records in %d groups", n, len(order))
 	for _, g := range order {
-		var r record.Record
+		r := record.Make(len(t.GroupBy) + len(t.Aggregates))
 		for i, f := range t.GroupBy {
 			r.Set(f, g.values[i])
 		}

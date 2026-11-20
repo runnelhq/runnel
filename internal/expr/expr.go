@@ -173,8 +173,13 @@ func (t *Template) Static() bool {
 // Eval evaluates the template. A value that consists of one expression returns the
 // result with its type; otherwise the parts are joined as text (see Format).
 func (t *Template) Eval(env map[string]any) (any, error) {
+	return t.eval(env, nil)
+}
+
+// eval evaluates the template with the virtual machine m; nil uses a new one.
+func (t *Template) eval(env map[string]any, m *vm.VM) (any, error) {
 	if t.whole {
-		return run(t.parts[0], env)
+		return run(t.parts[0], env, m)
 	}
 	var b strings.Builder
 	for _, p := range t.parts {
@@ -182,7 +187,7 @@ func (t *Template) Eval(env map[string]any) (any, error) {
 			b.WriteString(p.text)
 			continue
 		}
-		v, err := run(p, env)
+		v, err := run(p, env, m)
 		if err != nil {
 			return nil, err
 		}
@@ -193,7 +198,11 @@ func (t *Template) Eval(env map[string]any) (any, error) {
 
 // EvalBool evaluates a condition (e.g. of a link); the result must be true or false.
 func (t *Template) EvalBool(env map[string]any) (bool, error) {
-	v, err := t.Eval(env)
+	return t.evalBool(env, nil)
+}
+
+func (t *Template) evalBool(env map[string]any, m *vm.VM) (bool, error) {
+	v, err := t.eval(env, m)
 	if err != nil {
 		return false, err
 	}
@@ -213,8 +222,27 @@ func (t *Template) code() string {
 	return ""
 }
 
-func run(p part, env map[string]any) (any, error) {
-	v, err := exprlang.Run(p.prog, env)
+// Evaluator evaluates a template again and again with one virtual machine, e.g. once
+// per record, which saves allocations per evaluation. It is not safe for concurrent use.
+type Evaluator struct {
+	t  *Template
+	vm vm.VM
+}
+
+// Evaluator returns an evaluator of the template.
+func (t *Template) Evaluator() *Evaluator { return &Evaluator{t: t} }
+
+// Eval is Template.Eval with the evaluator's virtual machine.
+func (e *Evaluator) Eval(env map[string]any) (any, error) { return e.t.eval(env, &e.vm) }
+
+// EvalBool is Template.EvalBool with the evaluator's virtual machine.
+func (e *Evaluator) EvalBool(env map[string]any) (bool, error) { return e.t.evalBool(env, &e.vm) }
+
+func run(p part, env map[string]any, m *vm.VM) (any, error) {
+	if m == nil {
+		m = &vm.VM{}
+	}
+	v, err := m.Run(p.prog, env)
 	if err != nil {
 		return nil, &Error{Code: p.code, Msg: cleanError(err)}
 	}
@@ -279,12 +307,38 @@ func (t *Template) Members(root string) []string {
 	return names
 }
 
+// OnlyMembers is like Members, but also reports whether the expressions use root only
+// through fixed names: false for record[name], len(record) or "x" in record, which
+// may need any field.
+func (t *Template) OnlyMembers(root string) ([]string, bool) {
+	var names []string
+	only := true
+	for _, p := range t.parts {
+		if p.prog == nil {
+			continue
+		}
+		tree, err := parser.Parse(p.code)
+		if err != nil {
+			return nil, false
+		}
+		v := memberVisitor{root: root, names: &names, fixed: new(int), uses: new(int)}
+		ast.Walk(&tree.Node, v)
+		only = only && *v.fixed == *v.uses
+	}
+	return names, only
+}
+
 type memberVisitor struct {
 	root  string
 	names *[]string
+	// fixed counts the uses of root with a fixed name (root.name), uses all of them.
+	fixed, uses *int
 }
 
 func (v memberVisitor) Visit(node *ast.Node) {
+	if id, ok := (*node).(*ast.IdentifierNode); ok && id.Value == v.root && v.uses != nil {
+		*v.uses++
+	}
 	m, ok := (*node).(*ast.MemberNode)
 	if !ok {
 		return
@@ -293,7 +347,12 @@ func (v memberVisitor) Visit(node *ast.Node) {
 	if !ok || id.Value != v.root {
 		return
 	}
-	if s, ok := m.Property.(*ast.StringNode); ok && !slices.Contains(*v.names, s.Value) {
-		*v.names = append(*v.names, s.Value)
+	if s, ok := m.Property.(*ast.StringNode); ok {
+		if v.fixed != nil {
+			*v.fixed++
+		}
+		if !slices.Contains(*v.names, s.Value) {
+			*v.names = append(*v.names, s.Value)
+		}
 	}
 }

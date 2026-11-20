@@ -177,12 +177,19 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 		return nil
 	}
 	skipped := map[string]bool{}
+	var colCodecs []codec
 	var row []string
 	var n, seen int64 // records written, records received
 	for b := range in {
 		for _, r := range b {
 			if cols == nil {
 				cols = r.Names() // open schema without fields: the first record decides
+			}
+			if colCodecs == nil {
+				colCodecs = make([]codec, len(cols)) // looked up once, not per field and record
+				for i, c := range cols {
+					colCodecs[i] = codecs[c]
+				}
 			}
 			if err := writeHeader(); err != nil {
 				return n, err
@@ -191,9 +198,10 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 			row = row[:0]
 			var bad error
 			var badField string
-			for _, c := range cols {
-				v, _ := r.Get(c)
-				s, err := codecs[c].Format(v)
+			for i, c := range cols {
+				// Records usually have the columns in this order: GetAt looks there first.
+				v, _ := r.GetAt(i, c)
+				s, err := colCodecs[i].Format(v)
 				if err == nil && check != nil {
 					err = check(s)
 				}
