@@ -15,6 +15,7 @@ import (
 // core.constant adds fields with the same value to every record. Values may contain
 // ${…} and {{ … }}; expressions are evaluated once when the pipeline starts.
 var constantDefinition = transform.Definition{
+	Parallel:    true,
 	Type:        "core.constant",
 	Category:    transform.CategoryTransform,
 	Label:       "Add Constants",

@@ -446,7 +446,8 @@
           "fields"
         ],
         "additionalProperties": false
-      }
+      },
+      "parallel": true
     },
     {
       "type": "core.convert",
@@ -506,7 +507,8 @@
         ],
         "additionalProperties": false
       },
-      "recordErrors": true
+      "recordErrors": true,
+      "parallel": true
     },
     {
       "type": "core.dummy",
@@ -518,7 +520,8 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": false
-      }
+      },
+      "parallel": true
     },
     {
       "type": "core.filter",
@@ -543,7 +546,8 @@
         ],
         "additionalProperties": false
       },
-      "recordErrors": true
+      "recordErrors": true,
+      "parallel": true
     },
     {
       "type": "core.generate-rows",
@@ -631,7 +635,8 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "parallel": true
     },
     {
       "type": "core.select-fields",
@@ -679,7 +684,8 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "parallel": true
     },
     {
       "type": "core.switch",
@@ -732,7 +738,8 @@
         ],
         "additionalProperties": false
       },
-      "recordErrors": true
+      "recordErrors": true,
+      "parallel": true
     },
     {
       "type": "csv.input",

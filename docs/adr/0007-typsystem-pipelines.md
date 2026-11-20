@@ -95,7 +95,9 @@ unbekannten Feldern werden zu Fehlern. Gedacht für produktive, stabile Pipeline
   sonst wäre nach jedem Transform ohne Schema jedes verwendete Feld gemeldet, ohne Aussage.
 - **Zahlen in der Konfiguration** (z. B. Konstanten) bleiben ganze Zahlen (`int64`) bzw. werden `float64`; sie werden nicht
   über `float64` gelesen.
-- **Strikter Modus** folgt mit S17c, zusammen mit `settings` im Pipeline-Format.
+- **Strikter Modus** (S17c): `settings.strict: true`. Hat ein Link ein offenes Schema, ist das ein Fehler – beim
+  Transform, dessen Records es sind (z. B. `csv.input` ohne `fields`), bzw. beim Fehler-Link. Ein verwendetes Feld,
+  das nicht bekannt ist, ist immer ein Fehler, auch hinter einem offenen Schema.
 
 ## Konsequenzen
 

@@ -11,6 +11,7 @@ import (
 
 // core.filter passes on the records for which a condition is true.
 var filterDefinition = transform.Definition{
+	Parallel:     true,
 	Type:         "core.filter",
 	RecordErrors: true,
 	Category:     transform.CategoryTransform,

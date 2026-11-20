@@ -178,9 +178,9 @@ func TestValidatePipelines(t *testing.T) {
 		t.Errorf("valid: exit code %d, stdout %q, stderr %q", code, out, errOut)
 	}
 
-	bad := write("bad.pipeline.yaml", "transforms:\n  - { id: read, type: csv.input, copies: 2 }\n")
+	bad := write("bad.pipeline.yaml", "transforms:\n  - { id: read, type: csv.input, parallel: 2 }\n")
 	code, out, _ = run(t, "validate", bad)
-	if code != 1 || !strings.Contains(out, `bad.pipeline.yaml:5:34: error: unknown field "copies"`) {
+	if code != 1 || !strings.Contains(out, `bad.pipeline.yaml:5:34: error: unknown field "parallel"`) {
 		t.Errorf("invalid: exit code %d, stdout %q", code, out)
 	}
 	// Types and configurations of the transforms are checked like before a run (S13b).

@@ -12,6 +12,7 @@ import (
 
 // core.convert converts fields to another type, e.g. text in German format to decimal.
 var convertDefinition = transform.Definition{
+	Parallel:     true,
 	Type:         "core.convert",
 	RecordErrors: true,
 	Category:     transform.CategoryTransform,

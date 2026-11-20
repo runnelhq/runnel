@@ -506,8 +506,11 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
   bis dahin meldet `runnel validate` beide als „noch nicht unterstützt“ (der Editor zeigt Pipelines bis S25a nur als YAML).
 - Graph: mindestens ein Transform, eindeutige IDs, Links nur zwischen vorhandenen Transforms, keine Links auf sich
   selbst und **keine Zyklen** (Datensätze fließen nur vorwärts). Warnungen: doppelte Links, Transforms ohne Verbindung.
-- `copies`, `settings` (z. B. `bufferSize`), `disabled`, `layout` und der Verteilmodus kommen mit den Schritten, die sie
-  ausführen (S13, S17, S25a); bis dahin sind sie unbekannte Felder.
+- Je Transform `copies: n` (1–64 parallele Instanzen, die sich die eingehenden Datensätze teilen; nur für Transforms,
+  die jeden Datensatz für sich verarbeiten – nicht für Ein- und Ausgaben) und `distribution: copy | distribute` (seit
+  S17c). `settings:` der Pipeline: `batchSize` (Standard 500), `bufferSize` (Datensätze je Link, Standard 10.000,
+  mindestens `batchSize`) und `strict` (ADR 0007). `disabled` und `layout` kommen mit S25a; bis dahin sind sie
+  unbekannte Felder.
 - `runnel validate` prüft `*.pipeline.yaml` mit; `runnel run` führt Pipelines aus und zeigt am Ende je Transform, wie viele
   Records er gelesen und geschrieben hat (seit S13b).
 
@@ -615,8 +618,14 @@ type Transform interface {
 
 - **Mehrere Eingänge** eines Transforms werden zu einem Strom gemischt (Reihenfolge zwischen den Zweigen nicht
   festgelegt); **mehrere Ausgänge** bekommen jeden Record (`copy`), ab dem zweiten als Kopie, damit Zweige sich nicht
-  gegenseitig verändern. `distribute` und `copies` folgen mit S17c.
-- Batches zu 500 Records, Puffer je Link 10.000 Records (feste Werte bis S17c).
+  gegenseitig verändern. Mit `distribution: distribute` bekommen die Daten-Links die Records reihum (Fehler-Links
+  und `EmitTo` bleiben davon unberührt).
+- **Kopien** (`copies: n`): n Goroutinen mit je einer eigenen Instanz des Transforms lesen aus demselben Eingang und
+  schreiben in dieselben Links; die Reihenfolge der Records ist danach nicht mehr festgelegt. Zähler und Ereignisse
+  gelten für den Transform als Ganzes, Log-Meldungen schreibt jede Kopie selbst. Schlägt eine Kopie fehl, bricht die
+  Pipeline ab. Erlaubt nur, wo die Definition es zulässt (`Parallel`).
+- Batches zu 500 Records, Puffer je Link 10.000 Records; je Pipeline änderbar mit `settings.batchSize` und
+  `settings.bufferSize` (S17c).
 - Hört ein Transform vor dem Ende seiner Eingabe auf zu lesen, verwirft die Engine den Rest, damit die Transforms davor
   fertig werden. Eine Panik in einem Transform wird zum Fehler der Pipeline.
 - **Zähler** je Transform: gelesen, geschrieben (Ereignis `transform.finished`, Ergebnis des Laufs).
