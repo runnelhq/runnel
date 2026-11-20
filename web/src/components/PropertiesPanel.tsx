@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { categoryColor, useCatalog, type Schema } from "../catalog";
 import { idPattern, linkKind, type Action, type Problem, type Workflow } from "../workflow";
 import type { Selection } from "./Canvas";
 import { ActionIcon, ChevronIcon, CloseIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import type { SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
+import { exprContext, locate, useReference, type ExprContext } from "../expressions";
+import { ExpressionInput } from "./ExpressionInput";
 
 /** A value written to a field; null removes the field from the file. */
 export type FieldValue = string | number | boolean | null;
@@ -20,7 +22,8 @@ export interface PropertiesProps {
   onSet: (id: string, field: string, value: FieldValue) => void;
   /** Sets a field of the workflow: name, description, settings.timeout, settings.maxConcurrentRuns. */
   onSetWorkflow: (field: string, value: FieldValue) => void;
-  onLinkChange: (index: number, change: { when?: SettableKind; loop?: boolean; disabled?: boolean }) => void;
+  /** Changes a link; when is success, failure, always or an expression "{{ … }}". */
+  onLinkChange: (index: number, change: { when?: SettableKind | string; loop?: boolean; disabled?: boolean }) => void;
   onDeleteLink: (index: number) => void;
   onRename: (from: string, to: string) => void;
   onHide: () => void;
@@ -47,6 +50,8 @@ export function PropertiesPanel(props: PropertiesProps) {
   const link = actions.length === 0 && selected.links.length === 1 ? selected.links[0] : undefined;
   const count = actions.length + selected.links.length;
   const scroller = useRef<HTMLDivElement>(null);
+  const ref = useReference();
+  const ctx = useMemo(() => exprContext(ref, workflow), [ref, workflow]);
 
   // Shows and focuses a field, e.g. after a click on a problem; it lights up briefly.
   useEffect(() => {
@@ -58,7 +63,7 @@ export function PropertiesPanel(props: PropertiesProps) {
         return;
       }
       el.scrollIntoView({ block: "nearest" });
-      el.querySelector<HTMLElement>("input, textarea, select, button")?.focus({ preventScroll: true });
+      el.querySelector<HTMLElement>("input, textarea, select, button, .cm-content")?.focus({ preventScroll: true });
       el.classList.add("runnel-flash");
       setTimeout(() => el.classList.remove("runnel-flash"), 1200);
     });
@@ -82,9 +87,9 @@ export function PropertiesPanel(props: PropertiesProps) {
       <div ref={scroller} className="min-h-0 flex-1 overflow-auto pb-4">
         {action ? (
           // The key resets all fields when another action is selected.
-          <ActionProperties key={action.id} {...props} action={action} index={index} />
+          <ActionProperties key={action.id} {...props} ctx={ctx} action={action} index={index} />
         ) : link !== undefined && workflow.links?.[link] ? (
-          <LinkProperties key={link} {...props} index={link} />
+          <LinkProperties key={link} {...props} ctx={ctx} index={link} />
         ) : count > 1 ? (
           <p className="mx-4 my-4 text-xs text-muted-foreground">
             {count} elements selected. Select one action or link to see its properties.
@@ -97,7 +102,7 @@ export function PropertiesPanel(props: PropertiesProps) {
   );
 }
 
-function ActionProperties(props: PropertiesProps & { action: Action; index: number }) {
+function ActionProperties(props: PropertiesProps & { action: Action; index: number; ctx: ExprContext }) {
   const { action, index, workflow, problems, onSet } = props;
   const catalog = useCatalog();
   const d = catalog.get(action.type);
@@ -131,6 +136,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       required={schema?.required?.includes(name) ?? false}
       value={action.with?.[name]}
       problems={at(`with.${name}`, name)}
+      ctx={props.ctx}
       onChange={set(`with.${name}`)}
     />
   ));
@@ -254,19 +260,25 @@ let nextFieldId = 0;
 function Field(props: {
   label: string;
   fieldKey: string;
+  /** The key shown next to the label, if it differs from fieldKey. */
+  keyLabel?: string;
   required?: boolean;
   help?: string;
   problems?: Problem[];
   /** A problem found before sending, e.g. "Enter a number". */
   localError?: string | null;
-  children: (p: { id: string; invalid: boolean }) => ReactNode;
+  /** Messages shown instead of the problems' own, e.g. with "did you mean …?". */
+  messages?: string[];
+  /** Corrections offered below the problems, e.g. "Replace with result". */
+  fixes?: { label: string; apply: () => void }[];
+  children: (p: { id: string; labelId: string; invalid: boolean }) => ReactNode;
 }) {
   const [id] = useState(() => `field-${++nextFieldId}`);
-  const errors = [...(props.localError ? [props.localError] : []), ...(props.problems ?? []).map((p) => p.message)];
+  const errors = [...(props.localError ? [props.localError] : []), ...(props.messages ?? (props.problems ?? []).map((p) => p.message))];
   const invalid = errors.length > 0;
   return (
     <div className="mb-3 px-4" data-field={props.fieldKey}>
-      <label htmlFor={id} className="mb-1 flex items-baseline gap-1 text-xs font-medium">
+      <label id={`${id}-label`} htmlFor={id} className="mb-1 flex items-baseline gap-1 text-xs font-medium">
         {props.label}
         {props.required && (
           <span className="text-destructive" title="Required" aria-hidden="true">
@@ -274,14 +286,24 @@ function Field(props: {
           </span>
         )}
         <span aria-hidden="true" className="ml-auto font-mono text-[10px] font-normal text-muted-foreground">
-          {props.fieldKey}
+          {props.keyLabel ?? props.fieldKey}
         </span>
       </label>
-      {props.children({ id, invalid })}
+      {props.children({ id, labelId: `${id}-label`, invalid })}
       {invalid ? (
         <div role="alert" className="mt-1 text-2xs text-destructive">
           {errors.map((e, i) => (
             <div key={i}>✖ {e}</div>
+          ))}
+          {props.fixes?.map((f) => (
+            <button
+              key={f.label}
+              type="button"
+              onClick={f.apply}
+              className="mt-1 inline-flex h-[18px] cursor-pointer items-center rounded-sm border border-border bg-background px-1.5 text-2xs text-foreground hover:bg-muted"
+            >
+              {f.label}
+            </button>
           ))}
         </div>
       ) : (
@@ -304,6 +326,7 @@ const inputClass = (invalid: boolean, mono?: boolean, variable?: boolean) =>
  */
 function TextInput(props: {
   id: string;
+  labelId?: string;
   invalid: boolean;
   value: string;
   placeholder?: string;
@@ -414,6 +437,7 @@ function SchemaField(props: {
   required: boolean;
   value: unknown;
   problems: Problem[];
+  ctx: ExprContext;
   onChange: (value: FieldValue) => void;
 }) {
   const { name, schema: s, value } = props;
@@ -471,6 +495,24 @@ function SchemaField(props: {
     s.default !== undefined ? `${String(s.default)} (default)` : example !== undefined ? `e.g. ${String(example)}` : undefined;
   let help = s.description;
   if (props.required && !help) help = "Required";
+  if (!numeric) {
+    // Text fields take ${…} variables and {{ … }} expressions (roadmap S35a).
+    const text = value === undefined || value === null ? "" : String(value);
+    return (
+      <ExpressionField
+        label={label}
+        fieldKey={key}
+        required={props.required}
+        help={help}
+        problems={props.problems}
+        value={text}
+        placeholder={placeholder}
+        multiline={s.format === "runnel-text"}
+        ctx={props.ctx}
+        onCommit={(v) => props.onChange(v === "" ? null : v)}
+      />
+    );
+  }
   return (
     <Field label={label} fieldKey={key} required={props.required} help={help} problems={props.problems} localError={localError}>
       {(p) => (
@@ -485,7 +527,7 @@ function SchemaField(props: {
               setLocalError(null);
               return props.onChange(null);
             }
-            if (numeric && !v.includes("${")) {
+            if (numeric && !v.includes("${") && !v.includes("{{")) {
               const n = Number(v);
               if (v.trim() === "" || Number.isNaN(n) || (s.type === "integer" && !Number.isInteger(n))) {
                 setLocalError(s.type === "integer" ? "Enter a whole number" : "Enter a number");
@@ -497,6 +539,62 @@ function SchemaField(props: {
             setLocalError(null);
             props.onChange(v);
           }}
+        />
+      )}
+    </Field>
+  );
+}
+
+/**
+ * A field with variables and expressions: problems of expressions are marked at their
+ * position, a misspelt name can be replaced with one click (mockup S35, state "error").
+ */
+function ExpressionField(props: {
+  label: string;
+  fieldKey: string;
+  required?: boolean;
+  help?: string;
+  problems: Problem[];
+  value: string;
+  placeholder?: string;
+  multiline?: boolean;
+  ctx: ExprContext;
+  testId?: string;
+  onCommit: (value: string) => void;
+}) {
+  const { value, ctx, problems } = props;
+  const located = useMemo(
+    () => problems.map((p) => ({ problem: p, at: locate(value, p.message, ctx) })),
+    [problems, value, ctx],
+  );
+  const marks = useMemo(() => located.flatMap((l) => (l.at ? [l.at] : [])), [located]);
+  const messages = located.map((l) => (l.at?.fix ? `${l.problem.message} – did you mean ${l.at.fix}?` : l.problem.message));
+  const fixes = located.flatMap(({ at }) =>
+    at?.fix
+      ? [{ label: `Replace with ${at.fix}`, apply: () => props.onCommit(value.slice(0, at.from) + at.fix + value.slice(at.to)) }]
+      : [],
+  );
+  return (
+    <Field
+      label={props.label}
+      fieldKey={props.fieldKey}
+      required={props.required}
+      help={props.help}
+      problems={problems}
+      messages={messages}
+      fixes={fixes}
+    >
+      {(p) => (
+        <ExpressionInput
+          labelId={p.labelId}
+          invalid={p.invalid}
+          value={value}
+          placeholder={props.placeholder}
+          multiline={props.multiline}
+          problems={marks}
+          ctx={ctx}
+          testId={props.testId}
+          onCommit={props.onCommit}
         />
       )}
     </Field>
@@ -637,11 +735,25 @@ const kindColors: Record<string, string> = {
   expression: "var(--link-expression)",
 };
 
-/** Properties of a link: condition, loop, disabled (mockup E7, state "link"). */
-function LinkProperties(props: PropertiesProps & { index: number }) {
+/** Wraps a condition in {{ … }} if it is not an expression yet; "" stays empty. */
+export function asExpression(text: string): string {
+  const t = text.trim();
+  if (t === "") return "";
+  if (!t.startsWith("{{")) return `{{ ${t} }}`;
+  return t.endsWith("}}") ? t : `${t} }}`;
+}
+
+/**
+ * Properties of a link: condition, loop, disabled (mockup E7, state "link"); a condition
+ * can be an expression (mockup S35, state "condition").
+ */
+function LinkProperties(props: PropertiesProps & { index: number; ctx: ExprContext }) {
   const { index, workflow, problems } = props;
   const l = workflow.links![index];
-  const kind = linkKind(l.when);
+  // "Expression" chosen, but nothing written yet: the field is shown, the file unchanged.
+  const [editing, setEditing] = useState(false);
+  const saved = linkKind(l.when);
+  const kind = editing ? "expression" : saved;
   const base = `$.links[${index}]`;
   const own = problems.filter((p) => p.path === base || p.path?.startsWith(base + "."));
   const rest = own.filter((p) => !["when", "loop", "disabled"].some((f) => p.path?.startsWith(`${base}.${f}`)));
@@ -669,28 +781,42 @@ function LinkProperties(props: PropertiesProps & { index: number }) {
         {l.from} → {l.to}
       </p>
       {rest.length > 0 && <ProblemList problems={rest} />}
-      <Field label="Condition" fieldKey="when" help={help[kind]} problems={problemsAt(problems, base, "when")}>
-        {() =>
-          kind === "expression" ? (
-            <div className="rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-expression">{l.when}</div>
-          ) : (
-            <Segmented
-              label="Condition"
-              value={kind}
-              options={[
-                ["success", "✔ Success"],
-                ["failure", "✖ Failure"],
-                ["always", "∞ Always"],
-              ]}
-              onChange={(v) => props.onLinkChange(index, { when: v as SettableKind })}
-            />
-          )
-        }
+      <Field label="Condition" fieldKey={kind === "expression" ? "when-kind" : "when"} keyLabel="when" help={kind === "expression" ? undefined : help[kind]}>
+        {() => (
+          <Segmented
+            label="Condition"
+            value={kind}
+            options={[
+              ["success", "✔ Success"],
+              ["failure", "✖ Failure"],
+              ["always", "∞ Always"],
+              ["expression", "ƒ Expr."],
+            ]}
+            onChange={(v) => {
+              if (v === "expression") return setEditing(true);
+              setEditing(false);
+              props.onLinkChange(index, { when: v as SettableKind });
+            }}
+          />
+        )}
       </Field>
-      <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
-        ƒ Conditions with expressions <span className="font-mono">{"{{ … }}"}</span> are written in the YAML view, e.g.{" "}
-        <span className="font-mono">{"when: \"{{ result.success && params.N > 10 }}\""}</span>.
-      </p>
+      {kind === "expression" && (
+        <ExpressionField
+          label="Expression"
+          fieldKey="when"
+          help={`${help.expression}. \${…} is replaced before the expression runs`}
+          problems={problemsAt(problems, base, "when")}
+          value={saved === "expression" ? (l.when ?? "") : "{{  }}"}
+          ctx={props.ctx}
+          testId="link-expression"
+          onCommit={(v) => {
+            const when = asExpression(v);
+            if (when === "" || when.replace(/\s/g, "") === "{{}}") return;
+            setEditing(false);
+            props.onLinkChange(index, { when });
+          }}
+        />
+      )}
       <Check
         fieldKey="loop"
         checked={l.loop ?? false}

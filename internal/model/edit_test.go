@@ -110,7 +110,8 @@ func TestEditWorkflowErrors(t *testing.T) {
 		{editSource, WorkflowEdit{Rename: map[string]string{"nope": "x"}}, `cannot rename action "nope"`},
 		{editSource, WorkflowEdit{Rename: map[string]string{"wait": "x"}, Delete: []string{"done"}}, "cannot be combined"},
 		{editSource, WorkflowEdit{AddLinks: []Link{{From: "wait", To: "nope"}}}, `action "nope" does not exist`},
-		{editSource, WorkflowEdit{AddLinks: []Link{{From: "wait", To: "done", When: "{{ x }}"}}}, "not supported here"},
+		{editSource, WorkflowEdit{AddLinks: []Link{{From: "wait", To: "done", When: "sometimes"}}}, "not supported here"},
+		{editSource, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 0, When: ptr("{{ a }}\nwhen: x")}}}, "not supported here"},
 		{editSource, WorkflowEdit{DeleteLinks: []int{9}}, "cannot delete link #10"},
 		{editSource, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 0, When: ptr("maybe")}}}, "not supported here"},
 		{strings.Replace(editSource, "actions:\n", "links2: x\nactions:\n", 1), WorkflowEdit{}, "unknown field"},
@@ -180,6 +181,21 @@ func TestEditWorkflowLinks(t *testing.T) {
 	got = edit(t, src, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 2, When: ptr("success")}}})
 	if !strings.Contains(got, "  - { from: report, to: done, loop: true }   # end\n") {
 		t.Errorf("got:\n%s", got)
+	}
+}
+
+func TestEditWorkflowLinkExpression(t *testing.T) {
+	when := `{{ params.N > 10 && result.output != "" }}`
+	got := edit(t, editSource, WorkflowEdit{UpdateLinks: []LinkUpdate{{Index: 1, When: &when}, {Index: 2, When: &when}}})
+	w, err := ParseWorkflow("x", []byte(got))
+	if err != nil {
+		t.Fatalf("%v\n%s", err, got)
+	}
+	if w.Links[1].When != when || w.Links[2].When != when {
+		t.Errorf("links %+v\n%s", w.Links, got)
+	}
+	if !strings.Contains(got, `  - { from: report, to: done, when: "{{ params.N > 10 && result.output != \"\" }}" }   # end`) {
+		t.Errorf("flow style link not kept on one line:\n%s", got)
 	}
 }
 

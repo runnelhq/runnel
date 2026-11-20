@@ -158,7 +158,8 @@ export interface WorkflowEdit {
   rename?: Record<string, string>;
   addLinks?: Link[];
   deleteLinks?: number[];
-  updateLinks?: { index: number; when?: "success" | "failure" | "always"; loop?: boolean; disabled?: boolean }[];
+  /** when: success, failure, always or an expression "{{ … }}". */
+  updateLinks?: { index: number; when?: string; loop?: boolean; disabled?: boolean }[];
   /** Changes one field of an action (properties panel); null removes the field. */
   set?: { id: string; field: string; value: string | number | boolean | null }[];
   /** Changes one field of the workflow itself (name, description, settings.*). */

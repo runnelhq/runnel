@@ -250,7 +250,7 @@ export function FileView(props: {
     );
   }, []);
   const onLinkChange = useCallback(
-    (index: number, change: { when?: SettableKind; loop?: boolean; disabled?: boolean }) =>
+    (index: number, change: { when?: SettableKind | string; loop?: boolean; disabled?: boolean }) =>
       void applyEdit({ updateLinks: [{ index, ...change }] }),
     [applyEdit],
   );
@@ -366,7 +366,7 @@ export function FileView(props: {
       const k = e.key.toLowerCase();
       // In a text field (id, search), undo and redo belong to the field.
       const t = e.target as HTMLElement | null;
-      if (k !== "s" && t && ["INPUT", "TEXTAREA"].includes(t.tagName)) return;
+      if (k !== "s" && t && (t.isContentEditable || ["INPUT", "TEXTAREA"].includes(t.tagName))) return;
       if (k === "s") {
         e.preventDefault();
         void save();

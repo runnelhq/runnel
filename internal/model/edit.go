@@ -63,7 +63,7 @@ type NewAction struct {
 // LinkUpdate changes the link with the given index; fields that are not given stay as they are.
 type LinkUpdate struct {
 	Index int `json:"index"`
-	// When is "success", "failure" or "always"; "success" removes the field.
+	// When is "success", "failure", "always" or an expression "{{ … }}"; "success" removes the field.
 	When *string `json:"when,omitempty"`
 	// Loop marks a link back to an earlier action.
 	Loop *bool `json:"loop,omitempty"`
@@ -272,7 +272,11 @@ func checkWhen(when string) error {
 	case "", "success", "failure", "always":
 		return nil
 	}
-	return fmt.Errorf(`condition %q is not supported here (success, failure or always)`, when)
+	// Expressions are checked like any other value of the file after the change.
+	if t := strings.TrimSpace(when); strings.HasPrefix(t, "{{") && strings.HasSuffix(t, "}}") && !strings.ContainsAny(t, "\n\r") {
+		return nil
+	}
+	return fmt.Errorf(`condition %q is not supported here (success, failure, always or an expression "{{ … }}")`, when)
 }
 
 // apply handles all changes except renaming.
@@ -691,7 +695,7 @@ func itemLines(indent string, items [][]string) []string {
 func flowLink(l Link) string {
 	parts := []string{"from: " + l.From, "to: " + l.To}
 	if l.When != "" {
-		parts = append(parts, "when: "+l.When)
+		parts = append(parts, "when: "+yamlScalar(l.When))
 	}
 	if l.Loop {
 		parts = append(parts, "loop: true")
@@ -721,7 +725,7 @@ func (e *editor) rewriteLink(item ast.Node, l Link) error {
 	}
 	item2 := []string{"from: " + l.From, "to: " + l.To}
 	if l.When != "" {
-		item2 = append(item2, "when: "+l.When)
+		item2 = append(item2, "when: "+yamlScalar(l.When))
 	}
 	if l.Loop {
 		item2 = append(item2, "loop: true")

@@ -12,7 +12,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | freigegeben mit PR #30, umgesetzt mit E6b |
 | [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | freigegeben mit PR #32, umgesetzt mit E7a (`action`, `wait`) und E7b |
 | [`e8-run.html`](e8-run.html) | E8 – Ausführen im Editor | `run`, `running`, `done`, `cancelled`, `unsaved` | freigegeben mit PR #35, umgesetzt mit E8a (Run, Live-Status, Rückfrage) und E8b (Log, Ergebnis im Panel, „wartet“) |
-| [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | Entwurf |
+| [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | freigegeben mit PR #43, umgesetzt mit S35a (alle Zustände außer `expanded`); `expanded` folgt mit S35b |
 
 ## Entscheidungen
 
@@ -49,6 +49,12 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E8 | Debug-Zeilen im Log standardmäßig an; der Schalter wird im Browser gemerkt |
 | E8 | Das Log zeigt den letzten Lauf der Datei seit dem Start des Servers; frühere Läufe mit der Lauf-Historie (S26) |
 | E8 | Umsetzung in zwei Schritten: E8a Run (Button, Dialog, Rückfrage, Cancel) mit Live-Status auf dem Canvas, E8b Log-Tab und Ergebnis im Panel |
+| S35 | CodeMirror 6 (MIT) statt Monaco: für viele kleine Felder gebaut, ein Bruchteil der Größe, Vorschläge und Tooltips eingebaut |
+| S35 | Ausdruckseditor in allen Textfeldern unter `with:` (auch Zeitangaben) und in Link-Bedingungen; ID und Beschreibung bleiben normale Felder; Parameter-Standardwerte und Outputs mit E7c |
+| S35 | Prüfung weiter über `/validate` (nach der Tipp-Pause); Funktionen mit Signatur und Beschreibung liefert der Server (`GET /expressions`), damit Editor und Engine nicht auseinanderlaufen |
+| S35 | Vorschau mit Werten des letzten Laufs und Vorschläge für die Felder von `output` später |
+| S35 | Umsetzung in zwei Schritten: S35a Editor im Panel und Link-Bedingung, S35b größerer Editor mit Referenz |
+| S35 | Die Signaturhilfe erscheint über der Zeile (statt links neben dem Panel), damit die Vorschläge darunter sichtbar bleiben |
 
 ## Screenshots erzeugen
 
