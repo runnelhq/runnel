@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -110,7 +112,29 @@ func (s *scheduler) run() (Status, error) {
 	case len(s.unhandled) > 1:
 		return Failed, errors.Join(s.unhandled...)
 	}
+	s.warnUnreachedEnd()
 	return Succeeded, nil
+}
+
+// warnUnreachedEnd warns when a workflow with a core.success action ended without
+// reaching it, e.g. because a link to it was disabled: the run still succeeds – the
+// last actions decide (KONZEPT, chapter 9) –, but the end that was meant was not reached.
+func (s *scheduler) warnUnreachedEnd() {
+	var missed []string
+	for _, a := range s.r.w.Actions {
+		if a.Type == model.ActionTypeSuccess && s.runs[a.ID] == 0 {
+			missed = append(missed, strconv.Quote(a.ID))
+		}
+	}
+	if len(missed) == 0 {
+		return
+	}
+	what := "its end action"
+	if len(missed) > 1 {
+		what = "any of its end actions"
+	}
+	s.r.emit(Event{Time: s.r.opts.Now(), Kind: Log, RunID: s.runID, Level: slog.LevelWarn,
+		Message: fmt.Sprintf("workflow ended without reaching %s %s (no link led there)", what, strings.Join(missed, ", "))})
 }
 
 // end stops the run: no further actions start, running ones are cancelled.

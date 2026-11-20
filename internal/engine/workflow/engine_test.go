@@ -554,3 +554,67 @@ actions:
 		})
 	}
 }
+
+// A workflow with core.success that ends without reaching it still succeeds, with a warning.
+func TestRunWarnsWhenEndIsNotReached(t *testing.T) {
+	for _, tt := range []struct {
+		name, links, want string
+	}{
+		{"reached", "  - { from: a, to: done }\n", ""},
+		{"disabled link", "  - { from: a, to: done, disabled: true }\n",
+			`log : workflow ended without reaching its end action "done" (no link led there)`},
+		{"condition not met", "  - { from: a, to: done, when: failure }\n",
+			`log : workflow ended without reaching its end action "done" (no link led there)`},
+	} {
+		w := parse(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: test.ok, with: { value: one } }
+  - { id: done, type: core.success }
+links:
+  - { from: start, to: a }
+`+tt.links)
+		res, trace := runWorkflow(t, w, nil)
+		if res.Status != Succeeded {
+			t.Errorf("%s: status %s, %v", tt.name, res.Status, res.Err)
+		}
+		var warnings []string
+		for _, l := range trace {
+			if strings.Contains(l, "end action") {
+				warnings = append(warnings, l)
+			}
+		}
+		if got := strings.Join(warnings, "|"); got != tt.want {
+			t.Errorf("%s: warnings %q, want %q", tt.name, got, tt.want)
+		}
+	}
+
+	// Without core.success (only an abort on the failure path), ending without it is normal.
+	w := parse(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: test.ok, with: { value: one } }
+  - { id: stop, type: core.abort }
+links:
+  - { from: start, to: a }
+  - { from: a, to: stop, when: failure }
+`)
+	if res, trace := runWorkflow(t, w, nil); res.Status != Succeeded || strings.Contains(strings.Join(trace, "|"), "end action") {
+		t.Errorf("abort only: %s %v", res.Status, trace)
+	}
+	// Two unreached end actions are named together.
+	w = parse(t, `
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: test.ok, with: { value: one } }
+  - { id: ok1, type: core.success }
+  - { id: ok2, type: core.success }
+links:
+  - { from: start, to: a }
+  - { from: a, to: ok1, disabled: true }
+  - { from: a, to: ok2, disabled: true }
+`)
+	if _, trace := runWorkflow(t, w, nil); !strings.Contains(strings.Join(trace, "|"), `without reaching any of its end actions "ok1", "ok2"`) {
+		t.Errorf("two: %v", trace)
+	}
+}
