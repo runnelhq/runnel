@@ -58,12 +58,20 @@ func TestValidatePipeline(t *testing.T) {
 	if res.Pipeline == nil || len(res.Pipeline.Transforms) != 2 || res.Pipeline.Layout["read"].X != 16 || res.Workflow != nil {
 		t.Errorf("pipeline %+v", res.Pipeline)
 	}
+	// The schemas around the transforms: csv.input without fields reads an open schema.
+	if sc := res.Schemas["active"]; sc.Input == nil || !sc.Input.Open || res.Schemas["read"].Input != nil || len(res.Schemas) != 2 {
+		t.Errorf("schemas %+v", res.Schemas)
+	}
 	// An open schema (csv.input without fields) gives no warning for umsatzz; an unknown
 	// field of a transform is an error at its place.
 	content := strings.Replace(pipelineYAML, "      delimiter: \";\"\n", "      delimiter: \";\"\n      sheet: 1\n", 1)
 	rec = do(t, s, "POST", "/api/v1/validate", mustJSON(t, map[string]any{"path": "pipelines/customers.pipeline.yaml", "content": content}))
+	res = validateResponse{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
 		t.Fatal(err)
+	}
+	if res.Schemas["active"].Input == nil {
+		t.Errorf("schemas missing despite an error in a transform: %s", rec.Body)
 	}
 	if res.Errors != 1 || res.Problems[0].Path != "$.transforms[0].with" || !strings.Contains(res.Problems[0].Message, `unknown field "sheet"`) {
 		t.Errorf("problems %+v", res.Problems)

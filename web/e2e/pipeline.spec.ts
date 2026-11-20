@@ -203,3 +203,57 @@ test("changes the settings of the pipeline and jumps to problems", async ({ page
   await expect(page.getByTestId("node-write").getByTestId("copies")).toHaveCount(0);
   await expect(page.getByTestId("error-count")).toHaveCount(0);
 });
+
+test("shows the fields of the incoming records and of the links", async ({ page, request }) => {
+  // A filter between tag and write that uses a field of the records.
+  await request.put(fileURL, {
+    headers: { "If-Match": "*" },
+    data: original
+      .replace("  - { from: tag, to: write }\n", "  - { from: tag, to: check }\n  - { from: check, to: write }\n")
+      .replace("  - id: write\n", '  - id: check\n    type: core.filter\n    with:\n      condition: "{{ record.revenue > 0 }}"\n  - id: write\n'),
+  });
+  await open(page);
+  await expect(page.getByTestId("error-count")).toHaveCount(0);
+
+  // csv.input reads columns without fields: nothing is known before the pipeline runs.
+  await page.getByTestId("node-active").click();
+  await expect(panel(page)).toContainText("from types · open");
+  await expect(panel(page).getByTestId("fields")).toHaveText("fields known only when the pipeline runs");
+
+  // After map (select-fields), the fields are known; the one in the condition is marked.
+  await page.getByTestId("node-check").click();
+  await expect(page.getByRole("textbox", { name: "ID", exact: true })).toHaveValue("check");
+  const fields = panel(page).getByTestId("fields").getByRole("listitem");
+  await expect(fields).toHaveText(["externalIdany", "companyNameany", "revenueany", "sourcestring", "batchany"]);
+  await expect(fields.nth(2)).toHaveAttribute("data-used", "true");
+  await expect(fields.nth(0)).not.toHaveAttribute("data-used", "true");
+  // An input has no incoming fields.
+  await page.getByTestId("node-read").click();
+  await expect(panel(page)).not.toContainText("Incoming fields");
+
+  // An error link has the fields of the incoming records and the error fields.
+  await page.getByTestId("link-1").click();
+  await page.keyboard.press("Escape");
+  await expect(panel(page).getByTestId("fields").getByRole("listitem")).toHaveText([
+    "_errorstring",
+    "_errorFieldstring",
+    "_errorTransformstring",
+    "and fields known only when the pipeline runs",
+  ]);
+  // A data link: the records of its source.
+  await page.getByTestId("link-6").click();
+  await page.keyboard.press("Escape");
+  await expect(panel(page).getByTestId("link-ends")).toHaveText("check → write");
+  await expect(panel(page)).toContainText("closed");
+  await expect(panel(page).getByTestId("fields").getByRole("listitem")).toHaveCount(5);
+
+  // While a link leads nowhere, the fields are not derived.
+  await page.request.put(fileURL, {
+    headers: { "If-Match": "*" },
+    data: original.replace("  - { from: tag, to: write }\n", "  - { from: tag, to: write }\n  - { from: tag, to: nowhere }\n"),
+  });
+  await page.reload();
+  await page.getByRole("tree").getByText("canvas.pipeline.yaml", { exact: true }).click();
+  await page.getByTestId("node-write").click();
+  await expect(panel(page)).toContainText("The fields are shown once the transforms and links have no errors.");
+});

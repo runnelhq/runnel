@@ -119,7 +119,12 @@ type Runner struct {
 	// copies holds the further instances of transforms with copies > 1.
 	copies [][]transform.Transform
 	// schemas holds the schema of the output of each transform (ADR 0007).
-	schemas  []record.Schema
+	schemas []record.Schema
+	// errSchemas holds the schema of the records each transform passes to error links.
+	errSchemas []record.Schema
+	// inputs holds the merged schema of the incoming records of each transform; nil
+	// for a transform without incoming links.
+	inputs   []*record.Schema
 	warnings model.Errors
 	emitMu   sync.Mutex
 }
@@ -128,6 +133,33 @@ type Runner struct {
 // configuration must be valid. The pipeline must have been validated (Pipeline.Validate)
 // without errors. All problems are returned as model.Errors.
 func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
+	r, errs := build(p, opts)
+	if err := errs.Err(); err != nil {
+		return nil, err
+	}
+	diags := r.deriveSchemas()
+	for i, l := range p.Links {
+		if l.Type != model.ErrorLink {
+			continue
+		}
+		for _, t := range p.Transforms {
+			if def, _ := opts.Registry.Lookup(t.Type); t.ID == l.From && !def.RecordErrors {
+				diags = append(diags, p.WarningAt(fmt.Sprintf("$.links[%d].type", i),
+					"link #%d (%s → %s): %s does not pass records with errors on; the error link is never used", i+1, l.From, l.To, t.Type))
+			}
+		}
+	}
+	if diags.HasErrors() {
+		return nil, diags.Err()
+	}
+	diags.Sort()
+	r.warnings = diags
+	return r, nil
+}
+
+// build creates the transforms of a pipeline; a transform that cannot be created
+// (unknown type, invalid configuration) stays nil and its problem is returned.
+func build(p *model.Pipeline, opts Options) (*Runner, model.Errors) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
@@ -170,27 +202,34 @@ func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
 			r.copies[i] = append(r.copies[i], c)
 		}
 	}
-	if err := errs.Err(); err != nil {
-		return nil, err
-	}
-	diags := r.deriveSchemas()
-	for i, l := range p.Links {
-		if l.Type != model.ErrorLink {
-			continue
+	return r, errs
+}
+
+// TransformSchemas are the schemas around one transform, for the editor (roadmap S25a2).
+type TransformSchemas struct {
+	// Input is the merged schema of the incoming records; missing for a transform
+	// without incoming links.
+	Input *record.Schema `json:"input,omitempty"`
+	// Output is the schema of the records on its data links.
+	Output record.Schema `json:"output"`
+	// Errors is the schema of the records on its error links (with _error, _errorField
+	// and _errorTransform).
+	Errors record.Schema `json:"errors"`
+}
+
+// Schemas derives the schemas of all transforms by id, like Prepare does. Unlike
+// Prepare, it also works when some transforms have errors: their records count as
+// unknown (an open schema). The pipeline must pass Pipeline.Validate without errors.
+func Schemas(p *model.Pipeline, opts Options) map[string]TransformSchemas {
+	r, _ := build(p, opts)
+	_ = r.deriveSchemas() // the problems are those of Check
+	out := make(map[string]TransformSchemas, len(p.Transforms))
+	for i, t := range p.Transforms {
+		if _, dup := out[t.ID]; !dup {
+			out[t.ID] = TransformSchemas{Input: r.inputs[i], Output: r.schemas[i], Errors: r.errSchemas[i]}
 		}
-		for _, t := range p.Transforms {
-			if def, _ := opts.Registry.Lookup(t.Type); t.ID == l.From && !def.RecordErrors {
-				diags = append(diags, p.WarningAt(fmt.Sprintf("$.links[%d].type", i),
-					"link #%d (%s → %s): %s does not pass records with errors on; the error link is never used", i+1, l.From, l.To, t.Type))
-			}
-		}
 	}
-	if diags.HasErrors() {
-		return nil, diags.Err()
-	}
-	diags.Sort()
-	r.warnings = diags
-	return r, nil
+	return out
 }
 
 // outLink is an outgoing link of a transform.
@@ -225,7 +264,8 @@ func (r *Runner) values(runID string, started time.Time) map[string]any {
 
 // checkStrict reports links whose schema is open, which the strict mode does not allow
 // (ADR 0007): once per transform for its data links, and per error link.
-func (r *Runner) checkStrict(errSchemas []record.Schema) model.Errors {
+func (r *Runner) checkStrict() model.Errors {
+	errSchemas := r.errSchemas
 	p := r.p
 	index := map[string]int{}
 	for i, t := range p.Transforms {
@@ -296,7 +336,9 @@ func (r *Runner) deriveSchemas() model.Errors {
 		}
 	}
 	r.schemas = make([]record.Schema, len(p.Transforms))
-	errSchemas := make([]record.Schema, len(p.Transforms))
+	r.errSchemas = make([]record.Schema, len(p.Transforms))
+	r.inputs = make([]*record.Schema, len(p.Transforms))
+	errSchemas := r.errSchemas
 	var diags model.Errors
 	for len(queue) > 0 {
 		i := queue[0]
@@ -313,6 +355,8 @@ func (r *Runner) deriveSchemas() model.Errors {
 		// without input (e.g. csv.input) the values as read, so nothing is known.
 		errSchemas[i] = record.OpenSchema()
 		if len(in) > 0 {
+			merged := record.Merge(in...)
+			r.inputs[i] = &merged
 			errSchemas[i] = record.Merge(in...).
 				With(transform.ErrorField, record.String).
 				With(transform.ErrorFieldField, record.String).
@@ -358,7 +402,7 @@ func (r *Runner) deriveSchemas() model.Errors {
 		}
 	}
 	if p.Settings.Strict {
-		diags = append(diags, r.checkStrict(errSchemas)...)
+		diags = append(diags, r.checkStrict()...)
 	}
 	return diags
 }
