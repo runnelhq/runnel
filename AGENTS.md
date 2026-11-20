@@ -22,20 +22,23 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – danach Diff prüfen |
 | Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel triggers examples/hello` · `bin/runnel serve examples/hello` |
 
-Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderungen am Editor zusätzlich `make e2e`.
+Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderungen am Editor zusätzlich `make e2e`; bei
+Windows-Code (`*_windows.go`) zusätzlich `GOOS=windows go vet ./...` und `GOOS=windows golangci-lint run ./...`.
 
 ## Struktur
 
 | Pfad | Inhalt |
 |---|---|
 | `cmd/runnel/` | Einstiegspunkt, Signalbehandlung |
-| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`, `triggers`) |
+| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`, `triggers`, `service`) |
 | `internal/model/` | Dateiformate (Workflow, Pipeline, Project, Environment, Trigger), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
 | `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |
 | `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt |
+| `internal/winsvc/` | Windows-Dienst: Installieren, Steuern, Ausführen, Ereignisanzeige (`*_windows.go`; sonst `ErrNotSupported`) |
+| `internal/logfile/` | Log-Datei mit Rotation nach Größe (Dienst) |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Läufe und Ereignisse im Speicher |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |

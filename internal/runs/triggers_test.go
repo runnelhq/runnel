@@ -156,3 +156,27 @@ func TestStartRecordsTrigger(t *testing.T) {
 		t.Fatalf("%+v %v", run, err)
 	}
 }
+
+// Drain rejects new runs and waits for the running ones without cancelling them (S41).
+func TestDrain(t *testing.T) {
+	m := NewManager()
+	defer func() { _ = m.Shutdown(context.Background()) }()
+	short := spec(waitBody)
+	short.Params = map[string]string{"DELAY": "200ms"}
+	run, _, err := m.Start("workflows/a.workflow.yaml", short)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Running() != 1 {
+		t.Fatalf("running %d", m.Running())
+	}
+	if err := m.Drain(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := m.Get(run.ID); d.Status != "succeeded" {
+		t.Errorf("drained run: %s", d.Status)
+	}
+	if _, _, err := m.Start("workflows/a.workflow.yaml", short); !errors.Is(err, ErrShutdown) {
+		t.Errorf("start after drain: %v", err)
+	}
+}

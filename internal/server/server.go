@@ -41,6 +41,8 @@ type Options struct {
 	UI fs.FS
 	// Log receives messages for the server log (e.g. runs started by triggers); nil: none.
 	Log func(msg string)
+	// Warn receives problems for the server log (e.g. trigger files with errors); nil: Log.
+	Warn func(msg string)
 }
 
 // Server serves the API for one project.
@@ -73,7 +75,7 @@ func New(opts Options) (*Server, error) {
 	}
 	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
 		stop: make(chan struct{})}
-	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Running: s.running, Log: opts.Log})
+	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Running: s.running, Log: opts.Log, Warn: opts.Warn})
 	return s, nil
 }
 
@@ -88,6 +90,18 @@ func (s *Server) StartTriggers(ctx context.Context) {
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.stopOnce.Do(func() { close(s.stop) })
 	return s.runs.Shutdown(ctx)
+}
+
+// Drain stops starting runs (triggers and the API get "the server is shutting down",
+// 503) and waits until the running runs have ended or ctx is done, without cancelling
+// them (S41). Call Shutdown afterwards for the rest.
+func (s *Server) Drain(ctx context.Context) error {
+	return s.runs.Drain(ctx)
+}
+
+// Running returns the number of running runs.
+func (s *Server) Running() int {
+	return s.runs.Running()
 }
 
 // Close releases the project directory.
