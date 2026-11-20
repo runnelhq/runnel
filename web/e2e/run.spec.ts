@@ -70,15 +70,37 @@ test("runs a workflow and shows the status of each action", async ({ page }) => 
   await expect(node(page, "start")).not.toHaveAttribute("data-run");
 });
 
+/** The newest run of the test workflow on the server (the list is newest first). */
+async function newestRun(page: Page): Promise<{ id: string; status: string } | undefined> {
+  const { runs } = (await (await page.request.get("/api/v1/runs")).json()) as { runs: { id: string; path: string; status: string }[] };
+  return runs.find((r) => r.path === path);
+}
+
+/** Waits until a run newer than previous (an id) has finished on the server. */
+async function waitForRunAfter(page: Page, previous: string | undefined) {
+  const finished = async () => {
+    const run = await newestRun(page);
+    return run !== undefined && run.id !== previous && run.status !== "running";
+  };
+  await expect.poll(finished, { timeout: 10_000 }).toBe(true);
+}
+
 test("Run uses the remembered values; the arrow changes them", async ({ page }) => {
   await open(page);
+  let previous = (await newestRun(page))?.id;
   await runButton(page).click();
   await runWith(page, { DELAY_A: "0s", DELAY_B: "oops" });
+  await waitForRunAfter(page, previous);
+  previous = (await newestRun(page))?.id;
   await expect(page.getByTestId("run-status")).toContainText("Last run succeeded", { timeout: 10_000 });
 
-  // F5 runs again without the dialog, with the same values.
+  // F5 runs again without the dialog, with the same values. The canvas shows the same
+  // as after the first run, so the test waits for the run on the server: a run started
+  // while another one is running is ignored.
   await page.keyboard.press("F5");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await waitForRunAfter(page, previous);
+  previous = (await newestRun(page))?.id;
   await expect(node(page, "fetch-b")).toHaveAttribute("data-run", "failed");
   await expect(page.getByTestId("run-status")).toContainText("Last run succeeded", { timeout: 10_000 });
 
@@ -86,6 +108,7 @@ test("Run uses the remembered values; the arrow changes them", async ({ page }) 
   const dialog = page.getByRole("dialog", { name: "Run run.workflow.yaml" });
   await expect(dialog.getByLabel("DELAY_B")).toHaveValue("oops");
   await runWith(page, { DELAY_B: "" });
+  await waitForRunAfter(page, previous);
   await expect(page.getByTestId("run-status")).toContainText("Last run succeeded", { timeout: 10_000 });
   await expect(node(page, "fetch-b")).toHaveAttribute("data-run", "succeeded");
   await expect(node(page, "report-error")).toHaveAttribute("data-run", "skipped");

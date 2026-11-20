@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -13,8 +14,9 @@ import (
 // like core.run-workflow (roadmap S18). The pipeline gets only the parameters given here,
 // plus the variables of the project and environment. The output are the counts of its
 // transforms, e.g. {{ results.load.output.transforms.write.written }}, and the number
-// of records that went to error links ({{ results.load.output.errors }}). A failed
-// pipeline fails the action.
+// of records that went to error links ({{ results.load.output.errors }}). Records can
+// be passed in (rows, read by core.from-result) and come back (output.rows, written by
+// core.to-result). A failed pipeline fails the action.
 var runPipelineDefinition = action.Definition{
 	Type:        "core.run-pipeline",
 	Category:    action.CategoryExecution,
@@ -27,6 +29,8 @@ var runPipelineDefinition = action.Definition{
 type runPipeline struct {
 	Pipeline string         `json:"pipeline" doc:"Pipeline file, relative to the project folder" schema:"required,example=pipelines/import.pipeline.yaml"`
 	Params   map[string]any `json:"params" doc:"Values for the parameters of the pipeline, by name"`
+	// Rows is a list, usually from an expression; checked when the action runs.
+	Rows any `json:"rows" doc:"Records for core.from-result in the pipeline: a list, e.g. {{ results.files.output }}; items that are not objects become a record with the field value"`
 }
 
 func newRunPipeline(with map[string]any) (action.Action, error) {
@@ -52,7 +56,11 @@ func (a *runPipeline) Execute(ctx context.Context, ec *action.ExecContext) (acti
 	for name, v := range a.Params {
 		params[name] = expr.Format(v)
 	}
-	out, err := ec.RunPipeline(ctx, a.Pipeline, params)
+	rows, err := toRows(a.Rows)
+	if err != nil {
+		return action.Result{}, err
+	}
+	out, err := ec.RunPipeline(ctx, a.Pipeline, params, rows)
 	if err != nil {
 		if ctx.Err() != nil {
 			return action.Result{}, ctx.Err()
@@ -61,4 +69,26 @@ func (a *runPipeline) Execute(ctx context.Context, ec *action.ExecContext) (acti
 	}
 	ec.Logf(slog.LevelDebug, "%s finished, %v record(s) with errors", a.Pipeline, out["errors"])
 	return action.Result{Output: out}, nil
+}
+
+// toRows turns the value of rows into records: objects as they are, other items as
+// {value: item}. Without rows, nil.
+func toRows(v any) ([]map[string]any, error) {
+	switch v := v.(type) {
+	case nil:
+		return nil, nil
+	case []any:
+		rows := make([]map[string]any, len(v))
+		for i, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				rows[i] = m
+			} else {
+				rows[i] = map[string]any{"value": item}
+			}
+		}
+		return rows, nil
+	case []map[string]any:
+		return v, nil
+	}
+	return nil, fmt.Errorf("rows must be a list, e.g. {{ results.files.output }}, not %s", expr.Format(v))
 }

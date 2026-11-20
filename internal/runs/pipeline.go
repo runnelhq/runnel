@@ -5,6 +5,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
@@ -22,6 +23,8 @@ type PipelineSpec struct {
 	Registry *transform.Registry
 	Observer func(pipeline.Event)
 	RunID    string
+	// Rows are records for core.from-result (from core.run-pipeline).
+	Rows []record.Record
 }
 
 // PreparedPipeline is the result of PreparePipeline; it is also returned when it fails,
@@ -74,6 +77,7 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		Environment: envName,
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
+		Rows:        spec.Rows,
 	})
 	if err == nil {
 		// Warnings of the schemas, e.g. fields that are not known (ADR 0007).

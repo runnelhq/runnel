@@ -38,6 +38,8 @@ type Output struct {
 	values map[string]any
 	fail   func(record.Record) error
 	emitTo func(string, record.Record) error
+	rows   []record.Record
+	result func(record.Record) error
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
@@ -60,6 +62,26 @@ func (o *Output) EmitTo(target string, r record.Record) error {
 		return o.emit(r)
 	}
 	return o.emitTo(target, r)
+}
+
+// WithResults sets the records passed to the run (Rows) and where AddResult collects
+// the result records of the run (roadmap S24a); the engine sets them.
+func (o *Output) WithResults(rows []record.Record, add func(record.Record) error) *Output {
+	o.rows, o.result = rows, add
+	return o
+}
+
+// Rows returns the records passed to the run, e.g. by core.run-pipeline (rows); they
+// must not be changed (emit copies).
+func (o *Output) Rows() []record.Record { return o.rows }
+
+// AddResult adds a record to the result of the run, e.g. for output.rows of
+// core.run-pipeline. The record must not be changed afterwards.
+func (o *Output) AddResult(r record.Record) error {
+	if o.result == nil {
+		return nil
+	}
+	return o.result(r)
 }
 
 // Fields of a record on an error link (roadmap S17a): the message, the field that
