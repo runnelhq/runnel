@@ -24,6 +24,10 @@ const ActionTypeRunWorkflow = "core.run-workflow"
 func CheckCalls(w *model.Workflow, projectDir, file string) model.Errors {
 	var errs model.Errors
 	for i, a := range w.Actions {
+		if a.Type == ActionTypeRunPipeline {
+			errs = append(errs, checkPipelineCall(w, i, a, projectDir, file)...)
+			continue
+		}
 		path, ok := staticText(a.With["workflow"])
 		if a.Type != ActionTypeRunWorkflow || !ok || path == "" {
 			continue
@@ -76,20 +80,48 @@ func readWorkflow(file, name string) (*model.Workflow, error) {
 	return w, nil
 }
 
+// checkPipelineCall checks a call of a pipeline (core.run-pipeline) with a fixed path:
+// the file exists and is a pipeline, and the parameters fit (like workflow calls).
+func checkPipelineCall(w *model.Workflow, i int, a model.Action, projectDir, file string) model.Errors {
+	path, ok := staticText(a.With["pipeline"])
+	if !ok || path == "" {
+		return nil
+	}
+	at := fmt.Sprintf("$.actions[%d].with", i)
+	childFile, name := Resolve(projectDir, file, path)
+	data, err := os.ReadFile(childFile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return model.Errors{w.ErrorAt(at+".pipeline", "action %q: pipeline file %s not found", a.ID, name)}
+	} else if err != nil {
+		return model.Errors{w.ErrorAt(at+".pipeline", "action %q: cannot read pipeline file %s: %v", a.ID, name, err)}
+	}
+	pl, err := model.ParsePipeline(name, data)
+	if err != nil {
+		return model.Errors{w.ErrorAt(at+".pipeline", "action %q: pipeline file %s has errors; check it with \"runnel validate\"", a.ID, name)}
+	}
+	params, _ := a.With["params"].(map[string]any)
+	return checkGivenParams(w, at, a.ID, pl.Parameters, "pipeline "+name, params)
+}
+
 func checkParamsOf(w *model.Workflow, at, id string, child *model.Workflow, name string, params map[string]any) model.Errors {
+	return checkGivenParams(w, at, id, child.Parameters, "workflow "+name, params)
+}
+
+// checkGivenParams checks the parameters given to a called workflow or pipeline (what).
+func checkGivenParams(w *model.Workflow, at, id string, parameters []model.Parameter, what string, params map[string]any) model.Errors {
 	var errs model.Errors
 	declaredParams := map[string]model.Parameter{}
-	for _, p := range child.Parameters {
+	for _, p := range parameters {
 		declaredParams[p.Name] = p
 		if _, given := params[p.Name]; !given && p.Required && p.Default == "" {
-			errs = append(errs, w.ErrorAt(at, "action %q: missing required parameter %s of workflow %s", id, p.Name, name))
+			errs = append(errs, w.ErrorAt(at, "action %q: missing required parameter %s of %s", id, p.Name, what))
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(params)) {
 		p, ok := declaredParams[key]
 		if !ok {
-			errs = append(errs, w.ErrorAt(at+".params."+key, "action %q: parameter %s is not declared by workflow %s (declared: %s)",
-				id, key, name, declared(child)))
+			errs = append(errs, w.ErrorAt(at+".params."+key, "action %q: parameter %s is not declared by %s (declared: %s)",
+				id, key, what, declaredOf(parameters)))
 			continue
 		}
 		if text, fixed := staticText(params[key]); fixed {

@@ -67,6 +67,35 @@
       }
     },
     {
+      "type": "core.run-pipeline",
+      "kind": "action",
+      "category": "execution",
+      "label": "Run Pipeline",
+      "description": "Runs a pipeline with parameters; output: the counts of its transforms",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pipeline": {
+            "type": "string",
+            "description": "Pipeline file, relative to the project folder",
+            "examples": [
+              "pipelines/import.pipeline.yaml"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "description": "Values for the parameters of the pipeline, by name",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "pipeline"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "type": "core.run-workflow",
       "kind": "action",
       "category": "execution",

@@ -274,6 +274,33 @@ func TestRunParallelExample(t *testing.T) {
 	}
 }
 
+func TestRunPipelineFromWorkflowExample(t *testing.T) {
+	chdirRepoRoot(t)
+	dir := t.TempDir()
+	code, out, errOut := run(t, "run", "-v", "--param", "OUT_DIR="+dir, "examples/pipelines/workflows/import.workflow.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		`[prepare] pipeline "customers" started, run `,
+		"[prepare] customers/active: kept 2 of 3 records, dropped 1",
+		"[prepare] customers/types: read 4, written 3, errors 1 in ",
+		"[check] 1 customer(s) rejected, see customers-rejected.csv",
+		"[done] Batch 7: 2 customer(s) exported",
+		"output EXPORTED = 2",
+		"output REJECTED = 1",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	for _, file := range []string{"customers-crm.csv", "customers-rejected.csv"} {
+		if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
+			t.Errorf("%s: %v", file, err)
+		}
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

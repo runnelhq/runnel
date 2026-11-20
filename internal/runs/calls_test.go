@@ -12,6 +12,7 @@ import (
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/transforms"
 )
 
 const childWorkflow = `kind: Workflow
@@ -107,7 +108,7 @@ func startCtx(ctx context.Context, t *testing.T, dir string, params map[string]s
 	rec := &recorder{}
 	p, err := Prepare(Spec{
 		Name: "workflows/parent.workflow.yaml", File: filepath.Join(dir, "workflows", "parent.workflow.yaml"),
-		Data: data, ProjectDir: dir, Params: params, Registry: actions.Builtin(), Observer: rec.observe,
+		Data: data, ProjectDir: dir, Params: params, Registry: actions.Builtin(), Transforms: transforms.Builtin(), Observer: rec.observe,
 	})
 	if err != nil {
 		return workflow.Result{}, rec, err

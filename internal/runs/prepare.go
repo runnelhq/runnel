@@ -13,6 +13,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/transform"
 )
 
 // Spec describes a run to prepare.
@@ -33,8 +34,11 @@ type Spec struct {
 	Params map[string]string
 
 	Registry *action.Registry
-	Observer func(workflow.Event)
-	RunID    string
+	// Transforms are the transform types of pipelines called with core.run-pipeline;
+	// nil: calling pipelines is not available.
+	Transforms *transform.Registry
+	Observer   func(workflow.Event)
+	RunID      string
 
 	// chain lists the workflows that called this one (core.run-workflow).
 	chain []caller
@@ -116,17 +120,21 @@ func Prepare(spec Spec) (*Prepared, error) {
 		RunID:       spec.RunID,
 		Environment: envName,
 		Workflows:   spec.workflows(envName),
+		Pipelines:   spec.pipelines(envName),
 	})
 	return p, err
 }
 
 // declared lists the parameter names of a workflow for messages.
-func declared(w *model.Workflow) string {
-	if len(w.Parameters) == 0 {
+func declared(w *model.Workflow) string { return declaredOf(w.Parameters) }
+
+// declaredOf lists parameter names for messages; "none" without parameters.
+func declaredOf(params []model.Parameter) string {
+	if len(params) == 0 {
 		return "none"
 	}
-	names := make([]string, len(w.Parameters))
-	for i, p := range w.Parameters {
+	names := make([]string, len(params))
+	for i, p := range params {
 		names[i] = p.Name
 	}
 	return strings.Join(names, ", ")
