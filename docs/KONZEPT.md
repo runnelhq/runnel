@@ -470,7 +470,6 @@ transforms:
       method: POST
       url: /api/accounts
       body: "{{ record }}"
-    onError: error-link
 
   - id: rejected
     type: csv.output
@@ -483,6 +482,21 @@ links:
   - { from: map,         to: to-crm }
   - { from: to-crm,      to: rejected, type: error }
 ```
+
+Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beispiel oben zeigt den Zielumfang):
+
+- Pflichtfelder: `kind: Pipeline`, `apiVersion: runnel/v1`, `name`; je Transform `id` und `type`; je Link `from` und `to`.
+  Dazu `description`, `parameters` (wie bei Workflows, ohne `outputs`) und je Transform `with`.
+- Transform-IDs wie Action-IDs; Typen `<namespace>.<name>` in einem eigenen Namensraum ([ADR 0013](adr/0013-typnamen-namensraeume.md)).
+  Ob ein Typ existiert und seine Konfiguration passt, wird geprüft, sobald es Transforms gibt (S13).
+- Links sind Daten-Links (`type: data`, Standard). **Fehler werden nur über Links behandelt** (`type: error`, mit S17),
+  nicht über ein Feld am Transform – wie die Fehlerpfade (`when: failure`) bei Workflows. `type: info` folgt mit S23;
+  bis dahin meldet `runnel validate` beide als „noch nicht unterstützt“ (der Editor zeigt Pipelines bis S25a nur als YAML).
+- Graph: mindestens ein Transform, eindeutige IDs, Links nur zwischen vorhandenen Transforms, keine Links auf sich
+  selbst und **keine Zyklen** (Datensätze fließen nur vorwärts). Warnungen: doppelte Links, Transforms ohne Verbindung.
+- `copies`, `settings` (z. B. `bufferSize`), `disabled`, `layout` und der Verteilmodus kommen mit den Schritten, die sie
+  ausführen (S13, S17, S25a); bis dahin sind sie unbekannte Felder.
+- `runnel validate` prüft `*.pipeline.yaml` mit; `runnel run` lehnt Pipelines bis S13 mit einem Hinweis ab.
 
 ### 5.3 Trigger
 

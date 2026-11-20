@@ -28,7 +28,7 @@ daneben legen.
 |---|---|---|
 | W1 | `.\runnel.exe version` | Version `v0.1.0-alpha.2`, `windows/amd64`; ggf. SmartScreen-Warnung beim ersten Start (exe noch nicht signiert) |
 | W2 | `.\runnel.exe validate examples\hello` | `3 workflow files checked: 0 errors, 0 warnings` |
-| W3 | `.\runnel.exe validate examples\broken` | 4 Fehler, 2 Warnungen; Exit-Code 1 (`$LASTEXITCODE`) |
+| W3 | `.\runnel.exe validate examples\broken` | 4 Fehler, 2 Warnungen; Exit-Code 1 (`$LASTEXITCODE`); ab S12 mit `cycle.pipeline.yaml`: 6 Fehler, 2 Warnungen („2 workflow files and 1 pipeline file checked“) |
 | W4 | `.\runnel.exe run examples\hello\workflows\hello.workflow.yaml` | Gruß mit Rechnername und `%TEMP%`-Pfad, `output MESSAGE = …`, Exit-Code 0 |
 | W5 | wie W4 mit `--env prod --param GREETING=Moin` | „Moin, Production! … \\fileserver\exchange\runnel-hello“ |
 | W6 | wie W4 mit `--param GREETING=Servus` | Exit-Code 2, Meldung zu erlaubten Werten |

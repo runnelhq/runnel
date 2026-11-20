@@ -1,0 +1,9 @@
+# copies and onError are not part of the format yet (copies with S13/S17; errors via links).
+kind: Pipeline
+apiVersion: runnel/v1
+name: later
+transforms:
+  - id: call
+    type: http.request
+    copies: 4
+    onError: error-link

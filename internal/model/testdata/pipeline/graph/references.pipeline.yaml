@@ -1,0 +1,16 @@
+kind: Pipeline
+apiVersion: runnel/v1
+name: references
+transforms:
+  - { id: read, type: csv.input }
+  - { id: filter, type: core.filter }
+  - { id: write, type: csv.output }
+  - { id: write, type: csv.output }
+  - { id: lonely, type: core.dummy }
+links:
+  - { from: read, to: filtr }
+  - { from: raed, to: write }
+  - { from: read, to: filter }
+  - { from: read, to: filter }
+  - { from: filter, to: filter }
+  - { from: filter, to: write }

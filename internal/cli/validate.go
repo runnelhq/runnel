@@ -20,16 +20,21 @@ import (
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
-const workflowSuffix = ".workflow.yaml"
+const (
+	workflowSuffix = ".workflow.yaml"
+	pipelineSuffix = ".pipeline.yaml"
+)
 
 func newValidateCommand() *cobra.Command {
 	var opts validateOptions
 	cmd := &cobra.Command{
 		Use:   "validate [path...]",
-		Short: "Check workflow files for errors",
+		Short: "Check workflow and pipeline files for errors",
 		Long: "Checks workflow files (*" + workflowSuffix + ") for syntax errors, invalid fields,\n" +
 			"links to unknown actions, cycles, unreachable actions, undefined variables,\n" +
-			"unknown action types and invalid action configurations (with:).\n\n" +
+			"unknown action types and invalid action configurations (with:).\n" +
+			"Pipeline files (*" + pipelineSuffix + ") are checked for syntax errors, invalid fields,\n" +
+			"links to unknown transforms and cycles.\n\n" +
 			"Paths can be files or directories; directories are searched recursively.\n" +
 			"Without a path, the current directory is checked.\n\n" +
 			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
@@ -44,12 +49,12 @@ func newValidateCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			files, err := findWorkflowFiles(args)
+			files, err := findFiles(args)
 			if err != nil {
 				return err
 			}
 			if len(files) == 0 {
-				return fmt.Errorf("no workflow files (*%s) found in %s", workflowSuffix, strings.Join(args, ", "))
+				return fmt.Errorf("no workflow or pipeline files (*%s, *%s) found in %s", workflowSuffix, pipelineSuffix, strings.Join(args, ", "))
 			}
 			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
 				registry: actions.Builtin()}
@@ -84,17 +89,32 @@ func (v *validator) run(files []string) error {
 			return err
 		}
 	}
-	_, _ = fmt.Fprintf(v.out, "%s checked: %s, %s\n",
-		plural(len(files), "workflow file"), plural(v.nErrors, "error"), plural(v.nWarnings, "warning"))
+	pipelines := 0
+	for _, f := range files {
+		if strings.HasSuffix(f, pipelineSuffix) {
+			pipelines++
+		}
+	}
+	checked := plural(len(files)-pipelines, "workflow file")
+	switch {
+	case pipelines > 0 && pipelines == len(files):
+		checked = plural(pipelines, "pipeline file")
+	case pipelines > 0:
+		checked += " and " + plural(pipelines, "pipeline file")
+	}
+	_, _ = fmt.Fprintf(v.out, "%s checked: %s, %s\n", checked, plural(v.nErrors, "error"), plural(v.nWarnings, "warning"))
 	if v.nErrors > 0 || (v.opts.strict && v.nWarnings > 0) {
 		return errExitCode(1)
 	}
 	return nil
 }
 
-// file checks one workflow file. The returned error is only set for problems
+// file checks one workflow or pipeline file. The returned error is only set for problems
 // unrelated to the content (e.g. unreadable files or invalid command line flags).
 func (v *validator) file(file string) error {
+	if strings.HasSuffix(file, pipelineSuffix) {
+		return v.pipeline(file)
+	}
 	w, err := model.LoadWorkflow(file)
 	if err != nil {
 		var diags model.Errors
@@ -132,6 +152,22 @@ func (v *validator) file(file string) error {
 	}
 	diags.Sort()
 	v.report(diags)
+	return nil
+}
+
+// pipeline checks a pipeline file: fields and graph (roadmap S12). Transform types and
+// their configuration are checked once transforms exist (S13).
+func (v *validator) pipeline(file string) error {
+	p, err := model.LoadPipeline(file)
+	if err != nil {
+		var diags model.Errors
+		if !errors.As(err, &diags) {
+			return err
+		}
+		v.report(diags)
+		return nil
+	}
+	v.report(p.Validate())
 	return nil
 }
 
@@ -211,9 +247,9 @@ func plural(n int, word string) string {
 	return fmt.Sprintf("%d %ss", n, word)
 }
 
-// findWorkflowFiles expands the given paths: files are taken as they are,
-// directories are searched recursively for workflow files (hidden directories are skipped).
-func findWorkflowFiles(paths []string) ([]string, error) {
+// findFiles expands the given paths: files are taken as they are,
+// directories are searched recursively for workflow and pipeline files (hidden directories are skipped).
+func findFiles(paths []string) ([]string, error) {
 	var files []string
 	for _, p := range paths {
 		info, err := os.Stat(p)
@@ -231,7 +267,7 @@ func findWorkflowFiles(paths []string) ([]string, error) {
 			if d.IsDir() && path != p && strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
 			}
-			if !d.IsDir() && strings.HasSuffix(d.Name(), workflowSuffix) {
+			if !d.IsDir() && (strings.HasSuffix(d.Name(), workflowSuffix) || strings.HasSuffix(d.Name(), pipelineSuffix)) {
 				files = append(files, path)
 			}
 			return nil

@@ -103,7 +103,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| S12 | Pipeline-Dateiformat & Validierung | Go-Strukturen für `Pipeline`, `Transform`, Link-Typen; azyklischer Graph; `validate` für Pipelines | Golden-Tests |
+| S12 ✅ | Pipeline-Dateiformat & Validierung | Go-Strukturen für `Pipeline`, `Transform`, Link-Typen; azyklischer Graph; `validate` für Pipelines. Format zunächst minimal (Transforms mit `id`, `type`, `with`; Links mit `from`, `to`; `parameters`), Fehler nur über Links, `error`/`info`-Links als „noch nicht unterstützt“ (KONZEPT Kap. 5.2) | Golden-Tests |
 | S13 | Pipeline-Engine Kern | Transform = Goroutine, Link = gepufferter Channel, Batches, Backpressure, Ende-Signal, Abbruch; Testbausteine `core.generate-rows`, `core.dummy`, `core.log`; Zähler je Transform | Tests mit `-race`; 10 Mio. generierte Zeilen bei konstantem Speicher |
 | S14 | Record & Typsystem | Geordneter Record, Werttypen inkl. `decimal`, Schema-Ableitung über `Init`, Validator-Warnungen für unbekannte Felder ([ADR 0007](adr/0007-typsystem-pipelines.md)) | Unit-Tests |
 | S15 | CSV | `csv.input`, `csv.output`; Trennzeichen, Kopfzeile, Encoding (UTF-8, Windows-1252), Felddefinition mit Typ/Format | Golden-Tests: CSV rein → CSV raus |

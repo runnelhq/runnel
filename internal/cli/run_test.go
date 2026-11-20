@@ -183,6 +183,7 @@ func TestRunNotStarted(t *testing.T) {
 		want string
 	}{
 		{"invalid workflow", []string{"run", "examples/broken/graph.workflow.yaml"}, `unknown action "imprt"`},
+		{"pipeline", []string{"run", "examples/broken/cycle.pipeline.yaml"}, "pipelines cannot be run yet (roadmap S13)"},
 		{"unknown action type", []string{"run", writeWorkflow(t, `
 actions:
   - { id: start, type: core.start }

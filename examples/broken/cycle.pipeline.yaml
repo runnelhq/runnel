@@ -1,0 +1,16 @@
+# A pipeline with problems in the graph (roadmap S12). Check it with:
+#   runnel validate examples/broken/cycle.pipeline.yaml
+# - "fliter" is a typo of "filter".
+# - The link from "write" back to "read" closes a cycle: records only flow forward.
+kind: Pipeline
+apiVersion: runnel/v1
+name: cycle
+transforms:
+  - { id: read, type: csv.input }
+  - { id: filter, type: core.filter }
+  - { id: write, type: csv.output }
+links:
+  - { from: read, to: fliter }
+  - { from: read, to: filter }
+  - { from: filter, to: write }
+  - { from: write, to: read }

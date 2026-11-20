@@ -1,0 +1,12 @@
+field-values.pipeline.yaml:1:7: kind must be "Pipeline", got "Workflow"
+field-values.pipeline.yaml:2:13: unsupported apiVersion "runnel/v2" (supported: runnel/v1)
+field-values.pipeline.yaml:5:11: invalid parameter name "1FILE" (letters, digits and _, not starting with a digit)
+field-values.pipeline.yaml:8:14: parameter "LIMIT": default value "many" is not an integer
+field-values.pipeline.yaml:10:9: invalid transform id "2read" (letters, digits, - and _, starting with a letter)
+field-values.pipeline.yaml:13:11: transform "map": invalid type "Mapper" (expected "<namespace>.<name>", e.g. "csv.input")
+field-values.pipeline.yaml:14:5: transform "write": missing required field "type"
+field-values.pipeline.yaml:15:5: transform #4: missing required field "id"
+field-values.pipeline.yaml:17:7: link #1: missing required field "to"
+field-values.pipeline.yaml:18:34: link #2: error links are not supported yet (roadmap S17)
+field-values.pipeline.yaml:19:35: link #3: info links are not supported yet (roadmap S23)
+field-values.pipeline.yaml:20:35: link #4: invalid link type "lookup" (expected data)

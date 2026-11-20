@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -85,6 +86,9 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	}
 	if info, err := os.Stat(file); err == nil && info.IsDir() {
 		return nil, fmt.Errorf("%s is a directory; pass a workflow file (*%s)", file, workflowSuffix)
+	}
+	if strings.HasSuffix(file, pipelineSuffix) {
+		return nil, fmt.Errorf("%s: pipelines cannot be run yet (roadmap S13); check them with \"runnel validate\"", file)
 	}
 	data, err := os.ReadFile(file)
 	if err != nil {
