@@ -222,7 +222,7 @@ type TransformSchemas struct {
 // unknown (an open schema). The pipeline must pass Pipeline.Validate without errors.
 func Schemas(p *model.Pipeline, opts Options) map[string]TransformSchemas {
 	r, _ := build(p, opts)
-	r.deriveSchemas()
+	_ = r.deriveSchemas() // the problems are those of Check
 	out := make(map[string]TransformSchemas, len(p.Transforms))
 	for i, t := range p.Transforms {
 		if _, dup := out[t.ID]; !dup {
