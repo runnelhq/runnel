@@ -80,8 +80,8 @@ Inter SemiBold mit −2 % Laufweite, als Pfade gespeichert (keine Schrift nötig
 | `logo/runnel-wordmark.svg`, `…-inverse.svg` | Nur Wortmarke (wenn das Icon bereits daneben steht) |
 | `logo/png/runnel-logo.png`, `…-inverse.png` | 1020 × 320 px für Office, Präsentationen, E-Mail-Signatur |
 
-Im Fließtext heißt das Produkt immer **Runnel** (großes R). Die Kleinschreibung gibt es nur in der Wortmarke und
-als Befehl (`runnel`).
+Der Produktname ist **Runnel** (großes R). Die Kleinschreibung „runnel“ gibt es nur als **Grafik** (Wortmarke als
+SVG/PNG) und als **Befehl** in Monospace – nie als getippter Text. Details: [Kapitel 7.1](#71-schreibweise-des-namens).
 
 ### 2.3 Regeln
 
@@ -89,6 +89,8 @@ als Befehl (`runnel`).
 - **Mindestgröße:** App-Icon 16 px (dann `runnel-icon-small.svg`), Logo mit Wortmarke 96 px breit (Bildschirm) bzw. 25 mm (Druck).
 - **Hintergründe:** Standard-Logo auf Weiß bis Tiefe-100; Inverse-Logo auf Tiefe-800 bis Tiefe-950 und Strom-700 bis Strom-950.
   Auf Fotos nur das App-Icon (mit eigener Fläche).
+- **Wortmarke nie nachsetzen:** „runnel“ wird nicht mit einer Schrift als Text gesetzt (auch nicht in HTML oder
+  Präsentationen), sondern immer als Datei eingebunden. Wo ein Name als Text nötig ist, steht „Runnel“.
 - **Nicht erlaubt:** verzerren, drehen, spiegeln (der Fluss geht immer von oben links nach unten rechts), Farben
   austauschen, Link verdicken oder an Start/Ziel anschließen, Schatten/Verläufe/Konturen hinzufügen, Wortmarke in einer anderen Schrift nachsetzen, Ring und Punkt vertauschen.
 
@@ -247,7 +249,9 @@ Canvas-Konventionen ([Konzept, Kap. 11](../docs/KONZEPT.md#11-editor--ux-konzept
 | Links | 2 px, Bézier wie in der Bildmarke; Farbe nach Typ (`--link-*`), Symbol ✔/✖/∞/ƒ in der Mitte; aktiv = „Strömung“ |
 | Zeilenzähler an Links | Monospace 11 px, `tabular-nums`, Pille auf `--card` |
 
-Der Editor zeigt das Logo nur einmal: App-Icon (20 px) + Wortmarke oben links. Favicon und Fenster-Icon (WebView2) = `favicon.svg` bzw. `runnel.ico`.
+Der Editor zeigt das Logo nur einmal: App-Icon (20 px) + Wortmarke als SVG oben links, mit `aria-label="Runnel"`.
+Favicon und Fenster-Icon (WebView2) = `favicon.svg` bzw. `runnel.ico`. Fenster- und Tab-Titel: „‹Datei› – Runnel“,
+z. B. „nightly-import – Runnel“; ohne geöffnete Datei nur „Runnel“.
 
 ### 6.2 Website
 
@@ -302,6 +306,28 @@ Farben nur bei TTY und ohne `NO_COLOR`; Symbole (✔ ✖ ⚠) immer, damit Logs 
 ---
 
 ## 7. Sprache und Ton
+
+### 7.1 Schreibweise des Namens
+
+| Kontext | Schreibweise |
+|---|---|
+| Fließtext, Überschriften, UI-Texte, Alt-Texte, Tooltips, Fenster- und Tab-Titel | **Runnel** |
+| Windows: `ProductName`/`FileDescription` der exe, Anzeigename des Dienstes, Startmenü, Installer, winget-Name | **Runnel** |
+| Logo, Wortmarke | **runnel** – ausschließlich als SVG/PNG aus `logo/`, nie mit einer Schrift nachgesetzt |
+| Befehl, Binary, Dateinamen, Pfade, Domain, GitHub-Organisation, Go-Modul | `runnel` – im Text immer als Code (Monospace) |
+| Technische Präfixe | `RUNNEL_` (Umgebungsvariablen), `runnel/v1` (`apiVersion`) |
+| Zusammensetzungen | mit Bindestrich: „Runnel-Editor“, „Runnel-Projekt“, „Runnel-Workflow“ |
+| Genitiv | „der Editor von Runnel“ oder „Runnel-Editor“, nicht „Runnels Editor“ |
+
+Nicht erlaubt:
+
+- „RUNNEL“ als Name – auch nicht in Überschriften in Großbuchstaben oder in Labels; dort „Runnel“ verwenden.
+- Abweichende Formen wie „RunNel“, „Run-nel“, „runnel.exe“ als Produktname.
+- „runnel“ am Satzanfang – umformulieren: „Der Befehl `runnel run` startet …“.
+
+Die Ausgabe von `runnel version` („runnel v0.1.0 …“) nennt den Befehl, nicht das Produkt, und bleibt klein.
+
+### 7.2 Ton
 
 - **Sachlich, knapp, konkret.** Runnel spricht wie eine erfahrene Kollegin, nicht wie ein Werbeprospekt.
 - UI-Texte im Infinitiv bzw. Imperativ ohne Anrede: „Pipeline ausführen“, „Änderungen speichern“. Wo eine Anrede nötig ist: **du**.

@@ -25,7 +25,8 @@ Das Corporate Design liegt unter [`design/`](../../design/README.md) und besteht
 | Baustein | Festlegung |
 |---|---|
 | Bildmarke | Start-Punkt → geschwungener Link → Ziel-Ring (kleinster Workflow, zugleich Wasserlauf); drei getrennte Elemente, dünner Link |
-| Wortmarke | „runnel“, Kleinbuchstaben, Inter SemiBold, −2 % Laufweite, als Pfade |
+| Wortmarke | „runnel“, Kleinbuchstaben, Inter SemiBold, −2 % Laufweite, als Pfade – nur als Grafik, nie als Text |
+| Schreibweise | Produktname **Runnel** in Text, UI und Windows-Metadaten; `runnel` nur als Befehl/technischer Bezeichner in Monospace ([Handbuch, Kap. 7.1](../../design/README.md#71-schreibweise-des-namens)) |
 | Markenfarbe | **Strom** (Wasserblau), Hauptton Strom 600 `#0A6DA6` |
 | Neutralfarbe | **Tiefe** (kühles Schiefergrau), dunkler Grund Tiefe 950 `#0E151D` |
 | Funktionsfarben | Erfolg, Fehler, Warnung, **Ausdruck = Indigo** `#4549C9` (statt Markenblau, damit Auswahl/Fokus und Ausdrucks-Links unterscheidbar bleiben) |
@@ -34,6 +35,11 @@ Das Corporate Design liegt unter [`design/`](../../design/README.md) und besteht
 | Claim | „Leicht. Lokal. Im Fluss.“ |
 
 ## Konsequenzen
+
+- Kleine Wortmarke und großer Produktname stehen bewusst nebeneinander (wie bei vielen Entwicklerwerkzeugen):
+  Die Marke zeigt den Befehl, den man tippt; im Text bleibt der Name ein normales Substantiv. Damit das nicht
+  verwischt, darf „runnel“ nie als Text gesetzt werden. Erwogen und verworfen: Wortmarke „Runnel“ (förmlicher,
+  verliert die Nähe zum Befehl) und durchgehende Kleinschreibung (widerspricht ADR 0010, schwierig im Deutschen).
 
 - Der Editor (S30) bindet `design/tokens/tailwind.css` ein und verwendet ausschließlich die semantischen Rollen;
   Hex-Werte im Frontend-Code sind nicht erlaubt.
