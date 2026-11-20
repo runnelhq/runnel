@@ -8,6 +8,9 @@ export interface ActionNodeData extends Record<string, unknown> {
   id: string;
   type: string;
   join?: string;
+  /** Workflows: the action repeats for each entry of a list (forEach), parallel at a time. */
+  forEach?: boolean;
+  parallel?: number;
   /** Pipelines: instances of the transform (shown as a chip and a stack of cards when more than 1). */
   copies?: number;
   /** The type takes no incoming links: core.start, transforms of the category input. */
@@ -82,9 +85,14 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
       // Copies: a second card edge behind the node (mockup S25a).
       style={copies ? { boxShadow: "5px 5px 0 -1px var(--node), 5px 5px 0 0 var(--node-border), var(--rn-shadow-sm)" } : undefined}
     >
-      {((data.join && data.join !== "all") || copies > 0) && (
+      {((data.join && data.join !== "all") || copies > 0 || data.forEach) && (
         <span className="absolute -top-[22px] -left-0.5 flex gap-1">
           {data.join && data.join !== "all" && <Chip title={`join: ${data.join}`}>join: {data.join}</Chip>}
+          {data.forEach && (
+            <Chip title="Runs once for each entry of a list (forEach)" testId="for-each">
+              ↻ for each{data.parallel && data.parallel > 1 ? ` · ${data.parallel} at a time` : ""}
+            </Chip>
+          )}
           {copies > 0 && (
             <Chip title={`copies: ${copies}`} testId="copies">
               ×{copies} copies

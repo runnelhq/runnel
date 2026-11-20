@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { tileColor, useCatalog, type Schema } from "../catalog";
 import {
+  entryNamePattern,
+  graphOf,
   idPattern,
   linkKind,
   stepsKey,
   usedFields,
+  validate,
+  valueTypes,
   type Action,
+  type EntryEdit,
+  type Output,
+  type Parameter,
   type Problem,
   type RecordSchema,
   type TransformSchemas,
   type Workflow,
 } from "../workflow";
 import type { Selection } from "./Canvas";
-import { ActionIcon, ChevronIcon, CloseIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
@@ -33,6 +40,10 @@ export interface PropertiesProps {
   onSet: (id: string, field: string, value: FieldValue) => void;
   /** Sets a field of the workflow or pipeline: name, description, settings.*. */
   onSetWorkflow: (field: string, value: FieldValue) => void;
+  /** Sets a mapping of the configuration of an action, e.g. with.params; an empty one removes it. */
+  onSetMap?: (id: string, field: string, map: { key: string; value: string }[]) => void;
+  /** Changes the list of parameters or outputs (E7c). */
+  onEntry?: (edit: EntryEdit) => void;
   /** Changes a link; when is success, failure, always or an expression "{{ … }}"; type (pipelines) data or error. */
   onLinkChange: (index: number, change: LinkChange) => void;
   onDeleteLink: (index: number) => void;
@@ -120,9 +131,9 @@ export function PropertiesPanel(props: PropertiesProps) {
             {count} elements selected. Select one {workflow.kind === "pipeline" ? "transform" : "action"} or link to see its properties.
           </p>
         ) : workflow.kind === "pipeline" ? (
-          <PipelineProperties {...props} />
+          <PipelineProperties {...props} ctx={ctx} />
         ) : (
-          <WorkflowProperties {...props} />
+          <WorkflowProperties {...props} ctx={ctx} />
         )}
       </div>
     </section>
@@ -156,6 +167,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
   const schema = d?.schema;
   const config = Object.entries(schema?.properties ?? {});
 
+  const declared = useDeclaredParameters(action);
   const configFields = config.map(([name, s]) => (
     <SchemaField
       key={name}
@@ -167,6 +179,8 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       ctx={props.ctx}
       owner={action.id}
       onChange={set(`with.${name}`)}
+      onChangeMap={props.onSetMap ? (m) => props.onSetMap!(action.id, `with.${name}`, m) : undefined}
+      mapHelp={name === "params" ? declared : undefined}
     />
   ));
   const execution = (
@@ -262,6 +276,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           )}
         </Section>
       )}
+      {!pipeline && <ForEachSection action={action} at={at} set={set} ctx={props.ctx} />}
       <Section title="Execution" summary={summary || "defaults"}>
         {pipeline ? (
           <TransformExecution action={action} parallel={d ? !!d.parallel : true} outgoing={outgoing} at={at} set={set} />
@@ -274,8 +289,18 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
   );
 }
 
-function Section(props: { title: string; summary?: string; defaultOpen?: boolean; children: ReactNode }) {
+function Section(props: {
+  title: string;
+  summary?: string;
+  defaultOpen?: boolean;
+  /** Opens the section whenever it changes (and is not 0), e.g. to show a field with a problem. */
+  reveal?: number;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(props.defaultOpen ?? true);
+  useEffect(() => {
+    if (props.reveal) setOpen(true);
+  }, [props.reveal]);
   return (
     <div className="mt-2 border-t border-border">
       <button
@@ -480,13 +505,34 @@ function SchemaField(props: {
   /** Id of the action, shown in the larger editor. */
   owner: string;
   onChange: (value: FieldValue) => void;
+  /** Sets a mapping (fields of type object without properties, e.g. params). */
+  onChangeMap?: (map: { key: string; value: string }[]) => void;
+  /** Help for a mapping, e.g. the parameters a called workflow declares. */
+  mapHelp?: string;
 }) {
   const { name, schema: s, value } = props;
   const [localError, setLocalError] = useState<string | null>(null);
   const label = name.charAt(0).toUpperCase() + name.slice(1).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
   const key = `with.${name}`;
   const scalar = value === undefined || value === null || ["string", "number", "boolean"].includes(typeof value);
+  const plainObject = value !== null && typeof value === "object" && !Array.isArray(value);
 
+  // A mapping of names to values (e.g. the parameters given to a sub-workflow, mockup S25a "foreach").
+  if (s.type === "object" && !s.properties && props.onChangeMap && (value === undefined || value === null || plainObject)) {
+    return (
+      <KeyValueField
+        label={label}
+        fieldKey={key}
+        required={props.required}
+        help={props.mapHelp ?? s.description}
+        problems={props.problems}
+        value={(value ?? {}) as Record<string, unknown>}
+        ctx={props.ctx}
+        owner={props.owner}
+        onChange={props.onChangeMap}
+      />
+    );
+  }
   if (!scalar || s.type === "array" || s.type === "object") {
     return (
       <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={props.problems}>
@@ -594,6 +640,7 @@ function SchemaField(props: {
 function ExpressionField(props: {
   label: string;
   fieldKey: string;
+  keyLabel?: string;
   required?: boolean;
   help?: string;
   problems: Problem[];
@@ -624,6 +671,7 @@ function ExpressionField(props: {
     <Field
       label={props.label}
       fieldKey={props.fieldKey}
+      keyLabel={props.keyLabel}
       required={props.required}
       help={props.help}
       problems={problems}
@@ -1020,10 +1068,9 @@ function LinkProperties(props: PropertiesProps & { index: number; ctx: ExprConte
 }
 
 /** Properties of the workflow when nothing is selected (mockup E7, state "workflow"). */
-function WorkflowProperties(props: PropertiesProps) {
+function WorkflowProperties(props: PropertiesProps & { ctx: ExprContext }) {
   const { workflow, problems, onSetWorkflow } = props;
   const [localError, setLocalError] = useState<string | null>(null);
-  const outputs = workflow.outputs ?? [];
   return (
     <div data-testid="workflow-properties">
       <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-1.5">
@@ -1086,54 +1133,9 @@ function WorkflowProperties(props: PropertiesProps) {
           )}
         </Field>
       </Section>
-      <ParametersSection workflow={workflow} problems={problems} />
-      <Section title="Outputs" summary={String(outputs.length)} defaultOpen={false}>
-        <div data-field="outputs">
-          {outputs.length > 0 && (
-            <ul className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0">
-              {outputs.map((o) => (
-                <li key={o.name} className="grid grid-cols-[1fr_auto] gap-x-2 border-b border-border px-2.5 py-1.5 text-xs last:border-b-0">
-                  <b className="font-mono">{o.name}</b>
-                  <span className="truncate font-mono">{o.value}</span>
-                  <small className="col-span-2 font-mono text-2xs text-muted-foreground">{o.type ?? "string"}</small>
-                </li>
-              ))}
-            </ul>
-          )}
-          <ProblemList problems={problemsAt(problems, "$", "outputs")} />
-        </div>
-      </Section>
+      <EntrySection {...props} list="parameters" />
+      <EntrySection {...props} list="outputs" defaultOpen={false} />
     </div>
-  );
-}
-
-/** The parameters of a workflow or pipeline (read-only for now). */
-function ParametersSection(props: { workflow: Workflow; problems: Problem[] }) {
-  const params = props.workflow.parameters ?? [];
-  return (
-    <Section title="Parameters" summary={String(params.length)}>
-      <div data-field="parameters">
-        {params.length > 0 && (
-          <ul className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0">
-            {params.map((p) => (
-              <li key={p.name} className="grid grid-cols-[1fr_auto] gap-x-2 border-b border-border px-2.5 py-1.5 text-xs last:border-b-0">
-                <b className="font-mono">{p.name}</b>
-                <span className="font-mono">{p.default ?? ""}</span>
-                <small className="col-span-2 font-mono text-2xs text-muted-foreground">
-                  {p.type ?? "string"} · {p.required ? "required" : "optional"}
-                </small>
-              </li>
-            ))}
-          </ul>
-        )}
-        <ProblemList problems={problemsAt(props.problems, "$", "parameters")} />
-      </div>
-      <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
-        {props.workflow.kind === "pipeline"
-          ? "Adding and changing parameters follows with the next editor step; until then in your text editor."
-          : "Adding and changing parameters and outputs follows with the next editor step; until then in your text editor."}
-      </p>
-    </Section>
   );
 }
 
@@ -1303,7 +1305,7 @@ function FieldList(props: { schema: RecordSchema; used?: Set<string>; meta?: boo
 }
 
 /** Properties of the pipeline when nothing is selected: name, description, settings, parameters. */
-function PipelineProperties(props: PropertiesProps) {
+function PipelineProperties(props: PropertiesProps & { ctx: ExprContext }) {
   const { workflow, problems, onSetWorkflow } = props;
   const settings = workflow.settings ?? {};
   return (
@@ -1351,7 +1353,7 @@ function PipelineProperties(props: PropertiesProps) {
           onChange={(on) => onSetWorkflow("settings.strict", on ? true : null)}
         />
       </Section>
-      <ParametersSection workflow={workflow} problems={problems} />
+      <EntrySection {...props} list="parameters" />
     </div>
   );
 }
@@ -1385,6 +1387,556 @@ function NumberSetting(props: {
             props.onSet(key, v === "" ? null : n);
           }}
         />
+      )}
+    </Field>
+  );
+}
+
+/**
+ * Repetition of an action (roadmap S24b, mockup S25a "foreach"): the list, how many entries
+ * run at the same time and whether the first failed entry stops the others.
+ */
+function ForEachSection(props: {
+  action: Action;
+  at: (field: string) => Problem[];
+  set: (field: string) => (value: FieldValue) => void;
+  ctx: ExprContext;
+}) {
+  const { action, at, set } = props;
+  const parallel = action.parallel || 1;
+  const problems = [...at("forEach"), ...at("parallel"), ...at("stopOnError")];
+  return (
+    <Section
+      title="For each entry"
+      summary={action.forEach ? `${parallel} at a time` : "off"}
+      defaultOpen={!!action.forEach || problems.length > 0}
+    >
+      <ExpressionField
+        label="List"
+        fieldKey="forEach"
+        help="Runs the action once per entry; row is the entry in the configuration. Empty: the action runs once"
+        problems={at("forEach")}
+        value={action.forEach ?? ""}
+        placeholder="e.g. {{ results.list.output }}"
+        ctx={props.ctx}
+        owner={action.id}
+        onCommit={(v) => set("forEach")(asExpression(v) || null)}
+      />
+      <div className="grid grid-cols-2">
+        <Field label="At a time" fieldKey="parallel" keyLabel="parallel" problems={at("parallel")}>
+          {(p) => (
+            <Stepper {...p} value={parallel} min={1} max={maxParallel} onCommit={(n) => set("parallel")(n === 1 ? null : n)} />
+          )}
+        </Field>
+        <div className="pt-[22px]">
+          <Check
+            fieldKey="stopOnError"
+            checked={action.stopOnError ?? true}
+            label="Stop at the first error"
+            help="stopOnError"
+            problems={at("stopOnError")}
+            onChange={(on) => set("stopOnError")(on ? null : false)}
+          />
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+/** Upper limit of entries at a time (model.MaxParallel). */
+const maxParallel = 64;
+
+/**
+ * The parameters a called workflow or pipeline declares, as help for with.params
+ * (mockup S25a, state "foreach"), e.g. "Declared by total.pipeline.yaml: FILE (required)".
+ */
+function useDeclaredParameters(action: Action): string | undefined {
+  const target =
+    action.type === "core.run-workflow" ? action.with?.workflow : action.type === "core.run-pipeline" ? action.with?.pipeline : undefined;
+  const path = typeof target === "string" && !target.includes("${") && !target.includes("{{") ? target : null;
+  const [declared, setDeclared] = useState<{ path: string; text: string } | null>(null);
+  useEffect(() => {
+    if (!path) return;
+    let cancelled = false;
+    validate(path).then(
+      (v) => {
+        const g = graphOf(v);
+        if (cancelled || !g) return;
+        const params = (g.parameters ?? []).map((p) => (p.required ? `${p.name} (required)` : p.name));
+        const file = path.slice(path.lastIndexOf("/") + 1);
+        setDeclared({ path, text: params.length > 0 ? `Declared by ${file}: ${params.join(", ")}` : `${file} declares no parameters` });
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+  return declared && declared.path === path ? declared.text : undefined;
+}
+
+/**
+ * A mapping of names to values, e.g. the parameters given to a sub-workflow: one row per
+ * entry with the name and the value (with expressions), × removes, "+ Add" adds a row.
+ * The whole mapping is written when a row is changed.
+ */
+function KeyValueField(props: {
+  label: string;
+  fieldKey: string;
+  required: boolean;
+  help?: string;
+  problems: Problem[];
+  value: Record<string, unknown>;
+  ctx: ExprContext;
+  owner: string;
+  onChange: (map: { key: string; value: string }[]) => void;
+}) {
+  const fromValue = () => Object.entries(props.value).map(([key, v]) => ({ key, value: v === null || v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v) }));
+  const [rows, setRows] = useState(fromValue);
+  const [error, setError] = useState<string | null>(null);
+  const signature = JSON.stringify(props.value);
+  useEffect(() => setRows(fromValue()), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
+  const commit = (next: { key: string; value: string }[]) => {
+    setRows(next);
+    const filled = next.filter((r) => r.key.trim() !== "");
+    const keys = filled.map((r) => r.key.trim());
+    const bad = keys.find((k) => !/^[A-Za-z_][A-Za-z0-9_-]*$/.test(k));
+    const dup = keys.find((k, i) => keys.indexOf(k) !== i);
+    if (bad || dup) {
+      setError(bad ? `“${bad}”: use letters, digits, - and _, starting with a letter` : `“${dup}” is listed twice`);
+      return;
+    }
+    setError(null);
+    const map = filled.map((r) => ({ key: r.key.trim(), value: r.value }));
+    if (JSON.stringify(map) !== JSON.stringify(fromValue())) props.onChange(map);
+  };
+  return (
+    <Field
+      label={props.label}
+      fieldKey={props.fieldKey}
+      required={props.required}
+      help={props.help}
+      problems={props.problems}
+      localError={error}
+    >
+      {(p) => (
+        <div data-testid={`map-${props.fieldKey}`}>
+          {rows.map((row, i) => (
+            <div key={i} className="mb-1.5 grid grid-cols-[96px_1fr_24px] items-start gap-1.5">
+              <input
+                aria-label={`Name ${i + 1}`}
+                value={row.key}
+                placeholder="NAME"
+                onChange={(e) => setRows(rows.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)))}
+                onBlur={() => commit(rows)}
+                onKeyDown={(e) => e.key === "Enter" && commit(rows)}
+                className={inputClass(p.invalid, true)}
+              />
+              <ExpressionInput
+                labelId={p.labelId}
+                invalid={false}
+                value={row.value}
+                problems={[]}
+                ctx={props.ctx}
+                testId={`map-value-${i}`}
+                onCommit={(v) => commit(rows.map((r, j) => (j === i ? { ...r, value: v } : r)))}
+              />
+              <button
+                type="button"
+                title="Remove"
+                aria-label={`Remove ${row.key || `row ${i + 1}`}`}
+                onClick={() => commit(rows.filter((_, j) => j !== i))}
+                className="grid h-[30px] cursor-pointer place-items-center rounded-sm border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setRows([...rows, { key: "", value: "" }])}
+            className="cursor-pointer border-0 bg-transparent p-0 text-xs font-medium text-primary"
+          >
+            + Add {props.label === "Params" ? "parameter" : "entry"}
+          </button>
+        </div>
+      )}
+    </Field>
+  );
+}
+
+type Entry = Parameter | Output;
+
+/**
+ * The parameters (workflows and pipelines) or outputs (workflows) as rows; a click opens
+ * a row as a form (mockup design/mockups/e7c-parameters.html). "+ Add" appends an entry
+ * whose name is selected for typing, ↑/↓ change the order, Delete removes it (with Undo).
+ */
+function EntrySection(props: PropertiesProps & { list: "parameters" | "outputs"; ctx: ExprContext; defaultOpen?: boolean }) {
+  const { list, workflow, problems, focus, onEntry } = props;
+  const items: Entry[] = (list === "parameters" ? workflow.parameters : workflow.outputs) ?? [];
+  const noun = list === "parameters" ? "parameter" : "output";
+  const [open, setOpen] = useState<number | null>(null);
+  const [added, setAdded] = useState<number | null>(null);
+  // A problem or field to show opens its row (and the section).
+  const target = focus?.key.match(new RegExp(`^${list}\\[(\\d+)\\]`));
+  const reveal = target ? focus!.seq : 0;
+  useEffect(() => {
+    if (target) setOpen(Number(target[1]));
+  }, [reveal]); // eslint-disable-line react-hooks/exhaustive-deps
+  const add = () => {
+    const names = new Set(items.map((e) => e.name));
+    const base = list === "parameters" ? "PARAM" : "OUTPUT";
+    let n = 1;
+    while (names.has(`${base}_${n}`)) n++;
+    onEntry?.({ list, op: "add", name: `${base}_${n}` });
+    setOpen(items.length);
+    setAdded(items.length);
+  };
+  const own = (p: Problem) => new RegExp(`^\\$\\.${list}\\[\\d+\\]`).test(p.path ?? "");
+  return (
+    <Section title={list === "parameters" ? "Parameters" : "Outputs"} summary={String(items.length)} defaultOpen={props.defaultOpen} reveal={reveal}>
+      <div data-field={list}>
+        {items.length > 0 && (
+          <div role="list" aria-label={list === "parameters" ? "Parameters" : "Outputs"} className="mx-4 mb-2 rounded-md border border-border">
+            {items.map((item, i) => (
+              <EntryRow
+                key={i}
+                list={list}
+                index={i}
+                count={items.length}
+                item={item}
+                open={open === i}
+                selectName={added === i}
+                taken={new Set(items.filter((_, j) => j !== i).map((e) => e.name))}
+                problems={problems.filter((p) => p.path === `$.${list}[${i}]` || p.path?.startsWith(`$.${list}[${i}].`))}
+                ctx={props.ctx}
+                onToggle={() => {
+                  setOpen(open === i ? null : i);
+                  setAdded(null);
+                }}
+                onEntry={(e) => {
+                  if (e.op === "delete") setOpen(null);
+                  if (e.op === "move") setOpen(i + (e.by ?? 0));
+                  setAdded(null);
+                  onEntry?.(e);
+                }}
+              />
+            ))}
+          </div>
+        )}
+        <ProblemList problems={problemsAt(problems, "$", list).filter((p) => !own(p))} />
+        {onEntry && (
+          <button
+            type="button"
+            onClick={add}
+            className="mx-4 mb-3 cursor-pointer border-0 bg-transparent p-0 text-xs font-medium text-primary"
+          >
+            + Add {noun}
+          </button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+function EntryRow(props: {
+  list: "parameters" | "outputs";
+  index: number;
+  count: number;
+  item: Entry;
+  open: boolean;
+  /** The entry was just added: its name is selected for typing. */
+  selectName: boolean;
+  taken: Set<string>;
+  problems: Problem[];
+  ctx: ExprContext;
+  onToggle: () => void;
+  onEntry: (e: EntryEdit) => void;
+}) {
+  const { list, index, item, problems } = props;
+  const param = list === "parameters" ? (item as Parameter) : null;
+  const output = list === "outputs" ? (item as Output) : null;
+  const noun = param ? "parameter" : "output";
+  const base = `$.${list}[${index}]`;
+  const key = (f: string) => `${list}[${index}].${f}`;
+  // Problems of the entry itself name the missing field, e.g. 'missing required field "value"'.
+  const missing = (p: Problem) => (p.path === base ? p.message.match(/missing required field "(\w+)"/)?.[1] : undefined);
+  const at = (f: string) => [...problems.filter((p) => missing(p) === f && f !== "name"), ...problemsAt(problems, base, f)];
+  const set = (field: string, value: EntryEdit["value"]) => props.onEntry({ list, op: "set", index, field, value });
+  const value = param ? (param.default ?? "") : (output?.value ?? "");
+  const hasError = problems.some((p) => p.severity === "error");
+  // An opened row is scrolled into view (decision for mockup E7c).
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (props.open) row.current?.scrollIntoView?.({ block: "nearest" });
+  }, [props.open]);
+  return (
+    <div ref={row} role="listitem" data-testid={`${list}-${index}`} className={"border-b border-border last:border-b-0" + (props.open ? " bg-accent/40" : "")}>
+      <button
+        type="button"
+        aria-expanded={props.open}
+        onClick={props.onToggle}
+        className={
+          "grid w-full cursor-pointer grid-cols-[12px_1fr_auto] items-center gap-x-2 border-0 bg-transparent py-1.5 pr-2.5 pl-2 text-left text-xs" +
+          (props.open ? " border-b border-border" : "")
+        }
+      >
+        <ChevronIcon open={props.open} width={12} height={12} className="text-muted-foreground" />
+        <b className={"truncate font-mono" + (hasError ? " text-destructive" : "")}>{item.name || "(no name)"}</b>
+        <span className="max-w-[120px] truncate font-mono">
+          {hasError && <span className="font-bold text-destructive">✖ </span>}
+          {value}
+        </span>
+        <small className="col-start-2 col-end-4 font-mono text-2xs text-muted-foreground">
+          {item.type ?? "string"}
+          {param ? ` · ${param.required ? "required" : "optional"}` : ""}
+        </small>
+      </button>
+      {props.open && (
+        <div className="bg-background pt-2.5">
+          <EntryName
+            fieldKey={key("name")}
+            name={item.name}
+            taken={props.taken}
+            select={props.selectName}
+            problems={[...problems.filter((p) => p.path === base && (missing(p) ?? "name") === "name"), ...problemsAt(problems, base, "name")]}
+            onRename={(to) => set("name", to)}
+          />
+          <div className="grid grid-cols-2">
+            <Field label="Type" fieldKey={key("type")} keyLabel="type" problems={at("type")}>
+              {(p) => (
+                <select
+                  id={p.id}
+                  value={item.type ?? "string"}
+                  aria-invalid={p.invalid}
+                  onChange={(e) => set("type", e.target.value === "string" ? null : e.target.value)}
+                  className={inputClass(p.invalid)}
+                >
+                  {valueTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            {param && (
+              <div className="pt-[22px]">
+                <Check
+                  fieldKey={key("required")}
+                  checked={param.required ?? false}
+                  label="Required"
+                  help="required"
+                  problems={at("required")}
+                  onChange={(on) => set("required", on)}
+                />
+              </div>
+            )}
+          </div>
+          {param ? (
+            <>
+              <ExpressionField
+                label="Default"
+                fieldKey={key("default")}
+                keyLabel="default"
+                help={
+                  param.required
+                    ? "Not used while the parameter is required"
+                    : "Used when the run gives no value; may be an expression {{ … }}"
+                }
+                problems={at("default")}
+                value={param.default ?? ""}
+                placeholder="Empty: none"
+                ctx={props.ctx}
+                owner={item.name}
+                onCommit={(v) => set("default", v || null)}
+              />
+              <ChipsField
+                label="Allowed values"
+                fieldKey={key("enum")}
+                keyLabel="enum"
+                help="Empty: any value. With values, the run dialog offers a selection"
+                values={param.enum ?? []}
+                problems={at("enum")}
+                onChange={(values) => set("enum", values.length > 0 ? values : null)}
+              />
+            </>
+          ) : (
+            <ExpressionField
+              label="Value"
+              fieldKey={key("value")}
+              keyLabel="value"
+              required
+              help="Evaluated when the workflow has succeeded; results.<id> are the results of the actions"
+              problems={at("value")}
+              value={output?.value ?? ""}
+              placeholder="e.g. {{ results.combine.output }}"
+              ctx={props.ctx}
+              owner={item.name}
+              onCommit={(v) => set("value", v)}
+            />
+          )}
+          <Field label="Description" fieldKey={key("description")} keyLabel="description" problems={at("description")}>
+            {(p) => (
+              <TextInput
+                {...p}
+                value={item.description ?? ""}
+                placeholder={param ? "Shown in the run dialog" : "Optional note"}
+                onCommit={(v) => set("description", v || null)}
+              />
+            )}
+          </Field>
+          <div className="flex items-center gap-1 px-4 pb-2.5">
+            <SmallIconButton title="Move up" disabled={index === 0} onClick={() => props.onEntry({ list, op: "move", index, by: -1 })}>
+              <ArrowUpIcon width={14} height={14} />
+            </SmallIconButton>
+            <SmallIconButton
+              title="Move down"
+              disabled={index === props.count - 1}
+              onClick={() => props.onEntry({ list, op: "move", index, by: 1 })}
+            >
+              <ArrowDownIcon width={14} height={14} />
+            </SmallIconButton>
+            <button
+              type="button"
+              title="Delete (Undo with Ctrl+Z)"
+              onClick={() => props.onEntry({ list, op: "delete", index })}
+              className="ml-auto inline-flex h-[26px] cursor-pointer items-center gap-1.5 rounded-md border border-destructive bg-background px-2.5 text-xs font-medium text-destructive hover:bg-danger-soft"
+            >
+              <TrashIcon width={14} height={14} />
+              Delete {noun}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SmallIconButton(props: { title: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={props.title}
+      aria-label={props.title}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className="grid size-[26px] cursor-pointer place-items-center rounded-md border border-input bg-background text-foreground hover:bg-muted disabled:cursor-default disabled:opacity-50"
+    >
+      {props.children}
+    </button>
+  );
+}
+
+/** The name of a parameter or output: applied with Enter or when the field is left. */
+function EntryName(props: {
+  fieldKey: string;
+  name: string;
+  taken: Set<string>;
+  /** Select the name, e.g. for a new entry. */
+  select: boolean;
+  problems: Problem[];
+  onRename: (to: string) => void;
+}) {
+  const [text, setText] = useState(props.name);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => setText(props.name), [props.name]);
+  useEffect(() => {
+    if (props.select) {
+      input.current?.focus();
+      input.current?.select();
+    }
+  }, [props.select]);
+  const error = !entryNamePattern.test(text)
+    ? "Use letters, digits and _, not starting with a digit"
+    : text !== props.name && props.taken.has(text)
+      ? `“${text}” is already used`
+      : null;
+  const commit = () => {
+    if (error) setText(props.name);
+    else if (text !== props.name) props.onRename(text);
+  };
+  return (
+    <Field
+      label="Name"
+      fieldKey={props.fieldKey}
+      keyLabel="name"
+      required
+      help="References to it (${…}, params.…) are not renamed"
+      problems={props.problems}
+      localError={text !== props.name ? error : null}
+    >
+      {(p) => (
+        <input
+          ref={input}
+          id={p.id}
+          value={text}
+          aria-invalid={p.invalid}
+          onChange={(e) => setText(e.target.value.trim())}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") setText(props.name);
+          }}
+          className={inputClass(p.invalid, true)}
+        />
+      )}
+    </Field>
+  );
+}
+
+/** A list of short texts as chips: × removes one, Enter in the field adds one. */
+function ChipsField(props: {
+  label: string;
+  fieldKey: string;
+  keyLabel: string;
+  help: string;
+  values: string[];
+  problems: Problem[];
+  onChange: (values: string[]) => void;
+}) {
+  const [text, setText] = useState("");
+  const add = () => {
+    const v = text.trim();
+    setText("");
+    if (v !== "" && !props.values.includes(v)) props.onChange([...props.values, v]);
+  };
+  return (
+    <Field label={props.label} fieldKey={props.fieldKey} keyLabel={props.keyLabel} help={props.help} problems={props.problems}>
+      {(p) => (
+        <div
+          className={
+            "flex min-h-[30px] flex-wrap items-center gap-1 rounded-md border bg-background px-1 py-[3px] " +
+            (p.invalid ? "border-destructive" : "border-input")
+          }
+        >
+          {props.values.map((v) => (
+            <span key={v} className="inline-flex h-[22px] items-center gap-1 rounded-sm bg-secondary pr-0.5 pl-2 font-mono text-2xs text-secondary-foreground">
+              {v}
+              <button
+                type="button"
+                aria-label={`Remove ${v}`}
+                onClick={() => props.onChange(props.values.filter((x) => x !== v))}
+                className="grid size-4 cursor-pointer place-items-center rounded-sm border-0 bg-transparent text-muted-foreground hover:text-foreground"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            id={p.id}
+            aria-labelledby={p.labelId}
+            value={text}
+            placeholder="+ Add value"
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") add();
+            }}
+            onBlur={add}
+            className="min-w-[80px] flex-1 border-0 bg-transparent px-1 font-mono text-xs text-foreground outline-none placeholder:font-sans placeholder:text-muted-foreground"
+          />
+        </div>
       )}
     </Field>
   );

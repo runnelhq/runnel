@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
-import { editWorkflow, graphOf, problemTarget, validate, type GraphKind, type Link, type Problem, type Validation, type WorkflowEdit } from "../workflow";
+import {
+  editWorkflow,
+  graphOf,
+  problemTarget,
+  validate,
+  type EntryEdit,
+  type GraphKind,
+  type Link,
+  type Problem,
+  type Validation,
+  type WorkflowEdit,
+} from "../workflow";
 import { Canvas, type Selection } from "./Canvas";
 import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { RunDialog } from "./RunDialog";
@@ -265,6 +276,21 @@ export function FileView(props: {
   const onSet = useCallback(
     (id: string, field: string, value: FieldValue) => void applyEdit({ set: [{ id, field, value }] }, `${id}:${field}`),
     [applyEdit],
+  );
+  const onSetMap = useCallback(
+    (id: string, field: string, map: { key: string; value: string }[]) =>
+      void applyEdit({ set: [{ id, field, value: null, ...(map.length > 0 ? { map } : {}) }] }, `${id}:${field}`),
+    [applyEdit],
+  );
+  // Parameters and outputs (E7c): typing in one field of an entry is one undo step; a deleted entry can be restored.
+  const onEntry = useCallback(
+    async (e: EntryEdit) => {
+      const name = e.op === "delete" ? (e.list === "parameters" ? graph?.parameters : graph?.outputs)?.[e.index ?? 0]?.name : undefined;
+      const key = e.op === "set" ? `${e.list}:${e.index}:${e.field}` : undefined;
+      const next = await applyEdit({ entries: [e] }, key);
+      if (next !== null && e.op === "delete") setToast(`Deleted ${e.list === "parameters" ? "parameter" : "output"} ${name ?? ""}`.trim());
+    },
+    [applyEdit, graph],
   );
   const onLinkKind = useCallback(
     (index: number, kind: SettableKind) =>
@@ -665,6 +691,8 @@ export function FileView(props: {
           }}
           onSet={onSet}
           onSetWorkflow={onSetWorkflow}
+          onSetMap={onSetMap}
+          onEntry={(e) => void onEntry(e)}
           onLinkChange={onLinkChange}
           onDeleteLink={(index) => void onDelete([], [index])}
           onRename={(from, to) => {

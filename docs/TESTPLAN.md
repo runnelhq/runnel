@@ -93,6 +93,5 @@ Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe fe
 | K7 | Ausdrücke `{{ … }}` werden noch nicht ausgewertet (in Bedingungen und Outputs vor dem Start abgelehnt, sonst als Text) | S08 |
 | K8 | Die YAML-Bibliothek stürzt bei bestimmten fehlerhaften Eingaben ab; Runnel fängt das ab und meldet „the file could not be read“ | Fehlerbericht an `goccy/go-yaml` (Eingabe in `internal/model/testdata/fuzz/`) |
 | K9 | `runnel.exe` ist nicht signiert (SmartScreen-Warnung) | Code-Signing vor 1.0 (Roadmap) |
-| K10 | `params` von `core.run-workflow` lassen sich im Editor-Panel nicht bearbeiten (Hinweis „changed in your text editor“); Läufe aufgerufener Workflows erscheinen nicht als eigene Läufe, nur im Log der Action | im Texteditor; Feld für Schlüssel/Werte mit E7c, eigene Läufe mit der Lauf-Historie (S26) |
+| K10 | Läufe aufgerufener Workflows erscheinen nicht als eigene Läufe, nur im Log der Action (`params` lassen sich seit E7c im Panel bearbeiten) | eigene Läufe mit der Lauf-Historie (S26) |
 | K10 | Strg+C und Exit-Code 130 sind unter Windows nur über die CI (Build) abgedeckt, nicht automatisch getestet | manueller Test W9/W10 |
-| K11 | `forEach`, `parallel` und `stopOnError` (S24b) zeigt das Eigenschaften-Panel des Editors noch nicht an; der Canvas zeigt eine Action mit `forEach` wie eine einfache | im Texteditor; Anzeige und Bearbeiten im Panel mit E7c (Mockup S25a, Zustand `foreach`) |

@@ -139,6 +139,8 @@ function Graph(props: CanvasProps) {
           type: a.type,
           join: a.join,
           copies: a.copies,
+          forEach: !!a.forEach,
+          parallel: a.parallel,
           noInput: pipeline && d?.category === "input",
           color: d ? tileColor(d) : catalog.size === 0 ? categoryColor.general : undefined,
           problems: byAction.get(a.id) ?? [],

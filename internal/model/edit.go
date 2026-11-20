@@ -35,22 +35,29 @@ type WorkflowEdit struct {
 	Set []SetField `json:"set,omitempty"`
 	// SetWorkflow changes a field of the workflow itself (E7b); at most one.
 	SetWorkflow []WorkflowField `json:"setWorkflow,omitempty"`
+	// Entries changes a parameter or an output (E7c); at most one.
+	Entries []EntryEdit `json:"entries,omitempty"`
 }
 
 // SetField sets a field of an action to a value; a nil value removes the field.
 type SetField struct {
 	ID string `json:"id"`
 	// Field is one of description, timeout, continueOnError, join, joinTimeout,
-	// retry.attempts, retry.backoff, retry.strategy or with.<name>.
+	// retry.attempts, retry.backoff, retry.strategy, forEach, parallel, stopOnError or
+	// with.<name>.
 	Field string `json:"field"`
 	// Value is a text, a number or true/false.
 	Value any `json:"value"`
+	// Map sets a field of the configuration to a mapping of texts instead (e.g.
+	// with.params), in this order; Value must then be nil.
+	Map []KeyValue `json:"map,omitempty"`
 }
 
 var (
 	settableFields = map[string]bool{
 		"description": true, "timeout": true, "continueOnError": true, "join": true, "joinTimeout": true,
 		"retry.attempts": true, "retry.backoff": true, "retry.strategy": true,
+		"forEach": true, "parallel": true, "stopOnError": true,
 	}
 	configKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 )
@@ -91,7 +98,9 @@ func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 			return nil, nil, err
 		}
 		d := &graphDoc{noun: "action", docNoun: "workflow", stepsKey: "actions", src: w.src,
-			stepFields: settableFields, docFields: workflowFields}
+			stepFields: settableFields, docFields: workflowFields,
+			lists:  map[string]int{"parameters": len(w.Parameters), "outputs": len(w.Outputs)},
+			params: w.Parameters, outputs: w.Outputs}
 		for _, a := range w.Actions {
 			d.steps = append(d.steps, a.ID)
 		}
@@ -99,7 +108,7 @@ func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 			d.links = append(d.links, linkRef{l.From, l.To})
 		}
 		g := &graphEdit{Move: edit.Move, Delete: edit.Delete, Add: edit.Add, Rename: edit.Rename,
-			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetWorkflow}
+			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetWorkflow, Entries: edit.Entries}
 		for _, l := range edit.AddLinks {
 			if err := checkWhen(l.When); err != nil {
 				return nil, nil, fmt.Errorf("cannot add link from %q to %q: %w", l.From, l.To, err)
@@ -164,6 +173,11 @@ type graphDoc struct {
 	// stepFields are the fields of a step that Set may change besides with.*; docFields
 	// those of the document that SetDoc may change.
 	stepFields, docFields map[string]bool
+	// lists are the lists Entries may change, with their number of entries; params and
+	// outputs are their entries as read.
+	lists   map[string]int
+	params  []Parameter
+	outputs []Output
 }
 
 type linkRef struct{ From, To string }
@@ -186,6 +200,7 @@ type graphEdit struct {
 	UpdateLinks map[int]linkItem
 	Set         []SetField
 	SetDoc      []WorkflowField
+	Entries     []EntryEdit
 }
 
 // editText applies an edit to the text of a file: read parses the text into the steps
@@ -249,7 +264,8 @@ type editor struct {
 func (e *editor) check() error {
 	edit, noun := e.edit, e.d.noun
 	if len(edit.Rename) > 0 && (len(edit.Move) > 0 || len(edit.Delete) > 0 || len(edit.Add) > 0 ||
-		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0 || len(edit.SetDoc) > 0) {
+		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0 || len(edit.SetDoc) > 0 ||
+		len(edit.Entries) > 0) {
 		return errors.New("renaming cannot be combined with other changes")
 	}
 	e.ids = map[string]bool{}
@@ -341,7 +357,7 @@ func (e *editor) check() error {
 			return fmt.Errorf("%s: only a text, a number or true/false can be set here", f.Field)
 		}
 	}
-	return nil
+	return e.checkEntries()
 }
 
 var workflowFields = map[string]bool{"name": true, "description": true, "settings.timeout": true, "settings.maxConcurrentRuns": true}
@@ -357,6 +373,19 @@ func checkSetField(f SetField, fields map[string]bool) error {
 	name, ok := strings.CutPrefix(f.Field, "with.")
 	if (!ok || !configKeyPattern.MatchString(name)) && !fields[f.Field] {
 		return fmt.Errorf("field %q cannot be changed here", f.Field)
+	}
+	if len(f.Map) > 0 {
+		if !ok || f.Value != nil {
+			return fmt.Errorf("%s: a mapping can only be set for a field of the configuration", f.Field)
+		}
+		seen := map[string]bool{}
+		for _, kv := range f.Map {
+			if !configKeyPattern.MatchString(kv.Key) || seen[kv.Key] {
+				return fmt.Errorf("%s: invalid or duplicate key %q", f.Field, kv.Key)
+			}
+			seen[kv.Key] = true
+		}
+		return nil
 	}
 	switch v := f.Value.(type) {
 	case nil, string, bool, float64, int:
@@ -451,6 +480,9 @@ func (e *editor) apply() error {
 			return fmt.Errorf("cannot change the %s: %w", d.docNoun, err)
 		}
 	}
+	if err := e.applyEntries(); err != nil {
+		return err
+	}
 
 	e.layout()
 	return nil
@@ -469,7 +501,34 @@ func (e *editor) set(f SetField) error {
 		return fmt.Errorf("the %s is written in flow style ({ … }); write it as a block to edit it in the properties", e.d.noun)
 	}
 	indent := strings.Repeat(" ", itemEntries[0].Key.GetToken().Position.Column-1)
-	return e.setField(itemEntries, maxLine(item), indent, f.Field, f.Value)
+	value := f.Value
+	if len(f.Map) > 0 {
+		value = inFileOrder(f.Map, entries(valueOf(entries(valueOf(itemEntries, "with")), strings.TrimPrefix(f.Field, "with."))))
+	}
+	return e.setField(itemEntries, maxLine(item), indent, f.Field, value)
+}
+
+// inFileOrder orders the entries of a mapping like the keys already in the file (the
+// editor gets mappings with sorted keys); new keys follow in the order given.
+func inFileOrder(m []KeyValue, existing []*ast.MappingValueNode) []KeyValue {
+	out := make([]KeyValue, 0, len(m))
+	used := map[string]bool{}
+	for _, e := range existing {
+		key := e.Key.GetToken().Value
+		for _, kv := range m {
+			if kv.Key == key && !used[key] {
+				out = append(out, kv)
+				used[key] = true
+			}
+		}
+	}
+	for _, kv := range m {
+		if !used[kv.Key] {
+			out = append(out, kv)
+			used[kv.Key] = true
+		}
+	}
+	return out
 }
 
 // setField sets "field" or "parent.child" in a block mapping with the given entries and
@@ -633,6 +692,18 @@ func entryLines(indent, key string, value any) ([]string, error) {
 			return append([]string{indent + key + ": " + block[0]}, block[1:]...), nil
 		}
 		return []string{indent + key + ": " + yamlScalar(v)}, nil
+	case rawValue:
+		return []string{indent + key + ": " + string(v)}, nil
+	case []KeyValue:
+		lines := []string{indent + key + ":"}
+		for _, kv := range v {
+			entry, err := entryLines(indent+"  ", kv.Key, kv.Value)
+			if err != nil {
+				return nil, err
+			}
+			lines = append(lines, entry...)
+		}
+		return lines, nil
 	}
 	return nil, fmt.Errorf("unsupported value %T", value)
 }
@@ -1005,6 +1076,8 @@ type PipelineEdit struct {
 	Set []SetField `json:"set,omitempty"`
 	// SetPipeline changes a field of the pipeline: name, description or settings.*.
 	SetPipeline []WorkflowField `json:"setPipeline,omitempty"`
+	// Entries changes a parameter (E7c); at most one.
+	Entries []EntryEdit `json:"entries,omitempty"`
 }
 
 // PipelineLinkUpdate changes the type of a link: data or error.
@@ -1028,7 +1101,8 @@ func EditPipeline(name string, data []byte, edit PipelineEdit) ([]byte, error) {
 			return nil, nil, err
 		}
 		d := &graphDoc{noun: "transform", docNoun: "pipeline", stepsKey: "transforms", src: p.src,
-			stepFields: transformFields, docFields: pipelineFields}
+			stepFields: transformFields, docFields: pipelineFields,
+			lists: map[string]int{"parameters": len(p.Parameters)}, params: p.Parameters}
 		for _, t := range p.Transforms {
 			d.steps = append(d.steps, t.ID)
 		}
@@ -1036,7 +1110,7 @@ func EditPipeline(name string, data []byte, edit PipelineEdit) ([]byte, error) {
 			d.links = append(d.links, linkRef{l.From, l.To})
 		}
 		g := &graphEdit{Move: edit.Move, Delete: edit.Delete, Add: edit.Add, Rename: edit.Rename,
-			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetPipeline}
+			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetPipeline, Entries: edit.Entries}
 		for _, l := range edit.AddLinks {
 			if err := checkLinkType(l.Type); err != nil {
 				return nil, nil, fmt.Errorf("cannot add link from %q to %q: %w", l.From, l.To, err)

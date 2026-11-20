@@ -33,6 +33,12 @@ export function fieldLabel(key: string): string {
 function where(wf: Workflow, p: Problem): string {
   const t = problemTarget(wf, p);
   if (!t) return "—";
+  // A field of a parameter or output: its name and the field, e.g. "COUNT · Default".
+  const entry = t.field?.match(/^(parameters|outputs)\[(\d+)\]\.(\w+)$/);
+  if (entry) {
+    const list = entry[1] === "parameters" ? wf.parameters : wf.outputs;
+    return `${list?.[Number(entry[2])]?.name || `#${Number(entry[2]) + 1}`} · ${fieldLabel(entry[3])}`;
+  }
   const field = t.field ? ` · ${fieldLabel(t.field)}` : "";
   if (t.action) return t.action + field;
   if (t.link !== undefined) return `Link #${t.link + 1}${field}`;

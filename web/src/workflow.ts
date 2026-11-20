@@ -13,6 +13,12 @@ export interface Action {
   continueOnError?: boolean;
   join?: string;
   joinTimeout?: string;
+  /** Repeats the action for every entry of a list (an expression, roadmap S24b). */
+  forEach?: string;
+  /** Entries of forEach run at the same time; 0 or missing: 1. */
+  parallel?: number;
+  /** Stops forEach at the first failed entry; missing: true. */
+  stopOnError?: boolean;
   /** Pipelines: instances that share the incoming records (0 or missing: 1). */
   copies?: number;
   /** Pipelines: copy (default) or distribute, for several outgoing data links. */
@@ -135,8 +141,8 @@ export function graphOf(v: Validation | null): Workflow | undefined {
   return { ...rest, kind: "pipeline", actions: transforms, links: links?.map((l) => ({ ...l, type: l.type || "data" })) };
 }
 
-/** Checks a workflow on the server; content is the text shown in the editor. */
-export async function validate(path: string, content: string): Promise<Validation> {
+/** Checks a workflow or pipeline on the server; content is the text shown in the editor (missing: the saved file). */
+export async function validate(path: string, content?: string): Promise<Validation> {
   const res = await fetch(`${apiBase}/validate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -238,11 +244,34 @@ export interface WorkflowEdit {
   deleteLinks?: number[];
   /** when: success, failure, always or an expression "{{ … }}"; type (pipelines): data or error. */
   updateLinks?: { index: number; when?: string; loop?: boolean; disabled?: boolean; type?: string }[];
-  /** Changes one field of an action (properties panel); null removes the field. */
-  set?: { id: string; field: string; value: string | number | boolean | null }[];
+  /** Changes one field of an action (properties panel); null removes the field. map sets a mapping of texts (with.params). */
+  set?: { id: string; field: string; value: string | number | boolean | null; map?: { key: string; value: string }[] }[];
   /** Changes one field of the workflow itself (name, description, settings.*). */
   setWorkflow?: { field: string; value: string | number | boolean | null }[];
+  /** Changes a parameter or an output (E7c); at most one. */
+  entries?: EntryEdit[];
 }
+
+/** A change of the list of parameters or outputs (see model.EntryEdit). */
+export interface EntryEdit {
+  list: "parameters" | "outputs";
+  op: "add" | "set" | "delete" | "move";
+  index?: number;
+  /** add: the name of the new entry. */
+  name?: string;
+  /** set: name, description, type, default, required, enum (parameters) or value (outputs). */
+  field?: string;
+  /** set: a text, true/false or the allowed values; null removes the field. */
+  value?: string | boolean | string[] | null;
+  /** move: -1 (up) or 1 (down). */
+  by?: number;
+}
+
+/** Allowed names of parameters and outputs (like variables). */
+export const entryNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** Types of parameters and outputs (model.ValueType); string is the default. */
+export const valueTypes = ["string", "integer", "number", "boolean", "json"];
 
 /** What a problem belongs to: an action, a link or the workflow, and the field in the properties panel. */
 export interface ProblemTarget {
@@ -274,6 +303,9 @@ export function problemTarget(wf: Workflow, p: Problem): ProblemTarget | null {
     const field = m[2] === "from" || m[2] === "to" ? undefined : m[2];
     return { link: Number(m[1]), field };
   }
+  // A field of a parameter or output: the key of its field in the panel, e.g. "parameters[1].default".
+  m = path.match(/^\$\.(parameters|outputs)\[(\d+)\](?:\.(\w+))?/);
+  if (m) return { field: `${m[1]}[${m[2]}].${m[3] ?? p.message.match(/missing required field "(\w+)"/)?.[1] ?? "name"}` };
   m = path.match(/^\$\.(name|description|settings\.\w+|parameters|outputs)/);
   if (m) return { field: m[1] };
   return {};
@@ -326,6 +358,8 @@ export interface PipelineEdit {
   set?: { id: string; field: string; value: string | number | boolean | null }[];
   /** name, description or settings.*. */
   setPipeline?: { field: string; value: string | number | boolean | null }[];
+  /** Changes a parameter (E7c). */
+  entries?: EntryEdit[];
 }
 
 /**
