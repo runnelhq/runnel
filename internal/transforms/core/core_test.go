@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/runnelhq/runnel/internal/record"
+	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/transforms/transformtest"
 )
 
@@ -69,5 +72,58 @@ func TestLogWritesEveryNthRecord(t *testing.T) {
 	}
 	if _, err := logDefinition.New(map[string]any{"every": -1}); err == nil {
 		t.Error("every -1 accepted")
+	}
+}
+
+func TestGenerateRowsSchema(t *testing.T) {
+	tr := transformtest.New(t, generateRowsDefinition, map[string]any{
+		"rows": "1", "rowNumberField": "n",
+		"fields": []any{
+			map[string]any{"name": "status", "value": "new"},
+			map[string]any{"name": "count", "value": uint64(3)},
+			map[string]any{"name": "rate", "value": 1.5},
+			map[string]any{"name": "ok", "value": true},
+			map[string]any{"name": "nothing", "value": nil},
+		},
+	})
+	s, err := tr.(transform.Initializer).Init(transform.NewInitContext(record.Schema{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "n:int status:string count:int rate:float ok:bool nothing:"
+	var got []string
+	for _, f := range s.Fields {
+		got = append(got, f.Name+":"+string(f.Type))
+	}
+	if strings.Join(got, " ") != want || s.Open {
+		t.Errorf("schema %v (open %v), want %s", got, s.Open, want)
+	}
+	// Values are normalized: the YAML number becomes an int64.
+	out, _, _ := transformtest.Run(context.Background(), tr)
+	if v, _ := out[0].Get("count"); v != int64(3) {
+		t.Errorf("count = %#v", v)
+	}
+}
+
+func TestLogSelectedFieldsAndValueTypes(t *testing.T) {
+	tr := transformtest.New(t, logDefinition, map[string]any{"fields": []any{"amount", "day", "missing", "raw"}})
+	in := record.New(
+		record.Field{Name: "id", Value: int64(1)},
+		record.Field{Name: "amount", Value: decimal.RequireFromString("19.90")},
+		record.Field{Name: "day", Value: record.Date{Year: 2026, Month: time.November, Day: 20}},
+		record.Field{Name: "raw", Value: []byte("abc")},
+	)
+	out, logs, err := transformtest.Run(context.Background(), tr, in)
+	if err != nil || len(out) != 1 || out[0].Len() != 4 {
+		t.Fatalf("%v %v", out, err)
+	}
+	if len(logs) != 1 || logs[0].Msg != "#1 {amount: 19.9, day: 2026-11-20, raw: <3 bytes>}" {
+		t.Errorf("logs %v", logs)
+	}
+	// Init checks the fields against the incoming schema and passes the schema on.
+	ic := transform.NewInitContext(record.Schema{Fields: []record.FieldDef{{Name: "amount"}, {Name: "day"}, {Name: "raw"}}})
+	s, _ := tr.(transform.Initializer).Init(ic)
+	if p := ic.Problems(); len(p) != 1 || p[0].Path != "fields[2]" || len(s.Fields) != 3 {
+		t.Errorf("problems %+v, schema %+v", p, s)
 	}
 }

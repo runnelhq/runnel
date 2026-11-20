@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
@@ -22,6 +23,9 @@ var dummyDefinition = transform.Definition{
 }
 
 type dummy struct{}
+
+// Init passes the incoming schema on.
+func (dummy) Init(ic *transform.InitContext) (record.Schema, error) { return ic.In, nil }
 
 func (dummy) Process(_ context.Context, in <-chan transform.Batch, out *transform.Output) error {
 	for b := range in {

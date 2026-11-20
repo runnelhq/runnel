@@ -40,10 +40,10 @@ func (p *Pipeline) Validate() Errors {
 		_, fromOK := index[l.From]
 		_, toOK := index[l.To]
 		if !fromOK && l.From != "" {
-			errorf(path+".from", "%s: unknown transform %q%s", label(i, l), l.From, suggestID(l.From, ids))
+			errorf(path+".from", "%s: unknown transform %q%s", label(i, l), l.From, Suggest(l.From, ids))
 		}
 		if !toOK && l.To != "" {
-			errorf(path+".to", "%s: unknown transform %q%s", label(i, l), l.To, suggestID(l.To, ids))
+			errorf(path+".to", "%s: unknown transform %q%s", label(i, l), l.To, Suggest(l.To, ids))
 		}
 		if !fromOK || !toOK {
 			continue

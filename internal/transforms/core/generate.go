@@ -39,12 +39,30 @@ func newGenerateRows(with map[string]any) (transform.Transform, error) {
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
-	for _, f := range t.Fields {
+	for i, f := range t.Fields {
 		if f.Name == "" {
 			return nil, errors.New("fields: every field needs a name")
 		}
+		v, err := record.Normalize(f.Value)
+		if err != nil {
+			return nil, fmt.Errorf("fields[%d] (%s): %w", i, f.Name, err)
+		}
+		t.Fields[i].Value = v
 	}
 	return t, nil
+}
+
+// Init reports a closed schema: the row number (int) and the constant fields with the
+// types of their values (ADR 0007).
+func (t *generateRows) Init(*transform.InitContext) (record.Schema, error) {
+	var s record.Schema
+	if t.RowNumber != "" {
+		s = s.With(t.RowNumber, record.Int)
+	}
+	for _, f := range t.Fields {
+		s = s.With(f.Name, record.TypeOf(f.Value))
+	}
+	return s, nil
 }
 
 func (t *generateRows) Process(ctx context.Context, _ <-chan transform.Batch, out *transform.Output) error {

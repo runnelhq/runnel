@@ -496,6 +496,13 @@
             "type": "integer",
             "description": "Writes every n-th record, e.g. 1000 for large data",
             "default": 1
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields to write, in this order; empty: all fields",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

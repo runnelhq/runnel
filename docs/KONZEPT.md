@@ -608,7 +608,9 @@ type Transform interface {
 - Hört ein Transform vor dem Ende seiner Eingabe auf zu lesen, verwirft die Engine den Rest, damit die Transforms davor
   fertig werden. Eine Panik in einem Transform wird zum Fehler der Pipeline.
 - **Zähler** je Transform: gelesen, geschrieben (Ereignis `transform.finished`, Ergebnis des Laufs).
-- Mit S14 kommen Schema und Werttypen dazu (`Init(cfg, schemaIn) → schemaOut`, ADR 0007), ohne `Process` zu ändern;
+- **Schema und Werttypen** (S14, ADR 0007 mit Nachtrag): Transforms können `Init(ic) → Schema` umsetzen; die Engine
+  leitet die Schemas vor dem Lauf durch den Graphen ab, prüft verwendete Felder (`ic.Use`) und meldet Tippfehler mit
+  Datei, Zeile und Spalte – als Fehler bei geschlossenem, als Warnung bei offenem Schema. `Process` bleibt unverändert;
   vereinfachte Basistypen (`RowMapper`, `RowFilter`) für Transforms, die nur `func(Record) (Record, error)` brauchen,
   folgen mit den ersten solchen Transforms (S16).
 

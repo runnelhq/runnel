@@ -243,12 +243,12 @@ func (v *graphValidator) suggest(id string) string {
 	for i, a := range v.w.Actions {
 		ids[i] = a.ID
 	}
-	return suggestID(id, ids)
+	return Suggest(id, ids)
 }
 
-// suggestID returns " (did you mean …?)" for the most similar of the ids, if one is
-// at most two edits away; otherwise "".
-func suggestID(id string, ids []string) string {
+// Suggest returns " (did you mean …?)" for the most similar of the names, if one is
+// at most two edits away; otherwise "". Used for ids, transforms and field names.
+func Suggest(id string, ids []string) string {
 	best, bestDist := "", 3
 	for _, other := range ids {
 		if d := editDistance(id, other); d < bestDist {

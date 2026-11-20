@@ -11,7 +11,9 @@ transform core.log – Log (category output)
 Writes records to the run log and passes them on
 
 Fields (with:):
-  level  Log level of the messages
-         string, one of debug|info|warn|error, default info
-  every  Writes every n-th record, e.g. 1000 for large data
-         integer, default 1
+  level   Log level of the messages
+          string, one of debug|info|warn|error, default info
+  every   Writes every n-th record, e.g. 1000 for large data
+          integer, default 1
+  fields  Fields to write, in this order; empty: all fields
+          list of string

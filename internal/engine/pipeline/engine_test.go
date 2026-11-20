@@ -41,6 +41,19 @@ func testRegistry(c *collected) *transform.Registry {
 				}), nil
 			}})
 	}
+	r.Register(transform.Definition{Type: "test.open", Category: transform.CategoryFlow, Label: "Test", Description: "Test",
+		New: func(map[string]any) (transform.Transform, error) {
+			return openSchema{fn(func(_ context.Context, in <-chan transform.Batch, out *transform.Output) error {
+				for b := range in {
+					for _, rec := range b {
+						if err := out.Emit(rec); err != nil {
+							return err
+						}
+					}
+				}
+				return nil
+			})}, nil
+		}})
 	reg("test.collect", func(_ map[string]any, _ context.Context, in <-chan transform.Batch, out *transform.Output) error {
 		for b := range in {
 			for _, rec := range b {
@@ -89,6 +102,15 @@ func testRegistry(c *collected) *transform.Registry {
 }
 
 type fn func(ctx context.Context, in <-chan transform.Batch, out *transform.Output) error
+
+// openSchema passes records on and reports an open schema with the incoming fields.
+type openSchema struct{ fn }
+
+func (openSchema) Init(ic *transform.InitContext) (record.Schema, error) {
+	s := ic.In
+	s.Open = true
+	return s, nil
+}
 
 func (f fn) Process(ctx context.Context, in <-chan transform.Batch, out *transform.Output) error {
 	return f(ctx, in, out)
@@ -341,4 +363,78 @@ links:
 		t.Errorf("heap in use reached %d MiB for %d records, want below %d MiB", peak>>20, rows, limit>>20)
 	}
 	t.Logf("%d records in %s, peak heap %d MiB", rows, res.Duration, peak>>20)
+}
+
+func TestPrepareDerivesSchemas(t *testing.T) {
+	c := &collected{recs: map[string][]record.Record{}}
+	prepare := func(body string) (*Runner, error) {
+		return Prepare(parse(t, body), Options{Registry: testRegistry(c)})
+	}
+	// Closed schema from generate-rows, passed on by dummy: a typo is an error.
+	_, err := prepare(`
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n, fields: [ { name: status, value: new } ] } }
+  - { id: pass, type: core.dummy }
+  - { id: show, type: core.log, with: { fields: [n, stauts] } }
+links:
+  - { from: gen, to: pass }
+  - { from: pass, to: show }
+`)
+	want := `test.pipeline.yaml:8:53: transform "show": field "stauts" does not exist in the incoming records (did you mean "status"?) (fields: n, status)`
+	if err == nil || err.Error() != want {
+		t.Errorf("closed:\n got %v\nwant %s", err, want)
+	}
+
+	// test.open reports an open schema with the known fields: an unknown field is only a warning.
+	r, err := prepare(`
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: open, type: test.open }
+  - { id: show, type: core.log, with: { fields: [n, nn] } }
+links:
+  - { from: gen, to: open }
+  - { from: open, to: show }
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := r.Warnings(); len(w) != 1 || !strings.Contains(w[0].Error(), `warning: transform "show": field "nn" is not known in the incoming records (did you mean "n"?)`) {
+		t.Errorf("warnings %v", w)
+	}
+	// After a transform without Init nothing is known: no warning at all.
+	r, err = prepare(`
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1 } }
+  - { id: other, type: test.collect }
+  - { id: show, type: core.log, with: { fields: [anything] } }
+links:
+  - { from: gen, to: other }
+  - { from: other, to: show }
+`)
+	if err != nil || len(r.Warnings()) != 0 {
+		t.Errorf("unknown schema: %v %v", err, r.Warnings())
+	}
+	if s, _ := r.Schema("other"); !s.Open || len(s.Fields) != 0 {
+		t.Errorf("schema without Init: %+v", s)
+	}
+
+	// Two inputs: the schemas are merged.
+	r, err = prepare(`
+transforms:
+  - { id: a, type: core.generate-rows, with: { rows: 1, rowNumberField: n, fields: [ { name: x, value: 1 } ] } }
+  - { id: b, type: core.generate-rows, with: { rows: 1, rowNumberField: n, fields: [ { name: x, value: text } ] } }
+  - { id: both, type: core.dummy }
+links:
+  - { from: a, to: both }
+  - { from: b, to: both }
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s, _ := r.Schema("both"); len(s.Fields) != 2 || s.Fields[0].Type != record.Int || s.Fields[1].Type != record.Unknown || s.Open {
+		t.Errorf("merged %+v", s)
+	}
+	if diags := Check(parse(t, "transforms:\n  - { id: a, type: core.log, with: { fields: [x] } }\n"), Options{Registry: testRegistry(c)}); len(diags) != 1 || !diags.HasErrors() {
+		t.Errorf("check: %v", diags)
+	}
 }

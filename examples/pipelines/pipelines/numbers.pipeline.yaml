@@ -3,6 +3,7 @@
 #   runnel run --param ROWS=10000000 examples/pipelines/pipelines/numbers.pipeline.yaml
 # - "numbers" creates ROWS records with a running number and two constant fields.
 # - "both" collects the two branches: every record reaches it twice (copy to all links).
+# - "show" writes the fields n and amount; "runnel validate" checks that they exist.
 # - At the end every transform logs how many records it read and wrote.
 kind: Pipeline
 apiVersion: runnel/v1
@@ -30,6 +31,7 @@ transforms:
     type: core.log
     with:
       every: 250
+      fields: [n, amount]
 links:
   - { from: numbers, to: left }
   - { from: numbers, to: right }

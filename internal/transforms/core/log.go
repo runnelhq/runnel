@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
+
+	"github.com/shopspring/decimal"
 
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/record"
@@ -22,8 +25,17 @@ var logDefinition = transform.Definition{
 }
 
 type logRecords struct {
-	Level string `json:"level" doc:"Log level of the messages" schema:"enum=debug|info|warn|error,default=info"`
-	Every int64  `json:"every" doc:"Writes every n-th record, e.g. 1000 for large data" schema:"default=1"`
+	Level  string   `json:"level" doc:"Log level of the messages" schema:"enum=debug|info|warn|error,default=info"`
+	Every  int64    `json:"every" doc:"Writes every n-th record, e.g. 1000 for large data" schema:"default=1"`
+	Fields []string `json:"fields" doc:"Fields to write, in this order; empty: all fields"`
+}
+
+// Init checks the fields to write against the incoming schema and passes it on.
+func (t *logRecords) Init(ic *transform.InitContext) (record.Schema, error) {
+	for i, f := range t.Fields {
+		ic.Use(f, fmt.Sprintf("fields[%d]", i))
+	}
+	return ic.In, nil
 }
 
 func newLog(with map[string]any) (transform.Transform, error) {
@@ -62,7 +74,7 @@ func (t *logRecords) Process(_ context.Context, in <-chan transform.Batch, out *
 		for _, r := range b {
 			n++
 			if n%every == 0 {
-				out.Logf(lvl, "#%d %s", n, Format(r))
+				out.Logf(lvl, "#%d %s", n, Format(t.selected(r)))
 			}
 			if err := out.Emit(r); err != nil {
 				return err
@@ -72,7 +84,22 @@ func (t *logRecords) Process(_ context.Context, in <-chan transform.Batch, out *
 	return nil
 }
 
-// Format writes a record in one line: name: value, …; texts in quotes.
+// selected returns the configured fields of a record; missing ones are left out.
+func (t *logRecords) selected(r record.Record) record.Record {
+	if len(t.Fields) == 0 {
+		return r
+	}
+	var out record.Record
+	for _, name := range t.Fields {
+		if v, ok := r.Get(name); ok {
+			out.Set(name, v)
+		}
+	}
+	return out
+}
+
+// Format writes a record in one line: name: value, …; texts in quotes, dates in
+// ISO 8601, decimals exactly, binary values as their length.
 func Format(r record.Record) string {
 	var b strings.Builder
 	b.WriteString("{")
@@ -82,14 +109,24 @@ func Format(r record.Record) string {
 		}
 		b.WriteString(f.Name)
 		b.WriteString(": ")
-		if s, ok := f.Value.(string); ok {
-			fmt.Fprintf(&b, "%q", s)
-		} else if f.Value == nil {
-			b.WriteString("null")
-		} else {
-			b.WriteString(expr.Format(f.Value))
-		}
+		b.WriteString(formatValue(f.Value))
 	}
 	b.WriteString("}")
 	return b.String()
+}
+
+func formatValue(v any) string {
+	switch v := v.(type) {
+	case nil:
+		return "null"
+	case string:
+		return strconv.Quote(v)
+	case decimal.Decimal:
+		return v.String()
+	case record.Date:
+		return v.String()
+	case []byte:
+		return fmt.Sprintf("<%d bytes>", len(v))
+	}
+	return expr.Format(v)
 }

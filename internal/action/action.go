@@ -192,12 +192,26 @@ func (r *Registry) Types() []string {
 // Unknown fields and missing required fields (tag schema:"required") are errors.
 // Field names are those of the json tags.
 func DecodeConfig(with map[string]any, v any) error {
+	return decodeConfig(with, v, false)
+}
+
+// DecodeConfigNumbers is DecodeConfig, but numbers in fields of type any are decoded as
+// json.Number instead of float64, so that whole numbers stay whole (e.g. constant
+// values of pipeline transforms; see record.Normalize).
+func DecodeConfigNumbers(with map[string]any, v any) error {
+	return decodeConfig(with, v, true)
+}
+
+func decodeConfig(with map[string]any, v any, useNumber bool) error {
 	data, err := json.Marshal(with)
 	if err != nil {
 		return err
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
+	if useNumber {
+		dec.UseNumber()
+	}
 	if err := dec.Decode(v); err != nil {
 		var typeErr *json.UnmarshalTypeError
 		if errors.As(err, &typeErr) {

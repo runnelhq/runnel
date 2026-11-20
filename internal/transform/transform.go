@@ -156,5 +156,6 @@ func (r *Registry) Types() []string {
 	return types
 }
 
-// DecodeConfig decodes a "with" configuration like action.DecodeConfig.
-func DecodeConfig(with map[string]any, v any) error { return action.DecodeConfig(with, v) }
+// DecodeConfig decodes a "with" configuration like action.DecodeConfig; numbers in
+// fields of type any arrive as json.Number (record.Normalize makes them int64 or float64).
+func DecodeConfig(with map[string]any, v any) error { return action.DecodeConfigNumbers(with, v) }
