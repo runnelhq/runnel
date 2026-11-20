@@ -352,8 +352,9 @@ func TestRunForEachExample(t *testing.T) {
 		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
 	}
 	for _, want := range []string{
-		"[totals] [1/2] total/read: read 2 rows from examples/pipelines/inbox/orders-2026-11-18.csv",
-		"[totals] [2/2] total/read: read 3 rows from examples/pipelines/inbox/orders-2026-11-19.csv",
+		// The paths come from file.list, with the separator of the system.
+		"[totals] [1/2] total/read: read 2 rows from " + filepath.FromSlash("examples/pipelines/inbox/orders-2026-11-18.csv"),
+		"[totals] [2/2] total/read: read 3 rows from " + filepath.FromSlash("examples/pipelines/inbox/orders-2026-11-19.csv"),
 		"[report] orders-2026-11-18.csv: 2 orders, 350.5; orders-2026-11-19.csv: 3 orders, 1145.25",
 		"output FILES = 2",
 	} {
