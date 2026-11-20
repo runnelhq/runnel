@@ -444,17 +444,26 @@ export function FileView(props: {
 
   const slash = path.lastIndexOf("/");
   const editable = isWorkflow && !!validation?.workflow;
-  // The properties panel (mockup E7) takes room; the file bar is then more compact.
   const showPanel = editable && view === "canvas" && panel;
+  // Workflows have the compact file bar of mockups E7/E8 in every view, with or without the
+  // properties panel, so that nothing moves when switching between canvas and YAML: the
+  // name with the path in its tooltip, "Copy path" as a symbol next to it, no kind badge.
+  const compact = isWorkflow;
+  // The badges open the list of problems below the canvas, also from the YAML view.
+  const openProblems = editable
+    ? () => {
+        setView("canvas");
+        setBottomTab("problems");
+      }
+    : undefined;
   return (
     <>
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-4">
         <span className="font-mono text-xs whitespace-nowrap text-muted-foreground" data-testid="crumbs" title={path}>
-          {slash >= 0 && !showPanel && `${path.slice(0, slash).split("/").join(" / ")} / `}
+          {slash >= 0 && !compact && `${path.slice(0, slash).split("/").join(" / ")} / `}
           <b className="font-medium text-foreground">{path.slice(slash + 1)}</b>
         </span>
-        {/* Compact file bar with the properties panel (mockup E8): no kind badge, "Copy path" next to the name. */}
-        {showPanel ? (
+        {compact ? (
           <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} compact />
         ) : (
           <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
@@ -470,7 +479,7 @@ export function FileView(props: {
             testId="error-count"
             tone="error"
             title={problemList(validation, "error")}
-            onClick={editable && view === "canvas" ? () => setBottomTab("problems") : undefined}
+            onClick={openProblems}
           >
             ✖ {validation.errors}
           </Badge>
@@ -480,7 +489,7 @@ export function FileView(props: {
             testId="warning-count"
             tone="warning"
             title={problemList(validation, "warning")}
-            onClick={editable && view === "canvas" ? () => setBottomTab("problems") : undefined}
+            onClick={openProblems}
           >
             ⚠ {validation.warnings}
           </Badge>
@@ -539,7 +548,7 @@ export function FileView(props: {
               className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 text-xs font-medium text-primary-foreground disabled:cursor-default disabled:opacity-50"
             >
               <SaveIcon width={14} height={14} />
-              Save {!showPanel && <kbd className="font-mono text-[10px] opacity-75">Ctrl+S</kbd>}
+              Save
             </button>
             <ViewSwitch view={view} onView={setView} />
             {editable && view === "canvas" && !panel && (
@@ -549,7 +558,7 @@ export function FileView(props: {
             )}
           </>
         )}
-        {!showPanel && <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} />}
+        {!compact && <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} />}
       </div>
       {editError && (
         <div role="alert" className="flex shrink-0 items-center gap-3 border-b border-border bg-danger-soft px-4 py-1.5 text-xs text-destructive">

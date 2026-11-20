@@ -48,6 +48,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E8 | Der Laufstatus bleibt bis zum nächsten Lauf; Verschieben behält ihn, Änderungen an Actions oder Links blenden ihn aus |
 | E8 | Debug-Zeilen im Log standardmäßig an; der Schalter wird im Browser gemerkt |
 | E8 | Das Log zeigt den letzten Lauf der Datei seit dem Start des Servers; frühere Läufe mit der Lauf-Historie (S26) |
+| E7/E8 | Nachtrag nach dem Testen: Workflows zeigen die kompakte Dateileiste in jeder Ansicht (auch YAML und ohne Panel), damit sich beim Wechsel nichts verschiebt; das Fehler-Badge öffnet „Problems“ auch aus der YAML-Ansicht |
 | E8 | Umsetzung in zwei Schritten: E8a Run (Button, Dialog, Rückfrage, Cancel) mit Live-Status auf dem Canvas, E8b Log-Tab und Ergebnis im Panel |
 | S35 | CodeMirror 6 (MIT) statt Monaco: für viele kleine Felder gebaut, ein Bruchteil der Größe, Vorschläge und Tooltips eingebaut |
 | S35 | Ausdruckseditor in allen Textfeldern unter `with:` (auch Zeitangaben) und in Link-Bedingungen; ID und Beschreibung bleiben normale Felder; Parameter-Standardwerte und Outputs mit E7c |

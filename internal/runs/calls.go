@@ -123,6 +123,9 @@ func forward(log func(slog.Level, string)) func(workflow.Event) {
 	name := ""
 	return func(e workflow.Event) {
 		at := name + "/" + e.ActionID + ": "
+		if e.ActionID == "" {
+			at = name + ": " // a message of the run itself
+		}
 		switch e.Kind {
 		case workflow.RunStarted:
 			name = e.Message

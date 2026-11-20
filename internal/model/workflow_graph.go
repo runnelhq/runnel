@@ -9,6 +9,9 @@ import (
 // ActionTypeStart is the type of the action where every workflow begins.
 const ActionTypeStart = "core.start"
 
+// ActionTypeSuccess is the type of the action that ends a workflow successfully.
+const ActionTypeSuccess = "core.success"
+
 // Validate checks the workflow as a graph: references between actions and links,
 // the start action, cycles and reachability. It returns errors and warnings,
 // sorted by position; use Errors.HasErrors to decide whether the workflow is usable.
