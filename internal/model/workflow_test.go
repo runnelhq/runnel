@@ -222,3 +222,50 @@ func TestParentPath(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateExpressions(t *testing.T) {
+	src := `kind: Workflow
+apiVersion: runnel/v1
+name: x
+parameters:
+  - { name: DAY, default: "{{ formatDate(today(), 'yyyy-MM-dd') }}" }
+  - { name: BAD, default: "{{ today( }}" }
+outputs:
+  - { name: ROWS, value: "{{ results.load.rows }}" }
+  - { name: OOPS, value: "{{ reslt.rows }}" }
+actions:
+  - id: start
+    type: core.start
+  - id: load
+    type: core.log
+    with:
+      message: "rows: {{ result.rows }}, day {{ params.DAY }}"
+      list: ["{{ 1 + }}"]
+links:
+  - { from: start, to: load, when: "{{ vars.X == 'y' }}" }
+  - { from: load, to: start, loop: true, when: "{{ addDays() }}" }
+`
+	_, err := ParseWorkflow("x.workflow.yaml", []byte(src))
+	var errs Errors
+	if !errors.As(err, &errs) {
+		t.Fatalf("err = %v", err)
+	}
+	var got []string
+	for _, e := range errs {
+		got = append(got, e.Error())
+	}
+	want := []string{
+		`x.workflow.yaml:6:27: parameter "BAD": default value: expression {{ today( }}: unexpected token EOF`,
+		`x.workflow.yaml:9:26: output "OOPS": expression {{ reslt.rows }}: unknown name reslt`,
+		`x.workflow.yaml:17:14: action "load": expression {{ 1 + }}: unexpected token EOF`,
+		`x.workflow.yaml:20:48: link #2: expression {{ addDays() }}: not enough arguments to call addDays`,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d problems:\n%s", len(got), strings.Join(got, "\n"))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("problem %d:\n got %s\nwant %s", i, got[i], want[i])
+		}
+	}
+}

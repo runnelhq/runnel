@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -131,12 +133,21 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 			unsupported(fmt.Sprintf("$.outputs[%d].value", i), fmt.Sprintf("output %q: an expression", o.Name))
 		}
 	}
+	// Expressions are checked when the file is read (S08a) and evaluated with S08b.
+	for i, p := range w.Parameters {
+		if strings.Contains(p.Default, "{{") {
+			unsupported(fmt.Sprintf("$.parameters[%d].default", i), fmt.Sprintf("parameter %q: an expression as default value", p.Name))
+		}
+	}
 	for i := range w.Actions {
 		a := &w.Actions[i]
 		path := fmt.Sprintf("$.actions[%d]", i)
 		r.actions[a.ID] = a
 		if a.Type == model.ActionTypeStart {
 			r.start = a.ID
+		}
+		if path, found := findExpression(a.With, path+".with"); found {
+			unsupported(path, fmt.Sprintf("action %q: an expression in the configuration", a.ID))
 		}
 		def, ok := opts.Registry.Lookup(a.Type)
 		if !ok {
@@ -327,6 +338,27 @@ func (r *Runner) emit(e Event) {
 		defer r.emitMu.Unlock()
 		r.opts.Observer(e)
 	}
+}
+
+// findExpression returns the YAML path of the first string with {{ … }} in a configuration.
+func findExpression(v any, path string) (string, bool) {
+	switch v := v.(type) {
+	case string:
+		return path, strings.Contains(v, "{{")
+	case map[string]any:
+		for _, k := range slices.Sorted(maps.Keys(v)) {
+			if p, ok := findExpression(v[k], path+"."+k); ok {
+				return p, true
+			}
+		}
+	case []any:
+		for i, e := range v {
+			if p, ok := findExpression(e, fmt.Sprintf("%s[%d]", path, i)); ok {
+				return p, true
+			}
+		}
+	}
+	return "", false
 }
 
 // expand resolves ${…} references in all strings of a configuration value.

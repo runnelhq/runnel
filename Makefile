@@ -84,6 +84,7 @@ FUZZTIME ?= 30s
 fuzz:
 	go test ./internal/vars -run '^$$' -fuzz FuzzParseExpand -fuzztime $(FUZZTIME)
 	go test ./internal/model -run '^$$' -fuzz FuzzParseWorkflow -fuzztime $(FUZZTIME)
+	go test ./internal/expr -run '^$$' -fuzz FuzzCompile -fuzztime $(FUZZTIME)
 
 ## vulncheck: report known vulnerabilities in dependencies and the Go standard library
 vulncheck: $(GOVULNCHECK)

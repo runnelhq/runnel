@@ -467,3 +467,25 @@ actions:
 		t.Errorf("error = %v", err)
 	}
 }
+
+func TestPrepareExpressionsNotYetSupported(t *testing.T) {
+	// Expressions are checked when the file is read (S08a); the engine evaluates them with S08b.
+	w := parse(t, `
+parameters:
+  - { name: DAY, default: "{{ formatDate(today(), 'yyyy-MM-dd') }}" }
+actions:
+  - { id: start, type: core.start }
+  - { id: a, type: test.ok, with: { note: "rows: {{ result.rows }}" } }
+links:
+  - { from: start, to: a }
+`)
+	_, err := Prepare(w, Options{Registry: testRegistry(t)})
+	for _, want := range []string{
+		`parameter "DAY": an expression as default value is not supported`,
+		`action "a": an expression in the configuration is not supported`,
+	} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want containing %q", err, want)
+		}
+	}
+}

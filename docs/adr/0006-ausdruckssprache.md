@@ -79,6 +79,28 @@ when:      "{{ result.rows > 0 }}"
 - `expr` hat keine Schleifen (außer über Listenfunktionen), keine Variablenzuweisung und keinen Zugriff auf Dateien oder Netzwerk.
 - Pro Auswertung gelten ein **Speicherbudget** und eine maximale Ausdrucksgröße; Überschreitung ist ein Fehler.
 
+### Umsetzung (S08a)
+
+- Paket `internal/expr`: `Compile` zerlegt einen Wert in Text und `{{ … }}`-Teile und übersetzt jeden Ausdruck einmal;
+  `Eval` wertet aus. Ein Wert, der (bis auf Leerzeichen außen) aus genau einem Ausdruck besteht, behält den Ergebnistyp.
+  Als Text eingefügt werden Datumswerte in ISO 8601 (`2026-11-19T14:30:00Z`), ganze Zahlen ohne Nachkommastellen,
+  Listen und Objekte als JSON, `nil` als leerer Text. Ein Ausdruck endet am ersten `}}`.
+- Erlaubte Namen sind die Kontextobjekte der Tabelle oben; ein Tippfehler (`reslt.rows`) ist ein Fehler beim Lesen der
+  Datei, mit Datei, Zeile und Spalte. Geprüft werden Link-Bedingungen, alle Texte unter `with:`, `outputs` und
+  Standardwerte von Parametern.
+- Grenzen: höchstens 4.096 Zeichen je Ausdruck und 2.000 Knoten im übersetzten Ausdruck; zur Laufzeit gilt das
+  Speicherbudget von expr-lang.
+- Funktionsbibliothek Teil 1: `today`, `addDays`, `addHours`, `addMonths`, `formatDate`, `parseDate`, `dayOfWeek`
+  (1 = Montag … 7 = Sonntag), `diffDays(a, b)` (Kalendertage von `a` bis `b`), `padLeft`, `padRight`, `substr`
+  (ab 0, in Zeichen), `left`, `right`, `normalize` (ä → ae … ß → ss, Leerraum zusammengefasst), `coalesce`
+  (erster Wert, der nicht leer ist), `isEmpty` (`nil`, nur Leerzeichen, leere Liste/Map). `now()` ist die eingebaute
+  Funktion von expr-lang. Datumsangaben dürfen auch Texte in ISO 8601 sein (`'2026-11-19'`).
+- Datumsmuster: `yyyy`, `yy`, `MMMM`, `MMM`, `MM`, `M`, `dd`, `d`, `EEEE`, `EEE`, `HH`, `hh`, `h`, `mm`, `m`, `ss`, `s`,
+  `SSS`, `a`, `XXX`, `Z`; Text in `'…'` wird unverändert übernommen (`''` für ein Hochkomma), Ziffern und andere
+  Buchstaben außerhalb von Anführungszeichen sind ein Fehler. Ohne Zeitzone im Muster gilt die lokale Zeit.
+- Zahlen (`round` mit Stellen, `decimal`, `formatNumber`, `parseNumber`) und Sonstiges (`uuid`, `sha256` …) folgen mit
+  den Pipelines bzw. bei Bedarf.
+
 ### JavaScript in Skript-Bausteinen
 
 - Läuft in **goja** mit Sandbox (CPU-Zeitlimit, kein Datei-/Netzwerkzugriff außer über freigeschaltete APIs).
