@@ -76,7 +76,7 @@ func TestValidateActionTypesAndConfig(t *testing.T) {
 	file := writeWorkflow(t, `
 actions:
   - { id: start, type: core.start }
-  - { id: copy, type: file.copy }
+  - { id: copy, type: file.shred }
   - { id: greet, type: core.log, with: { msg: hi } }
 links:
   - { from: start, to: copy }
@@ -84,7 +84,7 @@ links:
 `)
 	code, out, _ := run(t, "validate", file)
 	for _, want := range []string{
-		`:7:23: error: action "copy": unknown action type "file.copy"`,
+		`:7:23: error: action "copy": unknown action type "file.shred"`,
 		`:8:42: error: action "greet" (core.log): unknown field "msg"`,
 		"2 errors, 0 warnings",
 	} {

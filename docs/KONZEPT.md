@@ -359,7 +359,7 @@ actions:
     type: file.wait
     with:
       path: "${INBOX}\\customers_${IMPORT_DATE}.csv"
-      timeout: 30m
+      maxWait: 30m
 
   - id: load
     type: core.run-pipeline
@@ -827,6 +827,27 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, ZIP/Entpacken, Dateiliste |
 | Netzwerk | HTTP-Request, SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
+
+**Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,
+`file.mkdir`, `file.list`; Umbenennen ist `file.move` mit neuem Dateinamen als Ziel, ZIP/Entpacken folgt später.
+
+- **Pfade:** Platzhalter `*`, `?` und `[abc]` sind im letzten Teil des Pfads erlaubt (`C:\in\*.csv`); unter Windows
+  ohne Unterscheidung von Groß- und Kleinschreibung wie im Explorer. UNC-Pfade (`\\server\share\…`) funktionieren wie
+  lokale; relative Pfade beziehen sich auf das Arbeitsverzeichnis von Runnel.
+- **Ziel bei Kopieren/Verschieben:** Bei Platzhaltern, einem Ziel mit `\` am Ende oder einem vorhandenen Ordner landen
+  die Dateien im Ordner; eine einzelne Datei kann auch unter neuem Namen abgelegt werden. Fehlende Ordner werden
+  angelegt.
+- **Konflikte:** Vorhandene Dateien werden nur mit `overwrite: true` ersetzt. Alle Ziele werden **vor** dem ersten
+  Kopieren geprüft, damit ein Konflikt keinen halb erledigten Vorgang hinterlässt. Kopiert wird über eine temporäre
+  Datei im Zielordner, der Änderungszeitpunkt bleibt erhalten; ein Abbruch des Laufs stoppt zwischen zwei Blöcken.
+  Verschieben benennt innerhalb eines Laufwerks um, sonst kopiert es und löscht danach die Quelle.
+- **Sicherheit beim Löschen:** Ordner nur mit `recursive: true` (sonst wird gar nichts gelöscht); nichts zu löschen ist kein Fehler (außer mit
+  `mustExist: true`).
+- **Ergebnis (`result.output`):** die gefundenen bzw. geschriebenen Pfade als Liste, bei `file.mkdir` der Pfad, bei
+  `file.list` je Eintrag `path`, `name`, `size`, `modified` und `folder` – z. B.
+  `{{ sum(map(results.list.output, .size)) }}`.
+- **Warten:** `file.wait` prüft alle `interval` (Standard 5 s), gibt nach `maxWait` auf und wartet mit `stableFor`,
+  bis sich die Größe nicht mehr ändert (Datei fertig geschrieben).
 
 ### 12.2 Pipeline-Transforms
 

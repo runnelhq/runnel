@@ -5,3 +5,11 @@ general
   core.start    Start    Entry point of the workflow
   core.success  Success  Ends the workflow successfully
   core.wait     Wait     Waits for a given time
+files
+  file.copy    Copy Files     Copies files or folders; output: the copied files
+  file.delete  Delete Files   Deletes files or folders; output: the deleted paths
+  file.exists  File Exists    Checks whether files or folders exist; output: the matching paths
+  file.list    List Files     Lists the files of a folder; output: path, name, size, modified and folder of each entry
+  file.mkdir   Create Folder  Creates a folder with its parent folders; output: the path
+  file.move    Move Files     Moves files or folders; output: the new paths
+  file.wait    Wait for File  Waits until files exist; output: the matching paths

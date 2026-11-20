@@ -1,0 +1,76 @@
+# File actions. Run it from the folder that contains "examples":
+#   runnel run -v examples/files/workflows/archive.workflow.yaml
+#   runnel run -v --param ARCHIVE=D:\archive examples/files/workflows/archive.workflow.yaml
+# - "check" fails if the inbox has no *.csv files; the failure link reports that.
+# - "folder" creates ARCHIVE\<today>; its result (the path) is the target of "copy".
+# - The files are copied, not moved, so that the example can run again (overwrite: true).
+# - "report" uses the outputs of "copy" and "list": the copied paths and the file details.
+# - The outputs use ?. and ??, because "folder" and "copy" do not run when the inbox is empty.
+kind: Workflow
+apiVersion: runnel/v1
+name: archive
+parameters:
+  - name: INBOX
+    description: Folder with the incoming order files
+    default: examples/files/inbox
+  - name: ARCHIVE
+    description: Archive folder; a subfolder per day is created in it
+    default: runnel-archive
+outputs:
+  - name: FOLDER
+    value: "{{ results.folder?.output ?? '' }}"
+  - name: FILES
+    value: "{{ len(results.copy?.output ?? []) }}"
+actions:
+  - id: start
+    type: core.start
+  - id: check
+    type: file.exists
+    with:
+      path: ${INBOX}/*.csv
+      kind: file
+  - id: folder
+    type: file.mkdir
+    with:
+      path: "${ARCHIVE}/{{ formatDate(today(), 'yyyy-MM-dd') }}"
+  - id: copy
+    type: file.copy
+    with:
+      source: ${INBOX}/*.csv
+      target: "{{ results.folder.output }}"
+      overwrite: true
+  - id: list
+    type: file.list
+    with:
+      folder: "{{ results.folder.output }}"
+      pattern: "*.csv"
+  - id: report
+    type: core.log
+    with:
+      message: "Archived {{ len(results.copy.output) }} files, {{ sum(map(results.list.output, .size)) }} bytes in the folder"
+  - id: empty
+    type: core.log
+    with:
+      message: No order files in ${INBOX}
+      level: warn
+  - id: done
+    type: core.success
+    join: first
+links:
+  - { from: start, to: check }
+  - { from: check, to: folder }
+  - { from: check, to: empty, when: failure }
+  - { from: folder, to: copy }
+  - { from: copy, to: list }
+  - { from: list, to: report }
+  - { from: report, to: done }
+  - { from: empty, to: done }
+layout:
+  start:  { x: 40, y: 120 }
+  check:  { x: 280, y: 120 }
+  folder: { x: 520, y: 120 }
+  copy:   { x: 760, y: 120 }
+  list:   { x: 1000, y: 120 }
+  report: { x: 1240, y: 120 }
+  empty:  { x: 520, y: 280 }
+  done:   { x: 1480, y: 200 }

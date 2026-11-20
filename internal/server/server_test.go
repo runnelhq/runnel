@@ -277,7 +277,7 @@ apiVersion: runnel/v1
 name: import
 actions:
   - { id: start, type: core.start }
-  - { id: copy, type: file.copy }
+  - { id: copy, type: file.shred }
   - { id: greet, type: core.log, with: { msg: "${MISSING}" } }
   - { id: lonely, type: core.dummy }
 links:

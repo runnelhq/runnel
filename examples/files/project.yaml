@@ -1,0 +1,6 @@
+# File actions (roadmap S09). Run it from the folder that contains "examples":
+#   runnel run -v examples/files/workflows/archive.workflow.yaml
+kind: Project
+apiVersion: runnel/v1
+name: files
+description: Copies order files into a dated archive folder

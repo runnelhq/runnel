@@ -100,7 +100,7 @@ func TestRunCancel(t *testing.T) {
 
 func TestRunStartErrors(t *testing.T) {
 	dir, s := newRunProject(t)
-	writeFile(t, filepath.Join(dir, "workflows", "broken.workflow.yaml"), "kind: Workflow\napiVersion: runnel/v1\nname: broken\nactions:\n  - { id: start, type: core.start }\n  - { id: x, type: file.copy }\nlinks:\n  - { from: start, to: x }\n")
+	writeFile(t, filepath.Join(dir, "workflows", "broken.workflow.yaml"), "kind: Workflow\napiVersion: runnel/v1\nname: broken\nactions:\n  - { id: start, type: core.start }\n  - { id: x, type: file.shred }\nlinks:\n  - { from: start, to: x }\n")
 	rec := do(t, s, "POST", "/api/v1/runs", `{"path": "workflows/broken.workflow.yaml"}`)
 	expect(t, rec, http.StatusUnprocessableEntity, `"path": "$.actions[1].type"`)
 	expect(t, rec, http.StatusUnprocessableEntity, "cannot be started")
