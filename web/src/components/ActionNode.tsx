@@ -1,5 +1,5 @@
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from "@xyflow/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatDuration, type ActionRun } from "../run";
 import { idPattern, type Problem } from "../workflow";
 import { ActionIcon } from "./Icons";
@@ -8,6 +8,10 @@ export interface ActionNodeData extends Record<string, unknown> {
   id: string;
   type: string;
   join?: string;
+  /** Pipelines: instances of the transform (shown as a chip and a stack of cards when more than 1). */
+  copies?: number;
+  /** The type takes no incoming links: core.start, transforms of the category input. */
+  noInput?: boolean;
   /** Tile colour (category of the action type); unknown types have none. */
   color?: string;
   problems: Problem[];
@@ -59,7 +63,8 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
   // During a run, its status has precedence over problems (decision for mockup E5).
   const severity = look ? null : severityRank(data.problems);
   const known = data.color !== undefined;
-  const hasInput = data.type !== "core.start";
+  const hasInput = data.type !== "core.start" && !data.noInput;
+  const copies = data.copies && data.copies > 1 ? data.copies : 0;
   const hasOutput = data.type !== "core.success" && data.type !== "core.abort";
   const border =
     severity === "error" ? "border-destructive" : severity === "warning" ? "border-warning" : "border-node-border";
@@ -74,13 +79,17 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
         (selected ? " outline-2 outline-offset-1 outline-node-selected" : "") +
         (run && (run.status === "pending" || run.status === "skipped") ? " opacity-55" : "")
       }
+      // Copies: a second card edge behind the node (mockup S25a).
+      style={copies ? { boxShadow: "5px 5px 0 -1px var(--node), 5px 5px 0 0 var(--node-border), var(--rn-shadow-sm)" } : undefined}
     >
-      {data.join && data.join !== "all" && (
-        <span
-          title={`join: ${data.join}`}
-          className="absolute -top-[22px] -left-0.5 inline-flex h-[18px] items-center rounded-sm border border-border bg-card px-1.5 font-mono text-[10px] font-medium text-muted-foreground"
-        >
-          join: {data.join}
+      {((data.join && data.join !== "all") || copies > 0) && (
+        <span className="absolute -top-[22px] -left-0.5 flex gap-1">
+          {data.join && data.join !== "all" && <Chip title={`join: ${data.join}`}>join: {data.join}</Chip>}
+          {copies > 0 && (
+            <Chip title={`copies: ${copies}`} testId="copies">
+              ×{copies} copies
+            </Chip>
+          )}
         </span>
       )}
       {hasInput && <Handle type="target" position={Position.Left} isConnectable={!!data.connectable} className="runnel-port" />}
@@ -183,6 +192,19 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
         </div>
       </NodeToolbar>
     </div>
+  );
+}
+
+/** A chip above a node for a setting that changes how it runs (join, copies). */
+function Chip(props: { title: string; testId?: string; children: ReactNode }) {
+  return (
+    <span
+      title={props.title}
+      data-testid={props.testId}
+      className="inline-flex h-[18px] items-center rounded-sm border border-border bg-card px-1.5 font-mono text-[10px] font-medium whitespace-nowrap text-muted-foreground"
+    >
+      {props.children}
+    </span>
   );
 }
 

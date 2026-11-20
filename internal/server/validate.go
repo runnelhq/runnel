@@ -15,7 +15,7 @@ import (
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
-// Catalog lists the available building blocks; transforms follow with the pipelines.
+// Catalog lists the available building blocks: the actions of workflows and the transforms of pipelines.
 type Catalog struct {
 	Actions []action.Descriptor `json:"actions"`
 	// Transforms of pipelines (roadmap S13b); a separate namespace (ADR 0013).

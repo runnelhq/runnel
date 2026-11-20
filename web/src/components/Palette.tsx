@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { categoryColor, categoryLabel, paletteDrag, paletteMime, useCatalog, type Descriptor } from "../catalog";
+import { categoryLabel, paletteDrag, paletteMime, tileColor, transformCategoryLabel, useCatalog, type Descriptor } from "../catalog";
 import { ActionIcon, ChevronIcon, SearchIcon } from "./Icons";
 
 /** What the palette needs to know about the open file. */
 export interface PaletteTarget {
-  /** The active file is a workflow shown as an editable canvas. */
+  /** A pipeline lists the transforms, a workflow the actions. */
+  kind: "workflow" | "pipeline";
+  /** The active file is shown as an editable canvas. */
   editable: boolean;
   /** The workflow already has a start action (a second one is not allowed). */
   hasStart: boolean;
@@ -12,10 +14,14 @@ export interface PaletteTarget {
 
 /**
  * Palette below the explorer (mockup E6b): the action types of the catalog by category,
- * with a search field ("/" jumps into it). Entries are dragged onto the canvas.
+ * with a search field ("/" jumps into it); for a pipeline the transform types (mockup
+ * S25a). Entries are dragged onto the canvas.
  */
 export function Palette(props: { target: PaletteTarget | null }) {
-  const catalog = useCatalog();
+  const pipeline = props.target?.kind === "pipeline";
+  const catalog = useCatalog(pipeline ? "pipeline" : "workflow");
+  const labels = pipeline ? transformCategoryLabel : categoryLabel;
+  const noun = pipeline ? "transform" : "action";
   const [query, setQuery] = useState("");
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const search = useRef<HTMLInputElement>(null);
@@ -41,9 +47,9 @@ export function Palette(props: { target: PaletteTarget | null }) {
     for (const d of [...catalog.values()].filter(match).sort((a, b) => a.label.localeCompare(b.label))) {
       byCategory.set(d.category, [...(byCategory.get(d.category) ?? []), d]);
     }
-    const order = Object.keys(categoryLabel);
+    const order = Object.keys(labels);
     return [...byCategory.entries()].sort(([a], [b]) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
-  }, [catalog, query]);
+  }, [catalog, query, labels]);
 
   const editable = props.target?.editable ?? false;
 
@@ -64,8 +70,8 @@ export function Palette(props: { target: PaletteTarget | null }) {
               e.currentTarget.blur();
             }
           }}
-          placeholder="Search actions"
-          aria-label="Search actions"
+          placeholder={`Search ${noun}s`}
+          aria-label={`Search ${noun}s`}
           className="min-w-0 flex-1 border-0 bg-transparent text-foreground outline-none"
         />
         <kbd className="rounded-[3px] border border-border px-1 font-mono text-[10px]">/</kbd>
@@ -74,7 +80,7 @@ export function Palette(props: { target: PaletteTarget | null }) {
         {groups.map(([category, items]) => {
           const open = query.trim() !== "" || !closed.has(category);
           return (
-            <div key={category} role="group" aria-label={categoryLabel[category] ?? category}>
+            <div key={category} role="group" aria-label={labels[category] ?? category}>
               <button
                 type="button"
                 aria-expanded={open}
@@ -89,13 +95,13 @@ export function Palette(props: { target: PaletteTarget | null }) {
                 className="flex h-[26px] w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-4 text-xs font-semibold text-sidebar-foreground"
               >
                 <ChevronIcon open={open} width={12} height={12} className="text-muted-foreground" />
-                {categoryLabel[category] ?? category}
+                {labels[category] ?? category}
                 <span className="ml-auto text-2xs font-normal text-muted-foreground">{items.length}</span>
               </button>
               {open && (
                 <ul className="m-0 list-none px-2 py-0">
                   {items.map((d) => (
-                    <Item key={d.type} d={d} editable={editable} blocked={d.type === "core.start" && !!props.target?.hasStart} />
+                    <Item key={d.type} d={d} editable={editable} blocked={!pipeline && d.type === "core.start" && !!props.target?.hasStart} />
                   ))}
                 </ul>
               )}
@@ -103,10 +109,12 @@ export function Palette(props: { target: PaletteTarget | null }) {
           );
         })}
         {groups.length === 0 && catalog.size > 0 && (
-          <p className="mx-4 my-2 text-xs text-muted-foreground">No action matches “{query}”.</p>
+          <p className="mx-4 my-2 text-xs text-muted-foreground">
+            No {noun} matches “{query}”.
+          </p>
         )}
         <p className="mx-4 my-2 text-xs text-muted-foreground">
-          {editable ? "Drag an action onto the canvas." : "Open a workflow on the canvas to add actions."}
+          {editable ? `Drag ${pipeline ? "a transform" : "an action"} onto the canvas.` : "Open a workflow or pipeline on the canvas to add steps."}
         </p>
       </div>
     </section>
@@ -137,7 +145,7 @@ function Item(props: { d: Descriptor; editable: boolean; blocked: boolean }) {
     >
       <span
         className="grid size-[22px] shrink-0 place-items-center rounded-sm"
-        style={{ background: categoryColor[d.category] ?? categoryColor.general, color: "var(--rn-tiefe-0)" }}
+        style={{ background: tileColor(d), color: "var(--rn-tiefe-0)" }}
       >
         <ActionIcon type={d.type} known width={13} height={13} />
       </span>

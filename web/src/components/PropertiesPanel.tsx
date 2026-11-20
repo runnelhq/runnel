@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { categoryColor, useCatalog, type Schema } from "../catalog";
-import { idPattern, linkKind, type Action, type Problem, type Workflow } from "../workflow";
+import { tileColor, useCatalog, type Schema } from "../catalog";
+import { idPattern, linkKind, stepsKey, type Action, type Problem, type Workflow } from "../workflow";
 import type { Selection } from "./Canvas";
-import { ActionIcon, ChevronIcon, CloseIcon, TrashIcon, WorkflowIcon } from "./Icons";
-import type { SettableKind } from "./LinkEdge";
+import { ActionIcon, ChevronIcon, CloseIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
 import { ExpressionInput } from "./ExpressionInput";
@@ -21,16 +21,24 @@ export interface PropertiesProps {
   focus?: { key: string; seq: number } | null;
   /** Sets a field of an action, e.g. "with.message" or "retry.attempts". */
   onSet: (id: string, field: string, value: FieldValue) => void;
-  /** Sets a field of the workflow: name, description, settings.timeout, settings.maxConcurrentRuns. */
+  /** Sets a field of the workflow or pipeline: name, description, settings.*. */
   onSetWorkflow: (field: string, value: FieldValue) => void;
-  /** Changes a link; when is success, failure, always or an expression "{{ … }}". */
-  onLinkChange: (index: number, change: { when?: SettableKind | string; loop?: boolean; disabled?: boolean }) => void;
+  /** Changes a link; when is success, failure, always or an expression "{{ … }}"; type (pipelines) data or error. */
+  onLinkChange: (index: number, change: LinkChange) => void;
   onDeleteLink: (index: number) => void;
   onRename: (from: string, to: string) => void;
   onHide: () => void;
   /** The current or last run, to show the result of the selected action (mockup E8). */
   run?: RunView | null;
   onShowInLog?: (actionId: string) => void;
+}
+
+/** A change of a link in the panel. */
+export interface LinkChange {
+  when?: SettableKind | string;
+  loop?: boolean;
+  disabled?: boolean;
+  type?: "data" | "error";
 }
 
 /** Pause after typing before a change is applied (decision for mockup E7). */
@@ -90,11 +98,17 @@ export function PropertiesPanel(props: PropertiesProps) {
           // The key resets all fields when another action is selected.
           <ActionProperties key={action.id} {...props} ctx={ctx} action={action} index={index} />
         ) : link !== undefined && workflow.links?.[link] ? (
-          <LinkProperties key={link} {...props} ctx={ctx} index={link} />
+          workflow.kind === "pipeline" ? (
+            <PipelineLinkProperties key={link} {...props} index={link} />
+          ) : (
+            <LinkProperties key={link} {...props} ctx={ctx} index={link} />
+          )
         ) : count > 1 ? (
           <p className="mx-4 my-4 text-xs text-muted-foreground">
-            {count} elements selected. Select one action or link to see its properties.
+            {count} elements selected. Select one {workflow.kind === "pipeline" ? "transform" : "action"} or link to see its properties.
           </p>
+        ) : workflow.kind === "pipeline" ? (
+          <PipelineProperties {...props} />
         ) : (
           <WorkflowProperties {...props} />
         )}
@@ -105,9 +119,10 @@ export function PropertiesPanel(props: PropertiesProps) {
 
 function ActionProperties(props: PropertiesProps & { action: Action; index: number; ctx: ExprContext }) {
   const { action, index, workflow, problems, onSet } = props;
-  const catalog = useCatalog();
+  const pipeline = workflow.kind === "pipeline";
+  const catalog = useCatalog(workflow.kind);
   const d = catalog.get(action.type);
-  const base = `$.actions[${index}]`;
+  const base = `$.${stepsKey(workflow)}[${index}]`;
   const set = (field: string) => (value: FieldValue) => onSet(action.id, field, value);
 
   // Problems of this action, by field; the rest is listed at the top.
@@ -183,9 +198,12 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       </Field>
     </>
   );
-  const summary = [action.timeout && "timeout", action.retry?.attempts && action.retry.attempts > 1 && `retry ${action.retry.attempts}×`, action.continueOnError && "continue on error"]
-    .filter(Boolean)
-    .join(" · ");
+  const summary = pipeline
+    ? `copies ${action.copies || 1} · ${action.distribution || "copy"}`
+    : [action.timeout && "timeout", action.retry?.attempts && action.retry.attempts > 1 && `retry ${action.retry.attempts}×`, action.continueOnError && "continue on error"]
+        .filter(Boolean)
+        .join(" · ");
+  const outgoing = (workflow.links ?? []).filter((l) => l.from === action.id && l.type === "data").length;
   const rest = own.filter((p) => !used.has(p));
 
   return (
@@ -193,16 +211,12 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-1.5">
         <span
           className="grid size-8 shrink-0 place-items-center rounded-md"
-          style={
-            d
-              ? { background: categoryColor[d.category] ?? categoryColor.general, color: "var(--rn-tiefe-0)" }
-              : { background: "var(--rn-tiefe-300)", color: "var(--rn-tiefe-800)" }
-          }
+          style={d ? { background: tileColor(d), color: "var(--rn-tiefe-0)" } : { background: "var(--rn-tiefe-300)", color: "var(--rn-tiefe-800)" }}
         >
           <ActionIcon type={action.type} known={!!d} />
         </span>
         <div className="min-w-0">
-          <h3 className="m-0 text-base leading-tight font-semibold">{d?.label ?? "Unknown action type"}</h3>
+          <h3 className="m-0 text-base leading-tight font-semibold">{d?.label ?? `Unknown ${pipeline ? "transform" : "action"} type`}</h3>
           <div className="font-mono text-2xs text-muted-foreground">{action.type}</div>
         </div>
       </div>
@@ -220,18 +234,28 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
         </ul>
       )}
       <IdField id={action.id} taken={ids} onRename={(to) => props.onRename(action.id, to)} problems={at("id")} />
-      <Field label="Description" fieldKey="description" problems={at("description")}>
-        {(p) => (
-          <TextInput {...p} value={action.description ?? ""} placeholder="Optional note shown in the run log" onCommit={(v) => set("description")(v || null)} />
-        )}
-      </Field>
+      {!pipeline && (
+        <Field label="Description" fieldKey="description" problems={at("description")}>
+          {(p) => (
+            <TextInput {...p} value={action.description ?? ""} placeholder="Optional note shown in the run log" onCommit={(v) => set("description")(v || null)} />
+          )}
+        </Field>
+      )}
       {d && (
         <Section title="Configuration">
-          {configFields.length > 0 ? configFields : <p className="mx-4 mt-0 mb-3 text-xs text-muted-foreground">This action has no configuration.</p>}
+          {configFields.length > 0 ? (
+            configFields
+          ) : (
+            <p className="mx-4 mt-0 mb-3 text-xs text-muted-foreground">This {pipeline ? "transform" : "action"} has no configuration.</p>
+          )}
         </Section>
       )}
       <Section title="Execution" summary={summary || "defaults"}>
-        {execution}
+        {pipeline ? (
+          <TransformExecution action={action} parallel={d ? !!d.parallel : true} outgoing={outgoing} at={at} set={set} />
+        ) : (
+          execution
+        )}
       </Section>
     </div>
   );
@@ -696,8 +720,10 @@ function RetryFields(props: { action: Action; problems: Problem[]; onSet: (field
 function Segmented(props: {
   label: string;
   value: string | undefined;
-  options: [string, string][];
+  options: [string, ReactNode][];
   disabled?: boolean;
+  /** Options that cannot be chosen (the chosen one stays selectable). */
+  disabledOptions?: string[];
   onChange: (value: string) => void;
 }) {
   return (
@@ -707,7 +733,7 @@ function Segmented(props: {
           key={v}
           type="button"
           aria-pressed={props.value === v}
-          disabled={props.disabled}
+          disabled={props.disabled || props.disabledOptions?.includes(v)}
           onClick={() => props.value !== v && props.onChange(v)}
           className="flex-1 cursor-pointer rounded-sm border-0 bg-transparent px-1.5 py-[3px] text-xs text-muted-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm disabled:cursor-default disabled:opacity-50"
         >
@@ -755,13 +781,117 @@ function problemsAt(problems: Problem[], base: string, field: string) {
   return problems.filter((p) => p.path === path || p.path?.startsWith(path + ".") || p.path?.startsWith(path + "["));
 }
 
-const kindSymbols: Record<string, string> = { success: "✔", failure: "✖", always: "∞", expression: "ƒ" };
-const kindColors: Record<string, string> = {
-  success: "var(--link-success)",
-  failure: "var(--link-failure)",
-  always: "var(--link-always)",
-  expression: "var(--link-expression)",
-};
+const kindSymbols = linkSymbols;
+const kindColors = linkColors;
+
+/**
+ * Execution of a transform (mockup S25a): copies and the distribution to several outgoing
+ * data links. Inputs and outputs run in one copy only (they would read or write twice).
+ */
+function TransformExecution(props: {
+  action: Action;
+  parallel: boolean;
+  outgoing: number;
+  at: (field: string) => Problem[];
+  set: (field: string) => (value: FieldValue) => void;
+}) {
+  const { action, parallel, outgoing, at, set } = props;
+  const copies = action.copies || 1;
+  const distribution = action.distribution || "copy";
+  const canDistribute = outgoing > 1 || distribution === "distribute";
+  return (
+    <>
+      <Field
+        label="Copies"
+        fieldKey="copies"
+        problems={at("copies")}
+        help={
+          parallel
+            ? "Instances that share the incoming records; the order of the records is then no longer fixed"
+            : `${action.type} runs as one instance (it would read or write the same data more than once)`
+        }
+      >
+        {(p) => (
+          <Stepper
+            {...p}
+            value={copies}
+            min={1}
+            max={parallel || copies > 1 ? maxCopies : 1}
+            onCommit={(n) => set("copies")(n === 1 ? null : n)}
+          />
+        )}
+      </Field>
+      <Field
+        label="Distribution"
+        fieldKey="distribution"
+        problems={at("distribution")}
+        help={
+          !canDistribute
+            ? "Only with more than one outgoing data link"
+            : distribution === "distribute"
+              ? "Records go to the data links in turn"
+              : "Every outgoing data link gets every record"
+        }
+      >
+        {() => (
+          <Segmented
+            label="Distribution"
+            value={distribution}
+            options={[
+              ["copy", "Copy to all"],
+              ["distribute", "Distribute"],
+            ]}
+            disabledOptions={canDistribute ? [] : ["distribute"]}
+            onChange={(v) => set("distribution")(v === "copy" ? null : v)}
+          />
+        )}
+      </Field>
+    </>
+  );
+}
+
+/** Upper limit of copies (model.MaxCopies). */
+const maxCopies = 64;
+
+/** A whole number with − and + buttons; typed values apply when the field is left or Enter is pressed. */
+function Stepper(props: { id: string; labelId?: string; invalid: boolean; value: number; min: number; max: number; onCommit: (n: number) => void }) {
+  const { value, min, max, onCommit } = props;
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+  const commit = (n: number) => {
+    const clamped = Math.min(max, Math.max(min, n));
+    setText(String(clamped));
+    if (clamped !== value) onCommit(clamped);
+  };
+  const typed = () => {
+    const n = Number(text);
+    if (text.trim() === "" || !Number.isInteger(n)) setText(String(value));
+    else commit(n);
+  };
+  const button =
+    "grid w-7 cursor-pointer place-items-center border border-l-0 border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-50 last:rounded-r-md";
+  return (
+    <div className="flex">
+      <input
+        id={props.id}
+        aria-labelledby={props.labelId}
+        aria-invalid={props.invalid}
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={typed}
+        onKeyDown={(e) => e.key === "Enter" && typed()}
+        className={inputClass(props.invalid, true) + " rounded-r-none"}
+      />
+      <button type="button" aria-label="Fewer" title="Fewer" disabled={value <= min} onClick={() => commit(value - 1)} className={button}>
+        −
+      </button>
+      <button type="button" aria-label="More" title="More" disabled={value >= max} onClick={() => commit(value + 1)} className={button}>
+        +
+      </button>
+    </div>
+  );
+}
 
 /** Wraps a condition in {{ … }} if it is not an expression yet; "" stays empty. */
 export function asExpression(text: string): string {
@@ -880,7 +1010,6 @@ function LinkProperties(props: PropertiesProps & { index: number; ctx: ExprConte
 function WorkflowProperties(props: PropertiesProps) {
   const { workflow, problems, onSetWorkflow } = props;
   const [localError, setLocalError] = useState<string | null>(null);
-  const params = workflow.parameters ?? [];
   const outputs = workflow.outputs ?? [];
   return (
     <div data-testid="workflow-properties">
@@ -944,27 +1073,7 @@ function WorkflowProperties(props: PropertiesProps) {
           )}
         </Field>
       </Section>
-      <Section title="Parameters" summary={String(params.length)}>
-        <div data-field="parameters">
-          {params.length > 0 && (
-            <ul className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0">
-              {params.map((p) => (
-                <li key={p.name} className="grid grid-cols-[1fr_auto] gap-x-2 border-b border-border px-2.5 py-1.5 text-xs last:border-b-0">
-                  <b className="font-mono">{p.name}</b>
-                  <span className="font-mono">{p.default ?? ""}</span>
-                  <small className="col-span-2 font-mono text-2xs text-muted-foreground">
-                    {p.type ?? "string"} · {p.required ? "required" : "optional"}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          )}
-          <ProblemList problems={problemsAt(problems, "$", "parameters")} />
-        </div>
-        <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
-          Adding and changing parameters and outputs follows in a later step; until then in the YAML view.
-        </p>
-      </Section>
+      <ParametersSection workflow={workflow} problems={problems} />
       <Section title="Outputs" summary={String(outputs.length)} defaultOpen={false}>
         <div data-field="outputs">
           {outputs.length > 0 && (
@@ -982,6 +1091,212 @@ function WorkflowProperties(props: PropertiesProps) {
         </div>
       </Section>
     </div>
+  );
+}
+
+/** The parameters of a workflow or pipeline (read-only for now). */
+function ParametersSection(props: { workflow: Workflow; problems: Problem[] }) {
+  const params = props.workflow.parameters ?? [];
+  return (
+    <Section title="Parameters" summary={String(params.length)}>
+      <div data-field="parameters">
+        {params.length > 0 && (
+          <ul className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0">
+            {params.map((p) => (
+              <li key={p.name} className="grid grid-cols-[1fr_auto] gap-x-2 border-b border-border px-2.5 py-1.5 text-xs last:border-b-0">
+                <b className="font-mono">{p.name}</b>
+                <span className="font-mono">{p.default ?? ""}</span>
+                <small className="col-span-2 font-mono text-2xs text-muted-foreground">
+                  {p.type ?? "string"} · {p.required ? "required" : "optional"}
+                </small>
+              </li>
+            ))}
+          </ul>
+        )}
+        <ProblemList problems={problemsAt(props.problems, "$", "parameters")} />
+      </div>
+      <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
+        {props.workflow.kind === "pipeline"
+          ? "Adding and changing parameters follows in a later step; until then in the YAML view."
+          : "Adding and changing parameters and outputs follows in a later step; until then in the YAML view."}
+      </p>
+    </Section>
+  );
+}
+
+/** Properties of a pipeline link: its type, data or error (mockup S25a, state "link"). */
+function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
+  const { index, workflow, problems } = props;
+  const l = workflow.links![index];
+  const kind = l.type === "error" ? "error" : "data";
+  const catalog = useCatalog("pipeline");
+  const from = workflow.actions?.find((a) => a.id === l.from);
+  const d = from ? catalog.get(from.type) : undefined;
+  const base = `$.links[${index}]`;
+  const own = problems.filter((p) => p.path === base || p.path?.startsWith(base + "."));
+  const rest = own.filter((p) => !p.path?.startsWith(`${base}.type`));
+  const help =
+    kind === "data"
+      ? `Passes the records of ${l.from} on`
+      : d && !d.recordErrors
+        ? `${d.type} passes no records to error links`
+        : `${d?.type ?? l.from} passes records it cannot process to its error links`;
+  return (
+    <div data-testid="link-properties">
+      <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-1.5">
+        <span
+          className="grid h-6 min-w-6 place-items-center rounded-full border-[1.5px] border-current bg-card px-1 text-xs font-bold"
+          style={{ color: kindColors[kind] }}
+        >
+          {kind === "data" ? "→" : kindSymbols.error}
+        </span>
+        <div>
+          <h3 className="m-0 text-base leading-tight font-semibold">Link</h3>
+          <div className="font-mono text-2xs text-muted-foreground" data-testid="link-ends">
+            {l.from} → {l.to}
+          </div>
+        </div>
+      </div>
+      <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
+        {kind === "data" ? (
+          <>
+            Records of <b className="text-foreground">{l.from}</b> flow to <b className="text-foreground">{l.to}</b>.
+          </>
+        ) : (
+          <>
+            Records that <b className="text-foreground">{l.from}</b> could not process, with the reason.
+          </>
+        )}
+      </p>
+      {rest.length > 0 && <ProblemList problems={rest} />}
+      <Field label="Type" fieldKey="type" help={help} problems={problemsAt(problems, base, "type")}>
+        {() => (
+          <Segmented
+            label="Type"
+            value={kind}
+            options={[
+              [
+                "data",
+                <>
+                  <span style={{ color: kindColors.data }}>→</span> Data
+                </>,
+              ],
+              [
+                "error",
+                <>
+                  <span style={{ color: kindColors.error }}>✖</span> Error
+                </>,
+              ],
+            ]}
+            onChange={(v) => props.onLinkChange(index, { type: v as "data" | "error" })}
+          />
+        )}
+      </Field>
+      {kind === "error" && (
+        <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
+          The record goes on unchanged, with the message in <code className="font-mono">_error</code>, the field in{" "}
+          <code className="font-mono">_errorField</code> and the id of the transform in <code className="font-mono">_errorTransform</code>.
+        </p>
+      )}
+      <div className="px-4">
+        <button
+          type="button"
+          onClick={() => props.onDeleteLink(index)}
+          className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-destructive bg-background px-2.5 text-xs font-medium text-destructive hover:bg-danger-soft"
+        >
+          <TrashIcon width={14} height={14} />
+          Delete link
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Properties of the pipeline when nothing is selected: name, description, settings, parameters. */
+function PipelineProperties(props: PropertiesProps) {
+  const { workflow, problems, onSetWorkflow } = props;
+  const settings = workflow.settings ?? {};
+  return (
+    <div data-testid="pipeline-properties">
+      <div className="flex items-center gap-2.5 px-4 pt-3.5 pb-1.5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground">
+          <PipelineIcon />
+        </span>
+        <div className="min-w-0">
+          <h3 className="m-0 text-base leading-tight font-semibold">Pipeline</h3>
+        </div>
+      </div>
+      <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">Nothing selected – properties of the pipeline.</p>
+      <Field label="Name" fieldKey="name" required problems={problemsAt(problems, "$", "name")}>
+        {(p) => <TextInput {...p} value={workflow.name ?? ""} onCommit={(v) => onSetWorkflow("name", v || null)} />}
+      </Field>
+      <Field label="Description" fieldKey="description" problems={problemsAt(problems, "$", "description")}>
+        {(p) => (
+          <TextInput {...p} multiline value={workflow.description ?? ""} onCommit={(v) => onSetWorkflow("description", v || null)} />
+        )}
+      </Field>
+      <Section title="Settings">
+        <NumberSetting
+          label="Batch size"
+          field="batchSize"
+          value={settings.batchSize}
+          help="Records passed over a link at once. Empty: 500"
+          problems={problems}
+          onSet={onSetWorkflow}
+        />
+        <NumberSetting
+          label="Buffer size"
+          field="bufferSize"
+          value={settings.bufferSize}
+          help="Records a link holds before the transform before it waits. Empty: 10000"
+          problems={problems}
+          onSet={onSetWorkflow}
+        />
+        <Check
+          fieldKey="settings.strict"
+          checked={settings.strict ?? false}
+          label="Strict"
+          help="Every link needs known fields; unknown fields are errors instead of warnings"
+          problems={problemsAt(problems, "$", "settings.strict")}
+          onChange={(on) => onSetWorkflow("settings.strict", on ? true : null)}
+        />
+      </Section>
+      <ParametersSection workflow={workflow} problems={problems} />
+    </div>
+  );
+}
+
+/** A setting that is a whole number of 1 or more; empty removes it (the default applies). */
+function NumberSetting(props: {
+  label: string;
+  field: string;
+  value: number | undefined;
+  help: string;
+  problems: Problem[];
+  onSet: (field: string, value: FieldValue) => void;
+}) {
+  const [localError, setLocalError] = useState<string | null>(null);
+  const key = `settings.${props.field}`;
+  return (
+    <Field label={props.label} fieldKey={key} help={props.help} problems={problemsAt(props.problems, "$", key)} localError={localError}>
+      {(p) => (
+        <TextInput
+          {...p}
+          mono
+          value={props.value ? String(props.value) : ""}
+          placeholder="Empty: default"
+          onCommit={(v) => {
+            const n = Number(v);
+            if (v !== "" && (!Number.isInteger(n) || n < 1)) {
+              setLocalError("Enter a whole number of 1 or more");
+              return;
+            }
+            setLocalError(null);
+            props.onSet(key, v === "" ? null : n);
+          }}
+        />
+      )}
+    </Field>
   );
 }
 

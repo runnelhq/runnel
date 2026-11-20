@@ -36,7 +36,7 @@ function where(wf: Workflow, p: Problem): string {
   const field = t.field ? ` · ${fieldLabel(t.field)}` : "";
   if (t.action) return t.action + field;
   if (t.link !== undefined) return `Link #${t.link + 1}${field}`;
-  return `Workflow${field}`;
+  return `${wf.kind === "pipeline" ? "Pipeline" : "Workflow"}${field}`;
 }
 
 export type BottomTab = "problems" | "log";
@@ -120,7 +120,7 @@ export function BottomPanel(props: {
         {tabButton("log", "Log")}
       </div>
       {tab === "problems" && <ProblemsTable {...props} />}
-      {tab === "log" && <LogView run={props.run} focus={props.logFocus} onSelectAction={props.onSelectAction} />}
+      {tab === "log" && <LogView run={props.run} pipeline={props.workflow.kind === "pipeline"} focus={props.logFocus} onSelectAction={props.onSelectAction} />}
     </section>
   );
 }
@@ -176,7 +176,12 @@ const levelClass: Record<string, string> = {
 };
 
 /** The log of the current or last run; it follows new lines while scrolled to the end. */
-function LogView(props: { run: RunView | null; focus?: { actionId: string; seq: number } | null; onSelectAction: (id: string) => void }) {
+function LogView(props: {
+  run: RunView | null;
+  pipeline?: boolean;
+  focus?: { actionId: string; seq: number } | null;
+  onSelectAction: (id: string) => void;
+}) {
   const { run, focus } = props;
   const [debug, setDebug] = useDebug();
   const box = useRef<HTMLDivElement>(null);
@@ -208,7 +213,13 @@ function LogView(props: { run: RunView | null; focus?: { actionId: string; seq: 
   }, [focus]); // only on a new request
 
   if (!run) {
-    return <p className="m-0 border-t border-border px-3 py-2 text-xs text-muted-foreground">No run yet. Run the workflow with ▶ Run (F5).</p>;
+    return (
+      <p className="m-0 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+        {props.pipeline
+          ? "Running a pipeline in the editor follows in a later step; until then with runnel run or core.run-pipeline."
+          : "No run yet. Run the workflow with ▶ Run (F5)."}
+      </p>
+    );
   }
   const c = chip[run.status];
   const ms = run.durationMs ?? (running ? Math.max(0, now - run.started) : undefined);
