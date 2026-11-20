@@ -13,6 +13,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | freigegeben mit PR #32, umgesetzt mit E7a (`action`, `wait`) und E7b |
 | [`e8-run.html`](e8-run.html) | E8 – Ausführen im Editor | `run`, `running`, `done`, `cancelled`, `unsaved` | freigegeben mit PR #35, umgesetzt mit E8a (Run, Live-Status, Rückfrage) und E8b (Log, Ergebnis im Panel, „wartet“) |
 | [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | freigegeben mit PR #43, umgesetzt mit S35a (Editor im Panel, Link-Bedingung) und S35b (`expanded`) |
+| [`s25a-pipeline.html`](s25a-pipeline.html) | S25a – Pipeline-Canvas (dazu K10/K11 im Workflow-Panel) | `canvas`, `link`, `run`, `problems`, `foreach` | zur Freigabe |
 
 ## Entscheidungen
 
@@ -68,6 +69,7 @@ node design/mockups/screenshots.cjs e6b-create palette,rename,connect,linkmenu
 node design/mockups/screenshots.cjs e7-properties action,wait,link,workflow,problems
 node design/mockups/screenshots.cjs e8-run run,running,done,cancelled,unsaved
 node design/mockups/screenshots.cjs s35-expressions complete,functions,error,condition,expanded
+node design/mockups/screenshots.cjs s25a-pipeline canvas,link,run,problems,foreach
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
