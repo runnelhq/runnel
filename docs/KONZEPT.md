@@ -509,8 +509,8 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
 - Je Transform `copies: n` (1–64 parallele Instanzen, die sich die eingehenden Datensätze teilen; nur für Transforms,
   die jeden Datensatz für sich verarbeiten – nicht für Ein- und Ausgaben) und `distribution: copy | distribute` (seit
   S17c). `settings:` der Pipeline: `batchSize` (Standard 500), `bufferSize` (Datensätze je Link, Standard 10.000,
-  mindestens `batchSize`) und `strict` (ADR 0007). `disabled` und `layout` kommen mit S25a; bis dahin sind sie
-  unbekannte Felder.
+  mindestens `batchSize`) und `strict` (ADR 0007). `layout` (Koordinaten je Transform-ID für den Editor) gibt es
+  seit S25a1a; `disabled` ist noch ein unbekanntes Feld.
 - `runnel validate` prüft `*.pipeline.yaml` mit; `runnel run` führt Pipelines aus und zeigt am Ende je Transform, wie viele
   Records er gelesen und geschrieben hat (seit S13b).
 

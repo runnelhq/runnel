@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -83,6 +84,113 @@ type WorkflowField struct {
 // everything else stay as they are, so that a saved file gives a small Git diff.
 // The workflow must be readable (no syntax errors, wrong types or unknown fields).
 func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
+	return editText(name, data, func(text []byte) (*graphDoc, *graphEdit, error) {
+		// Field errors (e.g. an invalid duration) do not prevent editing; they are fixed by editing.
+		w, err := ReadWorkflow(name, text)
+		if w == nil {
+			return nil, nil, err
+		}
+		d := &graphDoc{noun: "action", docNoun: "workflow", stepsKey: "actions", src: w.src,
+			stepFields: settableFields, docFields: workflowFields}
+		for _, a := range w.Actions {
+			d.steps = append(d.steps, a.ID)
+		}
+		for _, l := range w.Links {
+			d.links = append(d.links, linkRef{l.From, l.To})
+		}
+		g := &graphEdit{Move: edit.Move, Delete: edit.Delete, Add: edit.Add, Rename: edit.Rename,
+			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetWorkflow}
+		for _, l := range edit.AddLinks {
+			if err := checkWhen(l.When); err != nil {
+				return nil, nil, fmt.Errorf("cannot add link from %q to %q: %w", l.From, l.To, err)
+			}
+			g.AddLinks = append(g.AddLinks, workflowLinkItem(l))
+		}
+		if len(edit.UpdateLinks) > 0 {
+			g.UpdateLinks = map[int]linkItem{}
+		}
+		changed := map[int]Link{} // several updates of one link add up
+		for _, u := range edit.UpdateLinks {
+			if u.Index < 0 || u.Index >= len(w.Links) {
+				return nil, nil, fmt.Errorf("cannot change link #%d: it does not exist", u.Index+1)
+			}
+			l, ok := changed[u.Index]
+			if !ok {
+				l = w.Links[u.Index]
+			}
+			if u.When != nil {
+				if err := checkWhen(*u.When); err != nil {
+					return nil, nil, fmt.Errorf("cannot change link #%d: %w", u.Index+1, err)
+				}
+				l.When = *u.When
+			}
+			if u.Loop != nil {
+				l.Loop = *u.Loop
+			}
+			if u.Disabled != nil {
+				l.Disabled = *u.Disabled
+			}
+			changed[u.Index] = l
+			g.UpdateLinks[u.Index] = workflowLinkItem(l)
+		}
+		return d, g, nil
+	})
+}
+
+// workflowLinkItem writes a workflow link; "success" is the default and left out.
+func workflowLinkItem(l Link) linkItem {
+	item := linkItem{From: l.From, To: l.To}
+	if l.When != "" && l.When != "success" {
+		item.Fields = append(item.Fields, [2]string{"when", yamlScalar(l.When)})
+	}
+	if l.Loop {
+		item.Fields = append(item.Fields, [2]string{"loop", "true"})
+	}
+	if l.Disabled {
+		item.Fields = append(item.Fields, [2]string{"disabled", "true"})
+	}
+	return item
+}
+
+// graphDoc is what the line editor needs to know of a workflow or a pipeline: its
+// steps (actions or transforms) and links in the order of the file.
+type graphDoc struct {
+	noun     string // "action" or "transform", for messages
+	docNoun  string // "workflow" or "pipeline"
+	stepsKey string // "actions" or "transforms"
+	steps    []string
+	links    []linkRef
+	src      *source
+	// stepFields are the fields of a step that Set may change besides with.*; docFields
+	// those of the document that SetDoc may change.
+	stepFields, docFields map[string]bool
+}
+
+type linkRef struct{ From, To string }
+
+// linkItem is a link as written: from, to and further fields with their YAML values.
+type linkItem struct {
+	From, To string
+	Fields   [][2]string
+}
+
+// graphEdit is an edit of a workflow or pipeline, with links already in written form.
+type graphEdit struct {
+	Move        map[string]Point
+	Delete      []string
+	Add         []NewAction
+	Rename      map[string]string
+	AddLinks    []linkItem
+	DeleteLinks []int
+	// UpdateLinks are the links after the change, by index.
+	UpdateLinks map[int]linkItem
+	Set         []SetField
+	SetDoc      []WorkflowField
+}
+
+// editText applies an edit to the text of a file: read parses the text into the steps
+// and links of the file and translates the edit.
+func editText(name string, data []byte, read func([]byte) (*graphDoc, *graphEdit, error)) ([]byte, error) {
 	text := string(data)
 	eol := "\n"
 	if strings.Contains(text, "\r\n") {
@@ -90,16 +198,15 @@ func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 	}
 	// Line numbers of the parser refer to LF line endings; CRLF is restored when joining.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
-	// Field errors (e.g. an invalid duration) do not prevent editing; they are fixed by editing.
-	w, err := ReadWorkflow(name, []byte(text))
-	if w == nil {
+	d, edit, err := read([]byte(text))
+	if err != nil {
 		return nil, err
 	}
 	finalNewline := strings.HasSuffix(text, "\n")
 	e := &editor{
-		w:     w,
-		edit:  edit,
-		top:   entries(w.src.body),
+		d:     d,
+		edit:  *edit,
+		top:   entries(d.src.body),
 		lines: strings.Split(strings.TrimSuffix(text, "\n"), "\n"),
 	}
 	if err := e.check(); err != nil {
@@ -125,34 +232,34 @@ func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 	return []byte(out), nil
 }
 
-// editor collects the line edits for one WorkflowEdit.
+// editor collects the line edits for one edit.
 type editor struct {
-	w     *Workflow
-	edit  WorkflowEdit
+	d     *graphDoc
+	edit  graphEdit
 	top   []*ast.MappingValueNode
 	lines []string
 	edits []lineEdit
 	// atEnd is set when lines are appended at the end of the file.
 	atEnd bool
-	// ids are the actions after the edit (existing minus deleted plus added).
+	// ids are the steps after the edit (existing minus deleted plus added).
 	ids     map[string]bool
 	deleted map[string]bool
 }
 
 func (e *editor) check() error {
-	edit := e.edit
+	edit, noun := e.edit, e.d.noun
 	if len(edit.Rename) > 0 && (len(edit.Move) > 0 || len(edit.Delete) > 0 || len(edit.Add) > 0 ||
-		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0 || len(edit.SetWorkflow) > 0) {
+		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0 || len(edit.SetDoc) > 0) {
 		return errors.New("renaming cannot be combined with other changes")
 	}
 	e.ids = map[string]bool{}
-	for _, a := range e.w.Actions {
-		e.ids[a.ID] = true
+	for _, id := range e.d.steps {
+		e.ids[id] = true
 	}
 	e.deleted = map[string]bool{}
 	for _, id := range edit.Delete {
 		if !e.ids[id] {
-			return fmt.Errorf("cannot delete action %q: it does not exist", id)
+			return fmt.Errorf("cannot delete %s %q: it does not exist", noun, id)
 		}
 		e.deleted[id] = true
 	}
@@ -160,85 +267,77 @@ func (e *editor) check() error {
 		delete(e.ids, id)
 	}
 	for _, a := range edit.Add {
-		if err := checkID(a.ID); err != nil {
-			return fmt.Errorf("cannot add action: %w", err)
+		if err := checkID(noun, a.ID); err != nil {
+			return fmt.Errorf("cannot add %s: %w", noun, err)
 		}
 		if e.ids[a.ID] || e.deleted[a.ID] {
-			return fmt.Errorf("cannot add action %q: the id is already used", a.ID)
+			return fmt.Errorf("cannot add %s %q: the id is already used", noun, a.ID)
 		}
 		if !actionTypePattern.MatchString(a.Type) {
-			return fmt.Errorf("cannot add action %q: invalid action type %q", a.ID, a.Type)
+			return fmt.Errorf("cannot add %s %q: invalid %s type %q", noun, a.ID, noun, a.Type)
 		}
 		e.ids[a.ID] = true
 	}
 	for id := range edit.Move {
 		if !e.ids[id] {
-			return fmt.Errorf("cannot move action %q: it does not exist", id)
+			return fmt.Errorf("cannot move %s %q: it does not exist", noun, id)
 		}
 	}
 	for old, id := range edit.Rename {
 		if !e.ids[old] {
-			return fmt.Errorf("cannot rename action %q: it does not exist", old)
+			return fmt.Errorf("cannot rename %s %q: it does not exist", noun, old)
 		}
-		if err := checkID(id); err != nil {
-			return fmt.Errorf("cannot rename action %q: %w", old, err)
+		if err := checkID(noun, id); err != nil {
+			return fmt.Errorf("cannot rename %s %q: %w", noun, old, err)
 		}
 		if e.ids[id] {
-			return fmt.Errorf("cannot rename action %q to %q: the id is already used", old, id)
+			return fmt.Errorf("cannot rename %s %q to %q: the id is already used", noun, old, id)
 		}
 	}
 	for _, l := range edit.AddLinks {
 		for _, id := range []string{l.From, l.To} {
 			if !e.ids[id] {
-				return fmt.Errorf("cannot add link from %q to %q: action %q does not exist", l.From, l.To, id)
+				return fmt.Errorf("cannot add link from %q to %q: %s %q does not exist", l.From, l.To, noun, id)
 			}
-		}
-		if err := checkWhen(l.When); err != nil {
-			return fmt.Errorf("cannot add link from %q to %q: %w", l.From, l.To, err)
 		}
 	}
 	existing := map[string]bool{}
-	for _, a := range e.w.Actions {
-		existing[a.ID] = !e.deleted[a.ID]
+	for _, id := range e.d.steps {
+		existing[id] = !e.deleted[id]
 	}
 	set := map[string]bool{}
 	for _, f := range edit.Set {
 		if !existing[f.ID] {
-			return fmt.Errorf("cannot change action %q: it does not exist", f.ID)
+			return fmt.Errorf("cannot change %s %q: it does not exist", noun, f.ID)
 		}
 		if set[f.ID] {
-			return fmt.Errorf("cannot change action %q: only one field per action can be changed at a time", f.ID)
+			return fmt.Errorf("cannot change %s %q: only one field per %s can be changed at a time", noun, f.ID, noun)
 		}
 		set[f.ID] = true
-		if err := checkSetField(f); err != nil {
-			return fmt.Errorf("cannot change action %q: %w", f.ID, err)
+		if err := checkSetField(f, e.d.stepFields); err != nil {
+			return fmt.Errorf("cannot change %s %q: %w", noun, f.ID, err)
 		}
 	}
 	links := map[int]bool{}
 	for _, i := range edit.DeleteLinks {
-		if i < 0 || i >= len(e.w.Links) {
+		if i < 0 || i >= len(e.d.links) {
 			return fmt.Errorf("cannot delete link #%d: it does not exist", i+1)
 		}
 		links[i] = true
 	}
-	for _, u := range edit.UpdateLinks {
-		if u.Index < 0 || u.Index >= len(e.w.Links) || links[u.Index] {
-			return fmt.Errorf("cannot change link #%d: it does not exist", u.Index+1)
-		}
-		if u.When != nil {
-			if err := checkWhen(*u.When); err != nil {
-				return fmt.Errorf("cannot change link #%d: %w", u.Index+1, err)
-			}
+	for i := range edit.UpdateLinks {
+		if i < 0 || i >= len(e.d.links) || links[i] {
+			return fmt.Errorf("cannot change link #%d: it does not exist", i+1)
 		}
 	}
-	if len(edit.SetWorkflow) > 1 {
-		return errors.New("only one field of the workflow can be changed at a time")
+	if len(edit.SetDoc) > 1 {
+		return fmt.Errorf("only one field of the %s can be changed at a time", e.d.docNoun)
 	}
-	for _, f := range edit.SetWorkflow {
-		if !workflowFields[f.Field] {
-			return fmt.Errorf("field %q of the workflow cannot be changed here", f.Field)
+	for _, f := range edit.SetDoc {
+		if !e.d.docFields[f.Field] {
+			return fmt.Errorf("field %q of the %s cannot be changed here", f.Field, e.d.docNoun)
 		}
-		if err := checkSetField(SetField{Field: "with.x", Value: f.Value}); err != nil {
+		if err := checkSetField(SetField{Field: "with.x", Value: f.Value}, nil); err != nil {
 			return fmt.Errorf("%s: only a text, a number or true/false can be set here", f.Field)
 		}
 	}
@@ -247,16 +346,16 @@ func (e *editor) check() error {
 
 var workflowFields = map[string]bool{"name": true, "description": true, "settings.timeout": true, "settings.maxConcurrentRuns": true}
 
-func checkID(id string) error {
+func checkID(noun, id string) error {
 	if !idPattern.MatchString(id) {
-		return fmt.Errorf("invalid action id %q (letters, digits, - and _, starting with a letter)", id)
+		return fmt.Errorf("invalid %s id %q (letters, digits, - and _, starting with a letter)", noun, id)
 	}
 	return nil
 }
 
-func checkSetField(f SetField) error {
+func checkSetField(f SetField, fields map[string]bool) error {
 	name, ok := strings.CutPrefix(f.Field, "with.")
-	if (!ok || !configKeyPattern.MatchString(name)) && !settableFields[f.Field] {
+	if (!ok || !configKeyPattern.MatchString(name)) && !fields[f.Field] {
 		return fmt.Errorf("field %q cannot be changed here", f.Field)
 	}
 	switch v := f.Value.(type) {
@@ -281,15 +380,15 @@ func checkWhen(when string) error {
 
 // apply handles all changes except renaming.
 func (e *editor) apply() error {
-	edit := e.edit
-	actions := valueOf(e.top, "actions")
+	edit, d := e.edit, e.d
+	steps := valueOf(e.top, d.stepsKey)
 	linksNode := valueOf(e.top, "links")
 
-	// Actions: deleted ones are removed, new ones appended.
-	if seq, ok := actions.(*ast.SequenceNode); ok && len(e.deleted) > 0 {
+	// Steps: deleted ones are removed, new ones appended.
+	if seq, ok := steps.(*ast.SequenceNode); ok && len(e.deleted) > 0 {
 		for i, item := range seq.Values {
-			if i < len(e.w.Actions) && e.deleted[e.w.Actions[i].ID] {
-				if err := e.removeItem(item, "action"); err != nil {
+			if i < len(d.steps) && e.deleted[d.steps[i]] {
+				if err := e.removeItem(item, d.noun); err != nil {
 					return err
 				}
 			}
@@ -300,22 +399,22 @@ func (e *editor) apply() error {
 		for _, a := range edit.Add {
 			items = append(items, []string{"id: " + a.ID, "type: " + a.Type})
 		}
-		if err := e.appendItems("actions", items, "links", "layout"); err != nil {
+		if err := e.appendItems(d.stepsKey, items, "links", "layout"); err != nil {
 			return err
 		}
 	}
 
-	// Links: removed with their actions or on their own, changed, appended.
+	// Links: removed with their steps or on their own, changed, appended.
 	removed := map[int]bool{}
 	for _, i := range edit.DeleteLinks {
 		removed[i] = true
 	}
 	if seq, ok := linksNode.(*ast.SequenceNode); ok {
 		for i, item := range seq.Values {
-			if i >= len(e.w.Links) {
+			if i >= len(d.links) {
 				break
 			}
-			l := e.w.Links[i]
+			l := d.links[i]
 			if removed[i] || e.deleted[l.From] || e.deleted[l.To] {
 				if err := e.removeItem(item, "link"); err != nil {
 					return err
@@ -323,24 +422,11 @@ func (e *editor) apply() error {
 				removed[i] = true
 			}
 		}
-		for _, u := range edit.UpdateLinks {
-			if removed[u.Index] || u.Index >= len(seq.Values) {
+		for _, i := range slices.Sorted(maps.Keys(edit.UpdateLinks)) {
+			if removed[i] || i >= len(seq.Values) {
 				continue
 			}
-			l := e.w.Links[u.Index]
-			if u.When != nil {
-				l.When = *u.When
-			}
-			if l.When == "success" {
-				l.When = ""
-			}
-			if u.Loop != nil {
-				l.Loop = *u.Loop
-			}
-			if u.Disabled != nil {
-				l.Disabled = *u.Disabled
-			}
-			if err := e.rewriteLink(seq.Values[u.Index], l); err != nil {
+			if err := e.rewriteLink(seq.Values[i], edit.UpdateLinks[i]); err != nil {
 				return err
 			}
 		}
@@ -348,9 +434,6 @@ func (e *editor) apply() error {
 	if len(edit.AddLinks) > 0 {
 		var items [][]string
 		for _, l := range edit.AddLinks {
-			if l.When == "success" {
-				l.When = ""
-			}
 			items = append(items, []string{flowLink(l)})
 		}
 		if err := e.appendItems("links", items, "layout"); err != nil {
@@ -360,12 +443,12 @@ func (e *editor) apply() error {
 
 	for _, f := range edit.Set {
 		if err := e.set(f); err != nil {
-			return fmt.Errorf("cannot change action %q: %w", f.ID, err)
+			return fmt.Errorf("cannot change %s %q: %w", d.noun, f.ID, err)
 		}
 	}
-	for _, f := range edit.SetWorkflow {
-		if err := e.setWorkflow(f); err != nil {
-			return fmt.Errorf("cannot change the workflow: %w", err)
+	for _, f := range edit.SetDoc {
+		if err := e.setDoc(f); err != nil {
+			return fmt.Errorf("cannot change the %s: %w", d.docNoun, err)
 		}
 	}
 
@@ -373,17 +456,17 @@ func (e *editor) apply() error {
 	return nil
 }
 
-// set changes one field of an action in place, adds it or removes it.
+// set changes one field of a step in place, adds it or removes it.
 func (e *editor) set(f SetField) error {
-	items := seqValues(valueOf(e.top, "actions"))
-	i := slices.IndexFunc(e.w.Actions, func(a Action) bool { return a.ID == f.ID })
+	items := seqValues(valueOf(e.top, e.d.stepsKey))
+	i := slices.Index(e.d.steps, f.ID)
 	if i < 0 || i >= len(items) {
-		return errors.New("the action was not found in the file")
+		return fmt.Errorf("the %s was not found in the file", e.d.noun)
 	}
 	item := items[i]
 	itemEntries := entries(item)
 	if m, ok := item.(*ast.MappingNode); ok && m.IsFlowStyle || len(itemEntries) == 0 {
-		return errors.New("the action is written in flow style ({ … }); write it as a block to edit it in the properties")
+		return fmt.Errorf("the %s is written in flow style ({ … }); write it as a block to edit it in the properties", e.d.noun)
 	}
 	indent := strings.Repeat(" ", itemEntries[0].Key.GetToken().Position.Column-1)
 	return e.setField(itemEntries, maxLine(item), indent, f.Field, f.Value)
@@ -441,15 +524,15 @@ func (e *editor) setField(es []*ast.MappingValueNode, after int, indent, field s
 	return e.setEntry(ce, maxLine(pe.Value), childIndent, child, value)
 }
 
-// setWorkflow sets a field of the workflow itself. A missing description is added
-// after the name, missing settings before the actions.
-func (e *editor) setWorkflow(f WorkflowField) error {
+// setDoc sets a field of the workflow or pipeline itself. A missing description is
+// added after the name, missing settings before the steps.
+func (e *editor) setDoc(f WorkflowField) error {
 	after := len(e.lines)
 	switch {
 	case f.Field == "description" && keyOf(e.top, "name") != nil:
 		after = maxLine(keyOf(e.top, "name"))
 	default:
-		for _, k := range []string{"actions", "links", "layout"} {
+		for _, k := range []string{e.d.stepsKey, "links", "layout"} {
 			if next := keyOf(e.top, k); next != nil {
 				after = minLine(next) - 1
 				break
@@ -481,7 +564,7 @@ func (e *editor) setEntry(entry *ast.MappingValueNode, after int, indent, key st
 	}
 	if value == nil {
 		if strings.Contains(prefix, "-") {
-			return fmt.Errorf("%q is the first field of the action and cannot be removed here", key)
+			return fmt.Errorf("%q is the first field and cannot be removed here", key)
 		}
 		e.remove(entry)
 		return nil
@@ -612,10 +695,8 @@ func (e *editor) layout() {
 		}
 	}
 	var added []string
-	order := make([]string, 0, len(e.w.Actions)+len(e.edit.Add))
-	for _, a := range e.w.Actions { // in the order of the actions, for a readable file
-		order = append(order, a.ID)
-	}
+	order := make([]string, 0, len(e.d.steps)+len(e.edit.Add))
+	order = append(order, e.d.steps...) // in the order of the steps, for a readable file
 	for _, a := range e.edit.Add {
 		order = append(order, a.ID)
 	}
@@ -692,23 +773,17 @@ func itemLines(indent string, items [][]string) []string {
 }
 
 // flowLink writes a link in flow style: { from: a, to: b, when: failure }.
-func flowLink(l Link) string {
+func flowLink(l linkItem) string {
 	parts := []string{"from: " + l.From, "to: " + l.To}
-	if l.When != "" {
-		parts = append(parts, "when: "+yamlScalar(l.When))
-	}
-	if l.Loop {
-		parts = append(parts, "loop: true")
-	}
-	if l.Disabled {
-		parts = append(parts, "disabled: true")
+	for _, f := range l.Fields {
+		parts = append(parts, f[0]+": "+f[1])
 	}
 	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
 // rewriteLink replaces a link item. A link on one line in flow style stays one line
 // (with its comment); a block item is written in block style.
-func (e *editor) rewriteLink(item ast.Node, l Link) error {
+func (e *editor) rewriteLink(item ast.Node, l linkItem) error {
 	start, end := minLine(item), maxLine(item)
 	line := e.lines[start-1]
 	indent := leadingSpace(line)
@@ -724,14 +799,8 @@ func (e *editor) rewriteLink(item ast.Node, l Link) error {
 		return errors.New("the link cannot be changed on the canvas; change it in the YAML file")
 	}
 	item2 := []string{"from: " + l.From, "to: " + l.To}
-	if l.When != "" {
-		item2 = append(item2, "when: "+yamlScalar(l.When))
-	}
-	if l.Loop {
-		item2 = append(item2, "loop: true")
-	}
-	if l.Disabled {
-		item2 = append(item2, "disabled: true")
+	for _, f := range l.Fields {
+		item2 = append(item2, f[0]+": "+f[1])
 	}
 	e.edits = append(e.edits, lineEdit{start: start, end: end, lines: itemLines(indent, [][]string{item2})})
 	return nil
@@ -748,7 +817,7 @@ func (e *editor) removeItem(item ast.Node, what string) error {
 	return nil
 }
 
-// rename changes action ids in place: the id of the action, from/to of links and layout keys.
+// rename changes step ids in place: the id of the step, from/to of links and layout keys.
 func (e *editor) rename() error {
 	type spot struct {
 		col  int
@@ -765,15 +834,15 @@ func (e *editor) rename() error {
 			spots[t.Position.Line] = append(spots[t.Position.Line], spot{t.Position.Column, id, to})
 		}
 	}
-	for i, item := range seqValues(valueOf(e.top, "actions")) {
-		if i < len(e.w.Actions) {
-			add(valueOf(entries(item), "id"), e.w.Actions[i].ID)
+	for i, item := range seqValues(valueOf(e.top, e.d.stepsKey)) {
+		if i < len(e.d.steps) {
+			add(valueOf(entries(item), "id"), e.d.steps[i])
 		}
 	}
 	for i, item := range seqValues(valueOf(e.top, "links")) {
-		if i < len(e.w.Links) {
-			add(valueOf(entries(item), "from"), e.w.Links[i].From)
-			add(valueOf(entries(item), "to"), e.w.Links[i].To)
+		if i < len(e.d.links) {
+			add(valueOf(entries(item), "from"), e.d.links[i].From)
+			add(valueOf(entries(item), "to"), e.d.links[i].To)
 		}
 	}
 	for _, entry := range entries(valueOf(e.top, "layout")) {
@@ -786,14 +855,14 @@ func (e *editor) rename() error {
 		for _, s := range ss {
 			at := s.col - 1
 			if at < 0 || at >= len(text) {
-				return fmt.Errorf("cannot rename action %q: unexpected file content in line %d", s.from, line)
+				return fmt.Errorf("cannot rename %s %q: unexpected file content in line %d", e.d.noun, s.from, line)
 			}
 			old := s.from
 			if q := text[at]; q == '"' || q == '\'' {
 				old = string(q) + s.from + string(q)
 			}
 			if !strings.HasPrefix(string(text[at:]), old) {
-				return fmt.Errorf("cannot rename action %q: unexpected file content in line %d", s.from, line)
+				return fmt.Errorf("cannot rename %s %q: unexpected file content in line %d", e.d.noun, s.from, line)
 			}
 			text = slices.Concat(text[:at], []rune(s.to), text[at+len([]rune(old)):])
 		}
@@ -921,3 +990,92 @@ func nodeLines(n ast.Node) lineRange {
 
 func minLine(n ast.Node) int { return nodeLines(n).min }
 func maxLine(n ast.Node) int { return nodeLines(n).max }
+
+// PipelineEdit describes changes made on the editor's canvas of a pipeline (roadmap
+// S25a), like WorkflowEdit.
+type PipelineEdit struct {
+	Move        map[string]Point     `json:"move,omitempty"`
+	Delete      []string             `json:"delete,omitempty"`
+	Add         []NewAction          `json:"add,omitempty"`
+	Rename      map[string]string    `json:"rename,omitempty"`
+	AddLinks    []PipelineLink       `json:"addLinks,omitempty"`
+	DeleteLinks []int                `json:"deleteLinks,omitempty"`
+	UpdateLinks []PipelineLinkUpdate `json:"updateLinks,omitempty"`
+	// Set changes fields of transforms: copies, distribution or with.<name>.
+	Set []SetField `json:"set,omitempty"`
+	// SetPipeline changes a field of the pipeline: name, description or settings.*.
+	SetPipeline []WorkflowField `json:"setPipeline,omitempty"`
+}
+
+// PipelineLinkUpdate changes the type of a link: data or error.
+type PipelineLinkUpdate struct {
+	Index int       `json:"index"`
+	Type  *LinkType `json:"type,omitempty"`
+}
+
+var (
+	transformFields = map[string]bool{"copies": true, "distribution": true}
+	pipelineFields  = map[string]bool{"name": true, "description": true,
+		"settings.batchSize": true, "settings.bufferSize": true, "settings.strict": true}
+)
+
+// EditPipeline applies an edit to the text of a pipeline file and returns the new text,
+// changing only the lines concerned (see EditWorkflow).
+func EditPipeline(name string, data []byte, edit PipelineEdit) ([]byte, error) {
+	return editText(name, data, func(text []byte) (*graphDoc, *graphEdit, error) {
+		p, err := ReadPipeline(name, text)
+		if p == nil {
+			return nil, nil, err
+		}
+		d := &graphDoc{noun: "transform", docNoun: "pipeline", stepsKey: "transforms", src: p.src,
+			stepFields: transformFields, docFields: pipelineFields}
+		for _, t := range p.Transforms {
+			d.steps = append(d.steps, t.ID)
+		}
+		for _, l := range p.Links {
+			d.links = append(d.links, linkRef{l.From, l.To})
+		}
+		g := &graphEdit{Move: edit.Move, Delete: edit.Delete, Add: edit.Add, Rename: edit.Rename,
+			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetPipeline}
+		for _, l := range edit.AddLinks {
+			if err := checkLinkType(l.Type); err != nil {
+				return nil, nil, fmt.Errorf("cannot add link from %q to %q: %w", l.From, l.To, err)
+			}
+			g.AddLinks = append(g.AddLinks, pipelineLinkItem(l))
+		}
+		if len(edit.UpdateLinks) > 0 {
+			g.UpdateLinks = map[int]linkItem{}
+		}
+		for _, u := range edit.UpdateLinks {
+			if u.Index < 0 || u.Index >= len(p.Links) {
+				return nil, nil, fmt.Errorf("cannot change link #%d: it does not exist", u.Index+1)
+			}
+			l := p.Links[u.Index]
+			if u.Type != nil {
+				if err := checkLinkType(*u.Type); err != nil {
+					return nil, nil, fmt.Errorf("cannot change link #%d: %w", u.Index+1, err)
+				}
+				l.Type = *u.Type
+			}
+			g.UpdateLinks[u.Index] = pipelineLinkItem(l)
+		}
+		return d, g, nil
+	})
+}
+
+func checkLinkType(t LinkType) error {
+	switch t {
+	case "", DataLink, ErrorLink:
+		return nil
+	}
+	return fmt.Errorf("link type %q is not supported here (data or error)", t)
+}
+
+// pipelineLinkItem writes a pipeline link; "data" is the default and left out.
+func pipelineLinkItem(l PipelineLink) linkItem {
+	item := linkItem{From: l.From, To: l.To}
+	if l.Type != "" && l.Type != DataLink {
+		item.Fields = append(item.Fields, [2]string{"type", string(l.Type)})
+	}
+	return item
+}

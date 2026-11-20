@@ -52,3 +52,43 @@ func (s *Server) handleEditWorkflow(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, editResponse{Content: string(out)})
 	}
 }
+
+// pipelineEditRequest applies changes made on the canvas of a pipeline (S25a).
+type pipelineEditRequest struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	model.PipelineEdit
+}
+
+// handleEditPipeline changes the text of a pipeline like handleEditWorkflow; it does not save.
+func (s *Server) handleEditPipeline(w http.ResponseWriter, r *http.Request) {
+	var req pipelineEditRequest
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxFileSize+64*1024))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+	name, err := filePath(req.Path)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if fileKind(name) != "pipeline" {
+		writeError(w, http.StatusBadRequest, "only pipeline files (*.pipeline.yaml) can be edited here")
+		return
+	}
+	out, err := model.EditPipeline(name, []byte(req.Content), req.PipelineEdit)
+	var diags model.Errors
+	switch {
+	case errors.As(err, &diags):
+		writeJSON(w, http.StatusUnprocessableEntity, startProblems{
+			Error:            "the pipeline has errors that prevent editing it on the canvas",
+			validateResponse: s.response(diags),
+		})
+	case err != nil:
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeJSON(w, http.StatusOK, editResponse{Content: string(out)})
+	}
+}

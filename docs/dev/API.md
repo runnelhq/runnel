@@ -33,8 +33,9 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | DELETE | `/files/{path}` | Datei löschen, `204` |
 | GET | `/catalog` | `{"actions": [Descriptor …], "transforms": [Descriptor …]}` wie `runnel catalog --json` ([ADR 0014](../adr/0014-action-descriptor-schema.md)); `kind` ist `action` bzw. `transform` |
 | GET | `/expressions` | Referenz für den Ausdruckseditor (S35): `{"roots": [Doc …], "functions": [Doc …], "variables": [{name, value, source} …]}`; `Doc` = `{name, signature?, type, description, example?, group?, fields?}` aus `internal/expr/docs.go`; `variables` aus `project.yaml` und dem Standard-Environment (Wert wie in der Datei, `source` z. B. `environments/dev.yaml`). Ist das Projekt fehlerhaft, fehlen nur die Variablen |
-| POST | `/validate` | Workflow prüfen, siehe unten |
+| POST | `/validate` | Workflow oder Pipeline prüfen, siehe unten |
 | POST | `/workflows/edit` | Änderung vom Canvas auf den Text anwenden (nicht speichern), siehe unten |
+| POST | `/pipelines/edit` | dasselbe für Pipelines (S25a), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
 | GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst |
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
@@ -65,8 +66,9 @@ POST /api/v1/validate
 
 `content` ist optional; ohne ihn wird die gespeicherte Datei geprüft, mit ihm der ungespeicherte Stand des Editors.
 Geprüft wird genau wie bei `runnel validate`: Felder, Links, Zyklen, Erreichbarkeit, Variablen gegen alle
-Environments, Projektdateien und – wie vor einem Lauf – unbekannte Action-Typen und Konfiguration `with:`. Derzeit nur
-Workflow-Dateien.
+Environments, Projektdateien und – wie vor einem Lauf – unbekannte Action-Typen und Konfiguration `with:`. Für
+Pipeline-Dateien (`*.pipeline.yaml`, seit S25a1a): Felder, Links, Zyklen, `layout` und – wie vor einem Lauf – Typen,
+Konfiguration und verwendete Felder der Transforms (ADR 0007); die Pfade lauten `$.transforms[i]…`.
 
 ```json
 {
@@ -92,7 +94,8 @@ Antwort zusätzlich `workflow` – seit E7a auch bei ungültigen Feldwerten wie 
 Meldung am Feld zeigen kann: das
 geparste Modell mit `name`, `actions` (`id`, `type`, `join`, `with` …), `links` (`from`, `to`, `when`, `loop`,
 `disabled`) und `layout` (Koordinaten je Action-ID in Pixeln, linke obere Ecke). Der Canvas des Editors baut darauf
-auf; der Editor braucht so keinen eigenen YAML-Parser.
+auf; der Editor braucht so keinen eigenen YAML-Parser. Für Pipelines heißt das Feld `pipeline`: `name`, `transforms`
+(`id`, `type`, `with`, `copies`, `distribution`), `links` (`from`, `to`, `type`), `settings` und `layout` (je Transform-ID).
 
 ## Läufe
 
@@ -200,4 +203,23 @@ Flow- oder Block-Stil und Zeilenenden (LF/CRLF) aller anderen Zeilen bleiben erh
 einen kleinen Git-Diff. Antworten: `400` für unbekannte oder ungültige Action-IDs, unbekannte Links und nicht
 unterstützte Bedingungen, `422` (Format wie `/validate`), wenn die Datei nicht als Workflow lesbar ist. Ungültige
 Feldwerte verhindern das Bearbeiten nicht – sie lassen sich so im Panel korrigieren.
+
+### Pipelines (`/pipelines/edit`)
+
+Wie `/workflows/edit`, für `*.pipeline.yaml` (S25a1a); dieselbe Zeilen-genaue Bearbeitung.
+
+```json
+POST /api/v1/pipelines/edit
+{ "path": "pipelines/customers.pipeline.yaml", "content": "kind: Pipeline\n…",
+  "add": [{ "id": "rejected", "type": "csv.output" }], "move": { "rejected": { "x": 256, "y": 380 } },
+  "addLinks": [{ "from": "types", "to": "rejected", "type": "error" }] }
+```
+
+| Feld | Unterschied zu `/workflows/edit` |
+|---|---|
+| `move`, `delete`, `add`, `rename`, `deleteLinks` | wie dort, für Transforms (`transforms:`) |
+| `addLinks` | `from`, `to`, optional `type: error` (`data` ist der Standard und wird nicht geschrieben) |
+| `updateLinks` | ändert den Typ: `[{"index": 1, "type": "error"}]`; `data` entfernt `type:` |
+| `set` | `copies`, `distribution` und `with.<name>` eines Transforms |
+| `setPipeline` | `name`, `description`, `settings.batchSize`, `settings.bufferSize`, `settings.strict` |
 

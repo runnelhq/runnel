@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
@@ -60,6 +61,8 @@ type validateResponse struct {
 	// Workflow is the parsed workflow (actions, links, layout …) for the canvas; it is
 	// missing if the file cannot be read as a workflow (syntax or field errors).
 	Workflow *model.Workflow `json:"workflow,omitempty"`
+	// Pipeline is the parsed pipeline (transforms, links, layout …), for pipeline files (S25a).
+	Pipeline *model.Pipeline `json:"pipeline,omitempty"`
 }
 
 // handleValidate checks a workflow like "runnel validate" does: fields, links, graph,
@@ -78,8 +81,9 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if fileKind(name) != "workflow" {
-		writeError(w, http.StatusBadRequest, "only workflow files (*.workflow.yaml) can be validated")
+	kind := fileKind(name)
+	if kind != "workflow" && kind != "pipeline" {
+		writeError(w, http.StatusBadRequest, "only workflow and pipeline files (*.workflow.yaml, *.pipeline.yaml) can be validated")
 		return
 	}
 	var data []byte
@@ -87,6 +91,17 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		data = []byte(*req.Content)
 	} else if data, err = s.readFile(name); err != nil {
 		writeErr(w, err)
+		return
+	}
+	if kind == "pipeline" {
+		p, diags, err := s.validatePipeline(name, data)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		res := s.response(diags)
+		res.Pipeline = p
+		writeJSON(w, http.StatusOK, res)
 		return
 	}
 	wf, diags, err := s.validate(name, data)
@@ -97,6 +112,26 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	res := s.response(diags)
 	res.Workflow = wf
 	writeJSON(w, http.StatusOK, res)
+}
+
+// validatePipeline checks a pipeline like "runnel validate": fields, graph and – as
+// before a run – the types, configurations and fields of its transforms (ADR 0007).
+// It returns the parsed pipeline (nil if it cannot be decoded) and all problems.
+func (s *Server) validatePipeline(name string, data []byte) (*model.Pipeline, model.Errors, error) {
+	p, err := model.ReadPipeline(name, data)
+	var diags model.Errors
+	if err != nil && !errors.As(err, &diags) {
+		return nil, nil, err
+	}
+	if p == nil {
+		return nil, diags, nil
+	}
+	diags = append(diags, p.Validate()...)
+	if !diags.HasErrors() && s.transforms != nil {
+		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: s.transforms})...)
+	}
+	diags.Sort()
+	return p, diags, nil
 }
 
 // validate returns the parsed workflow (nil if it cannot be parsed) and all problems.
