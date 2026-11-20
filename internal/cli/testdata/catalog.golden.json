@@ -67,6 +67,35 @@
       }
     },
     {
+      "type": "core.run-workflow",
+      "kind": "action",
+      "category": "execution",
+      "label": "Run Workflow",
+      "description": "Runs another workflow with parameters; output: its outputs",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "description": "Workflow file, relative to the project folder",
+            "examples": [
+              "workflows/import.workflow.yaml"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "description": "Values for the parameters of the workflow, by name",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "workflow"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "type": "core.start",
       "kind": "action",
       "category": "general",

@@ -19,6 +19,9 @@ import (
 type Spec struct {
 	// Name identifies the workflow file in messages, e.g. "workflows/import.workflow.yaml".
 	Name string
+	// File is the path of the workflow file on disk, if Name is not (e.g. relative to
+	// the project); called workflows are found relative to it without a project.
+	File string
 	// Data is the content of the workflow file.
 	Data []byte
 	// ProjectDir is the directory of the project (with project.yaml); "" if the
@@ -32,6 +35,19 @@ type Spec struct {
 	Registry *action.Registry
 	Observer func(workflow.Event)
 	RunID    string
+
+	// chain lists the workflows that called this one (core.run-workflow).
+	chain []caller
+	// strict rejects parameters the workflow does not declare (called workflows).
+	strict bool
+}
+
+// file returns the path of the workflow file on disk.
+func (spec Spec) file() string {
+	if spec.File != "" {
+		return spec.File
+	}
+	return spec.Name
 }
 
 // Prepared is the result of Prepare. It is also returned when Prepare fails, holding
@@ -59,7 +75,9 @@ func Prepare(spec Spec) (*Prepared, error) {
 	}
 	p.Workflow = w
 	diags := w.Validate()
+	diags = append(diags, CheckCalls(w, spec.ProjectDir, spec.file())...)
 	if diags.HasErrors() {
+		diags.Sort()
 		return p, diags
 	}
 	p.Warnings = diags
@@ -78,6 +96,9 @@ func Prepare(spec Spec) (*Prepared, error) {
 	if p.Undeclared, err = checkParams(w, spec.Params); err != nil {
 		return p, err
 	}
+	if spec.strict && len(p.Undeclared) > 0 {
+		return p, fmt.Errorf("parameter(s) %v not declared by workflow %q (declared: %s)", p.Undeclared, w.Name, declared(w))
+	}
 
 	var defaultJoin model.JoinMode
 	if p.Project != nil {
@@ -94,8 +115,21 @@ func Prepare(spec Spec) (*Prepared, error) {
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
 		Environment: envName,
+		Workflows:   spec.workflows(envName),
 	})
 	return p, err
+}
+
+// declared lists the parameter names of a workflow for messages.
+func declared(w *model.Workflow) string {
+	if len(w.Parameters) == 0 {
+		return "none"
+	}
+	names := make([]string, len(w.Parameters))
+	for i, p := range w.Parameters {
+		names[i] = p.Name
+	}
+	return strings.Join(names, ", ")
 }
 
 // ErrMissingParameters is wrapped by the error of Prepare when required parameters are missing.

@@ -29,7 +29,22 @@ type ExecContext struct {
 	ActionID string
 	// Log writes a message to the run log.
 	Log func(level slog.Level, msg string)
+	// RunWorkflow runs another workflow of the project (core.run-workflow) and returns
+	// its outputs; nil where the caller of the engine does not support it.
+	RunWorkflow func(ctx context.Context, path string, params map[string]string) (map[string]any, error)
 }
+
+// WorkflowCall is a call of another workflow from an action (core.run-workflow).
+type WorkflowCall struct {
+	// Path of the workflow file as written in the action (relative to the project).
+	Path   string
+	Params map[string]string
+	// Log writes to the log of the calling action.
+	Log func(level slog.Level, msg string)
+}
+
+// WorkflowRunner runs a called workflow and returns its outputs (see ExecContext.RunWorkflow).
+type WorkflowRunner func(ctx context.Context, call WorkflowCall) (map[string]any, error)
 
 // Logf writes a formatted message to the run log.
 func (ec *ExecContext) Logf(level slog.Level, format string, args ...any) {

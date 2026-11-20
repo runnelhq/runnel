@@ -10,6 +10,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/runs"
 )
 
 // Catalog lists the available building blocks; transforms follow with the pipelines.
@@ -123,6 +124,7 @@ func (s *Server) validate(name string, data []byte) (*model.Workflow, model.Erro
 	}
 	if !diags.HasErrors() {
 		diags = append(diags, workflow.Check(wf, workflow.Options{Registry: s.registry})...)
+		diags = append(diags, runs.CheckCalls(wf, s.dir, filepath.Join(s.dir, filepath.FromSlash(name)))...)
 	}
 	diags.Sort()
 	return wf, diags, nil

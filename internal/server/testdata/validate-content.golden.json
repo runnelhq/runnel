@@ -8,7 +8,7 @@
       "column": 23,
       "path": "$.actions[1].type",
       "severity": "error",
-      "message": "action \"copy\": unknown action type \"file.shred\" (available: [core.abort core.dummy core.log core.start core.success core.wait file.copy file.delete file.exists file.list file.mkdir file.move file.wait])"
+      "message": "action \"copy\": unknown action type \"file.shred\" (available: [core.abort core.dummy core.log core.run-workflow core.start core.success core.wait file.copy file.delete file.exists file.list file.mkdir file.move file.wait])"
     },
     {
       "file": "workflows/import.workflow.yaml",

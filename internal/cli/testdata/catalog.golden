@@ -5,6 +5,8 @@ general
   core.start    Start    Entry point of the workflow
   core.success  Success  Ends the workflow successfully
   core.wait     Wait     Waits for a given time
+execution
+  core.run-workflow  Run Workflow  Runs another workflow with parameters; output: its outputs
 files
   file.copy    Copy Files     Copies files or folders; output: the copied files
   file.delete  Delete Files   Deletes files or folders; output: the deleted paths
