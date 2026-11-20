@@ -1,4 +1,4 @@
-core.log – Log (category general)
+action core.log – Log (category general)
 Writes a message to the run log
 
 Fields (with:):
@@ -6,3 +6,12 @@ Fields (with:):
            string, required, multi-line, e.g. Import finished
   level    Log level of the message
            string, one of debug|info|warn|error, default info
+
+transform core.log – Log (category output)
+Writes records to the run log and passes them on
+
+Fields (with:):
+  level  Log level of the messages
+         string, one of debug|info|warn|error, default info
+  every  Writes every n-th record, e.g. 1000 for large data
+         integer, default 1

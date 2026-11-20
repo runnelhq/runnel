@@ -93,7 +93,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 		return p, fmt.Errorf("environment %s: no project (%s) found for %s", spec.Env, model.ProjectFile, spec.Name)
 	}
 
-	if p.Undeclared, err = checkParams(w, spec.Params); err != nil {
+	if p.Undeclared, err = checkParams(w.Parameters, spec.Params); err != nil {
 		return p, err
 	}
 	if spec.strict && len(p.Undeclared) > 0 {
@@ -137,10 +137,10 @@ var ErrMissingParameters = errors.New("missing required parameter(s)")
 
 // checkParams fails for missing required parameters and values that do not match
 // the declared type or allowed values. It returns the undeclared parameters, sorted.
-func checkParams(w *model.Workflow, params map[string]string) ([]string, error) {
+func checkParams(parameters []model.Parameter, params map[string]string) ([]string, error) {
 	declared := map[string]bool{}
 	var problems, missing []string
-	for _, p := range w.Parameters {
+	for _, p := range parameters {
 		declared[p.Name] = true
 		value, given := params[p.Name]
 		if !given {

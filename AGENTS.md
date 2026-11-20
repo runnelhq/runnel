@@ -20,7 +20,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Fuzzing | `make fuzz FUZZTIME=1m` |
 | Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – danach Diff prüfen |
-| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel catalog core.log` · `bin/runnel serve examples/hello` |
+| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel serve examples/hello` |
 
 Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderungen am Editor zusätzlich `make e2e`.
 
@@ -51,6 +51,7 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderunge
 
 - **Sprache:** Code, Kommentare, CLI-Ausgaben, Fehlermeldungen und alle Texte der Oberfläche **englisch** (ADR 0015); Dokumentation, ADRs, PR-Beschreibungen **deutsch**.
 - **Neue Action:** genau nach [docs/dev/ACTIONS.md](docs/dev/ACTIONS.md) (eine Datei je Action, `register.go`, Vertragstest).
+- **Neuer Transform:** nach [docs/dev/TRANSFORMS.md](docs/dev/TRANSFORMS.md) (ergänzt ACTIONS.md um `Process`, Records, Backpressure).
 - **Typnamen:** `<namensraum>.<name>`; Actions und Transforms haben getrennte Namensräume, **kein** `-transform`-Suffix (ADR 0013).
 - **Fehlermeldungen in Dateien** mit Position: `datei:zeile:spalte: error|warning: text`; für Anwender verständlich, ohne Go-Typnamen.
 - **Tests:** Golden-Files für Formate und Ausgaben, `t.TempDir()` statt echter Pfade, plattformunabhängig (Linux und Windows in CI).

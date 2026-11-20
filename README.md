@@ -22,7 +22,8 @@ Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadma
 
 Noch im Aufbau – Workflows lassen sich prüfen und mit den Basis-Actions (`core.start`, `core.log`, `core.wait`,
 `core.success`, `core.abort`, `core.dummy`), Sub-Workflows (`core.run-workflow`) und den Datei-Actions (`file.exists`, `file.wait`, `file.copy`,
-`file.move`, `file.delete`, `file.mkdir`, `file.list`) ausführen; weitere Actions folgen laut [Roadmap](docs/ROADMAP.md).
+`file.move`, `file.delete`, `file.mkdir`, `file.list`) ausführen. Pipelines laufen bereits mit den Test-Transforms
+(`core.generate-rows`, `core.dummy`, `core.log`); CSV und weitere Transforms folgen laut [Roadmap](docs/ROADMAP.md).
 
 ```bash
 runnel run --env prod examples/hello/workflows/hello.workflow.yaml

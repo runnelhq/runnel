@@ -172,7 +172,7 @@ func TestValidatePipelines(t *testing.T) {
 		}
 		return path
 	}
-	write("ok.pipeline.yaml", "transforms:\n  - { id: read, type: csv.input }\n  - { id: write, type: csv.output }\nlinks:\n  - { from: read, to: write }\n")
+	write("ok.pipeline.yaml", "transforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 10 } }\n  - { id: log, type: core.log }\nlinks:\n  - { from: gen, to: log }\n")
 	code, out, errOut := run(t, "validate", dir)
 	if code != 0 || out != "1 pipeline file checked: 0 errors, 0 warnings\n" {
 		t.Errorf("valid: exit code %d, stdout %q, stderr %q", code, out, errOut)
@@ -183,6 +183,18 @@ func TestValidatePipelines(t *testing.T) {
 	if code != 1 || !strings.Contains(out, `bad.pipeline.yaml:5:34: error: unknown field "copies"`) {
 		t.Errorf("invalid: exit code %d, stdout %q", code, out)
 	}
+	// Types and configurations of the transforms are checked like before a run (S13b).
+	types := write("types.pipeline.yaml", "transforms:\n  - { id: read, type: csv.input }\n  - { id: log, type: core.log, with: { level: loud } }\nlinks:\n  - { from: read, to: log }\n")
+	_, out, _ = run(t, "validate", types)
+	for _, want := range []string{
+		`types.pipeline.yaml:5:23: error: transform "read": unknown transform type "csv.input"`,
+		`types.pipeline.yaml:6:40: error: transform "log" (core.log): invalid level "loud"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	_ = os.Remove(types)
 
 	// Workflows and pipelines together; the summary names both.
 	wf := filepath.Join(dir, "w.workflow.yaml")

@@ -406,5 +406,100 @@
         "additionalProperties": false
       }
     }
+  ],
+  "transforms": [
+    {
+      "type": "core.dummy",
+      "kind": "transform",
+      "category": "flow",
+      "label": "Dummy",
+      "description": "Passes all records on unchanged",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.generate-rows",
+      "kind": "transform",
+      "category": "input",
+      "label": "Generate Rows",
+      "description": "Creates records with constant fields",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "string",
+            "description": "Number of records to create, e.g. 1000 or ${ROWS}",
+            "examples": [
+              "10"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields of every record, with a constant value",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field",
+                  "examples": [
+                    "status"
+                  ]
+                },
+                "value": {
+                  "description": "Value of the field"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rowNumberField": {
+            "type": "string",
+            "description": "Name of a field for the number of the record, starting at 1; empty: none"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "core.log",
+      "kind": "transform",
+      "category": "output",
+      "label": "Log",
+      "description": "Writes records to the run log and passes them on",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "description": "Log level of the messages",
+            "enum": [
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
+            "default": "info"
+          },
+          "every": {
+            "type": "integer",
+            "description": "Writes every n-th record, e.g. 1000 for large data",
+            "default": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
   ]
 }

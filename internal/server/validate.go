@@ -11,20 +11,27 @@ import (
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/transform"
 )
 
 // Catalog lists the available building blocks; transforms follow with the pipelines.
 type Catalog struct {
 	Actions []action.Descriptor `json:"actions"`
+	// Transforms of pipelines (roadmap S13b); a separate namespace (ADR 0013).
+	Transforms []transform.Descriptor `json:"transforms"`
 }
 
-// NewCatalog builds the catalog of a registry.
-func NewCatalog(r *action.Registry) Catalog {
-	return Catalog{Actions: r.Descriptors()}
+// NewCatalog builds the catalog of the registries; transforms may be nil.
+func NewCatalog(actions *action.Registry, transforms *transform.Registry) Catalog {
+	c := Catalog{Actions: actions.Descriptors(), Transforms: []transform.Descriptor{}}
+	if transforms != nil {
+		c.Transforms = transforms.Descriptors()
+	}
+	return c
 }
 
 func (s *Server) handleCatalog(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, NewCatalog(s.registry))
+	writeJSON(w, http.StatusOK, NewCatalog(s.registry, s.transforms))
 }
 
 // validateRequest names the workflow to check. Content, if given, is checked instead

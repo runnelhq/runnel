@@ -1,0 +1,38 @@
+# Generates records and writes every 250th one to the log. Run it with:
+#   runnel run examples/pipelines/pipelines/numbers.pipeline.yaml
+#   runnel run --param ROWS=10000000 examples/pipelines/pipelines/numbers.pipeline.yaml
+# - "numbers" creates ROWS records with a running number and two constant fields.
+# - "both" collects the two branches: every record reaches it twice (copy to all links).
+# - At the end every transform logs how many records it read and wrote.
+kind: Pipeline
+apiVersion: runnel/v1
+name: numbers
+parameters:
+  - name: ROWS
+    type: integer
+    default: "1000"
+transforms:
+  - id: numbers
+    type: core.generate-rows
+    with:
+      rows: ${ROWS}
+      rowNumberField: n
+      fields:
+        - { name: status, value: new }
+        - { name: amount, value: 9.95 }
+  - id: left
+    type: core.dummy
+  - id: right
+    type: core.dummy
+  - id: both
+    type: core.dummy
+  - id: show
+    type: core.log
+    with:
+      every: 250
+links:
+  - { from: numbers, to: left }
+  - { from: numbers, to: right }
+  - { from: left, to: both }
+  - { from: right, to: both }
+  - { from: both, to: show }

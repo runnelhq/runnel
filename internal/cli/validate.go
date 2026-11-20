@@ -14,9 +14,12 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/transform"
+	"github.com/runnelhq/runnel/internal/transforms"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -34,7 +37,7 @@ func newValidateCommand() *cobra.Command {
 			"links to unknown actions, cycles, unreachable actions, undefined variables,\n" +
 			"unknown action types and invalid action configurations (with:).\n" +
 			"Pipeline files (*" + pipelineSuffix + ") are checked for syntax errors, invalid fields,\n" +
-			"links to unknown transforms and cycles.\n\n" +
+			"links to unknown transforms, cycles, unknown transform types and invalid configurations.\n\n" +
 			"Paths can be files or directories; directories are searched recursively.\n" +
 			"Without a path, the current directory is checked.\n\n" +
 			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
@@ -57,7 +60,7 @@ func newValidateCommand() *cobra.Command {
 				return fmt.Errorf("no workflow or pipeline files (*%s, *%s) found in %s", workflowSuffix, pipelineSuffix, strings.Join(args, ", "))
 			}
 			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
-				registry: actions.Builtin()}
+				registry: actions.Builtin(), transforms: transforms.Builtin()}
 			return v.run(files)
 		},
 	}
@@ -80,6 +83,7 @@ type validator struct {
 	// projects caches loaded projects by absolute directory; nil if loading failed.
 	projects           map[string]*model.Project
 	registry           *action.Registry
+	transforms         *transform.Registry
 	nErrors, nWarnings int
 }
 
@@ -155,8 +159,8 @@ func (v *validator) file(file string) error {
 	return nil
 }
 
-// pipeline checks a pipeline file: fields and graph (roadmap S12). Transform types and
-// their configuration are checked once transforms exist (S13).
+// pipeline checks a pipeline file: fields and graph (roadmap S12), then the types and
+// configurations of its transforms (S13b), like before a run.
 func (v *validator) pipeline(file string) error {
 	p, err := model.LoadPipeline(file)
 	if err != nil {
@@ -167,7 +171,12 @@ func (v *validator) pipeline(file string) error {
 		v.report(diags)
 		return nil
 	}
-	v.report(p.Validate())
+	diags := p.Validate()
+	if !diags.HasErrors() {
+		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: v.transforms})...)
+		diags.Sort()
+	}
+	v.report(diags)
 	return nil
 }
 

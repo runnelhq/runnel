@@ -21,6 +21,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/webui"
 )
 
@@ -33,16 +34,19 @@ type Options struct {
 	Dir string
 	// Registry holds the available actions.
 	Registry *action.Registry
+	// Transforms holds the available transforms; nil means none.
+	Transforms *transform.Registry
 	// UI holds the editor files; nil uses the editor embedded into the binary.
 	UI fs.FS
 }
 
 // Server serves the API for one project.
 type Server struct {
-	dir      string
-	root     *os.Root
-	registry *action.Registry
-	ui       fs.FS
+	dir        string
+	root       *os.Root
+	registry   *action.Registry
+	transforms *transform.Registry
+	ui         fs.FS
 	// writeMu serializes changes to files, so that the ETag check and the write
 	// happen atomically with respect to other requests of this server.
 	writeMu sync.Mutex
@@ -62,7 +66,7 @@ func New(opts Options) (*Server, error) {
 	if ui == nil {
 		ui = webui.FS()
 	}
-	return &Server{dir: opts.Dir, root: root, registry: opts.Registry, ui: ui, runs: runs.NewManager(),
+	return &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
 		stop: make(chan struct{})}, nil
 }
 

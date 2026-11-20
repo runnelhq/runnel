@@ -275,7 +275,7 @@ func TestPrepareErrors(t *testing.T) {
 parameters:
   - { name: N, default: "x" }
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: "${N}" } }
+  - { id: gen, type: core.generate-rows, with: { rows: "${MISSING}" } }
   - { id: what, type: core.nothing }
   - { id: log, type: core.log, with: { level: loud } }
 `)
@@ -283,7 +283,7 @@ transforms:
 	diags := Check(p, Options{Registry: testRegistry(c), Scope: scope})
 	got := diags.Error()
 	for _, want := range []string{
-		`transform "gen" (core.generate-rows): field "rows": expected int64, got string`,
+		`transform "gen" (core.generate-rows): rows: variable "MISSING" is undefined`,
 		`transform "what": unknown transform type "core.nothing"`,
 		`transform "log" (core.log): invalid level "loud"`,
 	} {

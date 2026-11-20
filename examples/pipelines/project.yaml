@@ -1,0 +1,6 @@
+# Pipelines (roadmap S13). Run it with:
+#   runnel run examples/pipelines/pipelines/numbers.pipeline.yaml
+kind: Project
+apiVersion: runnel/v1
+name: pipelines
+description: First pipelines with the test transforms of the pipeline engine

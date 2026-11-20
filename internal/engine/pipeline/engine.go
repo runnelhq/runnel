@@ -10,11 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/engine/runid"
+	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -132,7 +134,7 @@ func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
 		}
 		with, err := expand(t.With, opts.Scope)
 		if err == nil {
-			r.transforms[i], err = def.New(with)
+			r.transforms[i], err = def.New(asText(with, opts.Registry, t.Type))
 		}
 		if err != nil {
 			errs = append(errs, p.ErrorAt(path+".with", "transform %q (%s): %v", t.ID, t.Type, err))
@@ -155,6 +157,26 @@ func Check(p *model.Pipeline, opts Options) model.Errors {
 		return model.Errors{p.ErrorAt("$", "%v", err)}
 	}
 	return nil
+}
+
+// asText writes numbers and booleans as text where the schema of the transform expects
+// text, e.g. "rows: 100" for a field that may also hold "${ROWS}" (like the workflow engine).
+func asText(with map[string]any, reg *transform.Registry, typ string) map[string]any {
+	d, ok := reg.Descriptor(typ)
+	if !ok || d.Schema == nil || with == nil {
+		return with
+	}
+	out := maps.Clone(with)
+	for _, p := range d.Schema.Properties {
+		switch v := out[p.Name].(type) {
+		case string, nil, map[string]any, []any:
+		default:
+			if p.Schema.Type == "string" {
+				out[p.Name] = expr.Format(v)
+			}
+		}
+	}
+	return out
 }
 
 // expand resolves ${…} references in the configuration; without a scope it stays as it is.

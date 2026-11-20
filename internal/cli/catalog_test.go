@@ -49,7 +49,7 @@ func TestCatalogJSONOfOneAction(t *testing.T) {
 
 func TestCatalogUnknownType(t *testing.T) {
 	code, _, errOut := run(t, "catalog", "core.copy")
-	if code != 1 || !strings.Contains(errOut, `unknown action type "core.copy"`) {
+	if code != 1 || !strings.Contains(errOut, `unknown action or transform type "core.copy"`) {
 		t.Errorf("exit code %d, stderr %q", code, errOut)
 	}
 }

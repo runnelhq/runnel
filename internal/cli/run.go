@@ -38,22 +38,26 @@ type runOptions struct {
 func newRunCommand() *cobra.Command {
 	var opts runOptions
 	cmd := &cobra.Command{
-		Use:   "run <workflow-file>",
-		Short: "Run a workflow",
-		Long: "Runs a workflow file and prints its log.\n\n" +
-			"Variables come from the workflow parameters, the project (project.yaml in the\n" +
-			"workflow's directory or above), the environment (--env, default: defaultEnvironment\n" +
+		Use:   "run <workflow-or-pipeline-file>",
+		Short: "Run a workflow or a pipeline",
+		Long: "Runs a workflow (*" + workflowSuffix + ") or a pipeline (*" + pipelineSuffix + ") and prints its log;\n" +
+			"for a pipeline, the number of records each transform read and wrote.\n\n" +
+			"Variables come from the parameters, the project (project.yaml in the file's\n" +
+			"directory or above), the environment (--env, default: defaultEnvironment\n" +
 			"of the project) and --param, in this order of precedence (last wins).\n\n" +
-			"Ctrl+C cancels the run cleanly (running actions are stopped); press it twice to exit at once.\n\n" +
-			"Exit codes: 0 succeeded, 1 failed, 2 not started (invalid workflow or arguments), 130 cancelled.",
+			"Ctrl+C cancels the run cleanly (running actions and transforms are stopped); press it twice to exit at once.\n\n" +
+			"Exit codes: 0 succeeded, 1 failed, 2 not started (invalid file or arguments), 130 cancelled.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.HasSuffix(args[0], pipelineSuffix) {
+				return runPipeline(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), args[0], opts)
+			}
 			return runWorkflow(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), args[0], opts)
 		},
 	}
 	cmd.Flags().StringVar(&opts.env, "env", "", "environment of the project to use")
 	cmd.Flags().StringArrayVar(&opts.params, "param", nil, "parameter `KEY=VALUE` (repeatable)")
-	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "also log debug messages and every action start and end")
+	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "also log debug messages and every action or transform start and end")
 	return cmd
 }
 
@@ -87,23 +91,9 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	if info, err := os.Stat(file); err == nil && info.IsDir() {
 		return nil, fmt.Errorf("%s is a directory; pass a workflow file (*%s)", file, workflowSuffix)
 	}
-	if strings.HasSuffix(file, pipelineSuffix) {
-		return nil, fmt.Errorf("%s: pipelines cannot be run yet (roadmap S13); check them with \"runnel validate\"", file)
-	}
-	data, err := os.ReadFile(file)
+	data, projectDir, err := readRunFile(file, opts.env)
 	if err != nil {
 		return nil, err
-	}
-	root, found, err := model.FindProjectDir(filepath.Dir(file))
-	if err != nil {
-		return nil, err
-	}
-	projectDir := ""
-	switch {
-	case found:
-		projectDir = displayPath(root)
-	case opts.env != "":
-		return nil, fmt.Errorf("--env %s: no project (%s) found for %s", opts.env, model.ProjectFile, file)
 	}
 
 	var logger *runLogger
@@ -134,6 +124,24 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	}
 	logger = &runLogger{out: out, verbose: opts.verbose, workflow: p.Workflow.Name, env: p.Env}
 	return p.Runner, nil
+}
+
+// readRunFile reads a workflow or pipeline file and finds its project ("" if none).
+func readRunFile(file, env string) (data []byte, projectDir string, err error) {
+	if data, err = os.ReadFile(file); err != nil {
+		return nil, "", err
+	}
+	root, found, err := model.FindProjectDir(filepath.Dir(file))
+	if err != nil {
+		return nil, "", err
+	}
+	switch {
+	case found:
+		projectDir = displayPath(root)
+	case env != "":
+		return nil, "", fmt.Errorf("--env %s: no project (%s) found for %s", env, model.ProjectFile, file)
+	}
+	return data, projectDir, nil
 }
 
 func printDiags(errOut io.Writer, diags model.Errors) {
