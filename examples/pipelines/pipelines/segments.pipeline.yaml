@@ -1,0 +1,51 @@
+# Splits customers by revenue into two files. Run it from the folder that contains "examples":
+#   runnel run examples/pipelines/pipelines/segments.pipeline.yaml
+# - "read" reads the customers with types; a row whose revenue is not a number ("k. A.")
+#   goes over the error link to "invalid" instead of stopping the pipeline.
+# - "segment" passes each customer to one file: the first case that is true decides,
+#   so a key account does not also become a standard customer. Customers without
+#   revenue match no case and are dropped (there is no default); the log counts them.
+kind: Pipeline
+apiVersion: runnel/v1
+name: segments
+parameters:
+  - name: KEY_ACCOUNT
+    description: Revenue from which a customer is a key account
+    type: number
+    default: "10000"
+  - name: OUT_DIR
+    description: Folder for the two files
+    default: .
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: examples/pipelines/data/customers.csv
+      delimiter: ";"
+      fields:
+        - { name: kdnr, type: int }
+        - { name: name }
+        - { name: umsatz, type: decimal, format: "#.##0,00" }
+  - id: segment
+    type: core.switch
+    with:
+      cases:
+        - { when: "{{ record.umsatz >= params.KEY_ACCOUNT }}", to: key-accounts }
+        - { when: "{{ record.umsatz > 0 }}", to: standard }
+  - id: key-accounts
+    type: csv.output
+    with:
+      path: ${OUT_DIR}/customers-key-accounts.csv
+  - id: standard
+    type: csv.output
+    with:
+      path: ${OUT_DIR}/customers-standard.csv
+  - id: invalid
+    type: core.log
+    with:
+      level: warn
+links:
+  - { from: read, to: segment }
+  - { from: read, to: invalid, type: error }
+  - { from: segment, to: key-accounts }
+  - { from: segment, to: standard }

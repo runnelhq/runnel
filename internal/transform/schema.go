@@ -20,7 +20,10 @@ type Initializer interface {
 
 // InitContext is what Init needs: the incoming schema and a place for problems.
 type InitContext struct {
-	In       record.Schema
+	In record.Schema
+	// Targets are the ids of the transforms the data links of the transform lead to,
+	// in the order of the links (for Output.EmitTo).
+	Targets  []string
 	problems []Problem
 }
 
@@ -65,6 +68,11 @@ func (ic *InitContext) Use(name, path string) {
 	}
 	ic.problems = append(ic.problems, Problem{Path: path, Warning: true,
 		Message: fmt.Sprintf("field %q is not known in the incoming records%s; it is checked when the pipeline runs", name, hint)})
+}
+
+// Error reports an error in the configuration at path (within "with").
+func (ic *InitContext) Error(path, message string) {
+	ic.problems = append(ic.problems, Problem{Path: path, Message: message})
 }
 
 // Warn reports a warning about the configuration at path (within "with"; empty for the

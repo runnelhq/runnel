@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -222,9 +223,13 @@ func (r *Runner) deriveSchemas() model.Errors {
 	inputs := make([][]input, len(p.Transforms))
 	pending := make([]int, len(p.Transforms))
 	next := make([][]int, len(p.Transforms))
+	targets := make([][]string, len(p.Transforms))
 	for _, l := range p.Links {
 		from, to := index[l.From], index[l.To]
 		inputs[to] = append(inputs[to], input{from, l.Type == model.ErrorLink})
+		if l.Type != model.ErrorLink && !slices.Contains(targets[from], l.To) {
+			targets[from] = append(targets[from], l.To)
+		}
 		next[from] = append(next[from], to)
 		pending[to]++
 	}
@@ -261,6 +266,7 @@ func (r *Runner) deriveSchemas() model.Errors {
 		r.schemas[i] = record.OpenSchema()
 		if init, ok := r.transforms[i].(transform.Initializer); ok {
 			ic := transform.NewInitContext(record.Merge(in...))
+			ic.Targets = targets[i]
 			out, err := init.Init(ic)
 			base := fmt.Sprintf("$.transforms[%d].with", i)
 			for _, pr := range ic.Problems() {
@@ -417,13 +423,21 @@ func (r *Runner) Run(parent context.Context) Result {
 	for i, t := range r.p.Transforms {
 		in := r.input(ctx, links, ins[i], &wg)
 		data, errs := &port{}, &port{}
+		byTarget := map[string]*port{} // the data links by target, for EmitTo
 		for _, li := range outs[i] {
+			l := r.p.Links[li]
 			p := data
-			if r.p.Links[li].Type == model.ErrorLink {
+			if l.Type == model.ErrorLink {
 				p = errs
+			} else {
+				if byTarget[l.To] == nil {
+					byTarget[l.To] = &port{}
+				}
+				byTarget[l.To].targets = append(byTarget[l.To].targets, links[li])
+				byTarget[l.To].targetIdx = append(byTarget[l.To].targetIdx, index[l.To])
 			}
 			p.targets = append(p.targets, links[li])
-			p.targetIdx = append(p.targetIdx, index[r.p.Links[li].To])
+			p.targetIdx = append(p.targetIdx, index[l.To])
 		}
 		wg.Add(1)
 		go func() {
@@ -478,9 +492,21 @@ func (r *Runner) Run(parent context.Context) Result {
 			if len(errs.targets) > 0 {
 				out.WithErrorLinks(failRecord)
 			}
+			out.WithTargets(func(target string, rec record.Record) error {
+				p := byTarget[target]
+				if p == nil {
+					return fmt.Errorf("no data link leads to %q", target)
+				}
+				counts[i].written.Add(1)
+				return add(p, rec)
+			})
 
 			err := process(ctx, r.transforms[i], in, out)
-			for _, p := range []*port{data, errs} {
+			ports := []*port{data, errs}
+			for _, p := range byTarget {
+				ports = append(ports, p)
+			}
+			for _, p := range ports {
 				if err == nil && len(p.batch) > 0 {
 					err = send(p, p.batch)
 				}

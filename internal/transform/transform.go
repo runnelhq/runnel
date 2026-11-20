@@ -37,11 +37,29 @@ type Output struct {
 	log    func(slog.Level, string)
 	values map[string]any
 	fail   func(record.Record) error
+	emitTo func(string, record.Record) error
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
 func NewOutput(transformID string, emit func(record.Record) error, log func(slog.Level, string)) *Output {
 	return &Output{id: transformID, emit: emit, log: log}
+}
+
+// WithTargets sets how EmitTo reaches a single outgoing data link; the engine sets it.
+func (o *Output) WithTargets(emitTo func(target string, r record.Record) error) *Output {
+	o.emitTo = emitTo
+	return o
+}
+
+// EmitTo passes a record to the data link that leads to the transform with the id
+// target only (e.g. core.switch), instead of to all of them like Emit. The targets are
+// known in Init (InitContext.Targets). Without targets set (outside the engine), it
+// behaves like Emit.
+func (o *Output) EmitTo(target string, r record.Record) error {
+	if o.emitTo == nil {
+		return o.emit(r)
+	}
+	return o.emitTo(target, r)
 }
 
 // Fields of a record on an error link (roadmap S17a): the message, the field that

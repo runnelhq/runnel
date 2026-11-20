@@ -47,7 +47,7 @@ func (t *upper) Process(ctx context.Context, in <-chan transform.Batch, out *tra
 | Thema | Regel |
 |---|---|
 | Eingabe | `in` liefert Batches, bis alle eingehenden Links beendet sind; bei mehreren Links gemischt. Ein Transform ohne eingehende Links (Eingabe) bekommt einen geschlossenen Kanal und erzeugt Records selbst |
-| Ausgabe | `out.Emit(r)` je Record; die Engine bündelt zu Batches und gibt jeden Record an alle ausgehenden Links (ab dem zweiten als Kopie). Einen Record nach `Emit` nicht mehr ändern |
+| Ausgabe | `out.Emit(r)` je Record; die Engine bündelt zu Batches und gibt jeden Record an alle ausgehenden Links (ab dem zweiten als Kopie). Einen Record nach `Emit` nicht mehr ändern. `out.EmitTo(id, r)` gibt einen Record nur an den Daten-Link zu einem bestimmten Transform (Beispiel `switch.go`); die möglichen Ziele stehen in `Init` in `ic.Targets`. Test: `transformtest.RunRouted` |
 | Backpressure | `Emit` blockiert, solange die folgenden Transforms beschäftigt sind – nichts selbst puffern, sonst steigt der Speicher |
 | Abbruch | `Emit` gibt bei Abbruch einen Fehler zurück: sofort zurückgeben. Bei langen Schritten ohne `Emit` (z. B. Datei öffnen) `ctx` weitergeben |
 | Fehler | Ein Fehler, den `Process` zurückgibt, hält die ganze Pipeline an. Kann ein **einzelner Record** nicht verarbeitet werden (Wert passt nicht), `out.Fail(r, feld, err)` aufrufen: mit Fehler-Link geht der Record dorthin (mit `_error`, `_errorField`, `_errorTransform`), sonst gibt `Fail` den Fehler zurück – ihn zurückgeben. Den eingehenden Record unverändert übergeben, dazu `RecordErrors: true` in der Definition. Test: `transformtest.RunWithErrorLink`. Meldungen wie bei Actions |

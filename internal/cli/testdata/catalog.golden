@@ -24,7 +24,8 @@ transforms / transform
   core.filter         Filter         Passes on the records for which a condition is true
   core.select-fields  Select Fields  Keeps, orders and renames fields, or removes fields
 transforms / flow
-  core.dummy  Dummy  Passes all records on unchanged
+  core.dummy   Dummy   Passes all records on unchanged
+  core.switch  Switch  Passes each record to the link of the first case whose condition is true
 transforms / output
   core.log    Log         Writes records to the run log and passes them on
   csv.output  CSV Output  Writes records to a CSV file and passes them on

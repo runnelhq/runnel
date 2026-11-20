@@ -682,6 +682,59 @@
       }
     },
     {
+      "type": "core.switch",
+      "kind": "transform",
+      "category": "flow",
+      "label": "Switch",
+      "description": "Passes each record to the link of the first case whose condition is true",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cases": {
+            "type": "array",
+            "description": "Conditions in order; the first one that is true decides",
+            "items": {
+              "type": "object",
+              "properties": {
+                "when": {
+                  "type": "string",
+                  "description": "Condition, e.g. {{ record.country == 'DE' }}; a comparison with an empty value is false",
+                  "examples": [
+                    "{{ record.amount \u003e 0 }}"
+                  ]
+                },
+                "to": {
+                  "type": "string",
+                  "description": "Id of the transform the record goes to; a data link must lead there",
+                  "examples": [
+                    "germany"
+                  ]
+                }
+              },
+              "required": [
+                "when",
+                "to"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "default": {
+            "type": "string",
+            "description": "Transform for records that match no case; empty: they are dropped",
+            "examples": [
+              "others"
+            ]
+          }
+        },
+        "required": [
+          "cases"
+        ],
+        "additionalProperties": false
+      },
+      "recordErrors": true
+    },
+    {
       "type": "csv.input",
       "kind": "transform",
       "category": "input",
