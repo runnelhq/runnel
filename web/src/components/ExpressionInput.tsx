@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import {
   autocompletion,
   closeCompletion,
@@ -15,6 +15,7 @@ import {
   EditorView,
   hoverTooltip,
   keymap,
+  lineNumbers as lineNumbersExt,
   placeholder as placeholderExt,
   showTooltip,
   ViewPlugin,
@@ -224,6 +225,16 @@ export interface ExpressionInputProps {
   ctx: ExprContext;
   onCommit: (value: string) => void;
   testId?: string;
+  /** Shows ⤢ (and Ctrl+Shift+E) to open the larger editor (roadmap S35b). */
+  onExpand?: (text: string) => void;
+  /** The larger editor: line numbers, focus at the end, no commit after a pause or on leaving. */
+  large?: boolean;
+  /** Called with the text after every change. */
+  onChange?: (value: string) => void;
+  /** Ctrl+Enter, e.g. Apply in the larger editor (before CodeMirror's own binding). */
+  onSubmit?: () => void;
+  /** Receives the editor, e.g. to insert text from the reference. */
+  viewRef?: MutableRefObject<EditorView | null>;
 }
 
 /**
@@ -239,6 +250,13 @@ export function ExpressionInput(props: ExpressionInputProps) {
   ctx.current = props.ctx;
   const commitRef = useRef(props.onCommit);
   commitRef.current = props.onCommit;
+  const changeRef = useRef(props.onChange);
+  changeRef.current = props.onChange;
+  const expandRef = useRef(props.onExpand);
+  expandRef.current = props.onExpand;
+  const submitRef = useRef(props.onSubmit);
+  submitRef.current = props.onSubmit;
+  const large = props.large ?? false;
   const committed = useRef(props.value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -259,7 +277,24 @@ export function ExpressionInput(props: ExpressionInputProps) {
           history(),
           keymap.of([
             ...completionKeymap,
-            ...(props.multiline
+            {
+              key: "Mod-Enter",
+              run: () => {
+                if (!submitRef.current) return false;
+                submitRef.current();
+                return true;
+              },
+            },
+            {
+              key: "Mod-Shift-e",
+              run: () => {
+                if (!expandRef.current) return false;
+                commit();
+                expandRef.current(view.current?.state.doc.toString() ?? committed.current);
+                return true;
+              },
+            },
+            ...(props.multiline || large
               ? []
               : [
                   {
@@ -275,6 +310,7 @@ export function ExpressionInput(props: ExpressionInputProps) {
             ...defaultKeymap,
           ]),
           props.multiline ? [] : singleLine,
+          large ? lineNumbersExt() : [],
           EditorView.lineWrapping,
           autoClose,
           highlight,
@@ -287,6 +323,8 @@ export function ExpressionInput(props: ExpressionInputProps) {
             spellcheck: "false",
           }),
           EditorView.updateListener.of((u) => {
+            if (u.docChanged) changeRef.current?.(u.state.doc.toString());
+            if (large) return;
             if (u.docChanged && u.transactions.some((t) => t.isUserEvent("input") || t.isUserEvent("delete") || t.isUserEvent("undo") || t.isUserEvent("redo"))) {
               clearTimeout(timer.current ?? undefined);
               timer.current = setTimeout(commit, applyDelay);
@@ -297,21 +335,27 @@ export function ExpressionInput(props: ExpressionInputProps) {
           EditorView.domEventHandlers({
             blur: (_, view) => {
               closeCompletion(view);
-              commit();
+              if (!large) commit();
             },
           }),
         ],
       }),
     });
     view.current = v;
+    if (props.viewRef) props.viewRef.current = v;
+    if (large) {
+      v.focus();
+      v.dispatch({ selection: { anchor: v.state.doc.length } });
+    }
     return () => {
+      if (props.viewRef) props.viewRef.current = null;
       // A change still waiting for the pause is applied when the field goes away.
-      if (timer.current) commit();
+      if (timer.current && !large) commit();
       v.destroy();
       view.current = null;
     };
     // The editor is created once; value, problems and context follow in the effects below.
-  }, [props.multiline]);
+  }, [props.multiline, large]);
 
   // Changes from outside (e.g. after undo or a reload) replace the text unless it is being edited.
   useEffect(() => {
@@ -326,11 +370,29 @@ export function ExpressionInput(props: ExpressionInputProps) {
   }, [props.problems]);
 
   return (
-    <div
-      ref={host}
-      data-testid={props.testId}
-      data-invalid={props.invalid || undefined}
-      className={"runnel-expr" + (props.multiline ? " runnel-expr-area" : "")}
-    />
+    <div className="relative" data-testid={props.testId}>
+      <div
+        ref={host}
+        data-invalid={props.invalid || undefined}
+        className={"runnel-expr" + (props.multiline ? " runnel-expr-area" : "") + (large ? " runnel-expr-large" : "") + (props.onExpand ? " runnel-expr-expandable" : "")}
+      />
+      {props.onExpand && (
+        <button
+          type="button"
+          title="Open the larger editor (Ctrl+Shift+E)"
+          aria-label="Open the larger editor"
+          // Keeps the focus (and the text being typed) in the field until the click.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            const text = view.current?.state.doc.toString() ?? props.value;
+            view.current?.contentDOM.blur();
+            props.onExpand?.(text);
+          }}
+          className="absolute top-1 right-1 grid size-[22px] cursor-pointer place-items-center rounded-sm border-0 bg-transparent text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          ⤢
+        </button>
+      )}
+    </div>
   );
 }

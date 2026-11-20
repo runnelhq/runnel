@@ -156,3 +156,66 @@ test("writes a link condition as an expression", async ({ page }) => {
   await link.getByRole("group", { name: "Condition" }).getByRole("button", { name: "✔ Success" }).click();
   await expect.poll(() => yaml(page)).toContain("  - { from: check, to: many }\n");
 });
+
+test("edits a field in the larger editor with the reference", async ({ page }) => {
+  await open(page);
+  await selectCheck(page);
+  const field = panel(page).locator('[data-field="with.message"]');
+  await field.getByRole("button", { name: "Open the larger editor" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit Message" });
+  await expect(dialog).toContainText("check · with.message");
+  const editor = dialog.getByTestId("expression-dialog-editor").getByRole("textbox");
+  await expect(editor).toHaveText("Checking ${TARGET}");
+  await expect(editor).toBeFocused();
+  await expect(dialog.locator(".cm-lineNumbers")).toContainText("1");
+  await expect(dialog.getByTestId("expression-dialog-status")).toHaveText("✔ No problems · result is text");
+
+  // The reference lists the parameters and the functions; the search narrows it down.
+  const ref = dialog.getByRole("list", { name: "Reference" });
+  await expect(ref).toContainText("params.ORDERS");
+  await expect(ref).toContainText("formatDate(date, pattern)");
+  await dialog.getByRole("textbox", { name: "Search names and functions" }).fill("pad");
+  await expect(ref.getByRole("listitem")).toHaveCount(2);
+
+  // A click inserts at the cursor; outside of an expression with {{ … }} around it.
+  await editor.click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" ");
+  await ref.getByRole("listitem", { name: /padLeft/ }).click();
+  await expect(editor).toHaveText("Checking ${TARGET} {{ padLeft( }}");
+  await page.keyboard.type("params.ORDERS, 3, '0')");
+  await expect(dialog.getByTestId("expression-dialog-status")).toHaveText("Checked when applied · result is text");
+
+  // Ctrl+S is kept from the page behind the dialog; the dialog and its text stay.
+  await page.keyboard.press("Control+s");
+  await expect(dialog).toBeVisible();
+  await expect(editor).toHaveText("Checking ${TARGET} {{ padLeft(params.ORDERS, 3, '0') }}");
+
+  // Ctrl+Enter applies, the field and the file follow.
+  await page.keyboard.press("Control+Enter");
+  await expect(dialog).toHaveCount(0);
+  await expect(field.getByRole("textbox")).toHaveText("Checking ${TARGET} {{ padLeft(params.ORDERS, 3, '0') }}");
+  await expect.poll(() => yaml(page)).toContain("      message: Checking ${TARGET} {{ padLeft(params.ORDERS, 3, '0') }}\n");
+
+  // Ctrl+Shift+E opens it from the field; Escape leaves the field unchanged.
+  await selectCheck2(page);
+  await field.getByRole("textbox").click();
+  await page.keyboard.press("Control+Shift+E");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type(" changed {{");
+  // The first Escape closes the suggestions, the second the dialog.
+  await expect(suggestions(page)).toBeVisible();
+  await page.waitForTimeout(100); // CodeMirror's interactionDelay, see above
+  await page.keyboard.press("Escape");
+  await expect(suggestions(page)).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(field.getByRole("textbox")).toHaveText("Checking ${TARGET} {{ padLeft(params.ORDERS, 3, '0') }}");
+});
+
+async function selectCheck2(page: Page) {
+  await page.getByTestId("node-check").click();
+  await expect(message(page)).toContainText("padLeft");
+}

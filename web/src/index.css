@@ -296,3 +296,19 @@
 .rx-hover-text {
   color: var(--muted-foreground);
 }
+.runnel-expr-expandable .cm-line {
+  padding-right: 28px;
+}
+.runnel-expr-large .cm-editor {
+  height: 100%;
+  font-size: var(--rn-text-sm);
+}
+.runnel-expr-large .cm-scroller {
+  line-height: 1.7;
+}
+.runnel-expr-large .cm-gutters {
+  background: var(--muted);
+  color: var(--code-gutter);
+  border-right: 1px solid var(--border);
+  border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md);
+}

@@ -12,7 +12,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e6b-create.html`](e6b-create.html) | E6b – Knoten und Links anlegen | `palette`, `rename`, `connect`, `linkmenu` | freigegeben mit PR #30, umgesetzt mit E6b |
 | [`e7-properties.html`](e7-properties.html) | E7 – Eigenschaften und Meldungen | `action`, `wait`, `link`, `workflow`, `problems` | freigegeben mit PR #32, umgesetzt mit E7a (`action`, `wait`) und E7b |
 | [`e8-run.html`](e8-run.html) | E8 – Ausführen im Editor | `run`, `running`, `done`, `cancelled`, `unsaved` | freigegeben mit PR #35, umgesetzt mit E8a (Run, Live-Status, Rückfrage) und E8b (Log, Ergebnis im Panel, „wartet“) |
-| [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | freigegeben mit PR #43, umgesetzt mit S35a (alle Zustände außer `expanded`); `expanded` folgt mit S35b |
+| [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | freigegeben mit PR #43, umgesetzt mit S35a (Editor im Panel, Link-Bedingung) und S35b (`expanded`) |
 
 ## Entscheidungen
 
@@ -55,6 +55,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | S35 | Vorschau mit Werten des letzten Laufs und Vorschläge für die Felder von `output` später |
 | S35 | Umsetzung in zwei Schritten: S35a Editor im Panel und Link-Bedingung, S35b größerer Editor mit Referenz |
 | S35 | Die Signaturhilfe erscheint über der Zeile (statt links neben dem Panel), damit die Vorschläge darunter sichtbar bleiben |
+| S35 | Größerer Editor: Die Zeile unten zeigt die Meldungen des Felds beim Öffnen; geänderter Text wird erst nach Apply geprüft („Checked when applied“), statt bei jeder Eingabe den ganzen Workflow zu prüfen |
 
 ## Screenshots erzeugen
 
