@@ -46,10 +46,18 @@ func newTriggersCommand() *cobra.Command {
 				for _, t := range list {
 					info := triggers.InfoOf(t, time.Time{}, nil)
 					next := "disabled"
-					if t.IsEnabled() {
+					switch {
+					case !t.IsEnabled():
+					case t.Type == model.TriggerFile:
+						next = "on new files"
+					default:
 						next = t.Next(now).Format("2006-01-02 15:04 MST")
 					}
-					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s (%s)\t%s\t%s\n", t.Name, t.Type, info.Schedule, info.Timezone, t.Target, next)
+					schedule := info.Schedule
+					if info.Timezone != "" {
+						schedule += " (" + info.Timezone + ")"
+					}
+					_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", t.Name, t.Type, schedule, t.Target, next)
 				}
 				_ = tw.Flush()
 			}

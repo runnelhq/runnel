@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -191,8 +192,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 // startTrigger starts a run of a trigger's target (the saved file), with its
-// environment and parameters (S37).
-func (s *Server) startTrigger(t *model.Trigger) (string, error) {
+// environment and parameters (S37); extra are set by the trigger itself, e.g. the
+// path of a new file (S38).
+func (s *Server) startTrigger(t *model.Trigger, extra map[string]string) (string, error) {
 	name := t.Target
 	data, err := s.readFile(name)
 	if err != nil {
@@ -200,6 +202,10 @@ func (s *Server) startTrigger(t *model.Trigger) (string, error) {
 	}
 	trigger := t.Type + ":" + t.Name
 	params := runs.TriggerParams(t)
+	if len(extra) > 0 && params == nil {
+		params = map[string]string{}
+	}
+	maps.Copy(params, extra)
 	var run runs.Run
 	if fileKind(name) == "pipeline" {
 		run, _, err = s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,

@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/model"
@@ -48,7 +50,43 @@ func CheckTrigger(t *model.Trigger, p *model.Project, projectDir string) model.E
 		}
 		params = w.Parameters
 	}
-	return append(errs, checkGivenParams(t.ErrorAt, "$", "", params, what, t.Params)...)
+	given := t.Params
+	if t.Type == model.TriggerFile {
+		errs = append(errs, checkFileParam(t, params, what)...)
+		if slices.ContainsFunc(params, func(p model.Parameter) bool { return p.Name == t.With.Param }) {
+			given = maps.Clone(t.Params)
+			if given == nil {
+				given = map[string]any{}
+			}
+			given[t.With.Param] = nil // set at start; not a fixed value to check
+		}
+	}
+	return append(errs, checkGivenParams(t.ErrorAt, "$", "", params, what, given)...)
+}
+
+// checkFileParam checks the parameter that receives the path (mode each, type string)
+// or the paths as a JSON list (mode batch, type json) of a file trigger.
+func checkFileParam(t *model.Trigger, params []model.Parameter, what string) model.Errors {
+	name := t.With.Param
+	if _, ok := t.Params[name]; ok {
+		return model.Errors{t.ErrorAt("$.params."+name, "parameter %s is set by the file trigger (with.param); remove it from params", name)}
+	}
+	i := slices.IndexFunc(params, func(p model.Parameter) bool { return p.Name == name })
+	if i < 0 {
+		return model.Errors{t.ErrorAt("$.with.param", "parameter %s is not declared by %s (declared: %s)", name, what, declaredOf(params))}
+	}
+	want := model.TypeString
+	if t.FileMode() == model.FileBatch {
+		want = model.TypeJSON
+	}
+	if got := params[i].Type.OrString(); got != want {
+		return model.Errors{t.ErrorAt("$.with.param", "parameter %s of %s has type %s; with mode: %s it gets %s, so it must have type %s",
+			name, what, got, t.FileMode(), map[string]string{model.FileEach: "the path of a file", model.FileBatch: "a JSON list of paths"}[t.FileMode()], want)}
+	}
+	if len(params[i].Enum) > 0 {
+		return model.Errors{t.ErrorAt("$.with.param", "parameter %s of %s allows only some values (enum); a file path cannot be one of them", name, what)}
+	}
+	return nil
 }
 
 // TriggerParams returns the parameters of a trigger as text, as given at start.

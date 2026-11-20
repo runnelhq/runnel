@@ -1,0 +1,20 @@
+# Reports a new order file; started by triggers/orders.yaml while
+# "runnel serve examples/files" runs (roadmap S38). On its own:
+#   runnel run -v --param FILE=examples/files/inbox/orders-1.csv examples/files/workflows/arrived.workflow.yaml
+# FILE is the path of the file; the trigger sets it (with.param).
+kind: Workflow
+apiVersion: runnel/v1
+name: arrived
+parameters:
+  - name: FILE
+    description: Path of the new file
+    required: true
+actions:
+  - id: start
+    type: core.start
+  - id: report
+    type: core.log
+    with:
+      message: New order file ${FILE}
+links:
+  - { from: start, to: report }

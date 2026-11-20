@@ -1,6 +1,6 @@
-// Package triggers starts the runs of the triggers of a project at their times
-// (roadmap S37): it reads the trigger files, works out the next time of each and starts
-// the target when it is due.
+// Package triggers starts the runs of the triggers of a project: at the times of a
+// cron schedule (roadmap S37), at a fixed interval and for new files in a folder (S38).
+// It reads the trigger files, works out when each is due and starts the target.
 package triggers
 
 import (
@@ -25,8 +25,9 @@ var PollInterval = 5 * time.Second
 type Options struct {
 	// Dir is the project directory.
 	Dir string
-	// Start starts a run of the trigger's target and returns its id.
-	Start func(t *model.Trigger) (string, error)
+	// Start starts a run of the trigger's target and returns its id. params are set in
+	// addition to those of the trigger (the path of a file for file triggers).
+	Start func(t *model.Trigger, params map[string]string) (string, error)
 	// Running reports whether a run is still running (for overlap: skip).
 	Running func(runID string) bool
 	// Log receives messages for the server log, e.g. started and skipped runs.
@@ -51,12 +52,15 @@ type entry struct {
 	next   time.Time
 	last   *Fired
 	active []string // runs started by the trigger that may still run
+	files  *watch   // file triggers
 }
 
 // Fired is what happened at the last due time of a trigger.
 type Fired struct {
 	Time  time.Time `json:"time"`
 	RunID string    `json:"runId,omitempty"`
+	// Files are the files the run was started for (file triggers).
+	Files []string `json:"files,omitempty"`
 	// Skipped is set when the previous run was still running (overlap: skip).
 	Skipped bool   `json:"skipped,omitempty"`
 	Error   string `json:"error,omitempty"`
@@ -64,10 +68,12 @@ type Fired struct {
 
 // Info describes a trigger for the API and the command line.
 type Info struct {
-	Name     string    `json:"name"`
-	File     string    `json:"file"`
-	Type     string    `json:"type"`
-	Target   string    `json:"target"`
+	Name   string `json:"name"`
+	File   string `json:"file"`
+	Type   string `json:"type"`
+	Target string `json:"target"`
+	// Schedule tells when the trigger starts runs: the cron expression, "every 15m" or
+	// "new *.csv in inbox".
 	Schedule string    `json:"schedule,omitempty"`
 	Timezone string    `json:"timezone,omitempty"`
 	Enabled  bool      `json:"enabled"`
@@ -87,8 +93,10 @@ func New(opts Options) *Scheduler {
 }
 
 // Reload reads the trigger files and the project again. Triggers with problems are not
-// active; their problems are returned by Problems and logged. Unchanged triggers keep
-// their state; all due times are worked out anew from now.
+// active; their problems are returned by Problems and logged. Triggers keep their last
+// result and running runs; cron times are worked out anew from now, an unchanged
+// interval keeps its next time and a file trigger watching the same files keeps the
+// files it has processed.
 func (s *Scheduler) Reload() {
 	sig := s.signature()
 	triggers, problems := Load(s.opts.Dir)
@@ -103,11 +111,21 @@ func (s *Scheduler) Reload() {
 	s.entries = nil
 	for _, t := range triggers {
 		e := &entry{t: t}
-		if prev := old[t.Name]; prev != nil {
+		prev := old[t.Name]
+		if prev != nil {
 			e.last, e.active = prev.last, prev.active
 		}
 		if t.IsEnabled() {
-			e.next = t.Next(now)
+			switch {
+			case t.Type == model.TriggerFile && prev != nil && prev.files != nil && sameWatch(prev.t, t):
+				e.files, e.next = prev.files, prev.next
+			case t.Type == model.TriggerFile:
+				e.files, e.next = newWatch(t, s.opts.Dir), now
+			case t.Type == model.TriggerInterval && prev != nil && !prev.next.IsZero() && prev.t.Type == t.Type && prev.t.EveryValue() == t.EveryValue():
+				e.next = prev.next
+			default:
+				e.next = t.Next(now) // an interval runs first after one interval
+			}
 		}
 		s.entries = append(s.entries, e)
 	}
@@ -193,29 +211,71 @@ func (s *Scheduler) Tick(now time.Time) time.Time {
 func (s *Scheduler) fire(e *entry, now time.Time) {
 	t := e.t
 	s.mu.Lock()
-	e.next = t.Next(now) // a time missed while sleeping counts once
+	if t.Type == model.TriggerFile {
+		e.next = now.Add(t.PollInterval())
+	} else {
+		e.next = t.Next(now) // a time missed while sleeping counts once
+	}
+	s.mu.Unlock()
+	if t.Type == model.TriggerFile {
+		s.checkFolder(e, now)
+		return
+	}
+	s.start(e, now, nil, nil)
+}
+
+// start starts a run of the trigger unless overlap: skip prevents it and reports
+// whether it was started. params are set in addition to those of the trigger; files
+// are the files the run is for (file triggers). A file trigger logs a skip or an
+// error only once while it repeats at each check.
+func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, files []string) bool {
+	t := e.t
+	s.mu.Lock()
 	e.active = slices.DeleteFunc(e.active, func(id string) bool { return !s.opts.Running(id) })
 	busy := len(e.active) > 0 && t.OverlapMode() == model.OverlapSkip
+	var running string
+	if busy {
+		running = e.active[0]
+	}
+	repeat := func(f *Fired) bool {
+		return t.Type == model.TriggerFile && f.RunID == "" && e.last != nil && e.last.RunID == "" &&
+			e.last.Skipped == f.Skipped && e.last.Error == f.Error
+	}
 	s.mu.Unlock()
 
 	f := &Fired{Time: now}
+	what := t.Target
+	switch len(files) {
+	case 0:
+	case 1:
+		what += " for " + filepath.Base(files[0])
+	default:
+		what += fmt.Sprintf(" for %d files", len(files))
+	}
+	f.Files = files
+	var msg string
 	if busy {
 		f.Skipped = true
-		s.opts.Log(fmt.Sprintf("trigger %q: skipped, the previous run %s is still running (overlap: skip)", t.Name, e.active[0]))
-	} else if id, err := s.opts.Start(t); err != nil {
+		msg = fmt.Sprintf("trigger %q: skipped, the previous run %s is still running (overlap: skip)", t.Name, running)
+	} else if id, err := s.opts.Start(t, params); err != nil {
 		f.Error = err.Error()
-		s.opts.Log(fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, t.Target, err))
+		msg = fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, what, err)
 	} else {
 		f.RunID = id
-		s.opts.Log(fmt.Sprintf("trigger %q: started %s, run %s", t.Name, t.Target, id))
+		msg = fmt.Sprintf("trigger %q: started %s, run %s", t.Name, what, id)
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	quiet := repeat(f)
 	e.last = f
 	if f.RunID != "" {
 		e.active = append(e.active, f.RunID)
 	}
+	s.mu.Unlock()
+	if !quiet {
+		s.opts.Log(msg)
+	}
+	return f.RunID != ""
 }
 
 // Run reloads the triggers and starts their runs until ctx is done. Changed trigger
@@ -295,6 +355,10 @@ func InfoOf(t *model.Trigger, next time.Time, last *Fired) Info {
 	if tz == "" && t.Type == model.TriggerCron {
 		tz = "Local"
 	}
-	return Info{Name: t.Name, File: filepath.ToSlash(t.File()), Type: t.Type, Target: t.Target, Schedule: t.With.Schedule,
+	schedule := t.With.Schedule
+	if t.Type != model.TriggerCron {
+		schedule = t.Describe()
+	}
+	return Info{Name: t.Name, File: filepath.ToSlash(t.File()), Type: t.Type, Target: t.Target, Schedule: schedule,
 		Timezone: tz, Enabled: t.IsEnabled(), Next: next, Last: last}
 }

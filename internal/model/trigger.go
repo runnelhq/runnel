@@ -21,8 +21,8 @@ const KindTrigger = "Trigger"
 // TriggersDir is the folder of the trigger files in a project.
 const TriggersDir = "triggers"
 
-// Trigger types (KONZEPT, chapter 2.7). Only cron is supported yet (roadmap S37);
-// file and interval follow with S38, http with S38a (ADR 0018).
+// Trigger types (KONZEPT, chapter 2.7): cron (roadmap S37), file and interval (S38);
+// http follows with S38a (ADR 0018).
 const (
 	TriggerCron     = "cron"
 	TriggerFile     = "file"
@@ -39,6 +39,28 @@ const (
 	// OverlapQueue would start the run after the previous one; it needs the run queue
 	// (backlog) and is not supported yet.
 	OverlapQueue = "queue"
+)
+
+// Modes of a file trigger.
+const (
+	// FileEach starts one run per new file (the default).
+	FileEach = "each"
+	// FileBatch starts one run for all new files of a check.
+	FileBatch = "batch"
+)
+
+// Handling of the files already in the folder when the server starts (file triggers).
+const (
+	// ExistingProcess treats them as new (the default).
+	ExistingProcess = "process"
+	// ExistingIgnore only starts runs for files that appear or change later.
+	ExistingIgnore = "ignore"
+)
+
+// Defaults and limits of file and interval triggers.
+const (
+	DefaultFileInterval = 10 * time.Second
+	MinTriggerInterval  = time.Second
 )
 
 // Trigger is the content of a file in triggers/: it starts a workflow or a pipeline
@@ -76,6 +98,63 @@ type TriggerSettings struct {
 	// Overlap decides what happens while the previous run of the trigger still runs:
 	// skip (default) or allow.
 	Overlap string `yaml:"overlap,omitempty" json:"overlap,omitempty"`
+
+	// Every is the time between two runs (interval), e.g. 15m.
+	Every Duration `yaml:"every,omitempty" json:"every,omitempty"`
+
+	// Path is the folder to watch (file), relative to the project or absolute (also UNC).
+	Path string `yaml:"path,omitempty" json:"path,omitempty"`
+	// Pattern selects files by name, e.g. "*.csv" (file; default "*"); case is ignored.
+	Pattern string `yaml:"pattern,omitempty" json:"pattern,omitempty"`
+	// Interval is the time between two looks into the folder (file; default 10s).
+	Interval Duration `yaml:"interval,omitempty" json:"interval,omitempty"`
+	// Param is the parameter of the target that receives the path of the file (each) or
+	// the paths of the files as a JSON list (batch).
+	Param string `yaml:"param,omitempty" json:"param,omitempty"`
+	// Mode is each (one run per file, default) or batch (one run for all new files).
+	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	// Existing is process (default) or ignore: files already there when the server starts.
+	Existing string `yaml:"existing,omitempty" json:"existing,omitempty"`
+}
+
+// EveryValue returns the time between two runs of an interval trigger.
+func (t *Trigger) EveryValue() time.Duration {
+	d, _ := t.With.Every.Value()
+	return d
+}
+
+// PollInterval returns the time between two looks into the folder of a file trigger.
+func (t *Trigger) PollInterval() time.Duration {
+	d, _ := t.With.Interval.Value()
+	if d == 0 {
+		return DefaultFileInterval
+	}
+	return d
+}
+
+// FileMode returns each or batch.
+func (t *Trigger) FileMode() string {
+	if t.With.Mode == "" {
+		return FileEach
+	}
+	return t.With.Mode
+}
+
+// FilePattern returns the pattern of a file trigger, * if not given.
+func (t *Trigger) FilePattern() string {
+	if t.With.Pattern == "" {
+		return "*"
+	}
+	return t.With.Pattern
+}
+
+// Folder returns the folder of a file trigger: absolute, or relative to projectDir.
+func (t *Trigger) Folder(projectDir string) string {
+	p := filepath.FromSlash(t.With.Path)
+	if filepath.IsAbs(p) || strings.HasPrefix(t.With.Path, `\\`) {
+		return p
+	}
+	return filepath.Join(projectDir, p)
 }
 
 // IsEnabled reports whether the trigger starts runs.
@@ -92,10 +171,15 @@ func (t *Trigger) OverlapMode() string {
 // File returns the name of the trigger file as given to ParseTrigger.
 func (t *Trigger) File() string { return t.src.name }
 
-// Next returns the first time of the schedule after the given one (cron), in the
-// time zone of the trigger; zero if the trigger has no valid schedule.
+// Next returns the first time of the schedule after the given one: the next time of
+// the cron schedule in the time zone of the trigger, or one interval later (interval).
+// It is zero for file triggers (they start runs when files arrive) and for triggers
+// without a valid schedule.
 func (t *Trigger) Next(after time.Time) time.Time {
-	if t.schedule == nil {
+	switch {
+	case t.Type == TriggerInterval && t.EveryValue() > 0:
+		return after.Add(t.EveryValue())
+	case t.schedule == nil:
 		return time.Time{}
 	}
 	return t.schedule.Next(after.In(t.location))
@@ -143,15 +227,13 @@ func (t *Trigger) validate() error {
 		errs = append(errs, s.errorf("$.name", "invalid trigger name %q (letters, digits, - and _, starting with a letter)", t.Name))
 	}
 	switch t.Type {
-	case TriggerCron:
+	case TriggerCron, TriggerFile, TriggerInterval:
 	case "":
-		errs = append(errs, s.errorf("$", `missing required field "type" (expected cron)`))
-	case TriggerFile, TriggerInterval:
-		errs = append(errs, s.errorf("$.type", "trigger type %q is not supported yet (roadmap S38)", t.Type))
+		errs = append(errs, s.errorf("$", `missing required field "type" (expected cron, interval or file)`))
 	case TriggerHTTP:
 		errs = append(errs, s.errorf("$.type", "trigger type %q is not supported yet (roadmap S38a, ADR 0018)", t.Type))
 	default:
-		errs = append(errs, s.errorf("$.type", "unknown trigger type %q (expected cron)", t.Type))
+		errs = append(errs, s.errorf("$.type", "unknown trigger type %q (expected cron, interval or file)", t.Type))
 	}
 	switch {
 	case t.Target == "":
@@ -166,10 +248,103 @@ func (t *Trigger) validate() error {
 			errs = append(errs, s.errorf(keyPath("$.params", key), "parameter %s: expressions {{ … }} are not supported in triggers; use a fixed value or ${…}", key))
 		}
 	}
-	if t.Type == TriggerCron {
+	switch t.Type {
+	case TriggerCron:
 		errs = append(errs, t.checkCron()...)
+	case TriggerInterval:
+		errs = append(errs, t.checkInterval()...)
+	case TriggerFile:
+		errs = append(errs, t.checkFile()...)
+	}
+	if t.Type == TriggerCron || t.Type == TriggerInterval || t.Type == TriggerFile {
+		errs = append(errs, t.checkOverlap()...)
+		errs = append(errs, t.unusedFields()...)
 	}
 	return errs.errOrNil()
+}
+
+// fieldsOf are the fields under with: each type uses.
+var fieldsOf = map[string][]string{
+	TriggerCron:     {"schedule", "timezone", "overlap"},
+	TriggerInterval: {"every", "overlap"},
+	TriggerFile:     {"path", "pattern", "interval", "param", "mode", "existing", "overlap"},
+}
+
+// unusedFields reports fields under with: that the type does not use, e.g. schedule in
+// an interval trigger, so that a mistake does not go unnoticed.
+func (t *Trigger) unusedFields() Errors {
+	set := map[string]bool{
+		"schedule": t.With.Schedule != "", "timezone": t.With.Timezone != "", "overlap": t.With.Overlap != "",
+		"every": t.With.Every != "", "path": t.With.Path != "", "pattern": t.With.Pattern != "",
+		"interval": t.With.Interval != "", "param": t.With.Param != "", "mode": t.With.Mode != "", "existing": t.With.Existing != "",
+	}
+	var errs Errors
+	for _, f := range sortedKeys(set) {
+		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
+			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))
+		}
+	}
+	return errs
+}
+
+func (t *Trigger) checkOverlap() Errors {
+	switch t.With.Overlap {
+	case "", OverlapSkip, OverlapAllow:
+		return nil
+	case OverlapQueue:
+		return Errors{t.src.errorf("$.with.overlap", "overlap: queue is not supported yet (the run queue is in the backlog); use skip or allow")}
+	}
+	return Errors{t.src.errorf("$.with.overlap", "invalid overlap %q (expected skip or allow)", t.With.Overlap)}
+}
+
+// checkDuration checks a duration of with: that must be at least MinTriggerInterval.
+func (t *Trigger) checkDuration(field string, d Duration, required bool) Errors {
+	if d == "" {
+		if required {
+			return Errors{t.src.errorf("$.with", "missing required field %q (e.g. 15m)", field)}
+		}
+		return nil
+	}
+	v, err := d.Value()
+	if err != nil {
+		return Errors{t.src.errorf("$.with."+field, "%s: %v", field, err)}
+	}
+	if v < MinTriggerInterval {
+		return Errors{t.src.errorf("$.with."+field, "%s must be at least %s", field, MinTriggerInterval)}
+	}
+	return nil
+}
+
+func (t *Trigger) checkInterval() Errors {
+	return t.checkDuration("every", t.With.Every, true)
+}
+
+func (t *Trigger) checkFile() Errors {
+	s, w := t.src, t.With
+	var errs Errors
+	if strings.TrimSpace(w.Path) == "" {
+		errs = append(errs, s.errorf("$.with", `missing required field "path" (the folder to watch, relative to the project or absolute)`))
+	}
+	if _, err := filepath.Match(strings.ToLower(t.FilePattern()), ""); err != nil {
+		errs = append(errs, s.errorf("$.with.pattern", "invalid pattern %q (e.g. *.csv or orders-*.txt)", w.Pattern))
+	} else if strings.ContainsAny(w.Pattern, `/\`) {
+		errs = append(errs, s.errorf("$.with.pattern", "pattern %q matches file names only; put the folder into path", w.Pattern))
+	}
+	errs = append(errs, t.checkDuration("interval", w.Interval, false)...)
+	if w.Param == "" {
+		errs = append(errs, s.errorf("$.with", `missing required field "param" (the parameter of the target that gets the path of the file)`))
+	}
+	switch w.Mode {
+	case "", FileEach, FileBatch:
+	default:
+		errs = append(errs, s.errorf("$.with.mode", "invalid mode %q (expected each or batch)", w.Mode))
+	}
+	switch w.Existing {
+	case "", ExistingProcess, ExistingIgnore:
+	default:
+		errs = append(errs, s.errorf("$.with.existing", "invalid existing %q (expected process or ignore)", w.Existing))
+	}
+	return errs
 }
 
 func (t *Trigger) checkCron() Errors {
@@ -198,13 +373,6 @@ func (t *Trigger) checkCron() Errors {
 		} else {
 			t.schedule = schedule
 		}
-	}
-	switch w.Overlap {
-	case "", OverlapSkip, OverlapAllow:
-	case OverlapQueue:
-		errs = append(errs, s.errorf("$.with.overlap", "overlap: queue is not supported yet (the run queue is in the backlog); use skip or allow"))
-	default:
-		errs = append(errs, s.errorf("$.with.overlap", "invalid overlap %q (expected skip or allow)", w.Overlap))
 	}
 	return errs
 }
@@ -256,7 +424,16 @@ func IsTriggerFile(rel string) bool {
 	return strings.HasPrefix(rel, TriggersDir+"/") && strings.HasSuffix(rel, ".yaml") && !strings.Contains(rel[len(TriggersDir)+1:], "/")
 }
 
-// String describes the schedule for messages, e.g. "0 2 * * 1-5 (Europe/Berlin)".
-func (t *Trigger) String() string {
-	return fmt.Sprintf("%s (%s)", t.With.Schedule, t.location)
+// Describe tells when a trigger starts runs, e.g. "0 2 * * 1-5 (Europe/Berlin)",
+// "every 15m" or "new *.csv in inbox".
+func (t *Trigger) Describe() string {
+	switch t.Type {
+	case TriggerCron:
+		return fmt.Sprintf("%s (%s)", t.With.Schedule, t.location)
+	case TriggerInterval:
+		return "every " + string(t.With.Every)
+	case TriggerFile:
+		return fmt.Sprintf("new %s in %s", t.FilePattern(), t.With.Path)
+	}
+	return t.Type
 }

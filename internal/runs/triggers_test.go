@@ -60,6 +60,52 @@ func TestCheckTrigger(t *testing.T) {
 	}
 }
 
+// The parameter of a file trigger is declared by the target, with type string for
+// mode each and json for mode batch; the trigger sets it, so params must not.
+func TestCheckFileTrigger(t *testing.T) {
+	dir := project(t, map[string]string{"workflows/target.workflow.yaml": `kind: Workflow
+apiVersion: runnel/v1
+name: target
+parameters:
+  - { name: FILE, required: true }
+  - { name: FILES, type: json }
+  - { name: KIND, enum: [a, b] }
+actions:
+  - { id: start, type: core.start }
+`})
+	p, err := model.LoadProject(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := func(with, params string) *model.Trigger {
+		t.Helper()
+		tr, err := model.ParseTrigger("triggers/f.yaml", []byte("kind: Trigger\napiVersion: runnel/v1\nname: f\ntype: file\ntarget: workflows/target.workflow.yaml\n"+params+"with:\n  path: in\n"+with))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tr
+	}
+	if errs := CheckTrigger(file("  param: FILE\n", ""), p, dir); len(errs) != 0 {
+		t.Errorf("each: %v", errs)
+	}
+	if errs := CheckTrigger(file("  param: FILES\n  mode: batch\n", "params: { FILE: x }\n"), p, dir); len(errs) != 0 {
+		t.Errorf("batch: %v", errs)
+	}
+	for _, c := range []struct{ with, params, want string }{
+		{"  param: NAME\n", "", "parameter NAME is not declared by workflow workflows/target.workflow.yaml (declared: FILE, FILES, KIND)"},
+		{"  param: FILES\n", "params: { FILE: x }\n", "parameter FILES of workflow workflows/target.workflow.yaml has type json; with mode: each it gets the path of a file, so it must have type string"},
+		{"  param: FILE\n  mode: batch\n", "", "it gets a JSON list of paths, so it must have type json"},
+		{"  param: FILE\n", "params: { FILE: x }\n", "parameter FILE is set by the file trigger (with.param); remove it from params"},
+		{"  param: KIND\n", "params: { FILE: x }\n", "allows only some values (enum)"},
+		{"  param: FILES\n  mode: batch\n", "", "missing required parameter FILE"},
+	} {
+		errs := CheckTrigger(file(c.with, c.params), p, dir)
+		if len(errs) == 0 || !strings.Contains(errs.Error(), c.want) {
+			t.Errorf("%q %q: got %v, want %q", c.with, c.params, errs, c.want)
+		}
+	}
+}
+
 // settings.maxConcurrentRuns of the workflow and of the project reject further starts
 // while their runs are running (S37); the queue is in the backlog.
 func TestStartLimits(t *testing.T) {
