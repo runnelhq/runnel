@@ -235,8 +235,17 @@ const ParameterDefaultsLayer = "workflow parameters"
 // parameter values passed at start (see docs/KONZEPT.md, chapter 2.5).
 // p, env and params may be nil.
 func Scope(w *Workflow, p *Project, env *Environment, params map[string]string) *vars.Scope {
+	return scopeFor(w.Parameters, p, env, params)
+}
+
+// PipelineScope is Scope for a pipeline.
+func PipelineScope(pl *Pipeline, p *Project, env *Environment, params map[string]string) *vars.Scope {
+	return scopeFor(pl.Parameters, p, env, params)
+}
+
+func scopeFor(parameters []Parameter, p *Project, env *Environment, params map[string]string) *vars.Scope {
 	defaults := map[string]string{}
-	for _, param := range w.Parameters {
+	for _, param := range parameters {
 		defaults[param.Name] = param.Default
 	}
 	layers := []vars.Layer{{Name: ParameterDefaultsLayer, Values: defaults}}

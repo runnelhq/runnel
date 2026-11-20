@@ -1,0 +1,160 @@
+// Package transform defines the interface between the pipeline engine and the
+// transforms it runs, and the registry of transform types. Transforms have a registry
+// of their own, separate from actions (ADR 0013): the same type name may exist as
+// action and as transform (e.g. core.log).
+package transform
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"slices"
+
+	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/record"
+	"github.com/runnelhq/runnel/internal/schema"
+)
+
+// Batch is a group of records passed over a link at once (KONZEPT, chapter 6.2);
+// transforms see batches only when reading, they emit single records.
+type Batch []record.Record
+
+// Transform is one configured step of a pipeline, ready to run. All transforms of a
+// pipeline run at the same time, each in its own goroutine (KONZEPT, chapter 6.2).
+type Transform interface {
+	// Process reads the batches of in until it is closed and passes records on with
+	// out.Emit. in is closed when all incoming links have ended; for a transform without
+	// incoming links it is closed from the start. An error stops the whole pipeline.
+	// ctx is cancelled when the pipeline is aborted; out.Emit then returns ctx.Err().
+	Process(ctx context.Context, in <-chan Batch, out *Output) error
+}
+
+// Output passes the records of a transform on and writes to the run log.
+type Output struct {
+	id   string
+	emit func(record.Record) error
+	log  func(slog.Level, string)
+}
+
+// NewOutput creates an Output; the engine creates one per transform, tests their own.
+func NewOutput(transformID string, emit func(record.Record) error, log func(slog.Level, string)) *Output {
+	return &Output{id: transformID, emit: emit, log: log}
+}
+
+// TransformID returns the id of the transform in the pipeline.
+func (o *Output) TransformID() string { return o.id }
+
+// Emit passes a record to all outgoing links. It blocks while the following
+// transforms are busy (backpressure) and returns an error when the pipeline is aborted.
+// The record must not be changed after Emit.
+func (o *Output) Emit(r record.Record) error { return o.emit(r) }
+
+// Logf writes a formatted message to the run log.
+func (o *Output) Logf(level slog.Level, format string, args ...any) {
+	if o.log != nil {
+		o.log(level, fmt.Sprintf(format, args...))
+	}
+}
+
+// Categories group transforms in the editor's palette, in this order (KONZEPT, chapter 12.2).
+const (
+	CategoryInput     = "input"
+	CategoryTransform = "transform"
+	CategoryFlow      = "flow"
+	CategoryExecution = "execution"
+	CategoryCombine   = "combine"
+	CategoryOutput    = "output"
+)
+
+// Categories lists all categories in palette order.
+var Categories = []string{CategoryInput, CategoryTransform, CategoryFlow, CategoryExecution, CategoryCombine, CategoryOutput}
+
+// Definition describes a transform type; like action.Definition (ADR 0014).
+type Definition struct {
+	// Type is the name used in pipeline files, e.g. "core.generate-rows".
+	Type string
+	// Category is one of Categories.
+	Category    string
+	Label       string
+	Description string
+	// Config is the configuration struct that New decodes "with" into; nil for none.
+	Config any
+	// New creates a transform from its "with" configuration (variables resolved).
+	New func(with map[string]any) (Transform, error)
+}
+
+// Descriptor describes a transform type for the editor, the API and tools (ADR 0014).
+type Descriptor struct {
+	Type        string         `json:"type"`
+	Kind        string         `json:"kind"` // always "transform"
+	Category    string         `json:"category"`
+	Label       string         `json:"label"`
+	Description string         `json:"description"`
+	Schema      *schema.Schema `json:"schema"`
+}
+
+// Registry holds the available transform types.
+type Registry struct {
+	defs        map[string]Definition
+	descriptors map[string]Descriptor
+}
+
+// NewRegistry creates an empty registry.
+func NewRegistry() *Registry {
+	return &Registry{defs: map[string]Definition{}, descriptors: map[string]Descriptor{}}
+}
+
+// Register adds a transform type. It panics on invalid type names, duplicates and
+// configuration structs without a valid schema, which are programming errors.
+func (r *Registry) Register(d Definition) {
+	if !model.ValidTypeName(d.Type) {
+		panic(fmt.Sprintf("invalid transform type name %q (expected \"<namespace>.<name>\")", d.Type))
+	}
+	if _, dup := r.defs[d.Type]; dup {
+		panic("transform type registered twice: " + d.Type)
+	}
+	if !slices.Contains(Categories, d.Category) {
+		panic(fmt.Sprintf("transform type %s: unknown category %q", d.Type, d.Category))
+	}
+	s, err := schema.For(d.Config)
+	if err != nil {
+		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
+	}
+	r.defs[d.Type] = d
+	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s}
+}
+
+// Lookup returns the definition of a transform type.
+func (r *Registry) Lookup(typ string) (Definition, bool) {
+	d, ok := r.defs[typ]
+	return d, ok
+}
+
+// Descriptor returns the descriptor of a transform type.
+func (r *Registry) Descriptor(typ string) (Descriptor, bool) {
+	d, ok := r.descriptors[typ]
+	return d, ok
+}
+
+// Descriptors returns the descriptors of all transform types, sorted by type.
+func (r *Registry) Descriptors() []Descriptor {
+	out := make([]Descriptor, 0, len(r.descriptors))
+	for _, typ := range r.Types() {
+		out = append(out, r.descriptors[typ])
+	}
+	return out
+}
+
+// Types returns all registered type names, sorted.
+func (r *Registry) Types() []string {
+	types := make([]string, 0, len(r.defs))
+	for t := range r.defs {
+		types = append(types, t)
+	}
+	slices.Sort(types)
+	return types
+}
+
+// DecodeConfig decodes a "with" configuration like action.DecodeConfig.
+func DecodeConfig(with map[string]any, v any) error { return action.DecodeConfig(with, v) }
