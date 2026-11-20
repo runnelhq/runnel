@@ -18,6 +18,8 @@ actions / files
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
   csv.input           CSV Input      Reads the rows of a CSV file as records
+transforms / transform
+  core.filter  Filter  Passes on the records for which a condition is true
 transforms / flow
   core.dummy  Dummy  Passes all records on unchanged
 transforms / output

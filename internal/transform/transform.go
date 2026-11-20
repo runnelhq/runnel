@@ -32,15 +32,26 @@ type Transform interface {
 
 // Output passes the records of a transform on and writes to the run log.
 type Output struct {
-	id   string
-	emit func(record.Record) error
-	log  func(slog.Level, string)
+	id     string
+	emit   func(record.Record) error
+	log    func(slog.Level, string)
+	values map[string]any
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
 func NewOutput(transformID string, emit func(record.Record) error, log func(slog.Level, string)) *Output {
 	return &Output{id: transformID, emit: emit, log: log}
 }
+
+// WithValues sets what expressions see besides the record: vars, params, env and run
+// (ADR 0006). The engine sets them once per run; they must not be changed.
+func (o *Output) WithValues(values map[string]any) *Output {
+	o.values = values
+	return o
+}
+
+// Values returns what expressions see besides the record; see WithValues.
+func (o *Output) Values() map[string]any { return o.values }
 
 // TransformID returns the id of the transform in the pipeline.
 func (o *Output) TransformID() string { return o.id }

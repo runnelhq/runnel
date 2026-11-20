@@ -34,6 +34,8 @@ type Options struct {
 	Registry *transform.Registry
 	// Scope resolves ${…} references in the configuration of the transforms.
 	Scope *vars.Scope
+	// Environment is the name of the selected environment, for run.environment in expressions.
+	Environment string
 	// Observer receives the events of the run; it is called by one goroutine at a time.
 	Observer func(Event)
 	// BatchSize is the number of records passed over a link at once.
@@ -153,6 +155,22 @@ func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
 	diags.Sort()
 	r.warnings = diags
 	return r, nil
+}
+
+// values returns what expressions see besides the record (ADR 0006): vars, params, env
+// and run. They are the same for all transforms and records of a run.
+func (r *Runner) values(runID string, started time.Time) map[string]any {
+	scope := r.opts.Scope
+	if scope == nil {
+		scope = model.PipelineScope(r.p, nil, nil, nil)
+	}
+	variables, params := model.ExprValues(scope, r.p.Parameters)
+	return map[string]any{
+		"vars":   variables,
+		"params": params,
+		"env":    model.Environ(),
+		"run":    map[string]any{"id": runID, "pipeline": r.p.Name, "environment": r.opts.Environment, "startedAt": started},
+	}
 }
 
 // Warnings returns the warnings found by Prepare, e.g. fields that are not known in an open schema.
@@ -322,6 +340,7 @@ func (r *Runner) Run(parent context.Context) Result {
 		runID = runid.New(started)
 	}
 	r.emit(Event{Time: started, Kind: RunStarted, RunID: runID, Message: r.p.Name})
+	values := r.values(runID, started)
 
 	ctx, cancel := context.WithCancelCause(parent)
 	defer cancel(nil)
@@ -406,7 +425,7 @@ func (r *Runner) Run(parent context.Context) Result {
 			log := func(level slog.Level, msg string) {
 				r.emit(Event{Time: now(), Kind: Log, RunID: runID, TransformID: t.ID, TransformType: t.Type, Level: level, Message: msg})
 			}
-			out := transform.NewOutput(t.ID, emitRecord, log)
+			out := transform.NewOutput(t.ID, emitRecord, log).WithValues(values)
 
 			err := process(ctx, r.transforms[i], in, out)
 			if err == nil && len(batch) > 0 {

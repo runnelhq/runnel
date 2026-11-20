@@ -142,6 +142,24 @@ when:      "{{ result.rows > 0 }}"
   Beschreibung liefert der Server (`GET /api/v1/expressions`). Für Skript-Editoren (JavaScript, PowerShell) wird die
   Bibliothek mit dem jeweiligen Schritt erneut geprüft.
 
+### Umsetzung (S16a): Ausdrücke je Datensatz
+
+- **Kontext `record`** für Ausdrücke, die je Datensatz ausgewertet werden (zuerst die Bedingung von `core.filter`),
+  zusammen mit `vars`, `params`, `env` und `run` (`id`, `pipeline`, `environment`, `startedAt`). Diese Werte stellt die
+  Pipeline-Engine einmal je Lauf bereit (`transform.Output.Values`). Felder vom Typ `date` sind in Ausdrücken Zeitpunkte
+  um Mitternacht (lokale Zeit), damit `today()`, `formatDate()` und Vergleiche funktionieren.
+- **Exakte Dezimalzahlen:** Statt `expr.Operator`, das nur bei zur Übersetzungszeit bekannten Typen greift, werden
+  Operatoren (`+ - * / %`, Vergleiche, `-x`) mit einem Patch des Syntaxbaums ersetzt, wenn ein Operand erst zur
+  Laufzeit einen Typ hat (Felder, Parameter). Ist ein Operand `decimal`, wird exakt gerechnet bzw. verglichen; Ganz- und
+  Gleitkommazahlen werden dazu umgewandelt, Text nicht (`decimal > string` ist ein Fehler). Sonst gilt das Verhalten
+  von expr-lang. Operatoren mit bekannten Typen (`1 + 2`) bleiben unverändert.
+- **Leere Werte (`null`)** wie in SQL: Rechnen mit `null` ergibt `null`, ein Größenvergleich (`< > <= >=`) mit `null` ist
+  `false`. Ein Filter `record.betrag > 0` lässt Datensätze ohne Betrag also weg, statt die Pipeline abzubrechen.
+  `== nil` und `!= nil` prüfen auf leere Werte. Das gilt auch in Workflows (vorher ein Fehler).
+- **Prüfung:** Die Bedingung wird beim Laden übersetzt; die verwendeten Felder (`record.betrag`) prüft die Engine gegen
+  das Schema (ADR 0007): fehlt ein Feld im geschlossenen Schema, ist das ein Fehler mit Vorschlag.
+- `decimal()`, `round()`, `formatNumber()` und `parseNumber()` folgen mit `core.calculate` bzw. bei Bedarf.
+
 ## Konsequenzen
 
 **Positiv**

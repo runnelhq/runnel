@@ -6,7 +6,7 @@
 | [`expressions/`](expressions/) | Ausdrücke `{{ … }}` (ADR 0006): Bedingungs-Links abhängig von einem Parameter und einer Projektvariable, Standardwert per Ausdruck (gestriges Datum), Outputs aus den Ergebnissen der Actions |
 | [`files/`](files/) | Datei-Actions (S09): Bestellungen aus `inbox/` (nur `*.csv`) in einen Archivordner je Tag kopieren, Dateiliste mit Größen auswerten, leeren Eingang über einen Fehler-Link melden |
 | [`sub-workflows/`](sub-workflows/) | Sub-Workflows (S11): `nightly` ruft `import-region` je Region mit eigenen Parametern auf und summiert dessen Outputs; zu viele Bestellungen lassen das Kind abbrechen, der Fehler-Link meldet es |
-| [`pipelines/`](pipelines/) | Pipelines: `numbers` (S13) erzeugt Datensätze, kopiert sie auf zwei Zweige, führt sie zusammen und schreibt jeden 250. ins Log; `orders` (S15) liest eine CSV-Datei im deutschen Format (`;`, `1.234,50`, `19.11.2026`) und schreibt sie mit Komma, ISO-Daten und Punkt als Dezimaltrennzeichen |
+| [`pipelines/`](pipelines/) | Pipelines: `numbers` (S13) erzeugt Datensätze, kopiert sie auf zwei Zweige, führt sie zusammen und schreibt jeden 250. ins Log; `orders` (S15, S16a) liest eine CSV-Datei im deutschen Format (`;`, `1.234,50`, `19.11.2026`), behält Bestellungen ab einem Mindestbetrag (`core.filter`) und schreibt sie mit Komma, ISO-Daten und Punkt als Dezimaltrennzeichen |
 | [`broken/`](broken/) | Absichtlich fehlerhafte Workflows und eine Pipeline (Tippfehler, Zyklus), um die Meldungen von `runnel validate` zu zeigen |
 
 ```bash
