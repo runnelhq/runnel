@@ -32,6 +32,9 @@ type ExecContext struct {
 	// RunWorkflow runs another workflow of the project (core.run-workflow) and returns
 	// its outputs; nil where the caller of the engine does not support it.
 	RunWorkflow func(ctx context.Context, path string, params map[string]string) (map[string]any, error)
+	// RunPipeline runs a pipeline of the project (core.run-pipeline) and returns its
+	// result (the counts of its transforms); nil where it is not supported.
+	RunPipeline func(ctx context.Context, path string, params map[string]string) (map[string]any, error)
 }
 
 // WorkflowCall is a call of another workflow from an action (core.run-workflow).
@@ -45,6 +48,10 @@ type WorkflowCall struct {
 
 // WorkflowRunner runs a called workflow and returns its outputs (see ExecContext.RunWorkflow).
 type WorkflowRunner func(ctx context.Context, call WorkflowCall) (map[string]any, error)
+
+// PipelineRunner runs a pipeline called by an action and returns its result (see
+// ExecContext.RunPipeline). The call is described like that of a workflow.
+type PipelineRunner func(ctx context.Context, call WorkflowCall) (map[string]any, error)
 
 // Logf writes a formatted message to the run log.
 func (ec *ExecContext) Logf(level slog.Level, format string, args ...any) {

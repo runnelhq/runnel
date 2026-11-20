@@ -19,6 +19,7 @@ import (
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/transforms"
 )
 
 // Exit codes of "runnel run".
@@ -104,6 +105,7 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 		Env:        opts.env,
 		Params:     params,
 		Registry:   actions.Builtin(),
+		Transforms: transforms.Builtin(),
 		Observer:   func(e workflow.Event) { logger.event(e) },
 	})
 	printDiags(errOut, p.Warnings)

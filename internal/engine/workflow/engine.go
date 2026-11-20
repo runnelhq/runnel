@@ -44,6 +44,8 @@ type Options struct {
 	Environment string
 	// Workflows runs workflows called by actions (core.run-workflow); nil if not supported.
 	Workflows action.WorkflowRunner
+	// Pipelines runs pipelines called by actions (core.run-pipeline); nil if not supported.
+	Pipelines action.PipelineRunner
 }
 
 // Status is the final state of a run.
@@ -302,6 +304,12 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 			return r.opts.Workflows(ctx, action.WorkflowCall{Path: path, Params: params, Log: ec.Log})
 		}
 	}
+	if r.opts.Pipelines != nil {
+		ec.RunPipeline = func(ctx context.Context, path string, params map[string]string) (map[string]any, error) {
+			return r.opts.Pipelines(ctx, action.WorkflowCall{Path: path, Params: params, Log: ec.Log})
+		}
+	}
+
 	res, err := act.Execute(ctx, ec)
 	if err != nil && errors.Is(context.Cause(ctx), errActionTimeout) {
 		err = fmt.Errorf("timed out after %s", timeout)

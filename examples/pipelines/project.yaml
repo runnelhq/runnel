@@ -1,6 +1,7 @@
-# Pipelines (roadmap S13). Run it with:
+# Pipelines (roadmap S13–S18). Run them with, for example:
 #   runnel run examples/pipelines/pipelines/numbers.pipeline.yaml
+#   runnel run -v examples/pipelines/workflows/import.workflow.yaml
 kind: Project
 apiVersion: runnel/v1
 name: pipelines
-description: First pipelines with the test transforms of the pipeline engine
+description: Pipelines with CSV files, filters, error links and a workflow that runs one

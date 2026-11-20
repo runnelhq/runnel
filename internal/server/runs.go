@@ -57,6 +57,7 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		Env:        req.Environment,
 		Params:     req.Params,
 		Registry:   s.registry,
+		Transforms: s.transforms,
 	})
 	var diags model.Errors
 	switch {

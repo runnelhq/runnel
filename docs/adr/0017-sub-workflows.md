@@ -39,3 +39,9 @@ ADR 0012 beschreibt einen Workflow dagegen über seine `parameters` und `outputs
   versteckten Abhängigkeiten.
 - Rekursion ist ausgeschlossen. Wird sie gebraucht (z. B. Ordnerbäume), folgt eine eigene Entscheidung.
 - `runConfig:` und `forEachRow` aus ADR 0008 folgen mit Phase 0.4 (S24).
+
+## Nachtrag 2026-11-20 (S18): Pipelines
+
+`core.run-pipeline` folgt denselben Regeln (nur Parameter, Pfade, Log mit Präfix `<pipeline>/<transform>: `, Prüfung
+fester Aufrufe vorab). Ergebnis sind statt `outputs` die Zähler der Transforms: `output.transforms.<id>.read`,
+`.written`, `.errors` und die Summe `output.errors`. Ein Selbstaufruf ist nicht möglich, weil Pipelines nichts aufrufen.

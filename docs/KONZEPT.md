@@ -914,6 +914,24 @@ Workflow des Projekts auf und wartet auf sein Ende.
 - Feste Aufrufe prüft schon `runnel validate` (Datei, Parameter, Typen, Selbstaufruf); Pfade mit `${…}`/`{{ … }}` erst
   beim Lauf. `runConfig:` und `forEachRow` folgen mit S24.
 
+**Pipelines aus Workflows (umgesetzt mit S18):** `core.run-pipeline` ruft eine Pipeline des Projekts auf, mit denselben
+Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, Log mit Präfix
+`customers/<transform>: …`, Prüfung fester Aufrufe vorab, Abbruch bricht die Pipeline ab).
+
+```yaml
+- id: prepare
+  type: core.run-pipeline
+  with:
+    pipeline: pipelines/customers.pipeline.yaml
+    params:
+      BATCH: ${BATCH}
+```
+
+- `result.output` sind die Zähler der Transforms: `output.transforms.<id>.read`, `.written`, `.errors`, dazu
+  `output.errors` (alle Datensätze auf Fehler-Links), z. B. `{{ results.prepare.output.transforms.write.written }}` oder
+  ein Link mit `when: "{{ results.prepare.output.errors > 0 }}"`.
+- Datensätze auf Fehler-Links lassen die Action nicht scheitern; eine Pipeline, die abbricht, schon.
+
 ### 12.2 Pipeline-Transforms
 
 | Kategorie | Transforms |
