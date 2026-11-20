@@ -97,6 +97,22 @@ geparste Modell mit `name`, `actions` (`id`, `type`, `join`, `with` …), `links
 auf; der Editor braucht so keinen eigenen YAML-Parser. Für Pipelines heißt das Feld `pipeline`: `name`, `transforms`
 (`id`, `type`, `with`, `copies`, `distribution`), `links` (`from`, `to`, `type`), `settings` und `layout` (je Transform-ID).
 
+Seit S25a2 enthält die Antwort für Pipelines außerdem `schemas`: die abgeleiteten Felder (ADR 0007) je Transform-ID –
+`input` (Felder der eingehenden Datensätze, zusammengeführt; fehlt bei Transforms ohne eingehende Links), `output`
+(Datensätze auf den Datenlinks) und `errors` (Datensätze auf den Fehlerlinks, mit `_error`, `_errorField`,
+`_errorTransform`). Ein Schema ist `{ "fields": [{ "name": "kdnr", "type": "int" }], "open": true }`; ohne `type` ist der
+Typ unbekannt, `open` heißt, dass weitere Felder erst beim Lauf bekannt sind. Ein Transform, der wegen eines Fehlers
+nicht angelegt werden kann, gilt als unbekannt (offenes Schema). `schemas` fehlt, solange Felder oder Graph der
+Pipeline Fehler haben (z. B. ein Link auf einen unbekannten Transform).
+
+```json
+"schemas": {
+  "read":  { "output": { "fields": [], "open": true }, "errors": { "fields": [], "open": true } },
+  "types": { "input": { "fields": [], "open": true }, "output": { "fields": [], "open": true },
+             "errors": { "fields": [{ "name": "_error", "type": "string" }, …], "open": true } }
+}
+```
+
 ## Läufe
 
 ```json

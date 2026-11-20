@@ -748,3 +748,45 @@ links:
 		t.Errorf("not strict: %v", diags)
 	}
 }
+
+// Schemas works despite errors: a transform that cannot be created counts as unknown.
+func TestSchemasDespiteErrors(t *testing.T) {
+	c := &collected{recs: map[string][]record.Record{}}
+	p := parse(t, `
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: conv, type: core.convert, with: { fields: [ { name: n, type: string } ] } }
+  - { id: bad, type: core.dummy, with: { nope: 1 } }
+  - { id: show, type: core.log }
+links:
+  - { from: gen, to: conv }
+  - { from: conv, to: bad }
+  - { from: conv, to: show, type: error }
+`)
+	if diags := Check(p, Options{Registry: testRegistry(c)}); !diags.HasErrors() {
+		t.Fatalf("expected an error for bad: %v", diags)
+	}
+	s := Schemas(p, Options{Registry: testRegistry(c)})
+	names := func(sc record.Schema) string {
+		var out []string
+		for _, f := range sc.Fields {
+			out = append(out, f.Name+":"+string(f.Type))
+		}
+		return strings.Join(out, ",") + fmt.Sprintf(" open=%v", sc.Open)
+	}
+	if s["gen"].Input != nil || names(s["gen"].Output) != "n:int open=false" {
+		t.Errorf("gen %+v", s["gen"])
+	}
+	if s["conv"].Input == nil || names(*s["conv"].Input) != "n:int open=false" || names(s["conv"].Output) != "n:string open=false" {
+		t.Errorf("conv %+v", s["conv"])
+	}
+	if got := names(s["conv"].Errors); got != "n:int,_error:string,_errorField:string,_errorTransform:string open=false" {
+		t.Errorf("conv errors %s", got)
+	}
+	if !s["bad"].Output.Open || len(s["bad"].Output.Fields) != 0 {
+		t.Errorf("bad %+v", s["bad"])
+	}
+	if s["show"].Input == nil || names(*s["show"].Input) != names(s["conv"].Errors) {
+		t.Errorf("show %+v", s["show"])
+	}
+}

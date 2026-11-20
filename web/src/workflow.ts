@@ -87,6 +87,41 @@ export interface Validation {
   problems: Problem[];
   workflow?: Workflow;
   pipeline?: Pipeline;
+  /** Pipelines: the fields around each transform, by id; missing while the file has errors in its fields or links. */
+  schemas?: Record<string, TransformSchemas>;
+}
+
+/** Fields of the records on a link (record.Schema, ADR 0007). */
+export interface RecordSchema {
+  fields: { name: string; type?: string }[] | null;
+  /** Further fields may occur, known only when the pipeline runs. */
+  open?: boolean;
+}
+
+/** The schemas around a transform (pipeline.TransformSchemas). */
+export interface TransformSchemas {
+  /** Merged schema of the incoming records; missing for a transform without incoming links. */
+  input?: RecordSchema;
+  /** Records on its data links. */
+  output: RecordSchema;
+  /** Records on its error links. */
+  errors: RecordSchema;
+}
+
+/**
+ * Names of fields a configuration refers to: as record.<name> in an expression, or as a
+ * value of its own (e.g. a name in a list of fields).
+ */
+export function usedFields(value: unknown, out = new Set<string>()): Set<string> {
+  if (typeof value === "string") {
+    out.add(value);
+    for (const m of value.matchAll(/\brecord\.([A-Za-z_]\w*)/g)) out.add(m[1]);
+  } else if (Array.isArray(value)) {
+    for (const v of value) usedFields(v, out);
+  } else if (value && typeof value === "object") {
+    for (const v of Object.values(value)) usedFields(v, out);
+  }
+  return out;
 }
 
 /**

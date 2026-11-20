@@ -637,6 +637,7 @@ export function FileView(props: {
       {showPanel && graph && (
         <PropertiesPanel
           workflow={graph}
+          schemas={validation?.schemas}
           selected={selection}
           problems={validation?.problems ?? []}
           focus={focusField}

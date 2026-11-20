@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { tileColor, useCatalog, type Schema } from "../catalog";
-import { idPattern, linkKind, stepsKey, type Action, type Problem, type Workflow } from "../workflow";
+import {
+  idPattern,
+  linkKind,
+  stepsKey,
+  usedFields,
+  type Action,
+  type Problem,
+  type RecordSchema,
+  type TransformSchemas,
+  type Workflow,
+} from "../workflow";
 import type { Selection } from "./Canvas";
 import { ActionIcon, ChevronIcon, CloseIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
@@ -28,6 +38,8 @@ export interface PropertiesProps {
   onDeleteLink: (index: number) => void;
   onRename: (from: string, to: string) => void;
   onHide: () => void;
+  /** Pipelines: the fields around each transform (/validate), missing while the file has errors in its fields or links. */
+  schemas?: Record<string, TransformSchemas>;
   /** The current or last run, to show the result of the selected action (mockup E8). */
   run?: RunView | null;
   onShowInLog?: (actionId: string) => void;
@@ -257,6 +269,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           execution
         )}
       </Section>
+      {pipeline && <IncomingFields workflow={workflow} action={action} schemas={props.schemas} />}
     </div>
   );
 }
@@ -1192,12 +1205,7 @@ function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
           />
         )}
       </Field>
-      {kind === "error" && (
-        <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
-          The record goes on unchanged, with the message in <code className="font-mono">_error</code>, the field in{" "}
-          <code className="font-mono">_errorField</code> and the id of the transform in <code className="font-mono">_errorTransform</code>.
-        </p>
-      )}
+      <LinkFields kind={kind} schemas={props.schemas?.[l.from]} known={props.schemas !== undefined} />
       <div className="px-4">
         <button
           type="button"
@@ -1209,6 +1217,88 @@ function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** Fields of the incoming records of a transform (mockup S25a, state "canvas"); fields used in its configuration are marked. */
+function IncomingFields(props: { workflow: Workflow; action: Action; schemas?: Record<string, TransformSchemas> }) {
+  const { workflow, action, schemas } = props;
+  const from = [...new Set((workflow.links ?? []).filter((l) => l.to === action.id).map((l) => l.from))];
+  if (from.length === 0) return null;
+  const input = schemas?.[action.id]?.input;
+  const used = usedFields(action.with);
+  return (
+    <Section title="Incoming fields" summary={input ? `from ${from.join(", ")}${input.open ? " · open" : ""}` : undefined}>
+      {input ? (
+        <>
+          <FieldList schema={input} used={used} />
+          <p className="mx-4 mt-0 mb-3 text-2xs text-muted-foreground">
+            {input.open
+              ? "Fields come from the transforms before. Not all of them are known before the pipeline runs, e.g. columns of a file read without fields:."
+              : "Fields come from the transforms before; fields used in the configuration are marked."}
+          </p>
+        </>
+      ) : (
+        <NoFields />
+      )}
+    </Section>
+  );
+}
+
+/** Fields of the records on a pipeline link (mockup S25a, state "link"). */
+function LinkFields(props: { kind: "data" | "error"; schemas?: TransformSchemas; known: boolean }) {
+  const schema = props.schemas ? (props.kind === "error" ? props.schemas.errors : props.schemas.output) : undefined;
+  return (
+    <Section title="Fields on this link" summary={schema ? (schema.open ? "open" : "closed") : undefined}>
+      {schema ? <FieldList schema={schema} meta={props.kind === "error"} /> : <NoFields />}
+      {props.kind === "error" && (
+        <p className="mx-4 mt-0 mb-3 text-2xs text-muted-foreground">
+          The record goes on unchanged, with the message in <code className="font-mono">_error</code>, the field in{" "}
+          <code className="font-mono">_errorField</code> and the id of the transform in <code className="font-mono">_errorTransform</code>.
+        </p>
+      )}
+    </Section>
+  );
+}
+
+function NoFields() {
+  return (
+    <p className="mx-4 mt-0 mb-3 text-2xs text-muted-foreground">The fields are shown once the transforms and links have no errors.</p>
+  );
+}
+
+/** Error fields added on error links, shown dimmed. */
+const errorFields = new Set(["_error", "_errorField", "_errorTransform"]);
+
+/** A list of fields with their types; an open schema ends with a note on further fields. */
+function FieldList(props: { schema: RecordSchema; used?: Set<string>; meta?: boolean }) {
+  const fields = props.schema.fields ?? [];
+  return (
+    <ul data-testid="fields" className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0 text-xs">
+      {fields.map((f) => {
+        const used = props.used?.has(f.name);
+        return (
+          <li
+            key={f.name}
+            data-used={used || undefined}
+            title={used ? "Used in the configuration" : undefined}
+            className={
+              "grid h-[26px] grid-cols-[1fr_auto] items-center gap-2 border-b border-border px-2.5 last:border-b-0" +
+              (used ? " bg-accent/60" : "")
+            }
+          >
+            <span className={"truncate font-mono" + (props.meta && errorFields.has(f.name) ? " text-muted-foreground" : "")}>{f.name}</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{f.type || "any"}</span>
+          </li>
+        );
+      })}
+      {props.schema.open && (
+        <li className="flex h-[26px] items-center px-2.5 text-muted-foreground italic">
+          {fields.length > 0 ? "and fields known only when the pipeline runs" : "fields known only when the pipeline runs"}
+        </li>
+      )}
+      {!props.schema.open && fields.length === 0 && <li className="flex h-[26px] items-center px-2.5 text-muted-foreground italic">no fields</li>}
+    </ul>
   );
 }
 

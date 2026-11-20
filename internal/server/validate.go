@@ -63,6 +63,9 @@ type validateResponse struct {
 	Workflow *model.Workflow `json:"workflow,omitempty"`
 	// Pipeline is the parsed pipeline (transforms, links, layout …), for pipeline files (S25a).
 	Pipeline *model.Pipeline `json:"pipeline,omitempty"`
+	// Schemas are the fields of the records around each transform of a pipeline, by
+	// transform id (S25a2); missing if the pipeline has errors in its fields or graph.
+	Schemas map[string]pipeline.TransformSchemas `json:"schemas,omitempty"`
 }
 
 // handleValidate checks a workflow like "runnel validate" does: fields, links, graph,
@@ -94,13 +97,13 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if kind == "pipeline" {
-		p, diags, err := s.validatePipeline(name, data)
+		p, schemas, diags, err := s.validatePipeline(name, data)
 		if err != nil {
 			writeErr(w, err)
 			return
 		}
 		res := s.response(diags)
-		res.Pipeline = p
+		res.Pipeline, res.Schemas = p, schemas
 		writeJSON(w, http.StatusOK, res)
 		return
 	}
@@ -116,22 +119,26 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 
 // validatePipeline checks a pipeline like "runnel validate": fields, graph and – as
 // before a run – the types, configurations and fields of its transforms (ADR 0007).
-// It returns the parsed pipeline (nil if it cannot be decoded) and all problems.
-func (s *Server) validatePipeline(name string, data []byte) (*model.Pipeline, model.Errors, error) {
+// It returns the parsed pipeline (nil if it cannot be decoded), the schemas of its
+// transforms (nil if its fields or graph have errors) and all problems.
+func (s *Server) validatePipeline(name string, data []byte) (*model.Pipeline, map[string]pipeline.TransformSchemas, model.Errors, error) {
 	p, err := model.ReadPipeline(name, data)
 	var diags model.Errors
 	if err != nil && !errors.As(err, &diags) {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if p == nil {
-		return nil, diags, nil
+		return nil, nil, diags, nil
 	}
 	diags = append(diags, p.Validate()...)
+	var schemas map[string]pipeline.TransformSchemas
 	if !diags.HasErrors() && s.transforms != nil {
-		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: s.transforms})...)
+		opts := pipeline.Options{Registry: s.transforms}
+		diags = append(diags, pipeline.Check(p, opts)...)
+		schemas = pipeline.Schemas(p, opts)
 	}
 	diags.Sort()
-	return p, diags, nil
+	return p, schemas, diags, nil
 }
 
 // validate returns the parsed workflow (nil if it cannot be parsed) and all problems.
