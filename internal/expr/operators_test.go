@@ -104,3 +104,29 @@ func TestFormatDecimal(t *testing.T) {
 		t.Errorf("Format = %q", got)
 	}
 }
+
+func TestRow(t *testing.T) {
+	for _, tt := range []struct {
+		src  string
+		row  any
+		want any
+	}{
+		{"{{ row * 10 }}", int64(2), 20},
+		{"{{ row.path }}", map[string]any{"path": "a.csv"}, "a.csv"},
+		{"{{ upper(row) }}", "abc", "ABC"},
+		{"{{ row == 'x' }}", "x", true},
+	} {
+		tpl, err := Compile(tt.src, RowRoots)
+		if err != nil {
+			t.Errorf("%s: %v", tt.src, err)
+			continue
+		}
+		got, err := tpl.Eval(map[string]any{"row": tt.row, "params": map[string]any{}, "vars": map[string]any{}, "env": map[string]any{}, "run": map[string]any{}, "result": nil, "results": map[string]any{}})
+		if err != nil || got != tt.want {
+			t.Errorf("%s = %#v %v, want %#v", tt.src, got, err, tt.want)
+		}
+	}
+	if _, err := Compile("{{ row }}", WorkflowRoots); err == nil {
+		t.Error("row without forEach accepted")
+	}
+}

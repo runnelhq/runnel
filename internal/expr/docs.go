@@ -30,7 +30,8 @@ var resultFields = []Doc{
 	{Name: "type", Type: "string", Description: "Type of the action, e.g. core.log"},
 }
 
-// Roots describes the names an expression in a workflow can use (WorkflowRoots).
+// Roots describes the names an expression in a workflow can use (RowRoots: WorkflowRoots
+// and row, which only actions with forEach may use).
 var Roots = []Doc{
 	{Name: "params", Type: "map", Description: "Parameters of the workflow, with their declared type", Example: "{{ params.ORDERS > 10 }}"},
 	{Name: "vars", Type: "map", Description: "All variables of the run as text: parameters, project, environment", Example: "{{ vars.THRESHOLD }}"},
@@ -44,6 +45,7 @@ var Roots = []Doc{
 	}, Example: "{{ run.lastError }}"},
 	{Name: "result", Type: "map", Description: "Result of the action the link starts from (in link conditions)", Fields: resultFields, Example: "{{ result.success }}"},
 	{Name: "results", Type: "map", Description: "Results of the actions that have run, by action id", Fields: resultFields, Example: "{{ results.load.status }}"},
+	{Name: "row", Type: "any", Description: "The current entry of forEach; only in actions with forEach", Example: "{{ row.path }}"},
 }
 
 // Functions describes the functions of expressions: the library of Runnel (ADR 0006)

@@ -111,7 +111,7 @@ func (r *Runner) template(text string) (*expr.Template, error) {
 	if t, ok := r.templates.Load(text); ok {
 		return t.(*expr.Template), nil
 	}
-	t, err := expr.Compile(text, expr.WorkflowRoots)
+	t, err := expr.Compile(text, expr.RowRoots) // row is checked when the file is read
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,7 @@ import (
 	exprlang "github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
 	"github.com/expr-lang/expr/parser"
+	"github.com/expr-lang/expr/types"
 	"github.com/expr-lang/expr/vm"
 	"github.com/shopspring/decimal"
 )
@@ -30,6 +31,10 @@ const maxNodes = 2000
 
 // WorkflowRoots are the names a workflow expression can refer to (ADR 0006).
 var WorkflowRoots = []string{"vars", "params", "env", "run", "result", "results"}
+
+// RowRoots are the names an expression in the configuration of a workflow action with
+// forEach can refer to: the workflow names and row, the current entry (S24b).
+var RowRoots = append(append([]string(nil), WorkflowRoots...), "row")
 
 // RecordRoots are the names an expression evaluated per record of a pipeline can refer
 // to, e.g. the condition of core.filter (ADR 0006).
@@ -128,9 +133,14 @@ func Check(s string, roots []string) error {
 }
 
 func compile(code string, roots []string) (*vm.Program, error) {
-	env := make(map[string]any, len(roots))
+	// The roots are maps with any keys; row (forEach) can be any value: a number, a
+	// text or an object.
+	env := make(types.Map, len(roots))
 	for _, r := range roots {
-		env[r] = map[string]any{}
+		env[r] = types.TypeOf(map[string]any{})
+	}
+	if _, ok := env["row"]; ok {
+		env["row"] = types.Any
 	}
 	opts := append([]exprlang.Option{exprlang.Env(env), exprlang.MaxNodes(maxNodes)}, functions...)
 	opts = append(opts, operators...)

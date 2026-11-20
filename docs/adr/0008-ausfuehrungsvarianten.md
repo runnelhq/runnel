@@ -190,3 +190,13 @@ Abstimmung mit dem Maintainer zur Umsetzung von 3c:
   zurückgestellt (Backlog).
 - **Wiederholung je Datensatz** folgt mit S24b als `forEach: "{{ … }}"` (ausdrückliche Liste, aktueller Eintrag `row`)
   statt `forEachRow: true`.
+
+## Nachtrag 2026-11-20 (S24b): Wiederholung je Eintrag
+
+- **An der Action, für alle Actions:** `forEach`, `parallel` und `stopOnError` stehen neben `retry` und `timeout`, nicht
+  unter `with` von `core.run-pipeline`/`core.run-workflow` – so lässt sich z. B. auch `file.copy` je Datei wiederholen.
+  Die Engine wertet `with` je Eintrag mit `row` aus; `retry` und `timeout` gelten je Eintrag.
+- **Ergebnis:** `output.items` (je Eintrag `row`, `success`, `output`, `error`, in der Reihenfolge der Liste), dazu
+  `output.succeeded` und `output.failed`. `stopOnError` (Standard `true`) beendet beim ersten Fehler die übrigen
+  Einträge; mit `false` scheitert die Action erst am Ende, wenn ein Eintrag fehlschlug (wie oben unter 3b).
+- `parallel` ist standardmäßig 1, höchstens 64.

@@ -15,7 +15,7 @@ func TestExpressions(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
 		t.Fatalf("%s: %v", rec.Body, err)
 	}
-	if len(res.Roots) != 6 || len(res.Functions) == 0 || res.Functions[0].Signature == "" {
+	if len(res.Roots) != 7 || len(res.Functions) == 0 || res.Functions[0].Signature == "" {
 		t.Errorf("roots %d, functions %v", len(res.Roots), res.Functions)
 	}
 	// The default environment overrides the project.

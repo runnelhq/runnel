@@ -1,0 +1,30 @@
+# Sums up the orders of one file (roadmap S24b). Called once per file by
+# workflows/each-file.workflow.yaml; on its own:
+#   runnel run --param FILE=examples/pipelines/inbox/orders-2026-11-18.csv examples/pipelines/pipelines/total.pipeline.yaml
+# The result (one record with orders and total) goes back to the workflow (core.to-result).
+kind: Pipeline
+apiVersion: runnel/v1
+name: total
+parameters:
+  - name: FILE
+    description: CSV file with orders
+    required: true
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: ${FILE}
+      delimiter: ";"
+      fields:
+        - { name: Betrag, type: decimal, format: "#.##0,00" }
+  - id: sum
+    type: core.group-by
+    with:
+      aggregates:
+        - { name: orders, function: count }
+        - { name: total, function: sum, field: Betrag }
+  - id: result
+    type: core.to-result
+links:
+  - { from: read, to: sum }
+  - { from: sum, to: result }

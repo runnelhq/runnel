@@ -345,6 +345,25 @@ func TestRunResultRowsExample(t *testing.T) {
 	}
 }
 
+func TestRunForEachExample(t *testing.T) {
+	chdirRepoRoot(t)
+	code, out, errOut := run(t, "run", "-v", "examples/pipelines/workflows/each-file.workflow.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	for _, want := range []string{
+		// The paths come from file.list, with the separator of the system.
+		"[totals] [1/2] total/read: read 2 rows from " + filepath.FromSlash("examples/pipelines/inbox/orders-2026-11-18.csv"),
+		"[totals] [2/2] total/read: read 3 rows from " + filepath.FromSlash("examples/pipelines/inbox/orders-2026-11-19.csv"),
+		"[report] orders-2026-11-18.csv: 2 orders, 350.5; orders-2026-11-19.csv: 3 orders, 1145.25",
+		"output FILES = 2",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")
