@@ -30,7 +30,7 @@ func TestValidateExamples(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("examples/hello: exit code %d, stderr %q, stdout:\n%s", code, errOut, out)
 	}
-	if want := "3 workflow files checked: 0 errors, 0 warnings\n"; out != want {
+	if want := "3 workflow files and 1 trigger file checked: 0 errors, 0 warnings\n"; out != want {
 		t.Errorf("examples/hello output = %q, want %q", out, want)
 	}
 
@@ -99,7 +99,7 @@ links:
 
 func TestValidateNoFiles(t *testing.T) {
 	code, _, errOut := run(t, "validate", t.TempDir())
-	if code != 1 || !strings.Contains(errOut, "no workflow or pipeline files (*.workflow.yaml, *.pipeline.yaml)") {
+	if code != 1 || !strings.Contains(errOut, "no workflow, pipeline or trigger files (*.workflow.yaml, *.pipeline.yaml, triggers/*.yaml)") {
 		t.Errorf("exit code %d, stderr %q", code, errOut)
 	}
 

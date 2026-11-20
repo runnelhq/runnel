@@ -20,7 +20,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Fuzzing | `make fuzz FUZZTIME=1m` |
 | Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – danach Diff prüfen |
-| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel serve examples/hello` |
+| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel triggers examples/hello` · `bin/runnel serve examples/hello` |
 
 Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderungen am Editor zusätzlich `make e2e`.
 
@@ -29,12 +29,13 @@ Vor jedem Commit: `make lint` und `make test` müssen grün sein; bei Änderunge
 | Pfad | Inhalt |
 |---|---|
 | `cmd/runnel/` | Einstiegspunkt, Signalbehandlung |
-| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`) |
-| `internal/model/` | Dateiformate (Workflow, Project, Environment), Laden, Feld- und Graph-Prüfung, Namensräume |
+| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`, `triggers`) |
+| `internal/model/` | Dateiformate (Workflow, Pipeline, Project, Environment, Trigger), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
 | `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |
+| `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Läufe und Ereignisse im Speicher |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |

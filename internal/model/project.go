@@ -28,6 +28,8 @@ type Project struct {
 	Variables          map[string]string `yaml:"variables,omitempty" json:"variables,omitempty"`
 	// Workflow holds project-wide defaults for workflows.
 	Workflow ProjectWorkflowSettings `yaml:"workflow,omitempty" json:"workflow,omitzero"`
+	// Settings control the runs of the project as a whole (roadmap S37).
+	Settings ProjectSettings `yaml:"settings,omitempty" json:"settings,omitzero"`
 
 	// Dir is the project directory as passed to LoadProject.
 	Dir string `yaml:"-" json:"-"`
@@ -41,6 +43,13 @@ type Project struct {
 type ProjectWorkflowSettings struct {
 	// DefaultJoin applies to actions without "join" (ADR 0003); empty means all.
 	DefaultJoin JoinMode `yaml:"defaultJoin,omitempty" json:"defaultJoin,omitempty"`
+}
+
+// ProjectSettings control the runs of a project.
+type ProjectSettings struct {
+	// MaxConcurrentRuns limits the runs of the server that run at the same time; a
+	// start beyond it is rejected (KONZEPT, chapter 6.4). 0: no limit.
+	MaxConcurrentRuns int `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty"`
 }
 
 // Environment is the content of environments/<name>.yaml: variables for one target system.
@@ -179,6 +188,9 @@ func (p *Project) validate() Errors {
 	case "", JoinAll, JoinFirst, JoinEach:
 	default:
 		errs = append(errs, p.src.errorf("$.workflow.defaultJoin", "invalid defaultJoin %q (expected all, first or each)", p.Workflow.DefaultJoin))
+	}
+	if p.Settings.MaxConcurrentRuns < 0 {
+		errs = append(errs, p.src.errorf("$.settings.maxConcurrentRuns", "maxConcurrentRuns must not be negative"))
 	}
 	errs = append(errs, checkVariables(p.src, p.Variables)...)
 	errs = append(errs, checkReferenceSyntax(p.src)...)

@@ -23,6 +23,8 @@ type PipelineSpec struct {
 	Registry *transform.Registry
 	Observer func(pipeline.Event)
 	RunID    string
+	// Trigger names what started the run, e.g. "cron:nightly"; empty: started by hand.
+	Trigger string
 	// Rows are records for core.from-result (from core.run-pipeline).
 	Rows []record.Record
 }

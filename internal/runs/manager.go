@@ -3,6 +3,7 @@ package runs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"sync"
@@ -37,7 +38,9 @@ type Run struct {
 	// Kind is "workflow" or "pipeline" (S25a3).
 	Kind string `json:"kind"`
 	// Workflow is the name of the workflow or pipeline.
-	Workflow    string            `json:"workflow"`
+	Workflow string `json:"workflow"`
+	// Trigger names what started the run, e.g. "cron:nightly" (S37); empty: by hand.
+	Trigger     string            `json:"trigger,omitempty"`
 	Environment string            `json:"environment,omitempty"`
 	Params      map[string]string `json:"params,omitempty"`
 	Status      workflow.Status   `json:"status"`
@@ -135,6 +138,27 @@ func NewManager() *Manager {
 // ErrShutdown is returned by Start after Shutdown.
 var ErrShutdown = errors.New("the server is shutting down")
 
+// LimitError is returned by Start when a limit of runs at the same time is reached
+// (settings.maxConcurrentRuns of the project or the workflow); the run is not started.
+// A queue that starts it later is in the backlog.
+type LimitError struct{ msg string }
+
+func (e *LimitError) Error() string { return e.msg }
+
+// limits are the limits of runs at the same time that apply to a start; 0: none.
+type limits struct {
+	project int // all runs of the server
+	file    int // runs of the same file
+}
+
+func limitsOf(p *model.Project, perFile int) limits {
+	l := limits{file: perFile}
+	if p != nil {
+		l.project = p.Settings.MaxConcurrentRuns
+	}
+	return l
+}
+
 // Start prepares and starts a run in the background and returns its state. The
 // spec's Observer and RunID are set by the manager. Errors are those of Prepare.
 func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
@@ -153,9 +177,9 @@ func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
 	for i, a := range p.Workflow.Actions {
 		steps[i] = [2]string{a.ID, a.Type}
 	}
-	run := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params}, p.Env, steps,
-		func(ctx context.Context) { p.Runner.Run(ctx) })
-	return run, p, nil
+	run, err := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger},
+		p.Env, steps, limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns), func(ctx context.Context) { p.Runner.Run(ctx) })
+	return run, p, err
 }
 
 // StartPipeline prepares and starts a pipeline run in the background, like Start (S25a3).
@@ -175,15 +199,15 @@ func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedP
 	for i, t := range p.Pipeline.Transforms {
 		steps[i] = [2]string{t.ID, t.Type}
 	}
-	run := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params,
-		LinkRows: make([]int64, len(p.Pipeline.Links))}, p.Env, steps,
+	run, err := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger,
+		LinkRows: make([]int64, len(p.Pipeline.Links))}, p.Env, steps, limitsOf(p.Project, 0),
 		func(ctx context.Context) { p.Runner.Run(ctx) })
-	return run, p, nil
+	return run, p, err
 }
 
 // add registers a run with its steps (id and type of the actions or transforms) and
-// runs it in the background.
-func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, start func(context.Context)) Run {
+// runs it in the background, unless a limit of runs at the same time is reached.
+func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, lim limits, start func(context.Context)) (Run, error) {
 	ctx, cancel := context.WithCancel(m.ctx)
 	run.Status, run.Started = StatusRunning, time.Now()
 	if env != nil {
@@ -196,6 +220,11 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 		e.byID[st[0]] = s
 	}
 	m.mu.Lock()
+	if err := m.checkLimits(run.Path, lim); err != nil {
+		m.mu.Unlock()
+		cancel()
+		return Run{}, err
+	}
 	m.runs[id] = e
 	m.order = append(m.order, id)
 	m.prune()
@@ -209,7 +238,38 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 		defer cancel()
 		start(ctx)
 	}()
-	return out
+	return out, nil
+}
+
+// checkLimits reports a LimitError if starting another run of path would exceed a
+// limit. m.mu must be held.
+func (m *Manager) checkLimits(path string, lim limits) error {
+	all, same := 0, 0
+	for _, e := range m.runs {
+		if e.run.Status != StatusRunning {
+			continue
+		}
+		all++
+		if e.run.Path == path {
+			same++
+		}
+	}
+	switch {
+	case lim.file > 0 && same >= lim.file:
+		return &LimitError{fmt.Sprintf("%s is already running %s (settings.maxConcurrentRuns: %d); try again when a run has ended",
+			path, times(same), lim.file)}
+	case lim.project > 0 && all >= lim.project:
+		return &LimitError{fmt.Sprintf("%s already running in the project (settings.maxConcurrentRuns in %s: %d); try again when a run has ended",
+			times(all), model.ProjectFile, lim.project)}
+	}
+	return nil
+}
+
+func times(n int) string {
+	if n == 1 {
+		return "1 run"
+	}
+	return fmt.Sprintf("%d runs", n)
 }
 
 // pipelineKinds maps the events of a pipeline to those of a workflow: transforms are

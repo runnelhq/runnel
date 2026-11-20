@@ -61,6 +61,14 @@ und speichern mit Konfliktschutz, Katalog der Actions, Prüfung von Workflows so
 verfolgen – beschrieben in [docs/dev/API.md](docs/dev/API.md). Der Editor selbst folgt mit den nächsten Schritten.
 
 ```bash
+runnel triggers examples/hello
+```
+
+`runnel triggers [projektordner]` listet die Trigger des Projekts (`triggers/*.yaml`) mit Zeitplan, Ziel und nächstem
+Zeitpunkt. Solange `runnel serve` läuft, starten sie ihre Workflows bzw. Pipelines zu diesen Zeiten (Cron-Ausdruck mit
+Zeitzone); das Server-Log zeigt jeden Start.
+
+```bash
 runnel catalog core.wait
 ```
 

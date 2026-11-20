@@ -39,6 +39,8 @@ type Spec struct {
 	Transforms *transform.Registry
 	Observer   func(workflow.Event)
 	RunID      string
+	// Trigger names what started the run, e.g. "cron:nightly"; empty: started by hand.
+	Trigger string
 
 	// chain lists the workflows that called this one (core.run-workflow).
 	chain []caller

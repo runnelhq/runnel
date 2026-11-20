@@ -521,14 +521,22 @@ kind: Trigger
 apiVersion: runnel/v1
 name: nightly-import
 type: cron
-target: workflows/nightly-import.workflow.yaml   # auch Pipelines möglich
-environment: prod
-runConfig: local-fast
+target: workflows/nightly-import.workflow.yaml   # relativ zum Projekt; auch Pipelines möglich
+environment: prod          # leer: Standard-Environment des Projekts
+params:                    # Werte für die Parameter des Ziels (fest oder ${…})
+  DAYS: 3
+enabled: true              # false: bleibt im Projekt, startet aber nichts
 with:
-  schedule: "0 2 * * 1-5"
-  timezone: Europe/Berlin
-  overlap: skip            # skip | queue | allow
+  schedule: "0 2 * * 1-5"  # Minute Stunde Tag Monat Wochentag, oder @daily, @hourly …
+  timezone: Europe/Berlin  # leer: Zeitzone des Rechners
+  overlap: skip            # skip (Standard) | allow
 ```
+
+Trigger-Dateien liegen unter `triggers/*.yaml`. Gestartet wird nur, solange `runnel serve` läuft; geänderte Dateien
+übernimmt der Server ohne Neustart. Verpasste Zeitpunkte (Server lief nicht) werden nicht nachgeholt. `runnel triggers`
+listet die Trigger mit ihrem nächsten Zeitpunkt, `runnel validate` prüft sie (Zeitplan, Ziel, Environment, Parameter).
+`overlap: skip` startet keinen Lauf, solange der vorige dieses Triggers läuft. `runConfig` (S42), `overlap: queue`,
+das Nachholen verpasster Läufe und die Typen `file`, `interval` (S38) und `http` (ADR 0018) folgen später.
 
 Ein HTTP-Trigger (`type: http`) hat statt `schedule` Methode, Pfad, Absicherung und Antwortmodus unter `with:`;
 Format und Verhalten in [ADR 0018](adr/0018-http-trigger.md).
@@ -649,7 +657,9 @@ type Transform interface {
 
 ### 6.4 Run-Queue & Ressourcen
 
-- Globales Limit gleichzeitiger Runs (`maxConcurrentRuns`), zusätzlich pro Workflow.
+- Globales Limit gleichzeitiger Runs (`settings.maxConcurrentRuns` in `project.yaml`), zusätzlich pro Workflow
+  (`settings.maxConcurrentRuns`). Seit S37 wird ein Start über dem Limit abgelehnt (Editor/API: `429`, Trigger: Meldung
+  im Server-Log); eine Warteschlange, die ihn später startet, steht im Backlog.
 - Prioritäten (manuell > HTTP-Trigger > zeitgesteuerte Trigger).
 - Graceful Shutdown: Dienst-Stopp wartet konfigurierbar auf laufende Runs, danach Abbruch + Status `Cancelled` (resumebar).
 

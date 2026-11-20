@@ -228,3 +228,45 @@ func TestEventsResetAndShutdown(t *testing.T) {
 		t.Fatal("event stream still open after shutdown")
 	}
 }
+
+// A second start beyond settings.maxConcurrentRuns is rejected with 429 (S37).
+func TestRunLimit(t *testing.T) {
+	dir, s := newRunProject(t)
+	writeFile(t, filepath.Join(dir, "workflows", "once.workflow.yaml"),
+		strings.Replace(waitWorkflow, "name: wait\n", "name: once\nsettings: { maxConcurrentRuns: 1 }\n", 1))
+	run := startRun(t, s, `{"path": "workflows/once.workflow.yaml", "params": {"DELAY": "1h"}}`)
+	expect(t, do(t, s, "POST", "/api/v1/runs", `{"path": "workflows/once.workflow.yaml", "params": {"DELAY": "1h"}}`),
+		http.StatusTooManyRequests, "is already running 1 run (settings.maxConcurrentRuns: 1)")
+	expect(t, do(t, s, "POST", "/api/v1/runs/"+run.ID+"/cancel", ""), http.StatusAccepted, "cancelling")
+}
+
+// GET /triggers lists the triggers with their next time and the problems of trigger files;
+// a trigger starts its target with its parameters and records itself on the run.
+func TestTriggers(t *testing.T) {
+	dir, s := newRunProject(t)
+	writeFile(t, filepath.Join(dir, "triggers", "often.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: often\ntype: cron\n"+
+		"target: workflows/wait.workflow.yaml\nenvironment: dev\nparams: { DELAY: 1ms }\nwith: { schedule: \"* * * * *\" }\n")
+	writeFile(t, filepath.Join(dir, "triggers", "bad.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: bad\ntype: http\ntarget: workflows/wait.workflow.yaml\n")
+	s.triggers.Reload()
+	rec := do(t, s, "GET", "/api/v1/triggers", "")
+	var res triggersResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if len(res.Triggers) != 1 || res.Triggers[0].Name != "often" || res.Triggers[0].File != "triggers/often.yaml" || res.Triggers[0].Next.IsZero() {
+		t.Errorf("triggers %+v", res.Triggers)
+	}
+	if len(res.Problems) != 1 || res.Problems[0].File != "triggers/bad.yaml" || !strings.Contains(res.Problems[0].Message, "not supported yet") {
+		t.Errorf("problems %+v", res.Problems)
+	}
+
+	s.triggers.Tick(res.Triggers[0].Next)
+	list := s.triggers.List()
+	if list[0].Last == nil || list[0].Last.RunID == "" {
+		t.Fatalf("not started: %+v", list[0].Last)
+	}
+	d := waitRun(t, s, list[0].Last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
+	if d.Status != "succeeded" || d.Trigger != "cron:often" || d.Params["DELAY"] != "1ms" || d.Environment != "dev" {
+		t.Errorf("run %+v", d.Run)
+	}
+}

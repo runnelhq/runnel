@@ -137,7 +137,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| S37 | Cron-Trigger | Trigger-Dateien, Scheduler im Server, `overlap: skip/queue/allow`, Run-Queue mit Limits | Tests mit simulierter Uhr |
+| S37 ✅ | Cron-Trigger | Trigger-Dateien (`triggers/*.yaml`, Typ `cron` mit Zeitplan und Zeitzone, `params`, `enabled`), Scheduler im Server mit Neuladen geänderter Dateien, `overlap: skip/allow`; Limits gleichzeitiger Läufe (Projekt und Workflow) – ein Start darüber wird abgelehnt (`429`); `runnel triggers`, `GET /triggers`, Prüfung in `runnel validate`; Abhängigkeit `robfig/cron/v3` (MIT) | Tests mit simulierter Uhr; `runnel triggers examples/hello` |
 | S38 | Weitere Trigger | Datei-Überwachung, Intervall; Trigger für Pipelines | Tests mit temporären Ordnern und simulierter Uhr |
 | S41 | Windows-Dienst | `runnel service install/start/stop/uninstall`, Ereignisanzeige, Recovery-Optionen | Manuell auf Windows |
 | S38a | HTTP-Trigger: asynchron | Typ `http` nach [ADR 0018](adr/0018-http-trigger.md): eigener Listener (zunächst nur lokal), Methode und Pfad mit Platzhaltern, Routing-Prüfung, `auth: token \| none`, Pfad/Query/Body → typisierte Parameter (`400` vor dem Start), `response: accepted` mit `202` und Lauf-ID, `maxConcurrent` (`429`), Body-Limit, `trigger = http:<name>`; für Workflows und Pipelines | Tests; `curl` auf `127.0.0.1` |
@@ -202,6 +202,8 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S38 (Teil) | HMAC für HTTP-Trigger | Signaturprüfung als weitere `auth`-Variante (z. B. GitHub, Shop-Systeme) | S38a |
 | S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | – |
 | S43 | Wartung & Monitoring | Error-Workflow, `/health`, optional `/metrics`, Aufbewahrung der Historie (Retention) | Retention: S26 |
+| S37 (Teil) | Run-Queue | Starts über dem Limit warten (Status `queued`) statt abgelehnt zu werden, Prioritäten (manuell > HTTP > zeitgesteuert), `overlap: queue` | S37 |
+| S37 (Teil) | Verpasste Läufe nachholen | `catchUp` für Cron-Trigger: verpasste Zeitpunkte beim Start des Servers nachholen | S26 (letzter Lauf je Trigger) |
 | S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster; vorher Mockup | – |
 | S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | bis dahin ZIP |
 
