@@ -197,14 +197,27 @@ func TestRunCSVExample(t *testing.T) {
 func TestRunBasicTransformsExample(t *testing.T) {
 	chdirRepoRoot(t)
 	target := filepath.Join(t.TempDir(), "crm.csv")
-	code, out, errOut := run(t, "run", "--param", "BATCH=42", "--param", "OUTPUT="+target, "examples/pipelines/pipelines/customers.pipeline.yaml")
+	rejected := filepath.Join(t.TempDir(), "rejected.csv")
+	code, out, errOut := run(t, "run", "--param", "BATCH=42", "--param", "OUTPUT="+target, "--param", "REJECTED="+rejected,
+		"examples/pipelines/pipelines/customers.pipeline.yaml")
 	if code != 0 {
 		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
 	}
-	if !strings.Contains(out, "[active] kept 2 of 3 records, dropped 1") {
-		t.Errorf("filter log missing:\n%s", out)
+	for _, want := range []string{"[types] read 4, written 3, errors 1 in ", "[active] kept 2 of 3 records, dropped 1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
 	}
-	b, err := os.ReadFile(target)
+	// The customer with "k. A." went over the error link, with the reason.
+	b, err := os.ReadFile(rejected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "\xEF\xBB\xBFkdnr;name;umsatz;ort;telefon;_error;_errorField;_errorTransform\r\n" +
+		"4714;Klein KG;k. A.;Essen;;\"record 4, field \"\"umsatz\"\": \"\"k. A.\"\" is not a number\";umsatz;types\r\n"; string(b) != want {
+		t.Errorf("rejected %q, want %q", b, want)
+	}
+	b, err = os.ReadFile(target)
 	if err != nil {
 		t.Fatal(err)
 	}

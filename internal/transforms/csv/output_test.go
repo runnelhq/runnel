@@ -246,3 +246,28 @@ func TestOutputSchema(t *testing.T) {
 		t.Errorf("problems %+v", p)
 	}
 }
+
+func TestOutputErrorLink(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "out.csv")
+	tr := transformtest.New(t, outputDefinition, map[string]any{"path": p, "encoding": "windows-1252"})
+	out, failed, logs, err := transformtest.RunWithErrorLink(context.Background(), tr,
+		record.New(record.Field{Name: "a", Value: "Jörg"}),
+		record.New(record.Field{Name: "a", Value: "Ω"}),
+		record.New(record.Field{Name: "a", Value: "Ada"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The record that cannot be written goes to the error link and is not passed on.
+	if len(out) != 2 || len(failed) != 1 {
+		t.Fatalf("out %d, failed %d", len(out), len(failed))
+	}
+	if f, _ := failed[0].Get("_errorField"); f != "a" {
+		t.Errorf("_errorField %v", f)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "a\r\nJ\xf6rg\r\nAda\r\n" {
+		t.Errorf("file %q", b)
+	}
+	if len(logs) != 1 || logs[0].Msg != "wrote 2 rows to "+p {
+		t.Errorf("log %v", logs)
+	}
+}

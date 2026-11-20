@@ -36,11 +36,43 @@ type Output struct {
 	emit   func(record.Record) error
 	log    func(slog.Level, string)
 	values map[string]any
+	fail   func(record.Record) error
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
 func NewOutput(transformID string, emit func(record.Record) error, log func(slog.Level, string)) *Output {
 	return &Output{id: transformID, emit: emit, log: log}
+}
+
+// Fields of a record on an error link (roadmap S17a): the message, the field that
+// caused it (empty if none) and the id of the transform.
+const (
+	ErrorField          = "_error"
+	ErrorFieldField     = "_errorField"
+	ErrorTransformField = "_errorTransform"
+)
+
+// WithErrorLinks sets where Fail sends records: the engine sets it for transforms with
+// error links. Without, Fail returns the error and the pipeline stops.
+func (o *Output) WithErrorLinks(send func(record.Record) error) *Output {
+	o.fail = send
+	return o
+}
+
+// Fail reports a record that could not be processed, e.g. a value that cannot be
+// converted. err is the message as it would stop the pipeline ("record 3, field
+// "amount": …"). With an error link, the record goes there with ErrorField,
+// ErrorFieldField and ErrorTransformField set, and Fail returns nil (or the error of a
+// cancelled run); without, Fail returns err, which the transform returns.
+// The record must not be changed after Fail.
+func (o *Output) Fail(r record.Record, field string, err error) error {
+	if o.fail == nil {
+		return err
+	}
+	r.Set(ErrorField, err.Error())
+	r.Set(ErrorFieldField, field)
+	r.Set(ErrorTransformField, o.id)
+	return o.fail(r)
 }
 
 // WithValues sets what expressions see besides the record: vars, params, env and run
@@ -93,6 +125,9 @@ type Definition struct {
 	Config any
 	// New creates a transform from its "with" configuration (variables resolved).
 	New func(with map[string]any) (Transform, error)
+	// RecordErrors is set for transforms that pass records they cannot process to an
+	// error link (Output.Fail); an error link from another transform is never used.
+	RecordErrors bool
 }
 
 // Descriptor describes a transform type for the editor, the API and tools (ADR 0014).
@@ -103,6 +138,8 @@ type Descriptor struct {
 	Label       string         `json:"label"`
 	Description string         `json:"description"`
 	Schema      *schema.Schema `json:"schema"`
+	// RecordErrors: the transform can pass records to an error link (Definition.RecordErrors).
+	RecordErrors bool `json:"recordErrors,omitempty"`
 }
 
 // Registry holds the available transform types.
@@ -133,7 +170,7 @@ func (r *Registry) Register(d Definition) {
 		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
 	}
 	r.defs[d.Type] = d
-	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s}
+	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, RecordErrors: d.RecordErrors}
 }
 
 // Lookup returns the definition of a transform type.

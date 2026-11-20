@@ -64,6 +64,8 @@ type Counts struct {
 	Read int64 `json:"read"`
 	// Written is the number of records the transform passed on.
 	Written int64 `json:"written"`
+	// Errors is the number of records the transform passed to its error links.
+	Errors int64 `json:"errors,omitempty"`
 }
 
 // Result is the outcome of a run.
@@ -149,12 +151,31 @@ func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
 		return nil, err
 	}
 	diags := r.deriveSchemas()
+	for i, l := range p.Links {
+		if l.Type != model.ErrorLink {
+			continue
+		}
+		for _, t := range p.Transforms {
+			if def, _ := opts.Registry.Lookup(t.Type); t.ID == l.From && !def.RecordErrors {
+				diags = append(diags, p.WarningAt(fmt.Sprintf("$.links[%d].type", i),
+					"link #%d (%s → %s): %s does not pass records with errors on; the error link is never used", i+1, l.From, l.To, t.Type))
+			}
+		}
+	}
 	if diags.HasErrors() {
 		return nil, diags.Err()
 	}
 	diags.Sort()
 	r.warnings = diags
 	return r, nil
+}
+
+// port is one kind of outgoing links of a transform (data or error) with the batch
+// being collected for them.
+type port struct {
+	targets   []chan transform.Batch
+	targetIdx []int
+	batch     transform.Batch
 }
 
 // values returns what expressions see besides the record (ADR 0006): vars, params, env
@@ -194,12 +215,16 @@ func (r *Runner) deriveSchemas() model.Errors {
 	for i, t := range p.Transforms {
 		index[t.ID] = i
 	}
-	inputs := make([][]int, len(p.Transforms))
+	type input struct {
+		from  int
+		error bool // an error link: the records the transform could not process
+	}
+	inputs := make([][]input, len(p.Transforms))
 	pending := make([]int, len(p.Transforms))
 	next := make([][]int, len(p.Transforms))
 	for _, l := range p.Links {
 		from, to := index[l.From], index[l.To]
-		inputs[to] = append(inputs[to], from)
+		inputs[to] = append(inputs[to], input{from, l.Type == model.ErrorLink})
 		next[from] = append(next[from], to)
 		pending[to]++
 	}
@@ -210,13 +235,27 @@ func (r *Runner) deriveSchemas() model.Errors {
 		}
 	}
 	r.schemas = make([]record.Schema, len(p.Transforms))
+	errSchemas := make([]record.Schema, len(p.Transforms))
 	var diags model.Errors
 	for len(queue) > 0 {
 		i := queue[0]
 		queue = queue[1:]
 		var in []record.Schema
-		for _, from := range inputs[i] {
-			in = append(in, r.schemas[from])
+		for _, x := range inputs[i] {
+			if x.error {
+				in = append(in, errSchemas[x.from])
+			} else {
+				in = append(in, r.schemas[x.from])
+			}
+		}
+		// On error links: the incoming records with the error fields; for a transform
+		// without input (e.g. csv.input) the values as read, so nothing is known.
+		errSchemas[i] = record.OpenSchema()
+		if len(in) > 0 {
+			errSchemas[i] = record.Merge(in...).
+				With(transform.ErrorField, record.String).
+				With(transform.ErrorFieldField, record.String).
+				With(transform.ErrorTransformField, record.String)
 		}
 		t := p.Transforms[i]
 		r.schemas[i] = record.OpenSchema()
@@ -362,7 +401,7 @@ func (r *Runner) Run(parent context.Context) Result {
 		ins[index[l.To]] = append(ins[index[l.To]], i)
 	}
 
-	counts := make([]struct{ read, written atomic.Int64 }, len(r.p.Transforms))
+	counts := make([]struct{ read, written, errors atomic.Int64 }, len(r.p.Transforms))
 	var failMu sync.Mutex
 	var failure error
 	fail := func(err error) {
@@ -377,11 +416,14 @@ func (r *Runner) Run(parent context.Context) Result {
 	var wg sync.WaitGroup
 	for i, t := range r.p.Transforms {
 		in := r.input(ctx, links, ins[i], &wg)
-		var targets []chan transform.Batch
-		var targetIdx []int
+		data, errs := &port{}, &port{}
 		for _, li := range outs[i] {
-			targets = append(targets, links[li])
-			targetIdx = append(targetIdx, index[r.p.Links[li].To])
+			p := data
+			if r.p.Links[li].Type == model.ErrorLink {
+				p = errs
+			}
+			p.targets = append(p.targets, links[li])
+			p.targetIdx = append(p.targetIdx, index[r.p.Links[li].To])
 		}
 		wg.Add(1)
 		go func() {
@@ -389,9 +431,9 @@ func (r *Runner) Run(parent context.Context) Result {
 			start := now()
 			r.emit(Event{Time: start, Kind: TransformStarted, RunID: runID, TransformID: t.ID, TransformType: t.Type})
 
-			// send passes a batch to every outgoing link; links after the first get copies.
-			send := func(b transform.Batch) error {
-				for k, ch := range targets {
+			// send passes a batch to every link of a port; links after the first get copies.
+			send := func(p *port, b transform.Batch) error {
+				for k, ch := range p.targets {
 					batch := b
 					if k > 0 {
 						batch = make(transform.Batch, len(b))
@@ -401,35 +443,47 @@ func (r *Runner) Run(parent context.Context) Result {
 					}
 					select {
 					case ch <- batch:
-						counts[targetIdx[k]].read.Add(int64(len(b)))
+						counts[p.targetIdx[k]].read.Add(int64(len(b)))
 					case <-ctx.Done():
 						return context.Cause(ctx)
 					}
 				}
-				counts[i].written.Add(int64(len(b)))
 				return nil
 			}
-			batch := make(transform.Batch, 0, r.opts.BatchSize)
-			emitRecord := func(rec record.Record) error {
+			// add collects records of a port into batches.
+			add := func(p *port, rec record.Record) error {
 				if err := ctx.Err(); err != nil {
 					return context.Cause(ctx)
 				}
-				batch = append(batch, rec)
-				if len(batch) < r.opts.BatchSize {
+				p.batch = append(p.batch, rec)
+				if len(p.batch) < r.opts.BatchSize {
 					return nil
 				}
-				full := batch
-				batch = make(transform.Batch, 0, r.opts.BatchSize)
-				return send(full)
+				full := p.batch
+				p.batch = make(transform.Batch, 0, r.opts.BatchSize)
+				return send(p, full)
+			}
+			emitRecord := func(rec record.Record) error {
+				counts[i].written.Add(1)
+				return add(data, rec)
+			}
+			failRecord := func(rec record.Record) error {
+				counts[i].errors.Add(1)
+				return add(errs, rec)
 			}
 			log := func(level slog.Level, msg string) {
 				r.emit(Event{Time: now(), Kind: Log, RunID: runID, TransformID: t.ID, TransformType: t.Type, Level: level, Message: msg})
 			}
 			out := transform.NewOutput(t.ID, emitRecord, log).WithValues(values)
+			if len(errs.targets) > 0 {
+				out.WithErrorLinks(failRecord)
+			}
 
 			err := process(ctx, r.transforms[i], in, out)
-			if err == nil && len(batch) > 0 {
-				err = send(batch)
+			for _, p := range []*port{data, errs} {
+				if err == nil && len(p.batch) > 0 {
+					err = send(p, p.batch)
+				}
 			}
 			// A failure stops the others first; draining the input afterwards ends quickly.
 			status := Succeeded
@@ -441,13 +495,13 @@ func (r *Runner) Run(parent context.Context) Result {
 				err = fmt.Errorf("transform %q: %w", t.ID, err)
 				fail(err)
 			}
-			for _, ch := range targets {
+			for _, ch := range append(data.targets, errs.targets...) {
 				close(ch)
 			}
 			// Records still arriving are discarded, so that the transforms before can finish.
 			for range in {
 			}
-			c := Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load()}
+			c := Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load()}
 			end := now()
 			r.emit(Event{Time: end, Kind: TransformFinished, RunID: runID, TransformID: t.ID, TransformType: t.Type,
 				Status: status, Err: err, Duration: end.Sub(start), Counts: c})
@@ -457,7 +511,7 @@ func (r *Runner) Run(parent context.Context) Result {
 
 	res := Result{RunID: runID, Status: Succeeded, Duration: now().Sub(started), Counts: map[string]Counts{}}
 	for i, t := range r.p.Transforms {
-		res.Counts[t.ID] = Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load()}
+		res.Counts[t.ID] = Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load()}
 	}
 	switch {
 	case failure != nil:

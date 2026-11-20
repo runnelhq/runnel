@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	exprlang "github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
@@ -65,7 +66,7 @@ var operators = []exprlang.Option{
 		case decimal.Decimal:
 			return v.Neg(), nil
 		}
-		return safe(func() any { return runtime.Negate(p[0]) })
+		return safe("-", p[0], nil, func() any { return runtime.Negate(p[0]) })
 	}),
 }
 
@@ -99,9 +100,9 @@ func arith(name, op string, dec func(a, b decimal.Decimal) decimal.Decimal, plai
 			if err != nil {
 				return nil, err
 			}
-			return safe(func() any { return dec(x, y) })
+			return safe(op, a, b, func() any { return dec(x, y) })
 		}
-		return safe(func() any { return plain(a, b) })
+		return safe(op, a, b, func() any { return plain(a, b) })
 	})
 }
 
@@ -120,7 +121,7 @@ func compare(name, op string, ok func(int) bool, plain func(a, b any) bool) expr
 			}
 			return ok(x.Cmp(y)), nil
 		}
-		return safe(func() any { return plain(a, b) })
+		return safe(op, a, b, func() any { return plain(a, b) })
 	})
 }
 
@@ -180,6 +181,10 @@ func typeName(v any) string {
 		return "decimal"
 	case string:
 		return "string"
+	case time.Time:
+		return "datetime"
+	case map[string]any, []any:
+		return "json"
 	case bool:
 		return "bool"
 	case int, int64, int32:
@@ -190,15 +195,20 @@ func typeName(v any) string {
 	return fmt.Sprintf("%T", v)
 }
 
-// safe turns the panics of expr-lang's runtime (e.g. "1" + 2) into errors.
-func safe(f func() any) (v any, err error) {
+// safe turns the panics of expr-lang's runtime (e.g. "1" + 2) into errors that name
+// the types like records do (int, not int64).
+func safe(op string, a, b any, f func() any) (v any, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(error); ok && errors.Is(e, errDivZero) {
 				err = e
 				return
 			}
-			err = fmt.Errorf("%v", r)
+			if b == nil && op == "-" {
+				err = fmt.Errorf("invalid operation: -%s", typeName(a))
+				return
+			}
+			err = fmt.Errorf("invalid operation: %s %s %s", typeName(a), op, typeName(b))
 		}
 	}()
 	return f(), nil

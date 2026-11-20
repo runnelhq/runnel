@@ -97,6 +97,9 @@ func (l *pipelineLogger) event(e pipeline.Event) {
 		}
 	case pipeline.TransformFinished:
 		counts := fmt.Sprintf("read %d, written %d", e.Counts.Read, e.Counts.Written)
+		if e.Counts.Errors > 0 {
+			counts += fmt.Sprintf(", errors %d", e.Counts.Errors)
+		}
 		switch e.Status {
 		case pipeline.Cancelled:
 			l.line(e.Time, slog.LevelWarn, e.TransformID, fmt.Sprintf("cancelled after %s (%s)", round(e.Duration), counts))

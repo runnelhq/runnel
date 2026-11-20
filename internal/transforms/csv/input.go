@@ -18,12 +18,13 @@ import (
 
 // csv.input reads the rows of a CSV file as records.
 var inputDefinition = transform.Definition{
-	Type:        "csv.input",
-	Category:    transform.CategoryInput,
-	Label:       "CSV Input",
-	Description: "Reads the rows of a CSV file as records",
-	Config:      input{},
-	New:         newInput,
+	Type:         "csv.input",
+	RecordErrors: true,
+	Category:     transform.CategoryInput,
+	Label:        "CSV Input",
+	Description:  "Reads the rows of a CSV file as records",
+	Config:       input{},
+	New:          newInput,
 }
 
 type input struct {
@@ -131,11 +132,20 @@ func (t *input) Process(ctx context.Context, _ <-chan transform.Batch, out *tran
 
 	header := t.Header == nil || *t.Header
 	var cols []column // which value goes into which field
-	var rows int64
+	var rows, failed int64
 	for {
 		row, err := r.Read()
 		if errors.Is(err, io.EOF) {
 			break
+		}
+		if errors.Is(err, stdcsv.ErrFieldCount) && cols != nil {
+			// A row with more or fewer values can go to an error link, as text.
+			rows++
+			failed++
+			if err := out.Fail(raw(cols, row), "", t.readError(err)); err != nil {
+				return err
+			}
+			continue
 		}
 		if err != nil {
 			return t.readError(err)
@@ -148,26 +158,53 @@ func (t *input) Process(ctx context.Context, _ <-chan transform.Batch, out *tran
 				continue
 			}
 		}
+		rows++
 		var rec record.Record
+		var bad error
+		var badField string
 		for _, c := range cols {
-			s := ""
-			if c.index < len(row) {
-				s = row[c.index]
-			}
-			v, err := c.codec.Parse(s)
+			v, err := c.codec.Parse(value(row, c.index))
 			if err != nil {
 				line, col := r.FieldPos(c.index)
-				return fmt.Errorf("%s:%d:%d: field %q: %w", t.Path, line, col, c.name, err)
+				bad, badField = fmt.Errorf("%s:%d:%d: field %q: %w", t.Path, line, col, c.name, err), c.name
+				break
 			}
 			rec.Set(c.name, v)
+		}
+		if bad != nil {
+			// The row goes to an error link as text, or stops the pipeline.
+			failed++
+			if err := out.Fail(raw(cols, row), badField, bad); err != nil {
+				return err
+			}
+			continue
 		}
 		if err := out.Emit(rec); err != nil {
 			return err
 		}
-		rows++
 	}
-	out.Logf(levelInfo, "read %d %s from %s", rows, plural(rows, "row"), t.Path)
+	if failed > 0 {
+		out.Logf(levelInfo, "read %d %s from %s, %d with errors", rows, plural(rows, "row"), t.Path, failed)
+	} else {
+		out.Logf(levelInfo, "read %d %s from %s", rows, plural(rows, "row"), t.Path)
+	}
 	return nil
+}
+
+func value(row []string, i int) string {
+	if i < len(row) {
+		return row[i]
+	}
+	return ""
+}
+
+// raw returns the values of a row as text, for an error link.
+func raw(cols []column, row []string) record.Record {
+	var rec record.Record
+	for _, c := range cols {
+		rec.Set(c.name, value(row, c.index))
+	}
+	return rec
 }
 
 // column is a column of the file read into a field.

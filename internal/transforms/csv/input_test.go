@@ -231,3 +231,36 @@ func TestInputCancelled(t *testing.T) {
 		t.Errorf("error %v after %d records, want cancellation after 10", err, n)
 	}
 }
+
+func TestInputErrorLink(t *testing.T) {
+	p := writeFile(t, "id;amount\n1;1,50\n2;viel\n3\n4;4,00\n")
+	tr := transformtest.New(t, inputDefinition, map[string]any{"path": p, "delimiter": ";", "fields": []any{
+		map[string]any{"name": "id", "type": "int"}, map[string]any{"name": "amount", "type": "decimal", "format": "0,00"}}})
+	out, failed, logs, err := transformtest.RunWithErrorLink(context.Background(), tr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := show(out), "id=1(int64) amount=1.5(decimal.Decimal)\nid=4(int64) amount=4(decimal.Decimal)\n"; got != want {
+		t.Errorf("out\n%s\nwant\n%s", got, want)
+	}
+	// Rows with errors go on as text, with the error fields.
+	if len(failed) != 2 {
+		t.Fatalf("failed %v", failed)
+	}
+	for i, want := range []struct{ id, amount, msg, field string }{
+		{"2", "viel", `in.csv:3:3: field "amount": "viel" is not a number`, "amount"},
+		{"3", "", "in.csv:4:1: the row has a different number of values than the first row", ""},
+	} {
+		r := failed[i]
+		id, _ := r.Get("id")
+		amount, _ := r.Get("amount")
+		msg, _ := r.Get("_error")
+		field, _ := r.Get("_errorField")
+		if id != want.id || amount != want.amount || !strings.HasSuffix(msg.(string), want.msg) || field != want.field {
+			t.Errorf("failed[%d] = %s", i, show(failed[i:i+1]))
+		}
+	}
+	if len(logs) != 1 || !strings.HasSuffix(logs[0].Msg, "in.csv, 2 with errors") || !strings.HasPrefix(logs[0].Msg, "read 4 rows") {
+		t.Errorf("log %v", logs)
+	}
+}

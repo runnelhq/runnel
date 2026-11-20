@@ -11,12 +11,13 @@ import (
 
 // core.filter passes on the records for which a condition is true.
 var filterDefinition = transform.Definition{
-	Type:        "core.filter",
-	Category:    transform.CategoryTransform,
-	Label:       "Filter",
-	Description: "Passes on the records for which a condition is true",
-	Config:      filter{},
-	New:         newFilter,
+	Type:         "core.filter",
+	RecordErrors: true,
+	Category:     transform.CategoryTransform,
+	Label:        "Filter",
+	Description:  "Passes on the records for which a condition is true",
+	Config:       filter{},
+	New:          newFilter,
 }
 
 type filter struct {
@@ -48,13 +49,18 @@ func (t *filter) Init(ic *transform.InitContext) (record.Schema, error) {
 }
 
 func (t *filter) Process(ctx context.Context, in <-chan transform.Batch, out *transform.Output) error {
-	var read, kept int64
+	var read, kept, failed int64
 	for b := range in {
 		for _, r := range b {
 			read++
 			ok, err := t.cond.Bool(out, r)
 			if err != nil {
-				return fmt.Errorf("record %d: %w", read, err)
+				// To an error link, or the pipeline stops.
+				failed++
+				if err := out.Fail(r, "", fmt.Errorf("record %d: %w", read, err)); err != nil {
+					return err
+				}
+				continue
 			}
 			if !ok {
 				continue
@@ -68,6 +74,10 @@ func (t *filter) Process(ctx context.Context, in <-chan transform.Batch, out *tr
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	out.Logf(slog.LevelInfo, "kept %d of %d records, dropped %d", kept, read, read-kept)
+	if failed > 0 {
+		out.Logf(slog.LevelInfo, "kept %d of %d records, dropped %d, %d with errors", kept, read, read-kept-failed, failed)
+	} else {
+		out.Logf(slog.LevelInfo, "kept %d of %d records, dropped %d", kept, read, read-kept)
+	}
 	return nil
 }

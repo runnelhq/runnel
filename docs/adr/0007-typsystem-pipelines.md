@@ -95,7 +95,7 @@ unbekannten Feldern werden zu Fehlern. Gedacht für produktive, stabile Pipeline
   sonst wäre nach jedem Transform ohne Schema jedes verwendete Feld gemeldet, ohne Aussage.
 - **Zahlen in der Konfiguration** (z. B. Konstanten) bleiben ganze Zahlen (`int64`) bzw. werden `float64`; sie werden nicht
   über `float64` gelesen.
-- **Strikter Modus** folgt mit S17, zusammen mit `settings` im Pipeline-Format.
+- **Strikter Modus** folgt mit S17c, zusammen mit `settings` im Pipeline-Format.
 
 ## Konsequenzen
 

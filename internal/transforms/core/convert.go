@@ -12,12 +12,13 @@ import (
 
 // core.convert converts fields to another type, e.g. text in German format to decimal.
 var convertDefinition = transform.Definition{
-	Type:        "core.convert",
-	Category:    transform.CategoryTransform,
-	Label:       "Convert Types",
-	Description: "Converts fields to another type, with a number or date format",
-	Config:      convert{},
-	New:         newConvert,
+	Type:         "core.convert",
+	RecordErrors: true,
+	Category:     transform.CategoryTransform,
+	Label:        "Convert Types",
+	Description:  "Converts fields to another type, with a number or date format",
+	Config:       convert{},
+	New:          newConvert,
 }
 
 type convert struct {
@@ -78,19 +79,31 @@ func (t *convert) Init(ic *transform.InitContext) (record.Schema, error) {
 
 func (t *convert) Process(_ context.Context, in <-chan transform.Batch, out *transform.Output) error {
 	var n int64
+	converted := make([]any, len(t.Fields))
 	for b := range in {
+	records:
 		for _, r := range b {
 			n++
+			// Convert all fields first: a record that fails goes on unchanged.
 			for i, f := range t.Fields {
 				v, ok := r.Get(f.Name)
 				if !ok {
-					continue // not in this record: nothing to convert
+					converted[i] = missing{} // not in this record: nothing to convert
+					continue
 				}
 				c, err := t.codecs[i].Convert(v)
 				if err != nil {
-					return fmt.Errorf("record %d, field %q: %w", n, f.Name, err)
+					if err := out.Fail(r, f.Name, fmt.Errorf("record %d, field %q: %w", n, f.Name, err)); err != nil {
+						return err
+					}
+					continue records
 				}
-				r.Set(f.Name, c)
+				converted[i] = c
+			}
+			for i, f := range t.Fields {
+				if _, ok := converted[i].(missing); !ok {
+					r.Set(f.Name, converted[i])
+				}
 			}
 			if err := out.Emit(r); err != nil {
 				return err
@@ -99,3 +112,6 @@ func (t *convert) Process(_ context.Context, in <-chan transform.Batch, out *tra
 	}
 	return nil
 }
+
+// missing marks a field that is not in a record.
+type missing struct{}
