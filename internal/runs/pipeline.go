@@ -70,5 +70,10 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		Observer: spec.Observer,
 		RunID:    spec.RunID,
 	})
+	if err == nil {
+		// Warnings of the schemas, e.g. fields that are not known (ADR 0007).
+		p.Warnings = append(p.Warnings, p.Runner.Warnings()...)
+		p.Warnings.Sort()
+	}
 	return p, err
 }

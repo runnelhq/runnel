@@ -135,6 +135,14 @@ func (p *Pipeline) validate() error {
 	return errs.errOrNil()
 }
 
+// WarningAt creates a warning located at a YAML path of the pipeline file.
+func (p *Pipeline) WarningAt(path, format string, args ...any) *Error {
+	if p.src == nil {
+		return &Error{Severity: SeverityWarning, Msg: fmt.Sprintf(format, args...)}
+	}
+	return p.src.warnf(path, format, args...)
+}
+
 // ErrorAt creates an error located at a YAML path of the pipeline file, e.g. "$.transforms[2].type".
 func (p *Pipeline) ErrorAt(path, format string, args ...any) *Error {
 	if p.src == nil {

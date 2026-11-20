@@ -2,8 +2,9 @@ examples/broken/broken.workflow.yaml:11:14: error: action "download" timeout: in
 examples/broken/broken.workflow.yaml:20:40: error: link #4: invalid condition "sucess" (expected success, failure, always or an expression "{{ … }}")
 examples/broken/cycle.pipeline.yaml:13:23: error: link #1 (read → fliter): unknown transform "fliter" (did you mean "filter"?)
 examples/broken/cycle.pipeline.yaml:16:7: error: link #4 (write → read) closes a cycle (read → filter → write → read); records in a pipeline can only flow forward
+examples/broken/fields.pipeline.yaml:18:19: error: transform "show": field "amout" does not exist in the incoming records (did you mean "amount"?) (fields: n, amount)
 examples/broken/graph.workflow.yaml:11:12: warning: variable "API_URL" is not defined (neither as workflow parameter nor in the project or environment)
 examples/broken/graph.workflow.yaml:14:9: warning: action "cleanup" is not reachable from the start action "start" and will never run
 examples/broken/graph.workflow.yaml:18:27: error: link #2 (download → imprt): unknown action "imprt" (did you mean "import"?)
 examples/broken/graph.workflow.yaml:19:7: error: link #3 (import → download) closes a cycle (download → import → download); mark the link back with loop: true if the repetition is intended
-9 workflow files and 2 pipeline files checked: 6 errors, 2 warnings
+9 workflow files and 3 pipeline files checked: 7 errors, 2 warnings

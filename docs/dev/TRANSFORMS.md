@@ -51,11 +51,30 @@ func (t *upper) Process(ctx context.Context, in <-chan transform.Batch, out *tra
 | Abbruch | `Emit` gibt bei Abbruch einen Fehler zurück: sofort zurückgeben. Bei langen Schritten ohne `Emit` (z. B. Datei öffnen) `ctx` weitergeben |
 | Fehler | Ein Fehler hält die ganze Pipeline an (Fehler-Links für einzelne Records folgen mit S17). Meldungen wie bei Actions |
 | Frühes Ende | Ein Transform darf aufhören, bevor `in` leer ist; die Engine verwirft den Rest |
-| Records | geordnete Felder (`internal/record`): `Get`, `Set`, `Delete`, `Clone`; Namen mit `_` sind für Metadaten reserviert ([ADR 0007](../adr/0007-typsystem-pipelines.md)). Werttypen und Schema kommen mit S14 |
+| Records | geordnete Felder (`internal/record`): `Get`, `Set`, `Delete`, `Clone`; Namen mit `_` sind für Metadaten reserviert ([ADR 0007](../adr/0007-typsystem-pipelines.md)). Werte in der Go-Darstellung ihres Typs: `string`, `int64`, `decimal.Decimal`, `float64`, `bool`, `record.Date`, `time.Time`, `[]byte`, `map[string]any`/`[]any`; fremde Werte mit `record.Normalize` umwandeln |
 | Log | `out.Logf`: `Info` für Ergebnisse, `Debug` für Details; bei großen Datenmengen nie je Record auf `Info` |
 | Zustand | Ein Transform-Objekt läuft in genau einer Goroutine; Zustand im Objekt ist erlaubt, globaler nicht |
 
-## 3. Tests
+## 3. Schema (`Init`)
+
+```go
+// Init meldet das Schema der ausgegebenen Records und die gelesenen Felder (ADR 0007).
+func (t *upper) Init(ic *transform.InitContext) (record.Schema, error) {
+	ic.Use(t.Field, "field")            // Pfad innerhalb von with: – für Datei, Zeile, Spalte
+	return ic.In.With(t.Field, record.String), nil
+}
+```
+
+- `ic.In` ist das Schema der eingehenden Records (bei mehreren Links gemischt; leer und geschlossen ohne Eingang).
+- Jedes Feld, das der Transform liest, mit `ic.Use` melden: fehlt es im geschlossenen Schema, ist es ein Fehler, im
+  offenen eine Warnung – jeweils mit „did you mean …?“. Ist im offenen Schema nichts bekannt, wird nichts gemeldet.
+- Das Ergebnis beschreibt die Ausgabe: **geschlossen**, wenn alle Felder bekannt sind (z. B. Eingaben mit Felddefinition,
+  `core.generate-rows`), **offen**, wenn weitere vorkommen können. Transforms, die nur weiterreichen, geben `ic.In` zurück.
+- Ohne `Init` gilt die Ausgabe als offen und unbekannt – für neue Transforms nur, wenn sich wirklich nichts ableiten lässt.
+- Konstante Werte aus der Konfiguration mit `record.Normalize` umwandeln (`transform.DecodeConfig` liefert Zahlen als
+  `json.Number`).
+
+## 4. Tests
 
 ```go
 func TestUpper(t *testing.T) {
@@ -71,9 +90,10 @@ func TestUpper(t *testing.T) {
 - Zusammenspiel mehrerer Transforms über die Engine: Tests in `internal/engine/pipeline`, Beispiele unter `examples/`.
 - Golden-Dateien des Katalogs mit `go test ./internal/cli -update` neu erzeugen und den Diff prüfen.
 
-## 4. Checkliste für den PR
+## 5. Checkliste für den PR
 
 - [ ] Eine Datei je Transform, Eintrag in `register.go`, Kategorie, Label, Beschreibung, `doc` für jedes Feld
 - [ ] Werte mit Variablen werden in `Process` geprüft; `Emit`-Fehler werden zurückgegeben
+- [ ] `Init` meldet das Ausgabeschema und alle gelesenen Felder (`ic.Use`), mit Tests
 - [ ] Tests mit `transformtest`, Vertragstest grün, Katalog-Goldens geprüft
 - [ ] KONZEPT Kap. 12.2 und ROADMAP aktualisiert, ggf. Beispiel unter `examples/`

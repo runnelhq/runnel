@@ -1,0 +1,20 @@
+# A pipeline with a typo in a field name (roadmap S14). Check it with:
+#   runnel validate examples/broken/fields.pipeline.yaml
+# "numbers" says which fields its records have (a closed schema), so "amout" is an error.
+kind: Pipeline
+apiVersion: runnel/v1
+name: fields
+transforms:
+  - id: numbers
+    type: core.generate-rows
+    with:
+      rows: 10
+      rowNumberField: n
+      fields:
+        - { name: amount, value: 9.95 }
+  - id: show
+    type: core.log
+    with:
+      fields: [n, amout]
+links:
+  - { from: numbers, to: show }

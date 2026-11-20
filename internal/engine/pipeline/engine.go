@@ -106,7 +106,10 @@ type Runner struct {
 	p          *model.Pipeline
 	opts       Options
 	transforms []transform.Transform
-	emitMu     sync.Mutex
+	// schemas holds the schema of the output of each transform (ADR 0007).
+	schemas  []record.Schema
+	warnings model.Errors
+	emitMu   sync.Mutex
 }
 
 // Prepare creates the transforms of a pipeline: their types must exist and their
@@ -143,12 +146,95 @@ func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
 	if err := errs.Err(); err != nil {
 		return nil, err
 	}
+	diags := r.deriveSchemas()
+	if diags.HasErrors() {
+		return nil, diags.Err()
+	}
+	diags.Sort()
+	r.warnings = diags
 	return r, nil
 }
 
-// Check returns the problems Prepare finds, e.g. for "runnel validate".
+// Warnings returns the warnings found by Prepare, e.g. fields that are not known in an open schema.
+func (r *Runner) Warnings() model.Errors { return r.warnings }
+
+// Schema returns the schema of the records a transform emits.
+func (r *Runner) Schema(transformID string) (record.Schema, bool) {
+	for i, t := range r.p.Transforms {
+		if t.ID == transformID {
+			return r.schemas[i], true
+		}
+	}
+	return record.Schema{}, false
+}
+
+// deriveSchemas calls Init of the transforms in the order of the links (the graph has
+// no cycles): each gets the merged schemas of the transforms before it (ADR 0007).
+func (r *Runner) deriveSchemas() model.Errors {
+	p := r.p
+	index := map[string]int{}
+	for i, t := range p.Transforms {
+		index[t.ID] = i
+	}
+	inputs := make([][]int, len(p.Transforms))
+	pending := make([]int, len(p.Transforms))
+	next := make([][]int, len(p.Transforms))
+	for _, l := range p.Links {
+		from, to := index[l.From], index[l.To]
+		inputs[to] = append(inputs[to], from)
+		next[from] = append(next[from], to)
+		pending[to]++
+	}
+	var queue []int
+	for i := range p.Transforms {
+		if pending[i] == 0 {
+			queue = append(queue, i)
+		}
+	}
+	r.schemas = make([]record.Schema, len(p.Transforms))
+	var diags model.Errors
+	for len(queue) > 0 {
+		i := queue[0]
+		queue = queue[1:]
+		var in []record.Schema
+		for _, from := range inputs[i] {
+			in = append(in, r.schemas[from])
+		}
+		t := p.Transforms[i]
+		r.schemas[i] = record.OpenSchema()
+		if init, ok := r.transforms[i].(transform.Initializer); ok {
+			ic := transform.NewInitContext(record.Merge(in...))
+			out, err := init.Init(ic)
+			base := fmt.Sprintf("$.transforms[%d].with", i)
+			for _, pr := range ic.Problems() {
+				path := base
+				if pr.Path != "" {
+					path += "." + pr.Path
+				}
+				if pr.Warning {
+					diags = append(diags, p.WarningAt(path, "transform %q: %s", t.ID, pr.Message))
+				} else {
+					diags = append(diags, p.ErrorAt(path, "transform %q: %s", t.ID, pr.Message))
+				}
+			}
+			if err != nil {
+				diags = append(diags, p.ErrorAt(base, "transform %q (%s): %v", t.ID, t.Type, err))
+			} else {
+				r.schemas[i] = out
+			}
+		}
+		for _, to := range next[i] {
+			if pending[to]--; pending[to] == 0 {
+				queue = append(queue, to)
+			}
+		}
+	}
+	return diags
+}
+
+// Check returns the problems Prepare finds – errors and warnings –, e.g. for "runnel validate".
 func Check(p *model.Pipeline, opts Options) model.Errors {
-	_, err := Prepare(p, opts)
+	r, err := Prepare(p, opts)
 	var diags model.Errors
 	if errors.As(err, &diags) {
 		return diags
@@ -156,7 +242,7 @@ func Check(p *model.Pipeline, opts Options) model.Errors {
 	if err != nil {
 		return model.Errors{p.ErrorAt("$", "%v", err)}
 	}
-	return nil
+	return r.Warnings()
 }
 
 // asText writes numbers and booleans as text where the schema of the transform expects
