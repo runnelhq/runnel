@@ -159,7 +159,8 @@ func (t *input) Process(ctx context.Context, _ <-chan transform.Batch, out *tran
 			}
 		}
 		rows++
-		var rec record.Record
+		// The names of the columns are unique (checked by columns): the record is built at once.
+		fields := make([]record.Field, 0, len(cols))
 		var bad error
 		var badField string
 		for _, c := range cols {
@@ -169,7 +170,7 @@ func (t *input) Process(ctx context.Context, _ <-chan transform.Batch, out *tran
 				bad, badField = fmt.Errorf("%s:%d:%d: field %q: %w", t.Path, line, col, c.name, err), c.name
 				break
 			}
-			rec.Set(c.name, v)
+			fields = append(fields, record.Field{Name: c.name, Value: v})
 		}
 		if bad != nil {
 			// The row goes to an error link as text, or stops the pipeline.
@@ -179,7 +180,7 @@ func (t *input) Process(ctx context.Context, _ <-chan transform.Batch, out *tran
 			}
 			continue
 		}
-		if err := out.Emit(rec); err != nil {
+		if err := out.Emit(record.FromFields(fields)); err != nil {
 			return err
 		}
 	}
@@ -200,11 +201,11 @@ func value(row []string, i int) string {
 
 // raw returns the values of a row as text, for an error link.
 func raw(cols []column, row []string) record.Record {
-	var rec record.Record
-	for _, c := range cols {
-		rec.Set(c.name, value(row, c.index))
+	fields := make([]record.Field, len(cols))
+	for i, c := range cols {
+		fields[i] = record.Field{Name: c.name, Value: value(row, c.index)}
 	}
-	return rec
+	return record.FromFields(fields)
 }
 
 // column is a column of the file read into a field.

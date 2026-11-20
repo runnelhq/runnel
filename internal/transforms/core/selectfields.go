@@ -104,7 +104,7 @@ func (t *selectFields) Process(_ context.Context, in <-chan transform.Batch, out
 					r.Delete(name)
 				}
 			case len(t.Fields) > 0:
-				var kept record.Record
+				kept := record.Make(len(t.Fields))
 				for _, f := range t.Fields {
 					v, _ := r.Get(f.Name) // a missing field is null
 					kept.Set(f.out(), v)

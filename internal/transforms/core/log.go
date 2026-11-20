@@ -90,7 +90,7 @@ func (t *logRecords) selected(r record.Record) record.Record {
 	if len(t.Fields) == 0 {
 		return r
 	}
-	var out record.Record
+	out := record.Make(len(t.Fields))
 	for _, name := range t.Fields {
 		if v, ok := r.Get(name); ok {
 			out.Set(name, v)

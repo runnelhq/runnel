@@ -49,3 +49,27 @@ func TestCloneIsIndependent(t *testing.T) {
 		t.Error("empty clone")
 	}
 }
+
+func TestMakeFromFieldsGetAt(t *testing.T) {
+	r := Make(2)
+	r.Set("a", 1)
+	r.Set("b", 2)
+	if r.Len() != 2 || cap(r.fields) != 2 {
+		t.Errorf("make: %+v cap %d", r, cap(r.fields))
+	}
+	f := FromFields([]Field{{Name: "x", Value: 1}, {Name: "y", Value: 2}})
+	if !slices.Equal(f.Names(), []string{"x", "y"}) {
+		t.Errorf("from fields %v", f.Names())
+	}
+	// GetAt looks at the position first and falls back to the name.
+	for _, c := range []struct {
+		i    int
+		name string
+		want any
+		ok   bool
+	}{{0, "x", 1, true}, {1, "y", 2, true}, {0, "y", 2, true}, {5, "x", 1, true}, {-1, "y", 2, true}, {1, "z", nil, false}} {
+		if v, ok := f.GetAt(c.i, c.name); v != c.want || ok != c.ok {
+			t.Errorf("GetAt(%d, %q) = %v, %v", c.i, c.name, v, ok)
+		}
+	}
+}

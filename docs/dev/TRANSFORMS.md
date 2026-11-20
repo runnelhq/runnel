@@ -56,6 +56,7 @@ func (t *upper) Process(ctx context.Context, in <-chan transform.Batch, out *tra
 | Log | `out.Logf`: `Info` für Ergebnisse, `Debug` für Details; bei großen Datenmengen nie je Record auf `Info` |
 | Zustand | Ein Transform-Objekt läuft in genau einer Goroutine; Zustand im Objekt ist erlaubt, globaler nicht |
 | Aufrufer | `out.Rows()` liefert die Datensätze, die ein Workflow mitgegeben hat (`rows` an `core.run-pipeline`); `out.AddResult(r)` gibt einen Datensatz an ihn zurück (`output.rows`). Beispiele `fromresult.go`, `toresult.go` |
+| Leistung | Was je Record läuft, zählt bei Millionen Records. Neue Records mit bekannter Feldzahl mit `record.Make(n)` anlegen; stehen die Namen fest und sind eindeutig (z. B. Spalten einer Datei), die Felder sammeln und mit `record.FromFields` übernehmen – `Set` sucht bei jedem Feld nach dem Namen. Haben die Records meist dieselben Felder in derselben Reihenfolge, liest `r.GetAt(i, name)` zuerst an Position `i` (Beispiel `csv/output.go`). Nachschlagen (Codecs, Indizes) einmal vor der Schleife, nicht je Record |
 | Kopien | Mit `Parallel: true` in der Definition darf der Transform mit `copies: n` laufen: die Engine erzeugt n Objekte (je `New` und `Init`), die sich die Eingabe teilen. Nur setzen, wenn jeder Record für sich verarbeitet wird und nichts doppelt gelesen oder geschrieben wird (nicht bei Ein- und Ausgaben) |
 
 ## 3. Schema (`Init`)
@@ -76,7 +77,9 @@ func (t *upper) Init(ic *transform.InitContext) (record.Schema, error) {
 - Ohne `Init` gilt die Ausgabe als offen und unbekannt – für neue Transforms nur, wenn sich wirklich nichts ableiten lässt.
 - Ausdrücke je Datensatz (z. B. eine Bedingung) mit `transform.CompileExpression` in `New` übersetzen, die Felder aus
   `expr.Fields()` mit `ic.Use` melden und in `Process` mit `expr.Bool(out, r)` auswerten (Beispiel `filter.go`); die
-  Werte des Laufs (`params` …) liefert `out.Values()`. In Tests: `transformtest.RunWithValues`.
+  Werte des Laufs (`params` …) liefert `out.Values()`. In Tests: `transformtest.RunWithValues`. Ein `Expression` hält
+  seinen Kontext zwischen den Records und übergibt nur die Felder, die der Ausdruck nennt; es gehört deshalb genau einem
+  Transform-Objekt (in `New` anlegen, nicht teilen).
 - Konstante Werte aus der Konfiguration mit `record.Normalize` umwandeln (`transform.DecodeConfig` liefert Zahlen als
   `json.Number`).
 

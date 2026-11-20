@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -180,5 +181,46 @@ func TestCheckWithVariables(t *testing.T) {
 	}
 	if err := Check("{{ ${X} + reslt }}", WorkflowRoots); err == nil || !strings.Contains(err.Error(), "unknown name reslt") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestOnlyMembers(t *testing.T) {
+	for code, want := range map[string]string{
+		"{{ record.a > record.b && record.a != 0 }}": "[a b] true",
+		"{{ record?.a ?? params.X }}":                "[a] true",
+		`{{ record["a"] }}`:                          "[a] true",
+		`{{ record[params.F] }}`:                     "[] false",
+		"{{ len(record) }}":                          "[] false",
+		`{{ "a" in record }}`:                        "[] false",
+		"{{ params.X }}":                             "[] true",
+	} {
+		tpl, err := Compile(code, RecordRoots)
+		if err != nil {
+			t.Fatal(code, err)
+		}
+		names, only := tpl.OnlyMembers("record")
+		if got := fmt.Sprint(append([]string{}, names...), " ", only); got != want {
+			t.Errorf("%s: got %s, want %s", code, got, want)
+		}
+	}
+}
+
+// An evaluator reuses its virtual machine: results and errors as with Eval.
+func TestEvaluator(t *testing.T) {
+	tpl, err := Compile("{{ record.n * 2 > 4 }}", RecordRoots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := tpl.Evaluator()
+	for n, want := range map[int64]bool{1: false, 3: true, 2: false} {
+		if got, err := e.EvalBool(map[string]any{"record": map[string]any{"n": n}}); err != nil || got != want {
+			t.Errorf("n=%d: %v %v", n, got, err)
+		}
+	}
+	if _, err := e.EvalBool(map[string]any{"record": map[string]any{"n": "x"}}); err == nil {
+		t.Error("no error for a text")
+	}
+	if got, err := e.EvalBool(map[string]any{"record": map[string]any{"n": int64(5)}}); err != nil || !got {
+		t.Errorf("after an error: %v %v", got, err)
 	}
 }
