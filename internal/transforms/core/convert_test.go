@@ -83,3 +83,25 @@ func TestConvertSchema(t *testing.T) {
 		t.Errorf("open: %+v", s)
 	}
 }
+
+func TestConvertErrorLink(t *testing.T) {
+	tr := transformtest.New(t, convertDefinition, map[string]any{"fields": []any{
+		map[string]any{"name": "id", "type": "int"},
+		map[string]any{"name": "amount", "type": "decimal", "format": "#.##0,00"},
+	}})
+	in := func(id, amount string) record.Record {
+		return record.New(record.Field{Name: "id", Value: id}, record.Field{Name: "amount", Value: amount})
+	}
+	out, failed, _, err := transformtest.RunWithErrorLink(context.Background(), tr, in("1", "1,50"), in("2", "viel"), in("3", "3,00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 2 || Format(out[1]) != "{id: 3, amount: 3}" {
+		t.Errorf("out %v", out)
+	}
+	// The record goes on unchanged (id is still text), with the error fields.
+	want := `{id: "2", amount: "viel", _error: "record 2, field \"amount\": \"viel\" is not a number", _errorField: "amount", _errorTransform: "t"}`
+	if len(failed) != 1 || Format(failed[0]) != want {
+		t.Errorf("failed %v\nwant %s", failed, want)
+	}
+}

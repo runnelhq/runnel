@@ -116,7 +116,7 @@ my-project/
 - Ein Record ist ein **geordnetes, JSON-artiges Objekt** (Feldname → Wert). Pipelines sind **schemalos mit optionalen Typen** (string, int, decimal, float, bool, date, datetime, binary, json) – Details: [ADR 0007](adr/0007-typsystem-pipelines.md).
 - Links in Pipelines:
   - Normaler **Daten-Link**
-  - **Fehler-Link**: fehlerhafte Records werden mit Fehlerinfos (`_error.message`, `_error.field`) umgeleitet statt die Pipeline abzubrechen
+  - **Fehler-Link**: fehlerhafte Records werden mit Fehlerinfos (`_error`, `_errorField`, `_errorTransform`) umgeleitet statt die Pipeline abzubrechen
   - **Info-Link**: Nebeneingang (z. B. Lookup-Daten für „Stream Lookup“)
 - Verteilungsmodus bei mehreren Ausgängen: `copy` (jeder Ausgang bekommt jeden Record) oder `distribute` (Round-Robin), wie in Apache Hop.
 - Transforms können mit **mehreren Kopien** (Parallelität) laufen, z. B. für teure HTTP-Lookups.
@@ -496,8 +496,13 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
   Dazu `description`, `parameters` (wie bei Workflows, ohne `outputs`) und je Transform `with`.
 - Transform-IDs wie Action-IDs; Typen `<namespace>.<name>` in einem eigenen Namensraum ([ADR 0013](adr/0013-typnamen-namensraeume.md)).
   Ob ein Typ existiert und seine Konfiguration passt, prüfen `runnel validate` und der Start eines Laufs (seit S13b).
-- Links sind Daten-Links (`type: data`, Standard). **Fehler werden nur über Links behandelt** (`type: error`, mit S17),
-  nicht über ein Feld am Transform – wie die Fehlerpfade (`when: failure`) bei Workflows. `type: info` folgt mit S23;
+- Links sind Daten-Links (`type: data`, Standard). **Fehler werden nur über Links behandelt** (`type: error`, seit S17a),
+  nicht über ein Feld am Transform – wie die Fehlerpfade (`when: failure`) bei Workflows. Ein Datensatz, den ein
+  Transform nicht verarbeiten kann, geht mit `_error` (Meldung), `_errorField` (Feld, sonst leer) und `_errorTransform`
+  (ID) über alle Fehler-Links des Transforms (ab dem zweiten als Kopie); ohne Fehler-Link bricht die Pipeline ab. Der
+  Datensatz ist der eingehende, unverändert (bei `csv.input` die Werte der Zeile als Text). Fehler-Links nutzen
+  `csv.input`, `csv.output`, `core.convert` und `core.filter`; an anderen Transforms warnt `runnel validate`, dass der
+  Link nie genutzt wird. Das Schema eines Fehler-Links ist das eingehende mit den drei Feldern. `type: info` folgt mit S23;
   bis dahin meldet `runnel validate` beide als „noch nicht unterstützt“ (der Editor zeigt Pipelines bis S25a nur als YAML).
 - Graph: mindestens ein Transform, eindeutige IDs, Links nur zwischen vorhandenen Transforms, keine Links auf sich
   selbst und **keine Zyklen** (Datensätze fließen nur vorwärts). Warnungen: doppelte Links, Transforms ohne Verbindung.
@@ -591,7 +596,7 @@ flowchart LR
 - **Batching**: Records werden intern in Batches (z. B. 500) übertragen, um Channel-Overhead zu minimieren; für den Transform-Entwickler unsichtbar.
 - **Backpressure** entsteht automatisch: Volle Puffer blockieren den Erzeuger → konstanter Speicher auch bei großen Dateien.
 - **Ende-Signal**: Schließen des Channels propagiert durch den Graphen; die Pipeline ist fertig, wenn alle Transforms beendet sind.
-- **Fehler**: Pro Record → Fehler-Link (falls vorhanden), sonst Pipeline-Abbruch (alle Goroutinen via Context gecancelt). Schwelle konfigurierbar (`maxErrors: 100`).
+- **Fehler**: Pro Record → Fehler-Link (falls vorhanden), sonst Pipeline-Abbruch (alle Goroutinen via Context gecancelt). Die Zähler zeigen die Fehler je Transform (`read 4, written 3, errors 1`). Eine Schwelle (`maxErrors`) ist zurückgestellt (Backlog).
 - **Metriken** je Transform: gelesen/geschrieben/Fehler/Records pro Sekunde/Puffer-Füllstand – live per Server-Sent Events im Editor (vergleichbar mit dem „Metrics“-Tab in Apache Hop).
 - **Transaktionen**: DB-Outputs mit `commitSize`; optional „Unique Connection“-Modus (eine Transaktion über die ganze Pipeline, Rollback bei Fehler).
 
@@ -610,8 +615,8 @@ type Transform interface {
 
 - **Mehrere Eingänge** eines Transforms werden zu einem Strom gemischt (Reihenfolge zwischen den Zweigen nicht
   festgelegt); **mehrere Ausgänge** bekommen jeden Record (`copy`), ab dem zweiten als Kopie, damit Zweige sich nicht
-  gegenseitig verändern. `distribute` und `copies` folgen mit S17.
-- Batches zu 500 Records, Puffer je Link 10.000 Records (feste Werte bis S17).
+  gegenseitig verändern. `distribute` und `copies` folgen mit S17c.
+- Batches zu 500 Records, Puffer je Link 10.000 Records (feste Werte bis S17c).
 - Hört ein Transform vor dem Ende seiner Eingabe auf zu lesen, verwirft die Engine den Rest, damit die Transforms davor
   fertig werden. Eine Panik in einem Transform wird zum Fehler der Pipeline.
 - **Zähler** je Transform: gelesen, geschrieben (Ereignis `transform.finished`, Ergebnis des Laufs).
@@ -916,7 +921,7 @@ Umgesetzt (Stand S16b): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
 
 - **`core.filter`** reicht die Datensätze weiter, für die `condition` wahr ist (`{{ record.betrag > 0 }}`, die
   Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Ein Ausgang für „falsch“ folgt mit
-  den Link-Typen (S17).
+  `core.switch` (S17b). Lässt sich die Bedingung nicht auswerten, geht der Datensatz auf den Fehler-Link.
 - **`core.select-fields`** behält mit `fields:` nur die genannten Felder, in dieser Reihenfolge, wahlweise umbenannt
   (`{ name: kdnr, rename: externalId }`, geschlossenes Schema); fehlt ein Feld im Datensatz, ist es leer. Mit `remove:`
   werden die genannten Felder entfernt und alle anderen behalten. Beides zusammen ist ein Fehler.
@@ -925,7 +930,8 @@ Umgesetzt (Stand S16b): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   `run`, ohne `record`) und behalten ihren Typ. Werte je Datensatz berechnet später `core.calculate`.
 - **`core.convert`** wandelt Felder in einen anderen Typ um: Text mit Format (`"1.234,56"` → `decimal`, `"20.11.2026"` →
   `date`), in Text mit Format (`decimal` → `"1.234,56"`), Zahlen ineinander und `date` ↔ `datetime`. Was nicht passt,
-  bricht mit Datensatz und Feld ab (`1.5` ist kein `int`; es wird nicht gerundet), Fehler-Links folgen mit S17. Die
+  geht unverändert auf den Fehler-Link oder bricht mit Datensatz und Feld ab (`1.5` ist kein `int`; es wird nicht
+  gerundet). Die
   Formate teilen sich `csv.input`, `csv.output` und `core.convert` (Paket `internal/format`).
 
 - **`csv.input`** liest alle Spalten als Text (offenes Schema) oder mit `fields:` nur die genannten, mit Typ und Format
@@ -1025,7 +1031,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: E7c, S10, S19–S21, S23, S25, S26, S29, S36, S45, S47, S48, `core.calculate`, `core.dedupe`, Retention ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: E7c, S10, S19–S21, S23, S25, S26, S29, S36, S45, S47, S48, `core.calculate`, `maxErrors`, `core.dedupe`, Retention ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

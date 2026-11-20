@@ -505,7 +505,8 @@
           "fields"
         ],
         "additionalProperties": false
-      }
+      },
+      "recordErrors": true
     },
     {
       "type": "core.dummy",
@@ -541,7 +542,8 @@
           "condition"
         ],
         "additionalProperties": false
-      }
+      },
+      "recordErrors": true
     },
     {
       "type": "core.generate-rows",
@@ -765,7 +767,8 @@
           "path"
         ],
         "additionalProperties": false
-      }
+      },
+      "recordErrors": true
     },
     {
       "type": "csv.output",
@@ -848,7 +851,8 @@
           "path"
         ],
         "additionalProperties": false
-      }
+      },
+      "recordErrors": true
     }
   ]
 }

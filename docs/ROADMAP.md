@@ -11,7 +11,7 @@ Erledigte Schritte sind mit ✅ markiert.
 >
 > **Tiefe vor Breite (2026-11-19):** Damit der ganze Anwendungsfall früh bewertbar ist, werden die Phasen zuerst in der
 > Tiefe gebaut. Gute, aber nicht vorrangige Schritte stehen mit ihrer Nummer im [Backlog](#zurückgestellt-tiefe-vor-breite):
-> S10, S19, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48 sowie `core.calculate` (S16), `core.dedupe` (S22) und die
+> S10, S19, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48 sowie `core.calculate` (S16), `maxErrors` (S17), `core.dedupe` (S22) und die
 > Aufbewahrung der Historie (S43). E7c ist ebenfalls zurückgestellt.
 
 ## Regeln für jeden Schritt
@@ -110,7 +110,9 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | S15 ✅ | CSV | `csv.input`, `csv.output`; Trennzeichen, Kopfzeile, Encoding (UTF-8 mit/ohne BOM, Windows-1252, beim Lesen UTF-16 per BOM), Felddefinition mit Typ und Format (Zahlenmuster wie `#.##0,00`, Datumsmuster wie `dd.MM.yyyy`), `ifExists` (`replace` über temporäre Datei, `append`, `fail`); Abhängigkeit `golang.org/x/text`; Beispiel `examples/pipelines/pipelines/orders.pipeline.yaml` | Golden-Tests: CSV rein → CSV raus |
 | S16a ✅ | Ausdrücke je Datensatz & Filter | `record` im Ausdruckskontext mit `vars`, `params`, `env`, `run`; exakte Dezimalzahlen in Operatoren, `null` wie in SQL ([ADR 0006](adr/0006-ausdruckssprache.md), Nachtrag); `core.filter` (verworfene Datensätze werden gezählt); Beispiel `orders.pipeline.yaml` mit Mindestbetrag | Unit-Tests; `runnel validate` meldet Tippfehler in der Bedingung |
 | S16b ✅ | Basis-Transforms | `core.select-fields` (behalten mit Umbenennen oder entfernen), `core.constant` (Werte mit `${…}`/`{{ … }}` einmal je Lauf), `core.convert` (Formate aus `csv` als gemeinsames Paket `internal/format`); Beispiel `customers.pipeline.yaml`; `core.calculate` zurückgestellt | Unit-Tests; CLI-Test mit erzeugter CSV-Datei |
-| S17 | Fehler-Links & Fluss | Fehler-Link, `maxErrors`, `core.switch`, Verteilmodus `copy`/`distribute`, `copies` (parallele Instanzen) | Golden-Tests mit fehlerhaften Zeilen |
+| S17a ✅ | Fehler-Links | `type: error` an Pipeline-Links; `Output.Fail` schickt einen Datensatz mit `_error`, `_errorField`, `_errorTransform` dorthin, sonst Abbruch; genutzt von `csv.input`, `csv.output`, `core.convert`, `core.filter`; Zähler `errors`; Warnung bei Fehler-Links an Transforms ohne Fehler je Datensatz; Beispiel `customers.pipeline.yaml` mit abgelehnten Kunden | Tests mit fehlerhaften Zeilen; CLI-Test |
+| S17b | Switch | `core.switch`: Datensätze nach Bedingungen auf bestimmte Links verteilen | Golden-Tests |
+| S17c | Verteilen & Parallelität | Verteilmodus `copy`/`distribute`, `copies` (parallele Instanzen), `settings` (`bufferSize`, `batchSize`, strikter Modus nach ADR 0007) | Tests mit `-race` |
 | S18 | Workflow ↔ Pipeline | `core.run-pipeline` mit Parametern, Zeilenzahlen im Ergebnis | Beispiel: Workflow ruft CSV-Pipeline |
 | S22 | Sortieren & Gruppieren | `core.sort`, `core.group-by` (zunächst im Speicher; `core.dedupe` zurückgestellt) | Golden-Tests |
 | S24 | Ergebnis-Datensätze | `core.to-result`, `core.from-result`, `forEachRow` an `core.run-pipeline`/`core.run-workflow` ([ADR 0008](adr/0008-ausfuehrungsvarianten.md)) | Beispiel: Dateiliste → Pipeline je Datei |
@@ -174,6 +176,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | S26 |
 | S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | – |
 | S16 (Teil) | `core.calculate` | Felder per Ausdruck berechnen | S08 |
+| S17 (Teil) | `maxErrors` | Schwelle für Fehler-Links: mehr als n fehlerhafte Datensätze brechen die Pipeline ab | S17a |
 | S19 | JSON | `json.input`, `json.output` (JSON und NDJSON) | danach S46 auch für JSON |
 | S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | – |
 | S21 | DB-Ausgabe | `db.table-output` (Insert, `commitSize`), `db.upsert` | S20 |

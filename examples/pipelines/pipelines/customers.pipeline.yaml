@@ -1,7 +1,9 @@
 # Prepares customers for a CRM import. Run it from the folder that contains "examples":
 #   runnel run examples/pipelines/pipelines/customers.pipeline.yaml
 # - "read" reads all columns as text (no field definition).
-# - "types" converts kdnr and umsatz (German format) into numbers.
+# - "types" converts kdnr and umsatz (German format) into numbers. A customer whose
+#   values do not fit ("k. A.") goes over the error link to "rejected", with the reason
+#   in _error, instead of stopping the pipeline.
 # - "active" keeps customers with sales.
 # - "map" keeps three fields under the names the CRM expects; all others are dropped.
 # - "tag" adds the source and the batch number of the run (an expression, once per run).
@@ -16,6 +18,9 @@ parameters:
   - name: OUTPUT
     description: CSV file to write
     default: customers-crm.csv
+  - name: REJECTED
+    description: CSV file for customers with invalid values
+    default: customers-rejected.csv
 transforms:
   - id: read
     type: csv.input
@@ -49,8 +54,14 @@ transforms:
     type: csv.output
     with:
       path: ${OUTPUT}
+  - id: rejected
+    type: csv.output
+    with:
+      path: ${REJECTED}
+      delimiter: ";"
 links:
   - { from: read, to: types }
+  - { from: types, to: rejected, type: error }
   - { from: types, to: active }
   - { from: active, to: map }
   - { from: map, to: tag }

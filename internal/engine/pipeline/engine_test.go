@@ -54,6 +54,27 @@ func testRegistry(c *collected) *transform.Registry {
 				return nil
 			})}, nil
 		}})
+	// test.odd passes even values of n on and sends odd ones to its error links.
+	r.Register(transform.Definition{Type: "test.odd", Category: transform.CategoryFlow, Label: "Test", Description: "Test", RecordErrors: true,
+		New: func(map[string]any) (transform.Transform, error) {
+			return fn(func(_ context.Context, in <-chan transform.Batch, out *transform.Output) error {
+				for b := range in {
+					for _, rec := range b {
+						n, _ := rec.Get("n")
+						var err error
+						if n.(int64)%2 == 1 {
+							err = out.Fail(rec, "n", fmt.Errorf("odd number %d", n))
+						} else {
+							err = out.Emit(rec)
+						}
+						if err != nil {
+							return err
+						}
+					}
+				}
+				return nil
+			}), nil
+		}})
 	reg("test.collect", func(_ map[string]any, _ context.Context, in <-chan transform.Batch, out *transform.Output) error {
 		for b := range in {
 			for _, rec := range b {
@@ -171,7 +192,7 @@ links:
 	if res.Status != Succeeded || res.Err != nil {
 		t.Fatalf("%s %v", res.Status, res.Err)
 	}
-	if got := res.Counts; got["gen"] != (Counts{0, 100}) || got["pass"] != (Counts{100, 100}) || got["sink"] != (Counts{100, 100}) {
+	if got := res.Counts; got["gen"] != (Counts{Read: 0, Written: 100}) || got["pass"] != (Counts{Read: 100, Written: 100}) || got["sink"] != (Counts{Read: 100, Written: 100}) {
 		t.Errorf("counts %+v", got)
 	}
 	// Order within one link is kept.
@@ -181,7 +202,7 @@ links:
 			t.Fatalf("record %d has n=%v", i, v)
 		}
 	}
-	if e := finished(events, "pass"); e.Status != Succeeded || e.Counts != (Counts{100, 100}) {
+	if e := finished(events, "pass"); e.Status != Succeeded || e.Counts != (Counts{Read: 100, Written: 100}) {
 		t.Errorf("event %+v", e)
 	}
 	if events[0].Kind != RunStarted || events[len(events)-1].Kind != RunFinished || len(res.RunID) != 26 {
@@ -462,5 +483,83 @@ links:
 	}
 	if got := len(c.recs["out"]); got != 4 {
 		t.Errorf("%d records passed the filter, want 4 (7 to 10)", got)
+	}
+}
+
+func TestRunErrorLinks(t *testing.T) {
+	body := `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 20, rowNumberField: n } }
+  - { id: check, type: test.odd }
+  - { id: good, type: test.collect }
+  - { id: bad, type: test.collect }
+  - { id: bad2, type: test.collect }
+links:
+  - { from: gen, to: check }
+  - { from: check, to: good }
+  - { from: check, to: bad, type: error }
+  - { from: check, to: bad2, type: error }
+`
+	res, c, events := run(context.Background(), t, body, nil)
+	if res.Status != Succeeded {
+		t.Fatalf("%s: %v", res.Status, res.Err)
+	}
+	if got := res.Counts["check"]; got != (Counts{Read: 20, Written: 10, Errors: 10}) {
+		t.Errorf("counts %+v", got)
+	}
+	if e := finished(events, "check"); e.Counts.Errors != 10 {
+		t.Errorf("event counts %+v", e.Counts)
+	}
+	if len(c.recs["good"]) != 10 || len(c.recs["bad"]) != 10 || len(c.recs["bad2"]) != 10 {
+		t.Fatalf("good %d, bad %d, bad2 %d", len(c.recs["good"]), len(c.recs["bad"]), len(c.recs["bad2"]))
+	}
+	r := c.recs["bad"][0]
+	for name, want := range map[string]any{"n": int64(1), "_error": "odd number 1", "_errorField": "n", "_errorTransform": "check"} {
+		if v, _ := r.Get(name); v != want {
+			t.Errorf("%s = %#v, want %#v", name, v, want)
+		}
+	}
+	// The second error link gets copies.
+	c.recs["bad2"][0].Set("n", int64(99))
+	if v, _ := r.Get("n"); v != int64(1) {
+		t.Error("error links share records")
+	}
+
+	// Without an error link, a record error stops the pipeline.
+	res, _, _ = run(context.Background(), t, "transforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 3, rowNumberField: n } }\n  - { id: check, type: test.odd }\nlinks:\n  - { from: gen, to: check }\n", nil)
+	if res.Status != Failed || res.Err.Error() != `transform "check": odd number 1` {
+		t.Errorf("without error link: %s %v", res.Status, res.Err)
+	}
+}
+
+func TestPrepareErrorLinks(t *testing.T) {
+	c := &collected{recs: map[string][]record.Record{}}
+	p := parse(t, `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: pass, type: core.dummy }
+  - { id: check, type: test.odd }
+  - { id: log, type: core.log, with: { fields: [n, _error, nn] } }
+links:
+  - { from: gen, to: pass }
+  - { from: pass, to: check }
+  - { from: pass, to: log, type: error }
+  - { from: check, to: log, type: error }
+`)
+	var msgs []string
+	for _, d := range Check(p, Options{Registry: testRegistry(c)}) {
+		msgs = append(msgs, d.Error())
+	}
+	got := strings.Join(msgs, "\n")
+	// core.dummy has no record errors. The schema of an error link is the incoming one
+	// with the error fields: _error is known, nn is not.
+	for _, want := range []string{
+		`link #3 (pass → log): core.dummy does not pass records with errors on; the error link is never used`,
+		`transform "log": field "nn" does not exist in the incoming records (did you mean "n"?) (fields: n, _error, _errorField, _errorTransform)`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if len(msgs) != 2 {
+		t.Errorf("%d problems:\n%s", len(msgs), got)
 	}
 }

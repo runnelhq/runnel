@@ -111,3 +111,22 @@ func TestFilterSchema(t *testing.T) {
 		t.Errorf("problems %+v", p)
 	}
 }
+
+func TestFilterErrorLink(t *testing.T) {
+	tr := transformtest.New(t, filterDefinition, map[string]any{"condition": "{{ record.country > 'B' }}"})
+	in := []record.Record{
+		record.New(record.Field{Name: "country", Value: "DE"}),
+		record.New(record.Field{Name: "country", Value: int64(7)}),
+		record.New(record.Field{Name: "country", Value: "AT"}),
+	}
+	out, failed, logs, err := transformtest.RunWithErrorLink(context.Background(), tr, in...)
+	if err != nil || len(out) != 1 || len(failed) != 1 {
+		t.Fatalf("out %v, failed %v, %v", out, failed, err)
+	}
+	if v, _ := failed[0].Get("_error"); !strings.Contains(fmt.Sprint(v), "record 2: expression {{ record.country > 'B' }}: invalid operation: int > string") {
+		t.Errorf("_error %v", v)
+	}
+	if len(logs) != 1 || logs[0].Msg != "kept 1 of 3 records, dropped 1, 1 with errors" {
+		t.Errorf("log %v", logs)
+	}
+}

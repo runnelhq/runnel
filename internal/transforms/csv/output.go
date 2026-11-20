@@ -18,12 +18,13 @@ import (
 
 // csv.output writes records to a CSV file and passes them on.
 var outputDefinition = transform.Definition{
-	Type:        "csv.output",
-	Category:    transform.CategoryOutput,
-	Label:       "CSV Output",
-	Description: "Writes records to a CSV file and passes them on",
-	Config:      output{},
-	New:         newOutput,
+	Type:         "csv.output",
+	RecordErrors: true,
+	Category:     transform.CategoryOutput,
+	Label:        "CSV Output",
+	Description:  "Writes records to a CSV file and passes them on",
+	Config:       output{},
+	New:          newOutput,
 }
 
 type output struct {
@@ -177,7 +178,7 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 	}
 	skipped := map[string]bool{}
 	var row []string
-	var n int64
+	var n, seen int64 // records written, records received
 	for b := range in {
 		for _, r := range b {
 			if cols == nil {
@@ -186,8 +187,10 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 			if err := writeHeader(); err != nil {
 				return n, err
 			}
-			n++
+			seen++
 			row = row[:0]
+			var bad error
+			var badField string
 			for _, c := range cols {
 				v, _ := r.Get(c)
 				s, err := codecs[c].Format(v)
@@ -195,9 +198,17 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 					err = check(s)
 				}
 				if err != nil {
-					return n, fmt.Errorf("%s: record %d, field %q: %w", t.Path, n, c, err)
+					bad, badField = fmt.Errorf("%s: record %d, field %q: %w", t.Path, seen, c, err), c
+					break
 				}
 				row = append(row, s)
+			}
+			if bad != nil {
+				// Not written: to an error link, or the pipeline stops.
+				if err := out.Fail(r, badField, bad); err != nil {
+					return n, err
+				}
+				continue
 			}
 			if len(t.Fields) == 0 && r.Len() > len(cols) {
 				for _, name := range r.Names() {
@@ -210,6 +221,7 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 			if err := cw.Write(row); err != nil {
 				return n, fmt.Errorf("cannot write %q: %w", t.Path, plain(err))
 			}
+			n++
 			if err := out.Emit(r); err != nil {
 				return n, err
 			}

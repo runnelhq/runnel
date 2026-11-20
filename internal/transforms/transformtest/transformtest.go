@@ -52,3 +52,25 @@ func RunWithValues(ctx context.Context, tr transform.Transform, values map[strin
 	err := tr.Process(ctx, in, o)
 	return out, logs, err
 }
+
+// RunWithErrorLink is Run for a transform with an error link: it also returns the
+// records the transform passed there (transform.Output.Fail).
+func RunWithErrorLink(ctx context.Context, tr transform.Transform, input ...record.Record) (out, failed []record.Record, logs []Logged, err error) {
+	in := make(chan transform.Batch, len(input))
+	for _, r := range input {
+		in <- transform.Batch{r}
+	}
+	close(in)
+	o := transform.NewOutput("t", func(r record.Record) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		out = append(out, r)
+		return nil
+	}, func(l slog.Level, m string) { logs = append(logs, Logged{l, m}) }).WithErrorLinks(func(r record.Record) error {
+		failed = append(failed, r)
+		return ctx.Err()
+	})
+	err = tr.Process(ctx, in, o)
+	return out, failed, logs, err
+}

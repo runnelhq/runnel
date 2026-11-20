@@ -15,8 +15,8 @@ var PipelineRoots = []string{"vars", "params", "env", "run"}
 
 // Pipeline is the content of a *.pipeline.yaml file: transforms connected by links,
 // through which records flow (KONZEPT, chapter 2.3). The format grows with the
-// roadmap; S12 defines transforms and data links, further fields follow with the
-// steps that execute them (copies and settings with S13/S17, error links with S17).
+// roadmap; S12 defines transforms and data links, S17a error links; further fields
+// follow with the steps that execute them (copies and settings with S17c).
 type Pipeline struct {
 	Kind        string         `yaml:"kind" json:"kind"`
 	APIVersion  string         `yaml:"apiVersion" json:"apiVersion"`
@@ -54,7 +54,7 @@ const (
 type PipelineLink struct {
 	From string `yaml:"from" json:"from"`
 	To   string `yaml:"to" json:"to"`
-	// Type is data (default); error and info are reserved for later steps.
+	// Type is data (default) or error; info is reserved for a later step.
 	Type LinkType `yaml:"type,omitempty" json:"type,omitempty"`
 }
 
@@ -123,13 +123,11 @@ func (p *Pipeline) validate() error {
 			add(path, `%s: missing required field "to"`, label)
 		}
 		switch l.Type {
-		case "", DataLink:
-		case ErrorLink:
-			add(path+".type", "%s: error links are not supported yet (roadmap S17)", label)
+		case "", DataLink, ErrorLink:
 		case InfoLink:
 			add(path+".type", "%s: info links are not supported yet (roadmap S23)", label)
 		default:
-			add(path+".type", "%s: invalid link type %q (expected data)", label, l.Type)
+			add(path+".type", "%s: invalid link type %q (expected data or error)", label, l.Type)
 		}
 	}
 	return errs.errOrNil()
