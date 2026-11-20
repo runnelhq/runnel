@@ -100,33 +100,37 @@ func checkPipelineCall(w *model.Workflow, i int, a model.Action, projectDir, fil
 		return model.Errors{w.ErrorAt(at+".pipeline", "action %q: pipeline file %s has errors; check it with \"runnel validate\"", a.ID, name)}
 	}
 	params, _ := a.With["params"].(map[string]any)
-	return checkGivenParams(w, at, a.ID, pl.Parameters, "pipeline "+name, params)
+	return checkGivenParams(w.ErrorAt, at, fmt.Sprintf("action %q: ", a.ID), pl.Parameters, "pipeline "+name, params)
 }
 
 func checkParamsOf(w *model.Workflow, at, id string, child *model.Workflow, name string, params map[string]any) model.Errors {
-	return checkGivenParams(w, at, id, child.Parameters, "workflow "+name, params)
+	return checkGivenParams(w.ErrorAt, at, fmt.Sprintf("action %q: ", id), child.Parameters, "workflow "+name, params)
 }
 
-// checkGivenParams checks the parameters given to a called workflow or pipeline (what).
-func checkGivenParams(w *model.Workflow, at, id string, parameters []model.Parameter, what string, params map[string]any) model.Errors {
+// errorAt creates an error at a YAML path of a file (Workflow.ErrorAt, Trigger.ErrorAt …).
+type errorAt func(path, format string, args ...any) *model.Error
+
+// checkGivenParams checks the parameters given to a called workflow or pipeline (what);
+// at is the YAML path of the mapping that holds params, who starts the messages.
+func checkGivenParams(errAt errorAt, at, who string, parameters []model.Parameter, what string, params map[string]any) model.Errors {
 	var errs model.Errors
 	declaredParams := map[string]model.Parameter{}
 	for _, p := range parameters {
 		declaredParams[p.Name] = p
 		if _, given := params[p.Name]; !given && p.Required && p.Default == "" {
-			errs = append(errs, w.ErrorAt(at, "action %q: missing required parameter %s of %s", id, p.Name, what))
+			errs = append(errs, errAt(at, "%smissing required parameter %s of %s", who, p.Name, what))
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(params)) {
 		p, ok := declaredParams[key]
 		if !ok {
-			errs = append(errs, w.ErrorAt(at+".params."+key, "action %q: parameter %s is not declared by %s (declared: %s)",
-				id, key, what, declaredOf(parameters)))
+			errs = append(errs, errAt(at+".params."+key, "%sparameter %s is not declared by %s (declared: %s)",
+				who, key, what, declaredOf(parameters)))
 			continue
 		}
 		if text, fixed := staticText(params[key]); fixed {
 			if _, err := p.CheckValue(text); err != nil {
-				errs = append(errs, w.ErrorAt(at+".params."+key, "action %q: parameter %s (%s): %v", id, key, p.Type.OrString(), err))
+				errs = append(errs, errAt(at+".params."+key, "%sparameter %s (%s): %v", who, key, p.Type.OrString(), err))
 			}
 		}
 	}

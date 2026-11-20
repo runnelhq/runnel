@@ -41,6 +41,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
 | POST | `/runs/{id}/cancel` | Lauf abbrechen: `202`; bereits beendet `409` |
 | GET | `/events` | Live-Ereignisse (Server-Sent Events), siehe unten |
+| GET | `/triggers` | Trigger des Projekts (S37): `{"triggers": [{name, file, type, target, schedule, timezone, enabled, next, last} …], "problems": [Problem …]}`. `next` ist der nächste Zeitpunkt (fehlt bei deaktivierten Triggern), `last` das Ergebnis des letzten fälligen Zeitpunkts seit dem Start des Servers (`{time, runId}`, `{time, skipped: true}` bei `overlap: skip` oder `{time, error}`); `problems` sind Fehler in Trigger-Dateien (Format wie `/validate`), solche Trigger sind nicht aktiv |
 
 ## Konfliktschutz (ETag)
 
@@ -129,6 +130,7 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft. Seit 
 | `201` + `Run`, Header `Location` | Lauf gestartet; er läuft im Hintergrund weiter |
 | `422` + `{error, errors, warnings, problems}` | Fehler in Workflow oder Projektdateien (Format wie `/validate`) |
 | `400` | unbekanntes Environment, Parameter fehlen oder passen nicht zum Typ |
+| `429` | Limit gleichzeitiger Läufe erreicht (`settings.maxConcurrentRuns` des Workflows oder in `project.yaml`, seit S37); später erneut versuchen |
 | `404` | Datei nicht gefunden |
 | `503` | Server wird beendet |
 
@@ -138,6 +140,7 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft. Seit 
   "path": "workflows/parallel.workflow.yaml",
   "kind": "workflow",
   "workflow": "parallel",
+  "trigger": "cron:nightly",
   "environment": "dev",
   "status": "running",
   "started": "2026-11-19T14:20:50.898Z",

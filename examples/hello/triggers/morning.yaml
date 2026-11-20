@@ -1,0 +1,14 @@
+# Greets every weekday morning while "runnel serve examples/hello" runs (roadmap S37).
+# List the triggers and their next time with: runnel triggers examples/hello
+kind: Trigger
+apiVersion: runnel/v1
+name: morning
+description: Greets on weekday mornings
+type: cron
+target: workflows/hello.workflow.yaml
+environment: dev
+params:
+  GREETING: Moin
+with:
+  schedule: "30 7 * * 1-5"   # minute hour day-of-month month day-of-week
+  timezone: Europe/Berlin

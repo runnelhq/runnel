@@ -28,6 +28,8 @@ func newServeCommand() *cobra.Command {
 		Long: "Starts the server for the project in project-dir (or the current directory), found by its\n" +
 			"project.yaml in that directory or above. The server listens on 127.0.0.1 only and serves the\n" +
 			"API under " + server.APIPrefix + " (files, catalog, validation, runs, live events).\n" +
+			"It starts the runs of the project's triggers (" + model.TriggersDir + "/*.yaml) at their times; changed\n" +
+			"trigger files are picked up while it runs.\n" +
 			"Stop it with Ctrl+C; running workflows are cancelled.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -53,7 +55,8 @@ func serve(cmd *cobra.Command, dir string, port int) error {
 	if !found {
 		return fmt.Errorf("no project (%s) found in %s or above", model.ProjectFile, dir)
 	}
-	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin()})
+	logf := func(msg string) { cmd.Printf("%s %s\n", time.Now().Format("15:04:05"), msg) }
+	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin(), Log: logf})
 	if err != nil {
 		return err
 	}
@@ -81,6 +84,7 @@ func serve(cmd *cobra.Command, dir string, port int) error {
 
 	cmd.Printf("Serving project %s\n", root)
 	cmd.Printf("Listening on http://%s (API under %s); press Ctrl+C to stop\n", ln.Addr(), server.APIPrefix)
+	srv.StartTriggers(ctx)
 	err = hs.Serve(ln)
 	if errors.Is(err, http.ErrServerClosed) {
 		<-stopped

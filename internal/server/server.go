@@ -22,6 +22,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
+	"github.com/runnelhq/runnel/internal/triggers"
 	"github.com/runnelhq/runnel/internal/webui"
 )
 
@@ -38,6 +39,8 @@ type Options struct {
 	Transforms *transform.Registry
 	// UI holds the editor files; nil uses the editor embedded into the binary.
 	UI fs.FS
+	// Log receives messages for the server log (e.g. runs started by triggers); nil: none.
+	Log func(msg string)
 }
 
 // Server serves the API for one project.
@@ -51,6 +54,8 @@ type Server struct {
 	// happen atomically with respect to other requests of this server.
 	writeMu sync.Mutex
 	runs    *runs.Manager
+	// triggers starts the runs of the project's triggers (S37); see StartTriggers.
+	triggers *triggers.Scheduler
 	// stop is closed by Shutdown to end open event streams.
 	stop     chan struct{}
 	stopOnce sync.Once
@@ -66,8 +71,15 @@ func New(opts Options) (*Server, error) {
 	if ui == nil {
 		ui = webui.FS()
 	}
-	return &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
-		stop: make(chan struct{})}, nil
+	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
+		stop: make(chan struct{})}
+	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Running: s.running, Log: opts.Log})
+	return s, nil
+}
+
+// StartTriggers runs the scheduler of the project's triggers until ctx is done (S37).
+func (s *Server) StartTriggers(ctx context.Context) {
+	go s.triggers.Run(ctx)
 }
 
 // Shutdown ends open event streams, cancels running runs and waits until they have
@@ -101,6 +113,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}", s.handleGetRun)
 	mux.HandleFunc("POST "+APIPrefix+"/runs/{id}/cancel", s.handleCancelRun)
 	mux.HandleFunc("GET "+APIPrefix+"/events", s.handleEvents)
+	mux.HandleFunc("GET "+APIPrefix+"/triggers", s.handleTriggers)
 	mux.HandleFunc("GET "+APIPrefix+"/version", handleVersion)
 	mux.HandleFunc("/", s.handleUI)
 	mux.HandleFunc(APIPrefix+"/", func(w http.ResponseWriter, r *http.Request) {

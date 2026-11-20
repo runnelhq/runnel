@@ -11,6 +11,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/triggers"
 )
 
 // startRequest starts a run of a saved workflow or pipeline file.
@@ -79,6 +80,8 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 			Error:            fmt.Sprintf("the %s cannot be started; fix the problems listed", kind),
 			validateResponse: s.response(diags),
 		})
+	case errors.As(err, new(*runs.LimitError)):
+		writeError(w, http.StatusTooManyRequests, err.Error())
 	case errors.Is(err, runs.ErrShutdown):
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 	case err != nil:
@@ -185,4 +188,41 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// startTrigger starts a run of a trigger's target (the saved file), with its
+// environment and parameters (S37).
+func (s *Server) startTrigger(t *model.Trigger) (string, error) {
+	name := t.Target
+	data, err := s.readFile(name)
+	if err != nil {
+		return "", err
+	}
+	trigger := t.Type + ":" + t.Name
+	params := runs.TriggerParams(t)
+	var run runs.Run
+	if fileKind(name) == "pipeline" {
+		run, _, err = s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
+			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger})
+	} else {
+		run, _, err = s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
+			ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger})
+	}
+	return run.ID, err
+}
+
+// running reports whether a run is still running.
+func (s *Server) running(id string) bool {
+	d, ok := s.runs.Get(id)
+	return ok && d.Status == runs.StatusRunning
+}
+
+// triggersResponse lists the triggers of the project and the problems of trigger files.
+type triggersResponse struct {
+	Triggers []triggers.Info `json:"triggers"`
+	Problems []Problem       `json:"problems"`
+}
+
+func (s *Server) handleTriggers(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, triggersResponse{Triggers: s.triggers.List(), Problems: s.response(s.triggers.Problems()).Problems})
 }

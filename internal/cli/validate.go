@@ -37,7 +37,9 @@ func newValidateCommand() *cobra.Command {
 			"links to unknown actions, cycles, unreachable actions, undefined variables,\n" +
 			"unknown action types and invalid action configurations (with:).\n" +
 			"Pipeline files (*" + pipelineSuffix + ") are checked for syntax errors, invalid fields,\n" +
-			"links to unknown transforms, cycles, unknown transform types and invalid configurations.\n\n" +
+			"links to unknown transforms, cycles, unknown transform types and invalid configurations.\n" +
+			"Trigger files (" + model.TriggersDir + "/*.yaml of a project) are checked for invalid fields and schedules,\n" +
+			"missing targets and environments, and parameters the target does not declare.\n\n" +
 			"Paths can be files or directories; directories are searched recursively.\n" +
 			"Without a path, the current directory is checked.\n\n" +
 			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
@@ -57,7 +59,7 @@ func newValidateCommand() *cobra.Command {
 				return err
 			}
 			if len(files) == 0 {
-				return fmt.Errorf("no workflow or pipeline files (*%s, *%s) found in %s", workflowSuffix, pipelineSuffix, strings.Join(args, ", "))
+				return fmt.Errorf("no workflow, pipeline or trigger files (*%s, *%s, %s/*.yaml) found in %s", workflowSuffix, pipelineSuffix, model.TriggersDir, strings.Join(args, ", "))
 			}
 			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
 				registry: actions.Builtin(), transforms: transforms.Builtin()}
@@ -81,7 +83,9 @@ type validator struct {
 	opts   validateOptions
 	params map[string]string
 	// projects caches loaded projects by absolute directory; nil if loading failed.
-	projects           map[string]*model.Project
+	projects map[string]*model.Project
+	// triggerNames are the names of the trigger files checked so far, by project directory.
+	triggerNames       map[string]map[string]string
 	registry           *action.Registry
 	transforms         *transform.Registry
 	nErrors, nWarnings int
@@ -93,18 +97,29 @@ func (v *validator) run(files []string) error {
 			return err
 		}
 	}
-	pipelines := 0
+	var workflows, pipelines, triggers int
 	for _, f := range files {
-		if strings.HasSuffix(f, pipelineSuffix) {
+		switch {
+		case strings.HasSuffix(f, pipelineSuffix):
 			pipelines++
+		case isTriggerFile(f):
+			triggers++
+		default:
+			workflows++
 		}
 	}
-	checked := plural(len(files)-pipelines, "workflow file")
-	switch {
-	case pipelines > 0 && pipelines == len(files):
-		checked = plural(pipelines, "pipeline file")
-	case pipelines > 0:
-		checked += " and " + plural(pipelines, "pipeline file")
+	var parts []string
+	for _, c := range []struct {
+		n    int
+		noun string
+	}{{workflows, "workflow file"}, {pipelines, "pipeline file"}, {triggers, "trigger file"}} {
+		if c.n > 0 {
+			parts = append(parts, plural(c.n, c.noun))
+		}
+	}
+	checked := parts[len(parts)-1]
+	if len(parts) > 1 {
+		checked = strings.Join(parts[:len(parts)-1], ", ") + " and " + checked
 	}
 	_, _ = fmt.Fprintf(v.out, "%s checked: %s, %s\n", checked, plural(v.nErrors, "error"), plural(v.nWarnings, "warning"))
 	if v.nErrors > 0 || (v.opts.strict && v.nWarnings > 0) {
@@ -118,6 +133,9 @@ func (v *validator) run(files []string) error {
 func (v *validator) file(file string) error {
 	if strings.HasSuffix(file, pipelineSuffix) {
 		return v.pipeline(file)
+	}
+	if isTriggerFile(file) {
+		return v.trigger(file)
 	}
 	w, err := model.LoadWorkflow(file)
 	if err != nil {
@@ -178,6 +196,52 @@ func (v *validator) pipeline(file string) error {
 	}
 	v.report(diags)
 	return nil
+}
+
+// trigger checks a trigger file: its fields and schedule, and against the project its
+// target, environment and parameters (roadmap S37).
+func (v *validator) trigger(file string) error {
+	t, err := model.LoadTrigger(file)
+	if err != nil {
+		var diags model.Errors
+		if !errors.As(err, &diags) {
+			return err
+		}
+		v.report(diags)
+		return nil
+	}
+	root := filepath.Dir(filepath.Dir(file))
+	p, _, err := v.project(root)
+	if err != nil {
+		return err
+	}
+	diags := runs.CheckTrigger(t, p, root)
+	if v.triggerNames == nil {
+		v.triggerNames = map[string]map[string]string{}
+	}
+	names := v.triggerNames[root]
+	if names == nil {
+		names = map[string]string{}
+		v.triggerNames[root] = names
+	}
+	if first, dup := names[t.Name]; dup {
+		diags = append(diags, t.ErrorAt("$.name", "trigger name %q is already used by %s", t.Name, filepath.Base(first)))
+	} else {
+		names[t.Name] = file
+	}
+	diags.Sort()
+	v.report(diags)
+	return nil
+}
+
+// isTriggerFile reports whether a file is in the triggers folder of a project.
+func isTriggerFile(file string) bool {
+	dir := filepath.Dir(file)
+	if filepath.Base(dir) != model.TriggersDir || !strings.HasSuffix(file, ".yaml") {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(filepath.Dir(dir), model.ProjectFile))
+	return err == nil
 }
 
 // project returns the project of a directory, loading and reporting it on first use.
@@ -276,7 +340,7 @@ func findFiles(paths []string) ([]string, error) {
 			if d.IsDir() && path != p && strings.HasPrefix(d.Name(), ".") {
 				return filepath.SkipDir
 			}
-			if !d.IsDir() && (strings.HasSuffix(d.Name(), workflowSuffix) || strings.HasSuffix(d.Name(), pipelineSuffix)) {
+			if !d.IsDir() && (strings.HasSuffix(d.Name(), workflowSuffix) || strings.HasSuffix(d.Name(), pipelineSuffix) || isTriggerFile(path)) {
 				files = append(files, path)
 			}
 			return nil
