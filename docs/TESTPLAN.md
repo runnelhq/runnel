@@ -79,7 +79,7 @@ Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe fe
 | K3 | `join: all` startet auch, wenn ein Zweig fehlgeschlagen ist (so in ADR 0003 festgelegt) | Fehlerpfade separat modellieren; ggf. später Modus „alle erfolgreich“ |
 | K4 | In Schleifen wirken Zwischenergebnisse bereits auf Joins außerhalb der Schleife | für Wiederholungen `retry` statt Schleife verwenden (ADR 0003, „Umsetzung“) |
 | K5 | Typfehler nennen das betroffene Feld nicht („expected an integer, got a string“) – die Zeile/Spalte zeigt es | Grenze der YAML-Bibliothek; eigene Meldungen in einem späteren Schritt |
-| K6 | Keine Korrekturvorschläge bei unbekannten Feldern (`tpye` → „did you mean type?“); nur bei Action-IDs in Links | späterer Schritt |
+| K6 | ~~Keine Korrekturvorschläge bei unbekannten Feldern~~ – behoben: alle unbekannten Felder werden gemeldet, nach Position sortiert, mit Vorschlag (`unknown field "tpye" (did you mean "type"?)`) | – |
 | K7 | Ausdrücke `{{ … }}` werden noch nicht ausgewertet (in Bedingungen und Outputs vor dem Start abgelehnt, sonst als Text) | S08 |
 | K8 | Die YAML-Bibliothek stürzt bei bestimmten fehlerhaften Eingaben ab; Runnel fängt das ab und meldet „the file could not be read“ | Fehlerbericht an `goccy/go-yaml` (Eingabe in `internal/model/testdata/fuzz/`) |
 | K9 | `runnel.exe` ist nicht signiert (SmartScreen-Warnung) | Code-Signing vor 1.0 (Roadmap) |

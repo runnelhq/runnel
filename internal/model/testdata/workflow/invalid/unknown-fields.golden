@@ -1,0 +1,5 @@
+unknown-fields.workflow.yaml:6:1: unknown field "descripton" (did you mean "description"?)
+unknown-fields.workflow.yaml:8:3: unknown field "timeot" (did you mean "timeout"?)
+unknown-fields.workflow.yaml:17:7: unknown field "bakoff" (did you mean "backoff"?)
+unknown-fields.workflow.yaml:19:30: unknown field "condition"
+unknown-fields.workflow.yaml:21:24: unknown field "z" (did you mean "x"?)

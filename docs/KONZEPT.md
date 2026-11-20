@@ -416,7 +416,8 @@ Regeln des Workflow-Formats (umgesetzt in `internal/model`):
   ([ADR 0012](adr/0012-ki-faehigkeit.md)).
 - Link-Bedingung `when`: `success` (Standard, wenn nicht angegeben), `failure`, `always` oder ein Ausdruck `{{ … }}`.
 - Zeitangaben: Go-Syntax mit Einheit, z. B. `30s`, `5m`, `2h`, `1h30m`.
-- Unbekannte Felder sind ein Fehler (Schutz vor Tippfehlern). Fehler werden mit Datei, Zeile und Spalte gemeldet;
+- Unbekannte Felder sind ein Fehler (Schutz vor Tippfehlern); gemeldet werden alle auf einmal, nach Position sortiert,
+  mit Vorschlag bei ähnlichem Namen (`unknown field "tpye" (did you mean "type"?)`). Fehler werden mit Datei, Zeile und Spalte gemeldet;
   alle Feldfehler einer Datei auf einmal.
 - Eine Datei enthält genau ein YAML-Dokument.
 - Graph (`runnel validate`): genau eine Action vom Typ `core.start` ohne eingehende Links; eindeutige Action-IDs;

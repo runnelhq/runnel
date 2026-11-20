@@ -51,9 +51,13 @@ func parseSource(name string, data []byte) (src *source, err error) {
 	}
 }
 
-// decode decodes the document into v. Unknown fields are rejected.
+// decode decodes the document into v. Unknown fields are rejected, all of them.
 func (s *source) decode(v any) (err error) {
 	defer recoverYAML(s.name, &err)
+	// All unknown fields at once and in a fixed order; the library would report only one.
+	if errs := unknownFields(s.name, s.body, reflect.TypeOf(v)); len(errs) > 0 {
+		return errs
+	}
 	if err := yaml.NodeToValue(s.body, v, yaml.Strict()); err != nil {
 		return Errors{yamlError(s.name, err)}
 	}

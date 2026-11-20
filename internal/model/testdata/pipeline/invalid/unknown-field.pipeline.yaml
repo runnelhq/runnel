@@ -1,9 +1,10 @@
-# copies is not part of the format yet (with S17). One unknown field per file: with
-# several, the YAML library reports one of them, not always the same.
+# copies and onError are not part of the format (copies with S17; errors via links).
+# Both are reported, in the order of the file.
 kind: Pipeline
 apiVersion: runnel/v1
 name: later
 transforms:
   - id: call
     type: http.request
+    onError: error-link
     copies: 4
