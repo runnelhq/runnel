@@ -75,7 +75,6 @@ export function FileView(props: {
   const { path, active, epoch, onSummary, onPalette, onDirty, onRegister, onRun } = props;
   const [state, setState] = useState<State>({ status: "loading" });
   const fileKind = kindOf(path);
-  const isWorkflow = fileKind === "workflow";
   // Workflows and pipelines are graphs: shown on the canvas and edited there.
   const graphKind: GraphKind | null = fileKind === "workflow" || fileKind === "pipeline" ? fileKind : null;
   const isGraph = graphKind !== null;
@@ -312,7 +311,7 @@ export function FileView(props: {
   const [runDialog, setRunDialog] = useState(false);
   const [unsavedAsk, setUnsavedAsk] = useState<null | { dialog: boolean }>(null);
   const running = run?.status === "running";
-  const wfNow = validation?.workflow;
+  const wfNow = graph;
   // The status belongs to the actions and links it ran with; it is hidden once they change.
   const shownRun = run && wfNow && run.signature === structureSignature(wfNow) ? run : null;
   useEffect(() => {
@@ -321,7 +320,7 @@ export function FileView(props: {
 
   const doRun = useCallback(
     async (settings: RunSettings) => {
-      const wf = validation?.workflow;
+      const wf = graph;
       if (!wf) return;
       try {
         await startRun(settings, wf);
@@ -333,17 +332,17 @@ export function FileView(props: {
         if (err instanceof StartError && err.problems.length > 0) setBottomTab("problems");
       }
     },
-    [validation, startRun],
+    [graph, startRun],
   );
   const proceedRun = useCallback(
     (dialog: boolean) => {
       const remembered = loadRunSettings(path);
-      const params = validation?.workflow?.parameters ?? [];
+      const params = graph?.parameters ?? [];
       const envs = props.project?.environments ?? [];
       if (dialog || (!remembered && (params.length > 0 || envs.length > 1))) setRunDialog(true);
       else void doRun(remembered ?? { environment: "", params: {} });
     },
-    [path, validation, props.project, doRun],
+    [path, graph, props.project, doRun],
   );
   const requestRun = useCallback(
     (dialog: boolean) => {
@@ -358,13 +357,13 @@ export function FileView(props: {
   useEffect(() => {
     if (!active || !isGraph) return;
     const onKey = (e: KeyboardEvent) => {
-      if (isWorkflow && e.key === "F5" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === "F5" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault(); // instead of reloading the page
         requestRun(e.shiftKey);
         return;
       }
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      if (isWorkflow && e.key === ".") {
+      if (e.key === ".") {
         e.preventDefault();
         void cancelRun();
         return;
@@ -386,7 +385,7 @@ export function FileView(props: {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, isGraph, isWorkflow, save, doUndo, doRedo, requestRun, cancelRun]);
+  }, [active, isGraph, save, doUndo, doRedo, requestRun, cancelRun]);
 
   useEffect(() => {
     if (!toast) return;
@@ -499,7 +498,7 @@ export function FileView(props: {
           </Badge>
         )}
         <span className="flex-1" />
-        {isWorkflow &&
+        {isGraph &&
           (running ? (
             <button
               type="button"
@@ -663,7 +662,7 @@ export function FileView(props: {
         <RunDialog
           path={path}
           project={props.project}
-          parameters={validation?.workflow?.parameters ?? []}
+          parameters={graph?.parameters ?? []}
           initial={loadRunSettings(path)}
           onCancel={() => setRunDialog(false)}
           onRun={(settings) => {

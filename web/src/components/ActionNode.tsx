@@ -111,6 +111,18 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
             {data.id}
           </span>
         )}
+        {run?.counts ? (
+          // Records of the last run instead of the type (mockup S25a, state "run"): read → written, errors with ✖.
+          <span
+            data-testid="counts"
+            title={`read ${run.counts.read}, written ${run.counts.written}, errors ${run.counts.errors ?? 0}`}
+            className="block truncate font-mono text-2xs text-foreground tabular-nums"
+          >
+            {data.noInput ? "" : `${run.counts.read} → `}
+            {run.counts.written}
+            {run.counts.errors ? <span className="text-destructive"> · ✖ {run.counts.errors}</span> : null}
+          </span>
+        ) : (
         <span className="block truncate font-mono text-2xs text-muted-foreground">
           {data.type}
           {duration !== undefined && (
@@ -122,6 +134,7 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
             </>
           )}
         </span>
+        )}
       </span>
       {hasOutput && <Handle type="source" position={Position.Right} isConnectable={!!data.connectable} className="runnel-port" />}
       {look && (

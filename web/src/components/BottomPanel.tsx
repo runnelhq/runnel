@@ -215,9 +215,7 @@ function LogView(props: {
   if (!run) {
     return (
       <p className="m-0 border-t border-border px-3 py-2 text-xs text-muted-foreground">
-        {props.pipeline
-          ? "Running a pipeline in the editor follows in a later step; until then with runnel run or core.run-pipeline."
-          : "No run yet. Run the workflow with ▶ Run (F5)."}
+        No run yet. Run the {props.pipeline ? "pipeline" : "workflow"} with ▶ Run (F5).
       </p>
     );
   }

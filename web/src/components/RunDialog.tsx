@@ -62,7 +62,7 @@ export function RunDialog(props: {
         }}
       >
         <p>
-          Runs the saved file. The values are remembered for this workflow; <b>Run</b> uses them until you change them
+          Runs the saved file. The values are remembered for this file; <b>Run</b> uses them until you change them
           here.
         </p>
         <label className="mb-1 flex items-baseline text-xs font-medium text-foreground" htmlFor="run-env">

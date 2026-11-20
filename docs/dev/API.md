@@ -121,7 +121,8 @@ POST /api/v1/runs
 ```
 
 `environment` und `params` sind optional (ohne `environment` gilt das Standard-Environment des Projekts). Gestartet wird
-die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft.
+die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft. Seit S25a3 lassen sich auch Pipelines
+(`*.pipeline.yaml`) starten.
 
 | Antwort | Bedeutung |
 |---|---|
@@ -135,6 +136,7 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft.
 {
   "id": "01M7T2X0AHHW9G9ZAV04RRCXJC",
   "path": "workflows/parallel.workflow.yaml",
+  "kind": "workflow",
   "workflow": "parallel",
   "environment": "dev",
   "status": "running",
@@ -150,6 +152,12 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft.
 `id`, `type`, `status` (`pending`, `waiting`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), Zeiten, `durationMs`,
 `error` und `runs` (Anzahl Ausführungen bei Schleifen) – und `log` (`time`, `level`, `actionId`, `message`; höchstens
 5.000 Zeilen, ältere entfallen mit `logTruncated: true`).
+
+Bei einem Pipeline-Lauf ist `kind` `pipeline` und `workflow` der Name der Pipeline. Seine Transforms erscheinen als
+`actions` (Ereignisse `action.started`, `action.finished`), ein beendeter Transform zusätzlich mit `counts`
+(`read`, `written`, `errors`). `linkRows` zählt die Datensätze je Link (Index in `links`); ein Link ist gezählt, sobald
+der Transform davor beendet ist. Das Ereignis `action.finished` eines Transforms trägt `counts` und `linkRows` seiner
+ausgehenden Links (`{ "1": 2, "2": 2 }`).
 
 Läufe liegen **nur im Speicher**: die letzten 100, laufende werden nie verworfen. Beim Beenden des Servers (Strg+C)
 werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26 (zurückgestellt, siehe Backlog der Roadmap), ohne dass sich diese API ändert.

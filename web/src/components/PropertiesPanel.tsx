@@ -1428,6 +1428,21 @@ function LastRun(props: PropertiesProps & { id: string }) {
       </b>
       {a.durationMs !== undefined && ` after ${formatDuration(a.durationMs)}`}
       {a.error && <div className="mt-0.5">{a.error}</div>}
+      {a.counts && (
+        <div data-testid="run-counts" className="mt-1.5 grid grid-cols-3 gap-1 text-2xs text-muted-foreground">
+          <div>
+            <b className="block font-mono text-sm text-foreground tabular-nums">{a.counts.read}</b>read
+          </div>
+          <div>
+            <b className="block font-mono text-sm text-foreground tabular-nums">{a.counts.written}</b>written
+          </div>
+          {a.counts.errors ? (
+            <div>
+              <b className="block font-mono text-sm text-destructive tabular-nums">✖ {a.counts.errors}</b>to error links
+            </div>
+          ) : null}
+        </div>
+      )}
       {props.onShowInLog && (
         <button
           type="button"

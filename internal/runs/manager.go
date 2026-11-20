@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
+	"github.com/runnelhq/runnel/internal/model"
 )
 
 // Limits of the in-memory history. The SQLite history (roadmap S26) replaces it.
@@ -30,8 +32,11 @@ const (
 
 // Run is the state of a run as shown by the API.
 type Run struct {
-	ID          string            `json:"id"`
-	Path        string            `json:"path"`
+	ID   string `json:"id"`
+	Path string `json:"path"`
+	// Kind is "workflow" or "pipeline" (S25a3).
+	Kind string `json:"kind"`
+	// Workflow is the name of the workflow or pipeline.
 	Workflow    string            `json:"workflow"`
 	Environment string            `json:"environment,omitempty"`
 	Params      map[string]string `json:"params,omitempty"`
@@ -41,6 +46,9 @@ type Run struct {
 	DurationMs  int64             `json:"durationMs"`
 	Error       string            `json:"error,omitempty"`
 	Outputs     map[string]any    `json:"outputs,omitempty"`
+	// LinkRows are the records passed over each link of a pipeline, by link index;
+	// a link counts once the transform before it has finished.
+	LinkRows []int64 `json:"linkRows,omitempty"`
 }
 
 // Detail is a run with the state of its actions and its log.
@@ -63,6 +71,9 @@ type ActionState struct {
 	Error      string          `json:"error,omitempty"`
 	// Runs counts how often the action ran (loops, join: each).
 	Runs int `json:"runs"`
+	// Counts are the records a transform of a pipeline read, wrote and passed to its
+	// error links; set when it has finished.
+	Counts *pipeline.Counts `json:"counts,omitempty"`
 }
 
 // LogLine is a message of the run log.
@@ -87,6 +98,9 @@ type Event struct {
 	DurationMs int64              `json:"durationMs,omitempty"`
 	Error      string             `json:"error,omitempty"`
 	Outputs    map[string]any     `json:"outputs,omitempty"`
+	// Counts and LinkRows: a transform of a pipeline has finished (action.finished).
+	Counts   *pipeline.Counts `json:"counts,omitempty"`
+	LinkRows map[int]int64    `json:"linkRows,omitempty"`
 }
 
 // Manager starts runs and keeps their state and events in memory.
@@ -135,35 +149,90 @@ func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
 		return Run{}, p, err
 	}
 
+	steps := make([][2]string, len(p.Workflow.Actions))
+	for i, a := range p.Workflow.Actions {
+		steps[i] = [2]string{a.ID, a.Type}
+	}
+	run := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params}, p.Env, steps,
+		func(ctx context.Context) { p.Runner.Run(ctx) })
+	return run, p, nil
+}
+
+// StartPipeline prepares and starts a pipeline run in the background, like Start (S25a3).
+// Its transforms are reported as actions, with their counts when they have finished.
+func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedPipeline, error) {
+	if m.ctx.Err() != nil {
+		return Run{}, nil, ErrShutdown
+	}
+	id := workflow.NewRunID(time.Now())
+	spec.RunID = id
+	spec.Observer = func(e pipeline.Event) { m.recordPipeline(id, e) }
+	p, err := PreparePipeline(spec)
+	if err != nil {
+		return Run{}, p, err
+	}
+	steps := make([][2]string, len(p.Pipeline.Transforms))
+	for i, t := range p.Pipeline.Transforms {
+		steps[i] = [2]string{t.ID, t.Type}
+	}
+	run := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params,
+		LinkRows: make([]int64, len(p.Pipeline.Links))}, p.Env, steps,
+		func(ctx context.Context) { p.Runner.Run(ctx) })
+	return run, p, nil
+}
+
+// add registers a run with its steps (id and type of the actions or transforms) and
+// runs it in the background.
+func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, start func(context.Context)) Run {
 	ctx, cancel := context.WithCancel(m.ctx)
-	e := &entry{
-		run: Run{ID: id, Path: path, Workflow: p.Workflow.Name, Params: spec.Params,
-			Status: StatusRunning, Started: time.Now()},
-		byID:   map[string]*ActionState{},
-		cancel: cancel,
+	run.Status, run.Started = StatusRunning, time.Now()
+	if env != nil {
+		run.Environment = env.Name
 	}
-	if p.Env != nil {
-		e.run.Environment = p.Env.Name
-	}
-	for _, a := range p.Workflow.Actions {
-		s := &ActionState{ID: a.ID, Type: a.Type, Status: StatusPending}
+	e := &entry{run: run, byID: map[string]*ActionState{}, cancel: cancel}
+	for _, st := range steps {
+		s := &ActionState{ID: st[0], Type: st[1], Status: StatusPending}
 		e.actions = append(e.actions, s)
-		e.byID[a.ID] = s
+		e.byID[st[0]] = s
 	}
 	m.mu.Lock()
 	m.runs[id] = e
 	m.order = append(m.order, id)
 	m.prune()
-	run := e.run
+	out := e.run
+	out.LinkRows = slices.Clone(out.LinkRows) // the events change the entry's slice
 	m.mu.Unlock()
 
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
 		defer cancel()
-		p.Runner.Run(ctx)
+		start(ctx)
 	}()
-	return run, p, nil
+	return out
+}
+
+// pipelineKinds maps the events of a pipeline to those of a workflow: transforms are
+// reported as actions, so that clients handle both alike.
+var pipelineKinds = map[pipeline.EventKind]workflow.EventKind{
+	pipeline.RunStarted:        workflow.RunStarted,
+	pipeline.RunFinished:       workflow.RunFinished,
+	pipeline.TransformStarted:  workflow.ActionStarted,
+	pipeline.TransformFinished: workflow.ActionFinished,
+	pipeline.Log:               workflow.Log,
+}
+
+// recordPipeline applies an event of the pipeline engine to the run state and publishes it.
+func (m *Manager) recordPipeline(id string, pe pipeline.Event) {
+	we := workflow.Event{Kind: pipelineKinds[pe.Kind], Time: pe.Time, RunID: pe.RunID, ActionID: pe.TransformID,
+		ActionType: pe.TransformType, Level: pe.Level, Message: pe.Message, Status: workflow.Status(pe.Status),
+		Err: pe.Err, Duration: pe.Duration}
+	var counts *pipeline.Counts
+	if pe.Kind == pipeline.TransformFinished {
+		c := pe.Counts
+		counts = &c
+	}
+	m.apply(id, we, counts, pe.LinkRows)
 }
 
 // prune drops the oldest finished runs beyond MaxRuns. m.mu must be held.
@@ -180,7 +249,11 @@ func (m *Manager) prune() {
 }
 
 // record applies an event of the engine to the run state and publishes it.
-func (m *Manager) record(id string, we workflow.Event) {
+func (m *Manager) record(id string, we workflow.Event) { m.apply(id, we, nil, nil) }
+
+// apply applies an event to the run state and publishes it; counts and rows are those
+// of a finished transform of a pipeline.
+func (m *Manager) apply(id string, we workflow.Event, counts *pipeline.Counts, rows map[int]int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e := m.runs[id]
@@ -215,6 +288,13 @@ func (m *Manager) record(id string, we workflow.Event) {
 			if we.Kind == workflow.ActionSkipped {
 				a.Status = workflow.Skipped
 				ev.Status = workflow.Skipped
+			}
+			a.Counts = counts
+		}
+		ev.Counts, ev.LinkRows = counts, rows
+		for li, n := range rows {
+			if li >= 0 && li < len(e.run.LinkRows) {
+				e.run.LinkRows[li] = n
 			}
 		}
 	case workflow.Log:
@@ -280,7 +360,9 @@ func (m *Manager) Runs() []Run {
 	defer m.mu.Unlock()
 	out := make([]Run, 0, len(m.order))
 	for i := len(m.order) - 1; i >= 0; i-- {
-		out = append(out, m.runs[m.order[i]].run)
+		r := m.runs[m.order[i]].run
+		r.LinkRows = slices.Clone(r.LinkRows)
+		out = append(out, r)
 	}
 	return out
 }
@@ -294,6 +376,7 @@ func (m *Manager) Get(id string) (Detail, bool) {
 		return Detail{}, false
 	}
 	d := Detail{Run: e.run, Log: slices.Clone(e.log), LogTruncated: e.logTruncated}
+	d.LinkRows = slices.Clone(e.run.LinkRows)
 	for _, a := range e.actions {
 		c := *a
 		d.Actions = append(d.Actions, &c)
