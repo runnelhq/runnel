@@ -630,6 +630,78 @@
       }
     },
     {
+      "type": "core.group-by",
+      "kind": "transform",
+      "category": "combine",
+      "label": "Group By",
+      "description": "Combines records with the same values into one, with count, sum and other aggregates",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "groupBy": {
+            "type": "array",
+            "description": "Fields whose values form a group; empty: one record for all",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aggregates": {
+            "type": "array",
+            "description": "Fields computed per group, after the group fields",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the new field",
+                  "examples": [
+                    "total"
+                  ]
+                },
+                "function": {
+                  "type": "string",
+                  "description": "count: records (or values of field), countDistinct: different values, sum, avg, min, max, first, last, concat: values as text",
+                  "enum": [
+                    "count",
+                    "countDistinct",
+                    "sum",
+                    "avg",
+                    "min",
+                    "max",
+                    "first",
+                    "last",
+                    "concat"
+                  ]
+                },
+                "field": {
+                  "type": "string",
+                  "description": "Field the function is applied to; empty for count: all records",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "separator": {
+                  "type": "string",
+                  "description": "Text between the values of concat; empty: comma and space",
+                  "examples": [
+                    " / "
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "function"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "recordErrors": true
+    },
+    {
       "type": "core.log",
       "kind": "transform",
       "category": "output",
@@ -715,6 +787,54 @@
         "additionalProperties": false
       },
       "parallel": true
+    },
+    {
+      "type": "core.sort",
+      "kind": "transform",
+      "category": "combine",
+      "label": "Sort",
+      "description": "Sorts the records by fields; keeps all records in memory",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "description": "Fields to sort by, the first one first",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field",
+                  "examples": [
+                    "country"
+                  ]
+                },
+                "descending": {
+                  "type": "boolean",
+                  "description": "Largest value first",
+                  "default": false
+                },
+                "ignoreCase": {
+                  "type": "boolean",
+                  "description": "Compare text regardless of upper and lower case",
+                  "default": false
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "recordErrors": true
     },
     {
       "type": "core.switch",

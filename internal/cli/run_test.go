@@ -301,6 +301,28 @@ func TestRunPipelineFromWorkflowExample(t *testing.T) {
 	}
 }
 
+func TestRunGroupAndSortExample(t *testing.T) {
+	chdirRepoRoot(t)
+	target := filepath.Join(t.TempDir(), "days.csv")
+	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "examples/pipelines/pipelines/daily.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	if !strings.Contains(out, "[days] 3 records in 2 groups") {
+		t.Errorf("group log missing:\n%s", out)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "\xEF\xBB\xBFDatum;orders;total;average;largest;customers\r\n" +
+		"20.11.2026;1;12.500,00;12.500,00;12.500,00;Weber, Anna\r\n" +
+		"19.11.2026;2;1.324,40;662,20;1.234,50;Müller GmbH / Schmidt & Söhne\r\n"
+	if string(b) != want {
+		t.Errorf("written file %q, want %q", b, want)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

@@ -943,8 +943,20 @@ Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, L
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
 
-Umgesetzt (Stand S17b): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
-`core.constant`, `core.convert`, `core.switch` sowie `csv.input` und `csv.output`:
+Umgesetzt (Stand S22): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
+`core.constant`, `core.convert`, `core.switch`, `core.sort`, `core.group-by` sowie `csv.input` und `csv.output`:
+
+- **`core.sort`** sortiert stabil nach `fields: [{ name, descending, ignoreCase }]`; leere Werte zuletzt (auch absteigend),
+  Zahlen exakt über `int`, `decimal` und `float` hinweg, Text nach Unicode-Codepunkten (Großbuchstaben zuerst) oder mit
+  `ignoreCase`. Alle Werte eines Feldes müssen von einer Art sein (Zahl, Text, Wahrheitswert, Datum, Zeitpunkt); ein
+  Datensatz mit anderer Art geht auf den Fehler-Link. Hält alle Datensätze im Speicher.
+- **`core.group-by`** fasst Datensätze mit gleichen Werten in `groupBy` zu einem zusammen, in der Reihenfolge des ersten
+  Auftretens (im Speicher, er wächst mit der Zahl der Gruppen). `aggregates: [{ name, function, field }]` mit `count`
+  (ohne `field`: Datensätze, mit: Werte), `countDistinct`, `sum`, `avg`, `min`, `max`, `first`, `last`, `concat`
+  (`separator`, Standard „, “). Leere Werte zählen nicht mit (wie SQL); `sum`/`avg` ohne Werte sind leer. `sum` bleibt
+  bei ganzen Zahlen `int`, sonst exakt `decimal` (mit `float` dabei `float`); `avg` ganzer Zahlen ist `decimal`.
+  Zahlen gruppieren über Typen hinweg (`1` = `1.0`). Ohne `groupBy` entsteht genau ein Datensatz, auch ohne Eingabe
+  (`count` 0). Ein Wert, der nicht passt (Text in `sum`), geht auf den Fehler-Link und zählt in keiner Gruppe.
 
 - **`core.switch`** gibt jeden Datensatz an genau einen Daten-Link weiter: `cases: [{ when: "{{ … }}", to: <id> }]` in
   Reihenfolge, der erste wahre Fall entscheidet, sonst `default`; ohne `default` werden die übrigen verworfen und im Log
@@ -978,7 +990,8 @@ Umgesetzt (Stand S17b): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
 - **Formate:** Zahlenmuster aus `#`, `0` und Trennzeichen (`#.##0,00`, `#,##0.00`, `#'##0.00`); Datumsmuster wie bei
   `formatDate` (`dd.MM.yyyy HH:mm`). Ohne Format: `1234.5` und ISO-Daten. Leere Werte sind `null`, außer bei Text.
 
-Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dateien bei Überschreiten eines Speicherlimits.
+Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dateien bei Überschreiten eines Speicherlimits
+(Backlog; seit S22 im Speicher).
 
 ---
 
