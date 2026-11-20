@@ -12,7 +12,7 @@ Erledigte Schritte sind mit ✅ markiert.
 > **Tiefe vor Breite (2026-11-19):** Damit der ganze Anwendungsfall früh bewertbar ist, werden die Phasen zuerst in der
 > Tiefe gebaut. Gute, aber nicht vorrangige Schritte stehen mit ihrer Nummer im [Backlog](#zurückgestellt-tiefe-vor-breite):
 > S10, S19, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48 sowie `core.calculate` (S16), `maxErrors` (S17), `core.dedupe` (S22) und die
-> Aufbewahrung der Historie (S43). E7c ist ebenfalls zurückgestellt.
+> Aufbewahrung der Historie (S43). E7c war ebenfalls zurückgestellt und ist seit 2026-11-20 wieder eingeplant (Phase 0.4).
 
 ## Regeln für jeden Schritt
 
@@ -121,6 +121,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | S25a1b ✅ | Pipeline-Canvas: Editor | Pipelines im Canvas anzeigen und bearbeiten: Transform-Palette, Daten- und Fehler-Links, Eigenschaften aus dem Schema mit Execution (`copies`, `distribution`), Problems ([Mockup](../design/mockups/s25a-pipeline.html), Zustände `canvas`, `link`, `problems`) | Playwright |
 | S25a2 ✅ | Pipeline-Canvas: Felder | Felder der eingehenden Datensätze und der Links im Panel (Zustände `canvas`, `link`), Endpunkt für die abgeleiteten Schemas | Playwright |
 | S25a3 ✅ | Pipeline-Canvas: Ausführen | Pipelines im Editor ausführen, Zähler an Knoten und Links, Log (Zustand `run`) | Playwright |
+| E7c | Parameter, Outputs und Wiederholung im Editor | Mockup: [`design/mockups/e7c-parameters.html`](../design/mockups/e7c-parameters.html) (Parameter und Outputs) und [`s25a-pipeline.html`](../design/mockups/s25a-pipeline.html), Zustand `foreach`. Parameter von Workflows und Pipelines sowie Outputs von Workflows im Panel anlegen, ändern, sortieren und löschen (aufklappbare Zeilen, Server-Bearbeitung zeilengenau); `forEach`, `parallel`, `stopOnError` und das Schlüssel/Wert-Feld für `params` von `core.run-workflow`/`core.run-pipeline` (K10, K11). Bis dahin im Texteditor (die YAML-Ansicht ist nur lesend) | Playwright; Go-Tests der Bearbeitung |
 
 **Ergebnis 0.4:** ETL-Fälle mit CSV per CLI und im Editor, von Workflows gesteuert (auch je Datei bzw. Datensatz).
 
@@ -175,7 +176,6 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 
 | Nr. | Schritt | Inhalt | Hängt ab von / Hinweis |
 |---|---|---|---|
-| E7c | Parameter und Outputs im Editor | Parameter und Outputs des Workflows im Panel anlegen, ändern und löschen (Entscheidung zum Mockup E7); vorher Mockup | bis dahin in der YAML-Ansicht |
 | S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis); Tests gegen lokalen Testserver | – |
 | S26 | Run-Historie | Ersetzt den Speicher aus E3 ohne API-Änderung; SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | bis dahin die letzten 100 Läufe im Speicher, nach einem Neustart weg |
 | S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | S26 |

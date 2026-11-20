@@ -233,7 +233,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
         </div>
       </div>
       <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
-        {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in the YAML view."}
+        {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in your text editor."}
       </p>
       <LastRun {...props} id={action.id} />
       {rest.length > 0 && (
@@ -490,7 +490,7 @@ function SchemaField(props: {
   if (!scalar || s.type === "array" || s.type === "object") {
     return (
       <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={props.problems}>
-        {() => <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-2xs text-muted-foreground">Lists and nested values are changed in the YAML view for now.</p>}
+        {() => <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-2xs text-muted-foreground">Lists and nested values are changed in your text editor for now.</p>}
       </Field>
     );
   }
@@ -1130,8 +1130,8 @@ function ParametersSection(props: { workflow: Workflow; problems: Problem[] }) {
       </div>
       <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
         {props.workflow.kind === "pipeline"
-          ? "Adding and changing parameters follows in a later step; until then in the YAML view."
-          : "Adding and changing parameters and outputs follows in a later step; until then in the YAML view."}
+          ? "Adding and changing parameters follows with the next editor step; until then in your text editor."
+          : "Adding and changing parameters and outputs follows with the next editor step; until then in your text editor."}
       </p>
     </Section>
   );

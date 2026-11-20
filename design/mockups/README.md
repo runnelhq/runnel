@@ -14,6 +14,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e8-run.html`](e8-run.html) | E8 – Ausführen im Editor | `run`, `running`, `done`, `cancelled`, `unsaved` | freigegeben mit PR #35, umgesetzt mit E8a (Run, Live-Status, Rückfrage) und E8b (Log, Ergebnis im Panel, „wartet“) |
 | [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | freigegeben mit PR #43, umgesetzt mit S35a (Editor im Panel, Link-Bedingung) und S35b (`expanded`) |
 | [`s25a-pipeline.html`](s25a-pipeline.html) | S25a – Pipeline-Canvas (dazu K10/K11 im Workflow-Panel) | `canvas`, `link`, `run`, `problems`, `foreach` | freigegeben mit PR #62; Umsetzung in S25a1a (Server), S25a1b, S25a2, S25a3; `foreach` mit E7c |
+| [`e7c-parameters.html`](e7c-parameters.html) | E7c – Parameter und Outputs im Editor | `parameters`, `add`, `outputs`, `problems` | Entwurf |
 
 ## Entscheidungen
 
@@ -57,6 +58,10 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | S35 | Vorschau mit Werten des letzten Laufs und Vorschläge für die Felder von `output` später |
 | S35 | Umsetzung in zwei Schritten: S35a Editor im Panel und Link-Bedingung, S35b größerer Editor mit Referenz |
 | S35 | Die Signaturhilfe erscheint über der Zeile (statt links neben dem Panel), damit die Vorschläge darunter sichtbar bleiben |
+| E7c | Parameter und Outputs als aufklappbare Zeilen im Panel (kein Dialog): ein Klick öffnet das Formular, „+ Add parameter“/„+ Add output“ legt eine Zeile an (Name sofort zum Ändern markiert), „Delete“ löscht mit Rückgängig, ↑/↓ ändern die Reihenfolge (sie gilt im Run-Dialog). Änderungen wie in E7 nach der Tipp-Pause, ohne Apply |
+| E7c | Felder eines Parameters: Name, Type, Required, Default (Ausdruckseditor aus S35; bei Required ohne Wirkung), Allowed values (`enum`, als Chips), Description. Outputs: Name, Type, Value (Ausdruckseditor), Description |
+| E7c | Umbenennen eines Parameters ändert keine Verweise (`${NAME}`, `params.NAME`) – der Hinweis am Feld sagt das; Meldungen zu fehlenden Namen erscheinen danach über `/validate` |
+| E7c | Pipelines haben denselben Abschnitt „Parameters“, ohne Outputs. `forEach`/`parallel`/`stopOnError` und das Schlüssel/Wert-Feld für `params` folgen dem freigegebenen Mockup S25a (Zustand `foreach`) |
 | S35 | Größerer Editor: Die Zeile unten zeigt die Meldungen des Felds beim Öffnen; geänderter Text wird erst nach Apply geprüft („Checked when applied“), statt bei jeder Eingabe den ganzen Workflow zu prüfen |
 
 ## Screenshots erzeugen
@@ -70,6 +75,7 @@ node design/mockups/screenshots.cjs e7-properties action,wait,link,workflow,prob
 node design/mockups/screenshots.cjs e8-run run,running,done,cancelled,unsaved
 node design/mockups/screenshots.cjs s35-expressions complete,functions,error,condition,expanded
 node design/mockups/screenshots.cjs s25a-pipeline canvas,link,run,problems,foreach
+node design/mockups/screenshots.cjs e7c-parameters parameters,add,outputs,problems
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
