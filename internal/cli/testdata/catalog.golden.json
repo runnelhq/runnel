@@ -120,6 +120,262 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "type": "file.copy",
+      "kind": "action",
+      "category": "files",
+      "label": "Copy Files",
+      "description": "Copies files or folders; output: the copied files",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "File or folder; wildcards are allowed in the name, e.g. *.csv",
+            "examples": [
+              "C:\\in\\*.csv"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Target folder; for a single file also a new file name",
+            "examples": [
+              "D:\\archive"
+            ]
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "Replace existing files in the target",
+            "default": false
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "file.delete",
+      "kind": "action",
+      "category": "files",
+      "label": "Delete Files",
+      "description": "Deletes files or folders; output: the deleted paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File or folder; wildcards are allowed in the name, e.g. *.tmp",
+            "examples": [
+              "C:\\work\\*.tmp"
+            ]
+          },
+          "recursive": {
+            "type": "boolean",
+            "description": "Also delete folders with everything in them",
+            "default": false
+          },
+          "mustExist": {
+            "type": "boolean",
+            "description": "Fail if nothing matches the path",
+            "default": false
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "file.exists",
+      "kind": "action",
+      "category": "files",
+      "label": "File Exists",
+      "description": "Checks whether files or folders exist; output: the matching paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File or folder; wildcards are allowed in the name, e.g. *.csv",
+            "examples": [
+              "C:\\in\\*.csv"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "What has to exist",
+            "enum": [
+              "any",
+              "file",
+              "folder"
+            ],
+            "default": "any"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "file.list",
+      "kind": "action",
+      "category": "files",
+      "label": "List Files",
+      "description": "Lists the files of a folder; output: path, name, size, modified and folder of each entry",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string",
+            "description": "Folder to list",
+            "examples": [
+              "C:\\in"
+            ]
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Names to include, with wildcards, e.g. *.csv",
+            "default": "*"
+          },
+          "recursive": {
+            "type": "boolean",
+            "description": "Also list the subfolders",
+            "default": false
+          },
+          "include": {
+            "type": "string",
+            "description": "What to list",
+            "enum": [
+              "files",
+              "folders",
+              "all"
+            ],
+            "default": "files"
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "file.mkdir",
+      "kind": "action",
+      "category": "files",
+      "label": "Create Folder",
+      "description": "Creates a folder with its parent folders; output: the path",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Folder to create",
+            "examples": [
+              "D:\\archive\\2026"
+            ]
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "file.move",
+      "kind": "action",
+      "category": "files",
+      "label": "Move Files",
+      "description": "Moves files or folders; output: the new paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "File or folder; wildcards are allowed in the name, e.g. *.csv",
+            "examples": [
+              "C:\\in\\*.csv"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Target folder; for a single file also a new file name",
+            "examples": [
+              "D:\\archive"
+            ]
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "Replace existing files in the target",
+            "default": false
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "file.wait",
+      "kind": "action",
+      "category": "files",
+      "label": "Wait for File",
+      "description": "Waits until files exist; output: the matching paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File to wait for; wildcards are allowed in the name, e.g. *.csv",
+            "examples": [
+              "C:\\in\\*.csv"
+            ]
+          },
+          "interval": {
+            "type": "string",
+            "description": "How often to look, e.g. 5s or 1m",
+            "format": "runnel-duration",
+            "default": "5s"
+          },
+          "maxWait": {
+            "type": "string",
+            "description": "Give up and fail after this time; empty: wait until the action's timeout or the end of the run",
+            "format": "runnel-duration",
+            "examples": [
+              "30m"
+            ]
+          },
+          "stableFor": {
+            "type": "string",
+            "description": "The size of the files must not change for this time, e.g. 10s; empty: do not check",
+            "format": "runnel-duration",
+            "examples": [
+              "10s"
+            ]
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

@@ -43,7 +43,9 @@ internal/actions/<namensraum>/
 
 Kopiervorlage: [`internal/actions/core/wait.go`](../../internal/actions/core/wait.go) und `wait_test.go`.
 Mehrere eng verwandte Actions dürfen sich eine Datei teilen, wenn sie dieselbe Implementierung nutzen
-(Beispiel: `core.success` und `core.abort` in `end.go`).
+(Beispiel: `core.success` und `core.abort` in `end.go`). Hilfsfunktionen, die mehrere Actions eines Namensraums
+gemeinsam nutzen, stehen in einer eigenen Datei des Pakets (Beispiel: `internal/actions/file/files.go` mit Platzhaltern,
+Kopieren und Konfliktprüfung).
 
 ## 4. Definition und Konfiguration
 

@@ -90,6 +90,33 @@ func TestRunExpressionsExample(t *testing.T) {
 	}
 }
 
+func TestRunFilesExample(t *testing.T) {
+	chdirRepoRoot(t)
+	archive := t.TempDir()
+	code, out, errOut := run(t, "run", "--param", "ARCHIVE="+archive, "examples/files/workflows/archive.workflow.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	if !strings.Contains(out, "[copy] copied 2 files to ") || !strings.Contains(out, "[report] Archived 2 files, 81 bytes in the folder") ||
+		!strings.Contains(out, `output FILES = "2"`) {
+		t.Errorf("output:\n%s", out)
+	}
+	day, err := os.ReadDir(archive)
+	if err != nil || len(day) != 1 {
+		t.Fatalf("archive: %v %v", day, err)
+	}
+	files, _ := os.ReadDir(filepath.Join(archive, day[0].Name()))
+	if len(files) != 2 || files[0].Name() != "orders-1.csv" {
+		t.Errorf("archived files: %v", files)
+	}
+
+	// Without order files, the failure link reports it and the workflow succeeds.
+	code, out, _ = run(t, "run", "--param", "INBOX="+t.TempDir(), "--param", "ARCHIVE="+archive, "examples/files/workflows/archive.workflow.yaml")
+	if code != 0 || !strings.Contains(out, "[empty] No order files in") || !strings.Contains(out, `output FILES = "0"`) {
+		t.Errorf("empty inbox: exit code %d:\n%s", code, out)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")
@@ -136,10 +163,10 @@ func TestRunNotStarted(t *testing.T) {
 		{"unknown action type", []string{"run", writeWorkflow(t, `
 actions:
   - { id: start, type: core.start }
-  - { id: copy, type: file.copy }
+  - { id: copy, type: file.shred }
 links:
   - { from: start, to: copy }
-`)}, `unknown action type "file.copy"`},
+`)}, `unknown action type "file.shred"`},
 		{"missing required parameter", []string{"run", writeWorkflow(t, `
 parameters:
   - { name: TARGET, required: true }

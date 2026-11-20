@@ -9,12 +9,14 @@ package actions
 import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions/core"
+	"github.com/runnelhq/runnel/internal/actions/file"
 )
 
 // namespaces lists the Register functions of all built-in namespaces.
 // A new namespace is added here and nowhere else.
 var namespaces = []func(*action.Registry){
 	core.Register,
+	file.Register,
 }
 
 // Builtin returns a new registry with all built-in actions.

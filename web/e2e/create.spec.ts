@@ -60,6 +60,7 @@ test("the palette lists the actions of the catalog by category", async ({ page }
   const palette = page.getByRole("region", { name: "Palette" });
   await expect(palette.getByRole("group", { name: "General" })).toBeVisible();
   await expect(palette.getByTestId("palette-core.log")).toContainText("Log");
+  await expect(palette.getByRole("group", { name: "Files" }).getByTestId("palette-file.copy")).toContainText("Copy Files");
   await expect(palette.getByText("Open a workflow on the canvas to add actions.")).toBeVisible();
   await expect(palette.getByTestId("palette-core.log")).toHaveAttribute("draggable", "false");
 
@@ -75,8 +76,9 @@ test("the palette lists the actions of the catalog by category", async ({ page }
   await page.keyboard.press("/");
   await expect(palette.getByRole("textbox", { name: "Search actions" })).toBeFocused();
   await page.keyboard.type("wai");
-  await expect(palette.getByRole("listitem")).toHaveCount(1);
+  await expect(palette.getByRole("listitem")).toHaveCount(2);
   await expect(palette.getByTestId("palette-core.wait")).toBeVisible();
+  await expect(palette.getByTestId("palette-file.wait")).toBeVisible();
   await page.keyboard.type("xyz");
   await expect(palette.getByText("No action matches “waixyz”.")).toBeVisible();
   await page.keyboard.press("Escape");
