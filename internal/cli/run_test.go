@@ -194,6 +194,27 @@ func TestRunCSVExample(t *testing.T) {
 	}
 }
 
+func TestRunBasicTransformsExample(t *testing.T) {
+	chdirRepoRoot(t)
+	target := filepath.Join(t.TempDir(), "crm.csv")
+	code, out, errOut := run(t, "run", "--param", "BATCH=42", "--param", "OUTPUT="+target, "examples/pipelines/pipelines/customers.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	if !strings.Contains(out, "[active] kept 2 of 3 records, dropped 1") {
+		t.Errorf("filter log missing:\n%s", out)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "\xEF\xBB\xBFexternalId,companyName,revenue,source,batch\r\n4711,Müller GmbH,12500,runnel,42\r\n" +
+		"4713,\"Weber, Anna\",980.5,runnel,42\r\n"
+	if string(b) != want {
+		t.Errorf("written file %q, want %q", b, want)
+	}
+}
+
 func writeWorkflow(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.workflow.yaml")

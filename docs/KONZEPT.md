@@ -459,9 +459,14 @@ transforms:
     type: core.select-fields
     with:
       fields:
-        - { from: kdnr, to: externalId }
-        - { from: name, to: companyName }
-        - { name: importedAt, value: "{{ now() }}" }
+        - { name: kdnr, rename: externalId }
+        - { name: name, rename: companyName }
+
+  - id: stamp
+    type: core.constant
+    with:
+      fields:
+        - { name: importedAt, value: "{{ run.startedAt }}" }
 
   - id: to-crm
     type: http.request
@@ -480,7 +485,8 @@ transforms:
 links:
   - { from: read,        to: only-active }
   - { from: only-active, to: map }
-  - { from: map,         to: to-crm }
+  - { from: map,         to: stamp }
+  - { from: stamp,       to: to-crm }
   - { from: to-crm,      to: rejected, type: error }
 ```
 
@@ -905,12 +911,22 @@ Workflow des Projekts auf und wartet auf sein Ende.
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
 
-Umgesetzt (Stand S16a): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter` sowie `csv.input` und
-`csv.output`:
+Umgesetzt (Stand S16b): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
+`core.constant`, `core.convert` sowie `csv.input` und `csv.output`:
 
 - **`core.filter`** reicht die Datensätze weiter, für die `condition` wahr ist (`{{ record.betrag > 0 }}`, die
   Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Ein Ausgang für „falsch“ folgt mit
   den Link-Typen (S17).
+- **`core.select-fields`** behält mit `fields:` nur die genannten Felder, in dieser Reihenfolge, wahlweise umbenannt
+  (`{ name: kdnr, rename: externalId }`, geschlossenes Schema); fehlt ein Feld im Datensatz, ist es leer. Mit `remove:`
+  werden die genannten Felder entfernt und alle anderen behalten. Beides zusammen ist ein Fehler.
+- **`core.constant`** setzt Felder mit demselben Wert in jedem Datensatz (ein vorhandenes Feld behält seine Position).
+  Werte dürfen `${…}` und `{{ … }}` enthalten; Ausdrücke werden einmal beim Start ausgewertet (`vars`, `params`, `env`,
+  `run`, ohne `record`) und behalten ihren Typ. Werte je Datensatz berechnet später `core.calculate`.
+- **`core.convert`** wandelt Felder in einen anderen Typ um: Text mit Format (`"1.234,56"` → `decimal`, `"20.11.2026"` →
+  `date`), in Text mit Format (`decimal` → `"1.234,56"`), Zahlen ineinander und `date` ↔ `datetime`. Was nicht passt,
+  bricht mit Datensatz und Feld ab (`1.5` ist kein `int`; es wird nicht gerundet), Fehler-Links folgen mit S17. Die
+  Formate teilen sich `csv.input`, `csv.output` und `core.convert` (Paket `internal/format`).
 
 - **`csv.input`** liest alle Spalten als Text (offenes Schema) oder mit `fields:` nur die genannten, mit Typ und Format
   (geschlossenes Schema). Spalten werden über die Kopfzeile gefunden, ohne Kopfzeile über die Position. Ein Wert, der
