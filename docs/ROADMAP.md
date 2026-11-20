@@ -17,7 +17,8 @@ Erledigte Schritte sind mit ✅ markiert.
 > **Betrieb verschlankt (2026-11-20):** Aus Phase 0.5 stehen jetzt S39 (Secret-Store), S40b (Netzwerkbetrieb des
 > Editors), S42 (Run-Konfigurationen) und S43 (Wartung & Monitoring) im Backlog. Der Webhook-Trigger wurde neu
 > besprochen und ist zum HTTP-Trigger geworden ([ADR 0018](adr/0018-http-trigger.md)): S38a–S38c, dazu S40a
-> (Listener und TLS) aus S40.
+> (Listener und TLS) aus S40. Reihenfolge: zuerst die Trigger ohne HTTP und der Windows-Dienst (S37, S38, S41),
+> danach alles zum HTTP-Trigger (S38a, S40a, S38b, S38c).
 
 ## Regeln für jeden Schritt
 
@@ -137,12 +138,12 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
 | S37 | Cron-Trigger | Trigger-Dateien, Scheduler im Server, `overlap: skip/queue/allow`, Run-Queue mit Limits | Tests mit simulierter Uhr |
+| S38 | Weitere Trigger | Datei-Überwachung, Intervall; Trigger für Pipelines | Tests mit temporären Ordnern und simulierter Uhr |
+| S41 | Windows-Dienst | `runnel service install/start/stop/uninstall`, Ereignisanzeige, Recovery-Optionen | Manuell auf Windows |
 | S38a | HTTP-Trigger: asynchron | Typ `http` nach [ADR 0018](adr/0018-http-trigger.md): eigener Listener (zunächst nur lokal), Methode und Pfad mit Platzhaltern, Routing-Prüfung, `auth: token \| none`, Pfad/Query/Body → typisierte Parameter (`400` vor dem Start), `response: accepted` mit `202` und Lauf-ID, `maxConcurrent` (`429`), Body-Limit, `trigger = http:<name>`; für Workflows und Pipelines | Tests; `curl` auf `127.0.0.1` |
 | S40a | Listener und TLS | Adresse des Trigger-Listeners frei wählbar, TLS mit eigenem oder selbst erzeugtem Zertifikat (später auch für den Editor, S40b) | Aufruf von einem zweiten Rechner |
 | S38b | HTTP-Trigger: Antwort aus dem Workflow | `response: run` mit `timeout` (`504`), Standardantwort aus `outputs` (`200`/`500`), Action `http.respond` (Status, Header, Body; erste Antwort gilt, ohne Aufrufer wirkungslos), `request` im Ausdruckskontext, `history`, Zwischenspeicher vorbereiteter Workflows, eigenes Limit im Lauf-Speicher | Tests; `curl` mit verschiedenen Statuscodes |
 | S38c | HTTP-Trigger: Antwort aus der Pipeline | Transform `http.response` (Datensätze als JSON, `single`, `whenEmpty`, Status und Header), JSON-Array im Body als Datensätze | Tests; REST-artiges Beispiel |
-| S38 | Weitere Trigger | Datei-Überwachung, Intervall; Trigger für Pipelines | Tests mit temporären Ordnern und simulierter Uhr |
-| S41 | Windows-Dienst | `runnel service install/start/stop/uninstall`, Ereignisanzeige, Recovery-Optionen | Manuell auf Windows |
 
 **Ergebnis 0.5:** Dauerbetrieb als Windows-Dienst – zeit- und dateigesteuert und per HTTP von anderen Systemen
 ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der Editor bleibt lokal.

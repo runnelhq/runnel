@@ -1101,7 +1101,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.2 – Editor-Grundlage** ✅ | E1–E8: Action-Descriptor & Schema, Server mit Datei- und Run-API, Live-Events, Editor (Canvas, Bearbeiten, Eigenschaften, Ausführen) | Workflows visuell bauen und testen |
 | **0.3 – Workflow-Ausbau** | S08, S09, S11, S35: Ausdrücke, Datei-Actions, Sub-Workflows, Ausdruckseditor | Praxistaugliche Workflows |
 | **0.4 – Pipelines** | S12–S18, S22, S24, S25a: Pipeline-Engine, Typsystem, CSV, Transforms, Workflow ↔ Pipeline, Ausführung pro Datensatz, Pipeline-Canvas | ETL per CLI und Editor |
-| **0.5 – Betrieb** | S37, S38, S38a–c, S40a, S41: Cron-, Datei-, Intervall- und HTTP-Trigger (auch als Dienst mit Antwort aus dem Lauf), Listener mit TLS, Windows-Dienst | Dauerbetrieb auf einem Windows-Rechner, von anderen Systemen per HTTP ansprechbar |
+| **0.5 – Betrieb** | S37, S38, S41, dann S38a, S40a, S38b, S38c: Cron-, Datei- und Intervall-Trigger, Windows-Dienst; danach HTTP-Trigger (auch als Dienst mit Antwort aus dem Lauf) mit Listener und TLS | Dauerbetrieb auf einem Windows-Rechner, von anderen Systemen per HTTP ansprechbar |
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
