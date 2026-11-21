@@ -28,15 +28,13 @@ test("opens files in tabs and shows them as highlighted YAML", async ({ page }) 
   await expect(page.getByTestId("crumbs")).toHaveAttribute("title", "workflows/hello.workflow.yaml");
   await expect(page.getByTestId("kind")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy path" })).toBeVisible();
-  // Workflows are edited on the canvas (E6a); their YAML view is read-only, marked after the problem badges.
-  await expect(page.getByTestId("yaml-read-only")).toHaveText("Read-only");
-  await expect(page.getByTestId("yaml-read-only")).toHaveAttribute("title", /change the file on the canvas or in your text editor/);
-
-  const code = page.getByTestId("code");
+  // Workflows are edited in the YAML view too (E9): no "Read-only", highlighted as before.
+  await expect(page.getByText("Read-only")).toHaveCount(0);
+  const code = page.getByTestId("yaml-editor");
   await expect(code).toContainText("apiVersion: runnel/v1");
-  await expect(code.locator('[data-token="key"]', { hasText: "apiVersion" })).toBeVisible();
-  await expect(code.locator('[data-token="comment"]').first()).toContainText("# A small, valid workflow");
-  await expect(code.locator('[data-token="var"]', { hasText: "${GREETING}" }).first()).toBeVisible();
+  await expect(code.locator(".ry-key", { hasText: "apiVersion" })).toBeVisible();
+  await expect(code.locator(".ry-comment").first()).toContainText("# A small, valid workflow");
+  await expect(code.locator(".ry-var", { hasText: "${GREETING}" }).first()).toBeVisible();
   await expect(page.getByTestId("file-summary")).toHaveText(/^YAML · UTF-8 · \d+ lines$/);
 
   // A second file opens a second tab; the explorer marks the active file.

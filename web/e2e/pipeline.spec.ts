@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { editorText } from "./editor";
 import { expect, test, type Page } from "@playwright/test";
 
 // The canvas of a pipeline (mockup design/mockups/s25a-pipeline.html, states canvas, link
@@ -36,9 +37,9 @@ async function open(page: Page) {
 /** The text of the YAML view, line by line. */
 async function yaml(page: Page) {
   await page.getByRole("button", { name: "YAML", exact: true }).click();
-  const lines = await page.getByTestId("code").locator(":scope > div > span:nth-child(2)").allTextContents();
+  const text = await editorText(page);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  return lines.join("\n") + "\n";
+  return text;
 }
 
 const panel = (page: Page) => page.getByRole("region", { name: "Properties" });

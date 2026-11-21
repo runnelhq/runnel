@@ -1,3 +1,4 @@
+import { editorText } from "./editor";
 import { expect, test, type Page } from "@playwright/test";
 
 // Expression editor (roadmap S35a, mockup design/mockups/s35-expressions.html): fields of
@@ -50,9 +51,9 @@ async function open(page: Page) {
 
 async function yaml(page: Page) {
   await page.getByRole("button", { name: "YAML", exact: true }).click();
-  const lines = await page.getByTestId("code").locator(":scope > div > span:nth-child(2)").allTextContents();
+  const text = await editorText(page);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  return lines.join("\n") + "\n";
+  return text;
 }
 
 const panel = (page: Page) => page.getByRole("region", { name: "Properties" });

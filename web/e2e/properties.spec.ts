@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { editorText } from "./editor";
 import { expect, test, type Page } from "@playwright/test";
 
 // Properties panel (mockup design/mockups/e7-properties.html), against the server on a
@@ -29,9 +30,9 @@ async function select(page: Page, id: string) {
 /** The text of the YAML view, line by line. */
 async function yaml(page: Page) {
   await page.getByRole("button", { name: "YAML", exact: true }).click();
-  const lines = await page.getByTestId("code").locator(":scope > div > span:nth-child(2)").allTextContents();
+  const text = await editorText(page);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  return lines.join("\n") + "\n";
+  return text;
 }
 
 const panel = (page: Page) => page.getByRole("region", { name: "Properties" });
@@ -244,13 +245,17 @@ test("lists the problems below the canvas and jumps to the field", async ({ page
   const bar = page.getByRole("region", { name: "Problems and log" });
   await expect(bar.getByTestId("problem-count")).toHaveText("1");
   await expect(bar.getByRole("table")).toHaveCount(0);
-  // The badge opens the list, also from the YAML view (which switches to the canvas).
+  // The badge opens the list, also in the YAML view (E9); there a click shows the line.
   await page.getByRole("button", { name: "YAML", exact: true }).click();
   await page.getByTestId("error-count").click();
-  await expect(page.getByRole("button", { name: "Canvas", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "YAML", exact: true })).toHaveAttribute("aria-pressed", "true");
   const rows = bar.getByRole("table").getByRole("row");
   await expect(rows.nth(1)).toContainText('invalid duration "5 mins"');
   await expect(rows.nth(1)).toContainText("fetch-a · Timeout");
+  await rows.nth(1).click();
+  await expect(page.getByTestId("yaml-editor").locator(".cm-activeLine")).toContainText("timeout: 5 mins");
+  // On the canvas a click selects the action and shows the field.
+  await page.getByRole("button", { name: "Canvas", exact: true }).click();
 
   await rows.nth(1).click();
   await expect(page.getByRole("textbox", { name: "ID", exact: true })).toHaveValue("fetch-a");

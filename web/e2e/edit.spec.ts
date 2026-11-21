@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { editorText } from "./editor";
 import { expect, test, type Page } from "@playwright/test";
 
 // Editing on the canvas (mockup design/mockups/e6a-edit.html). These tests run against a
@@ -34,9 +35,11 @@ async function drag(page: Page, id: string, dx: number, dy: number) {
   await page.mouse.up();
 }
 
+/** Switches to the YAML view and returns the whole text once the editor shows it. */
 async function showYAML(page: Page) {
   await page.getByRole("button", { name: "YAML", exact: true }).click();
-  return page.getByTestId("code");
+  await page.getByTestId("yaml-editor").locator(".cm-content").waitFor();
+  return editorText(page);
 }
 
 test("moves a node, marks the file as changed and saves it", async ({ page, request }) => {
@@ -48,8 +51,8 @@ test("moves a node, marks the file as changed and saves it", async ({ page, requ
   await expect(page.getByRole("tab", { name: /parallel\.workflow\.yaml/ })).toHaveAttribute("data-dirty", "true");
   await expect(page.getByTestId("unsaved")).toHaveText("● Unsaved changes");
   const code = await showYAML(page);
-  await expect(code).toContainText(/fetch-b: \{ x: \d+, y: \d+ \}/);
-  const [, x, y] = (await code.textContent())!.match(/fetch-b: \{ x: (\d+), y: (\d+) \}/)!.map(Number);
+  expect(code).toMatch(/fetch-b: \{ x: \d+, y: \d+ \}/);
+  const [, x, y] = code.match(/fetch-b: \{ x: (\d+), y: (\d+) \}/)!.map(Number);
   // Moved right and down, snapped to the 8 px grid.
   expect(x).toBeGreaterThan(280);
   expect(y).toBeGreaterThan(300);
@@ -122,7 +125,7 @@ test("asks when the file was changed in another browser", async ({ page, browser
   await page.getByRole("button", { name: /^Save/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Reload" }).click();
   await expect(page.getByTestId("unsaved")).toHaveCount(0);
-  await expect(await showYAML(page)).toContainText(/fetch-a: \{ x: 280, y: 1[3-4]\d \}/);
+  expect(await showYAML(page)).toMatch(/fetch-a: \{ x: 280, y: 1[3-4]\d \}/);
 });
 
 test("overwrites a file changed elsewhere when asked to", async ({ page, request }) => {
@@ -168,9 +171,9 @@ test("creates the layout block on the first move", async ({ page, request }) => 
 
   await drag(page, "start", 0, 40);
   const code = await showYAML(page);
-  await expect(code).toContainText("layout:");
+  expect(code).toContain("layout:");
   for (const id of ["start", "fetch-a", "fetch-b", "combine", "report-error"]) {
-    await expect(code).toContainText(`${id}: { x:`);
+    expect(code).toContain(`${id}: { x:`);
   }
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
   await expect(page.getByTestId("auto-layout")).toHaveCount(0);

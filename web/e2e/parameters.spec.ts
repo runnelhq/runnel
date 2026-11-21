@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { editorText } from "./editor";
 import { expect, test, type Page } from "@playwright/test";
 
 // Parameters, outputs and repetition in the properties panel (mockups
@@ -44,9 +45,9 @@ async function open(page: Page, name = "params.workflow.yaml", node = "node-fetc
 /** The text of the YAML view, line by line. */
 async function yaml(page: Page) {
   await page.getByRole("button", { name: "YAML", exact: true }).click();
-  const lines = await page.getByTestId("code").locator(":scope > div > span:nth-child(2)").allTextContents();
+  const text = await editorText(page);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  return lines.join("\n") + "\n";
+  return text;
 }
 
 const panel = (page: Page) => page.getByRole("region", { name: "Properties" });
