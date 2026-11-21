@@ -133,7 +133,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 |---|---|---|---|
 | S44 | Datenvorschau | Pipeline bis Transform X mit Limit, Records je Link als Tabelle/JSON | Manuell im Editor |
 | S46 ✅ | Felder ermitteln | „Felder ermitteln“ für CSV schreibt `fields:` in die Datei; Mockup [`s46-fields.html`](../design/mockups/s46-fields.html). Die Erkennung ist eine optionale Schnittstelle der Eingabe-Transforms: neue Eingabe-Formate (JSON mit S19, später XML, Excel, Datenbank) setzen sie gleich mit um | Playwright-Test |
-| E9 | YAML bearbeiten | Workflows und Pipelines in der YAML-Ansicht bearbeiten (Editor mit Hervorhebung, Prüfung beim Tippen über `/validate`, Rückgängig gemeinsam mit dem Canvas, Umgang mit Fehlern, die keinen Graph mehr erlauben); vorher Mockup. Bis dahin ist die YAML-Ansicht als „Read-only“ gekennzeichnet | Playwright |
+| E9 | YAML bearbeiten | Workflows und Pipelines in der YAML-Ansicht bearbeiten (Editor mit Hervorhebung, Prüfung beim Tippen über `/validate`, Rückgängig gemeinsam mit dem Canvas, Umgang mit Fehlern, die keinen Graph mehr erlauben); Mockup [`e9-yaml.html`](../design/mockups/e9-yaml.html). Bis dahin ist die YAML-Ansicht als „Read-only“ gekennzeichnet | Playwright |
 
 ---
 
