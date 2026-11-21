@@ -17,6 +17,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e7c-parameters.html`](e7c-parameters.html) | E7c – Parameter und Outputs im Editor | `parameters`, `add`, `outputs`, `problems` | freigegeben mit PR #69, umgesetzt mit E7c (zusammen mit `foreach` aus S25a) |
 | [`e9-yaml.html`](e9-yaml.html) | E9 – YAML bearbeiten | `edit`, `problem`, `syntax`, `canvas` | freigegeben mit PR #90, umgesetzt mit E9 |
 | [`e11-files.html`](e11-files.html) | E11 – Dateien anlegen und löschen | `new`, `name`, `rename`, `delete`, `folder` | freigegeben mit PR #96, umgesetzt mit E11 |
+| [`e12-organize.html`](e12-organize.html) | E12 – Projekt organisieren | `drag`, `moveto`, `refs`, `triggers` | zur Freigabe |
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 
@@ -82,6 +83,11 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | S44 | Die Tabelle bleibt ohne neue Abhängigkeit (höchstens 1.000 Zeilen, keine Virtualisierung nötig); das Konzept nannte `@tanstack/react-table` – erst bei Bedarf |
 | S44 | „Refresh“ führt die Vorschau nach Änderungen erneut aus; ein Fehler zeigt, an welchem Transform die Vorschau stehen blieb, mit der Meldung |
 | S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
+| E12 | Ordner sind frei: nach Art (`workflows/`, `pipelines/`) oder nach Thema (z. B. `import/` mit den Workflows und der Pipeline, die nur sie nutzen; `shared/` für gemeinsam genutzte Pipelines). Ob eine Datei Workflow oder Pipeline ist, entscheidet die Endung; `workflows/` und `pipelines/` sind nur die Vorgabe für „+“ im Kopf des Explorers. Nur Trigger (`triggers/`) und Environments (`environments/`) haben feste Ordner |
+| E12 | Verschieben auf zwei Wegen: Ziehen und Ablegen im Explorer (der Zielordner wird hervorgehoben, ein Hinweis nennt den Zielordner) und „Move to…“ im Menü einer Datei oder eines Ordners mit einer Ordnerauswahl (aktueller Ordner ausgegraut, „New folder“ im Dialog) |
+| E12 | Beim Verschieben und Umbenennen fragt ein Dialog „Update the references?“, wenn andere Dateien auf den alten Pfad verweisen (Trigger-Ziel, `core.run-workflow`, `core.run-pipeline` mit festem Pfad, wie die Rückfrage beim Löschen in E11): je Verweis Datei, Stelle und alter → neuer Pfad, standardmäßig ausgewählt; „Move and update n references“, „Move only“ oder „Cancel“. Ohne Verweise kein Dialog |
+| E12 | Angepasst wird nur der Pfad in der betroffenen Zeile; die Dateien werden gespeichert. Verweise mit Variablen oder Ausdrücken werden nicht erkannt und nicht geändert (die Prüfung meldet sie danach). Ändert sich eine geöffnete Datei mit ungespeicherten Änderungen, wird sie nicht angepasst und im Dialog als nicht änderbar genannt. Damit ändert sich die Entscheidung aus E11 („Umbenennen ändert keine Verweise“) |
+| E12 | Trigger werden auch in Unterordnern von `triggers/` gelesen (Server, `runnel triggers`, Prüfung); Namen bleiben im ganzen Projekt eindeutig. Behebt K14 |
 | S46 | Vorschlag in einem Dialog (das Panel ist für eine Tabelle zu schmal): je Spalte Auswahl, Name, Type, Format, gelesene Werte und eine Begründung; geschrieben wird erst mit „Write n fields“ |
 | S46 | Gelesen wird mit der aktuellen (auch ungespeicherten) Konfiguration des Transforms; Variablen im Pfad mit den Standardwerten der Parameter und dem Standard-Environment (wie Run ohne Dialog); höchstens die ersten 1.000 Zeilen |
 | S46 | Ein Typ wird nur vorgeschlagen, wenn jeder gelesene Wert passt; sonst `string` mit Begründung (z. B. „3 of 4 values are decimal“). Zahlen mit führender Null bleiben Text; `ja`/`nein` ist kein `bool` (das Format kennt true/false, 1/0, yes/no) |
@@ -107,6 +113,7 @@ node design/mockups/screenshots.cjs s46-fields fields,detect,written,update,erro
 node design/mockups/screenshots.cjs e9-yaml edit,problem,syntax,canvas
 node design/mockups/screenshots.cjs s44-preview preview,json,link,error
 node design/mockups/screenshots.cjs e11-files new,name,rename,delete,folder
+node design/mockups/screenshots.cjs e12-organize drag,moveto,refs,triggers
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
