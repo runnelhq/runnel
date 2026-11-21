@@ -16,7 +16,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s25a-pipeline.html`](s25a-pipeline.html) | S25a – Pipeline-Canvas (dazu K10/K11 im Workflow-Panel) | `canvas`, `link`, `run`, `problems`, `foreach` | freigegeben mit PR #62; Umsetzung in S25a1a (Server), S25a1b, S25a2, S25a3; `foreach` mit E7c ✅ |
 | [`e7c-parameters.html`](e7c-parameters.html) | E7c – Parameter und Outputs im Editor | `parameters`, `add`, `outputs`, `problems` | freigegeben mit PR #69, umgesetzt mit E7c (zusammen mit `foreach` aus S25a) |
 | [`e9-yaml.html`](e9-yaml.html) | E9 – YAML bearbeiten | `edit`, `problem`, `syntax`, `canvas` | freigegeben mit PR #90, umgesetzt mit E9 |
-| [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | zur Freigabe |
+| [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 
 ## Entscheidungen

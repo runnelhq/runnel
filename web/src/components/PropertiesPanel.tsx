@@ -19,7 +19,7 @@ import {
   type Workflow,
 } from "../workflow";
 import type { Selection } from "./Canvas";
-import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, DetectIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, DetectIcon, EyeIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
@@ -56,6 +56,8 @@ export interface PropertiesProps {
   onShowInLog?: (actionId: string) => void;
   /** Input transforms that can propose their fields: opens "Detect fields" (S46). */
   onDetectFields?: (id: string) => void;
+  /** Pipelines: runs the data preview up to a transform (S44). */
+  onPreview?: (id: string) => void;
 }
 
 /** A change of a link in the panel. */
@@ -253,6 +255,21 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
         {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in the YAML view."}
       </p>
+      {pipeline && d && props.onPreview && (
+        <div className="mx-4 mb-3">
+          <button
+            type="button"
+            onClick={() => props.onPreview!(action.id)}
+            className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted"
+          >
+            <EyeIcon width={14} height={14} />
+            Preview data
+          </button>
+          <p className="mt-1 mb-0 text-2xs text-muted-foreground">
+            Runs the pipeline up to <b>{action.id}</b> with the first records of its inputs; nothing is written
+          </p>
+        </div>
+      )}
       <LastRun {...props} id={action.id} />
       {rest.length > 0 && (
         <ul className="mx-4 mt-0 mb-3 list-none rounded-md bg-danger-soft px-2.5 py-1.5 text-2xs text-destructive">

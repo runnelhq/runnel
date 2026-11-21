@@ -17,6 +17,8 @@ import { Canvas, type Selection } from "./Canvas";
 import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { RunDialog } from "./RunDialog";
 import { DetectFieldsDialog } from "./DetectFieldsDialog";
+import { PreviewPanel, type PreviewSelection } from "./PreviewPanel";
+import { previewRun, runPreview, type PreviewResult } from "../preview";
 import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
@@ -123,6 +125,16 @@ export function FileView(props: {
   const [yamlFocus, setYamlFocus] = useState<{ line: number; seq: number } | null>(null);
   const flushTyping = useRef<(() => void) | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  // The data preview of a pipeline (S44): up to which transform, its result and what is shown.
+  const [preview, setPreview] = useState<{
+    upTo: string;
+    limit: number;
+    result: PreviewResult | null;
+    error: string | null;
+    loading: boolean;
+    selected: PreviewSelection;
+  } | null>(null);
+  const previewSeq = useRef(0);
   useEffect(() => setCursor(null), [view]);
 
   const doc = state.status === "loaded" ? state.doc : null;
@@ -305,6 +317,45 @@ export function FileView(props: {
       void applyEdit({ set: [{ id, field, value: null, ...(map.length > 0 ? { map } : {}) }] }, `${id}:${field}`),
     [applyEdit],
   );
+  // The data preview (S44) runs the text shown, with the values remembered for Run.
+  const startPreview = useCallback(
+    async (upTo: string, limit?: number) => {
+      flushTyping.current?.();
+      await pending.current?.catch(() => undefined);
+      const current = docRef.current;
+      if (!current) return;
+      const seq = ++previewSeq.current;
+      const lim = limit ?? 100;
+      setPreview((p) => ({
+        upTo,
+        limit: lim,
+        result: p?.upTo === upTo ? p.result : null,
+        error: null,
+        loading: true,
+        selected: p?.upTo === upTo ? p.selected : "output",
+      }));
+      setBottomTab("preview");
+      const settings = loadRunSettings(path);
+      try {
+        const result = await runPreview({ path, content: current.text, transform: upTo, limit: lim, environment: settings?.environment, params: settings?.params });
+        if (seq === previewSeq.current) setPreview((p) => p && { ...p, result, loading: false });
+      } catch (err) {
+        if (seq === previewSeq.current) setPreview((p) => p && { ...p, result: null, error: err instanceof Error ? err.message : String(err), loading: false });
+      }
+    },
+    [path],
+  );
+  const endPreview = useCallback(() => {
+    previewSeq.current++;
+    setPreview(null);
+    setBottomTab((t) => (t === "preview" ? null : t));
+  }, []);
+  // A link selected on the canvas shows its records in the preview.
+  useEffect(() => {
+    const link = selection.links.length === 1 && selection.actions.length === 0 ? selection.links[0] : undefined;
+    if (link !== undefined && preview?.result?.links[link]) setPreview((p) => p && { ...p, selected: link });
+  }, [selection]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // "Detect fields" (S46): the selected fields replace "fields:" as one undo step.
   const onWriteFields = useCallback(
     async (id: string, fields: { name: string; type: string; format?: string }[]) => {
@@ -688,7 +739,8 @@ export function FileView(props: {
             onSelect={onSelect}
             selection={selection}
             problemsInPanel={showPanel}
-            run={shownRun}
+            run={preview?.result && graph ? previewRun(preview.result, graph, preview.upTo) : shownRun}
+            preview={preview ? { upTo: preview.upTo, limit: preview.limit, onClose: endPreview } : null}
           />
         ) : validation ? (
           <NotAGraph path={path} kind={graphKind ?? "workflow"} validation={validation} onShowYAML={showInYAML} />
@@ -700,6 +752,28 @@ export function FileView(props: {
             workflow={graph ?? null}
             pipeline={graphKind === "pipeline"}
             log={isGraph}
+            preview={
+              preview && graphKind === "pipeline"
+                ? {
+                    failed: !!preview.error || (!!preview.result && preview.result.status !== "succeeded"),
+                    onClose: endPreview,
+                    content: (
+                      <PreviewPanel
+                        upTo={preview.upTo}
+                        result={preview.result}
+                        loading={preview.loading}
+                        error={preview.error}
+                        links={graph?.links ?? []}
+                        selected={preview.selected}
+                        onSelect={(selected) => setPreview((p) => p && { ...p, selected })}
+                        limit={preview.limit}
+                        onLimit={(limit) => void startPreview(preview.upTo, limit)}
+                        onRefresh={() => void startPreview(preview.upTo, preview.limit)}
+                      />
+                    ),
+                  }
+                : null
+            }
             problems={validation?.problems ?? []}
             tab={bottomTab}
             onTab={setBottomTab}
@@ -755,6 +829,7 @@ export function FileView(props: {
           }}
           onHide={() => setPanel(false)}
           onDetectFields={graphKind === "pipeline" ? setDetecting : undefined}
+          onPreview={graphKind === "pipeline" ? (id) => void startPreview(id, preview?.limit) : undefined}
         />
       )}
       </div>

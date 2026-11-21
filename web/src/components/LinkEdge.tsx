@@ -17,6 +17,8 @@ export interface LinkEdgeData extends Record<string, unknown> {
   run?: "flow" | "dead";
   /** Pipelines: records passed over the link in the last run (mockup S25a, state "run"). */
   rows?: number;
+  /** The counts come from a data preview (S44): drawn dashed. */
+  preview?: boolean;
   /** The link menu is open (mockup E6b). */
   menu?: boolean;
   onOpenMenu?: () => void;
@@ -127,6 +129,7 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
                   : `translate(-50%, -50%) translate(${(sourceX + targetX) / 2}px, ${(sourceY + targetY) / 2}px)`,
               color: kind === "error" ? "var(--link-failure)" : "var(--foreground)",
               borderColor: kind === "error" ? "var(--link-failure)" : "var(--border)",
+              borderStyle: data.preview ? "dashed" : undefined,
             }}
           >
             {data.rows.toLocaleString("en-US")}

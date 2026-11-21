@@ -328,7 +328,7 @@ Eingesetzt (fest gepinnt in `go.mod`): `goccy/go-yaml`, `expr-lang/expr`, `shops
 | Formulare | Automatisch aus JSON-Schema der Action/Transform generiert (`@rjsf/core` oder eigene schlanke Lösung) |
 | Code-/Ausdruckseditor | **CodeMirror 6** (Autovervollständigung für Variablen, Felder, Funktionen; S35, Nachtrag in ADR 0006) |
 | Zustand | `zustand` + Undo/Redo-Stack (Command-Pattern) |
-| Datenvorschau | Virtualisierte Tabelle (`@tanstack/react-table` + `react-virtual`) |
+| Datenvorschau | Einfache Tabelle (höchstens 1.000 Zeilen, S44); virtualisiert (`@tanstack/react-table` + `react-virtual`) erst bei Bedarf |
 | UI-Kit | `shadcn/ui` + Tailwind (leicht, kein schweres Komponenten-Framework) |
 | Gestaltung | Design Tokens aus [`design/tokens`](../design/README.md) (Farben, Schriften, Radien, hell/dunkel) – [ADR 0011](adr/0011-corporate-design.md) |
 
@@ -963,7 +963,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/runs?status=&path=` | Historie (seit E3 im Speicher, Filter folgen mit S26 – zurückgestellt) |
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern (`resume` mit S29, Backlog) |
-| POST | `/preview` | Pipeline-Vorschau bis Transform X (geplant, S44) |
+| POST | `/preview` | Pipeline-Vorschau bis Transform X (S44, `docs/dev/API.md`) |
 | GET/PUT | `/secrets/{name}` | Secrets setzen, Wert nie lesbar zurück (geplant, S39) |
 | GET | `/triggers` | Trigger mit nächstem Zeitpunkt, letztem Ergebnis und Problemen (seit S37); ein-/ausschalten über die Datei (`enabled`) |
 | ANY | Pfade der HTTP-Trigger | auf dem eigenen Listener der Trigger, nicht unter `/api/v1` ([ADR 0018](adr/0018-http-trigger.md)) |
