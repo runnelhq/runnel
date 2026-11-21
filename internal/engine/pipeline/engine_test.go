@@ -137,7 +137,7 @@ func (f fn) Process(ctx context.Context, in <-chan transform.Batch, out *transfo
 	return f(ctx, in, out)
 }
 
-func parse(t *testing.T, body string) *model.Pipeline {
+func parse(t testing.TB, body string) *model.Pipeline {
 	t.Helper()
 	p, err := model.ParsePipeline("test.pipeline.yaml", []byte("kind: Pipeline\napiVersion: runnel/v1\nname: test\n"+body))
 	if err != nil {
@@ -795,5 +795,50 @@ links:
 	}
 	if s["show"].Input == nil || names(*s["show"].Input) != names(s["conv"].Errors) {
 		t.Errorf("show %+v", s["show"])
+	}
+}
+
+// TestRunInputLimitAndSamples checks the data preview (S44): inputs stop after
+// InputLimit records as if their input had ended, and the first SampleRows records of
+// each link are kept, also those on error links.
+func TestRunInputLimitAndSamples(t *testing.T) {
+	body := `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1000, rowNumberField: n } }
+  - { id: check, type: test.odd }
+  - { id: good, type: test.collect }
+  - { id: bad, type: test.collect }
+links:
+  - { from: gen, to: check }
+  - { from: check, to: good }
+  - { from: check, to: bad, type: error }
+`
+	res, c, _ := run(context.Background(), t, body, func(o *Options) { o.InputLimit, o.SampleRows = 20, 3 })
+	if res.Status != Succeeded || res.Err != nil {
+		t.Fatalf("%s %v", res.Status, res.Err)
+	}
+	if got := res.Counts["gen"]; got.Written != 20 {
+		t.Errorf("gen wrote %d records, want 20", got.Written)
+	}
+	if len(c.recs["good"]) != 10 || len(c.recs["bad"]) != 10 {
+		t.Errorf("good %d, bad %d", len(c.recs["good"]), len(c.recs["bad"]))
+	}
+	values := func(recs []record.Record) string {
+		var out []string
+		for _, r := range recs {
+			v, _ := r.Get("n")
+			out = append(out, fmt.Sprint(v))
+		}
+		return strings.Join(out, ",")
+	}
+	if got := []string{values(res.Samples[0]), values(res.Samples[1]), values(res.Samples[2])}; fmt.Sprint(got) != "[1,2,3 2,4,6 1,3,5]" {
+		t.Errorf("samples %v", got)
+	}
+	if _, ok := res.Samples[2][0].Get("_error"); !ok {
+		t.Error("the sample of the error link has no _error")
+	}
+	// Without the options: no samples, all records.
+	res, _, _ = run(context.Background(), t, body, nil)
+	if res.Samples != nil || res.Counts["gen"].Written != 1000 {
+		t.Errorf("samples %v, written %d", res.Samples, res.Counts["gen"].Written)
 	}
 }

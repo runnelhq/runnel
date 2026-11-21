@@ -53,7 +53,16 @@ type Options struct {
 	Rows []record.Record
 	// Respond answers the waiting caller of an http trigger (http.response, S38c); nil if none.
 	Respond action.Responder
+	// InputLimit stops each input (a transform without incoming links) after that many
+	// records, as if its input had ended (data preview, S44); 0: no limit.
+	InputLimit int
+	// SampleRows keeps the first records passed over each link in Result.Samples (data
+	// preview, S44); 0: none.
+	SampleRows int
 }
+
+// errInputLimit ends an input that has emitted Options.InputLimit records.
+var errInputLimit = errors.New("input limit reached")
 
 // Status is the final state of a run or a transform.
 type Status string
@@ -88,6 +97,9 @@ type Result struct {
 	LinkRows []int64
 	// Rows are the result records of the run, written by core.to-result (S24a).
 	Rows []record.Record
+	// Samples are the first records passed over each link, by index in the list of
+	// links (Options.SampleRows).
+	Samples [][]record.Record
 }
 
 // EventKind classifies events of a run.
@@ -539,6 +551,15 @@ func (r *Runner) Run(parent context.Context) Result {
 
 	counts := make([]struct{ read, written, errors atomic.Int64 }, len(r.p.Transforms))
 	linkRows := make([]atomic.Int64, len(r.p.Links))
+	samples := make([][]record.Record, len(r.p.Links))
+	var sampleMu sync.Mutex
+	sample := func(link int, b transform.Batch) {
+		sampleMu.Lock()
+		defer sampleMu.Unlock()
+		for _, rec := range b[:min(len(b), r.opts.SampleRows-len(samples[link]))] {
+			samples[link] = append(samples[link], rec.Clone())
+		}
+	}
 	var failMu sync.Mutex
 	var failure error
 	fail := func(err error) {
@@ -581,6 +602,9 @@ func (r *Runner) Run(parent context.Context) Result {
 						for j, rec := range b {
 							batch[j] = rec.Clone()
 						}
+					}
+					if r.opts.SampleRows > 0 {
+						sample(l.index, batch) // before the transform after it may change the records
 					}
 					select {
 					case l.ch <- batch:
@@ -627,7 +651,15 @@ func (r *Runner) Run(parent context.Context) Result {
 					byTarget[l.target].links = append(byTarget[l.target].links, l)
 				}
 				next := 0
+				limited := r.opts.InputLimit > 0 && len(ins[i]) == 0
+				var emitted int
 				out := transform.NewOutput(t.ID, func(rec record.Record) error {
+					if limited {
+						if emitted == r.opts.InputLimit {
+							return errInputLimit
+						}
+						emitted++
+					}
 					counts[i].written.Add(1)
 					if distribute {
 						p := single[next]
@@ -651,6 +683,9 @@ func (r *Runner) Run(parent context.Context) Result {
 					return add(p, rec)
 				})
 				err := process(ctx, tr, in, out)
+				if errors.Is(err, errInputLimit) {
+					err = nil // the input ends there, like a shorter file
+				}
 				for _, p := range ports {
 					if err == nil && len(p.batch) > 0 {
 						err = send(p, p.batch)
@@ -707,6 +742,9 @@ func (r *Runner) Run(parent context.Context) Result {
 
 	res := Result{RunID: runID, Status: Succeeded, Duration: now().Sub(started), Counts: map[string]Counts{}, Rows: results,
 		LinkRows: make([]int64, len(linkRows))}
+	if r.opts.SampleRows > 0 {
+		res.Samples = samples
+	}
 	for i := range linkRows {
 		res.LinkRows[i] = linkRows[i].Load()
 	}

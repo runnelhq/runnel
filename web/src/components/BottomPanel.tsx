@@ -45,7 +45,7 @@ function where(wf: Workflow, p: Problem): string {
   return `${wf.kind === "pipeline" ? "Pipeline" : "Workflow"}${field}`;
 }
 
-export type BottomTab = "problems" | "log";
+export type BottomTab = "problems" | "log" | "preview";
 
 const debugKey = "runnel.log.debug";
 
@@ -83,6 +83,8 @@ export function BottomPanel(props: {
   pipeline: boolean;
   /** Whether the tab "Log" is shown (only files that run, E10). */
   log?: boolean;
+  /** The data preview of a pipeline (S44): its content, whether it failed, and how to end it. */
+  preview?: { content: ReactNode; failed: boolean; onClose: () => void } | null;
   problems: Problem[];
   tab: BottomTab | null;
   onTab: (tab: BottomTab | null) => void;
@@ -128,8 +130,28 @@ export function BottomPanel(props: {
           ),
         )}
         {props.log !== false && tabButton("log", "Log")}
+        {props.preview &&
+          tabButton(
+            "preview",
+            "Preview",
+            props.preview.failed && (
+              <span className="inline-grid h-4 min-w-[18px] place-items-center rounded-full bg-danger-soft px-[5px] text-[10px] font-semibold text-destructive">!</span>
+            ),
+          )}
+        {props.preview && (
+          <button
+            type="button"
+            title="End the preview"
+            aria-label="End the preview"
+            onClick={props.preview.onClose}
+            className="ml-auto cursor-pointer border-0 bg-transparent px-2 text-muted-foreground hover:text-foreground"
+          >
+            ×
+          </button>
+        )}
       </div>
       {tab === "problems" && <ProblemsTable {...props} />}
+      {tab === "preview" && props.preview?.content}
       {tab === "log" && props.log !== false && <LogView run={props.run} pipeline={props.pipeline} focus={props.logFocus} onSelectAction={props.onSelectAction} />}
     </section>
   );

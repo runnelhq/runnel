@@ -37,6 +37,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | POST | `/workflows/edit` | Änderung vom Canvas auf den Text anwenden (nicht speichern), siehe unten |
 | POST | `/pipelines/edit` | dasselbe für Pipelines (S25a), siehe unten |
 | POST | `/pipelines/fields` | Felder eines Eingabe-Transforms ermitteln (S46), siehe unten |
+| POST | `/preview` | Datenvorschau einer Pipeline bis zu einem Transform (S44), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
 | GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst |
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
@@ -321,3 +322,36 @@ Ein Typ wird nur vorgeschlagen, wenn **jeder** gelesene Wert passt (`int`, `deci
 Null bleiben Text. Antworten: `404` für einen unbekannten Transform, `400` für Typen ohne Erkennung, `422`, wenn die
 Pipeline oder das Projekt nicht lesbar ist, oder – mit `{"error", "workingDir"}` – wenn die Eingabe nicht lesbar ist
 (relative Pfade beziehen sich auf `workingDir`, den Ordner, in dem `runnel` gestartet wurde).
+
+## Datenvorschau (`/preview`)
+
+„Preview data“ im Editor (S44): Die Pipeline läuft bis zu einem Transform – nur er und die Transforms davor –, jede
+Eingabe liest höchstens `limit` Datensätze (Standard 100, höchstens 1.000). Ausgaben (Kategorie `output`, z. B.
+`csv.output`) laufen nicht, **es wird nichts geschrieben**; die Transforms nach dem gewählten nehmen nur die
+Datensätze seiner Links auf. Gelesen wird `content` (der Text im Editor, gespeichert oder nicht); Parameter und
+Environment wie bei `POST /runs`. Die Vorschau ist kein Lauf: Sie erscheint nicht unter `/runs` und nicht in
+`/events`.
+
+```json
+POST /api/v1/preview
+{ "path": "pipelines/customers.pipeline.yaml", "content": "kind: Pipeline\n…", "transform": "types",
+  "limit": 100, "environment": "dev", "params": { "BATCH": "42" } }
+
+→ 200 { "status": "succeeded", "durationMs": 6, "limit": 100,
+        "counts": { "read": { "read": 0, "written": 4 }, "types": { "read": 4, "written": 3, "errors": 1 } },
+        "links": { "0": { "rows": 4, "fields": [ … ], "records": [ … ] },
+                   "1": { "rows": 1, "fields": [ { "name": "kdnr", "type": "string" }, …, { "name": "_error", "type": "string" } ],
+                          "records": [ [ "4714", "Klein KG", "k. A.", "Essen", "", "field \"umsatz\": …", "umsatz", "types" ] ] } },
+        "output": { "rows": 3, "fields": [ { "name": "kdnr", "type": "int" }, { "name": "umsatz", "type": "decimal" }, … ],
+                    "records": [ [ 4711, 12500, … ] ] } }
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `status`, `error`, `failedAt` | `succeeded`, `failed` (mit Meldung und dem Transform, an dem die Vorschau stehen blieb) oder `cancelled` (nach einer Minute abgebrochen) |
+| `counts` | gelesene, weitergegebene und an Fehler-Links gegebene Datensätze des gewählten Transforms und der Transforms davor |
+| `links` | je Link (Index in `links:`), der gelaufen ist: `rows` (Datensätze über den Link) und die ersten `limit` Datensätze als `fields` (Name, Typ des ersten Werts, der nicht null ist) und `records` (Werte in der Reihenfolge der Felder; Zahlen als JSON-Zahlen, Dezimalzahlen exakt, Datum ISO 8601, `null` für fehlende Werte) |
+| `output` | dasselbe für die Ausgabe des gewählten Transforms (alle Datensätze, die er weitergibt) |
+
+Antworten: `422` mit `problems` (Format wie `/validate`), wenn die Pipeline Fehler hat, `422` für einen unbekannten
+Transform, `429`, wenn schon zwei Vorschauen laufen, `400` für andere Dateien.

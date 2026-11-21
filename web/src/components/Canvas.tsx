@@ -31,7 +31,7 @@ import {
 } from "../workflow";
 import type { RunView } from "../run";
 import { ActionNode, type ActionNodeType } from "./ActionNode";
-import { ActionIcon, FitIcon, LayoutIcon, MinusIcon, PlusIcon } from "./Icons";
+import { ActionIcon, EyeIcon, FitIcon, LayoutIcon, MinusIcon, PlusIcon } from "./Icons";
 import { LinkEdge, linkPath, pipelineKinds, type LinkEdgeType, type SettableKind } from "./LinkEdge";
 
 const nodeTypes: NodeTypes = { action: ActionNode };
@@ -78,6 +78,8 @@ export interface CanvasProps {
   problemsInPanel?: boolean;
   /** The current or last run, shown as status at the actions and links (mockup E8). */
   run?: RunView | null;
+  /** The run shown is a data preview (S44): record counts are drawn dashed, and a hint says up to which transform it ran. */
+  preview?: { upTo: string; limit: number; onClose: () => void } | null;
   /** Id of the action whose id is being edited. */
   renaming?: string | null;
   onRenaming?: (id: string | null) => void;
@@ -99,7 +101,7 @@ export function Canvas(props: CanvasProps) {
 }
 
 function Graph(props: CanvasProps) {
-  const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel, run } =
+  const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel, run, preview } =
     props;
   const pipeline = workflow.kind === "pipeline";
   const catalog = useCatalog(workflow.kind);
@@ -169,10 +171,11 @@ function Graph(props: CanvasProps) {
           disabled: l.disabled,
           run: pipeline ? undefined : linkRun(run, l),
           rows: pipeline ? run?.linkRows[i] : undefined,
+          preview: !!preview,
         },
       }));
     return { computed, computedEdges, auto };
-  }, [workflow, pipeline, problems, catalog, onShowInYAML, problemsInPanel, run, editable, renaming, onRenaming, finishRename]);
+  }, [workflow, pipeline, problems, catalog, onShowInYAML, problemsInPanel, run, preview, editable, renaming, onRenaming, finishRename]);
 
   // Local node and edge state for dragging and selection; it follows the workflow and keeps the selection.
   // The nodes start with the current selection, so that React Flow does not report an empty one first.
@@ -387,17 +390,38 @@ function Graph(props: CanvasProps) {
             <Ghost {...ghost} color={categoryColor[catalog.get(ghost.type)?.category ?? "general"] ?? categoryColor.general} id={newActionId(workflow, ghost.type)} />
           </ViewportPortal>
         )}
-        {auto !== "none" && (
-          <Panel position="top-right">
-            <span
-              data-testid="auto-layout"
-              className="inline-flex h-[26px] items-center gap-1.5 rounded-full border border-border bg-card px-2.5 text-xs text-muted-foreground shadow-sm"
-            >
-              <LayoutIcon width={14} height={14} />
-              {auto === "all"
-                ? "Arranged automatically – the file has no layout yet"
-                : `Some ${pipeline ? "transforms" : "actions"} have no position and were arranged automatically`}
-            </span>
+        {(preview || auto !== "none") && (
+          // The hints at the top right, one below the other (mockups E5, S44).
+          <Panel position="top-right" className="flex flex-col items-end gap-1.5">
+            {preview && (
+              <span
+                data-testid="preview-hint"
+                className="inline-flex h-[26px] items-center gap-1.5 rounded-full border border-border bg-card px-2.5 text-xs text-foreground shadow-sm"
+              >
+                <EyeIcon width={14} height={14} />
+                Preview up to <b>{preview.upTo}</b> · first {preview.limit} records · nothing is written
+                <button
+                  type="button"
+                  title="End the preview"
+                  aria-label="End the preview"
+                  onClick={preview.onClose}
+                  className="cursor-pointer border-0 bg-transparent p-0 text-muted-foreground hover:text-foreground"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {auto !== "none" && (
+              <span
+                data-testid="auto-layout"
+                className="inline-flex h-[26px] items-center gap-1.5 rounded-full border border-border bg-card px-2.5 text-xs text-muted-foreground shadow-sm"
+              >
+                <LayoutIcon width={14} height={14} />
+                {auto === "all"
+                  ? "Arranged automatically – the file has no layout yet"
+                  : `Some ${pipeline ? "transforms" : "actions"} have no position and were arranged automatically`}
+              </span>
+            )}
           </Panel>
         )}
       </ReactFlow>

@@ -33,6 +33,8 @@ type PipelineSpec struct {
 	Respond action.Responder
 	// History: see Spec.History.
 	History string
+	// Preview runs only a part of the pipeline as data preview (S44); nil: all of it.
+	Preview *PreviewSpec
 }
 
 // PreparedPipeline is the result of PreparePipeline; it is also returned when it fails,
@@ -45,6 +47,8 @@ type PreparedPipeline struct {
 	Warnings model.Errors
 	// Undeclared lists parameters given at start but not declared by the pipeline.
 	Undeclared []string
+	// Preview relates the links of a preview to those of the pipeline (PipelineSpec.Preview).
+	Preview Preview
 }
 
 // PreparePipeline loads, checks and prepares a pipeline run (roadmap S13b). Problems in
@@ -71,7 +75,17 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 	if p.Env != nil {
 		envName = p.Env.Name
 	}
-	p.Runner, err = pipeline.Prepare(pl, pipeline.Options{
+	run, opts := pl, pipeline.Options{}
+	if spec.Preview != nil {
+		if run, p.Preview, err = previewPipeline(pl, spec.Preview.UpTo, spec.Registry); err != nil {
+			return p, err
+		}
+		limit := min(max(spec.Preview.Limit, 1), MaxPreviewLimit)
+		opts.InputLimit, opts.SampleRows = limit, limit
+	}
+	p.Runner, err = pipeline.Prepare(run, pipeline.Options{
+		InputLimit:  opts.InputLimit,
+		SampleRows:  opts.SampleRows,
 		Registry:    spec.Registry,
 		Scope:       model.PipelineScope(pl, p.Project, p.Env, spec.Params),
 		Environment: envName,

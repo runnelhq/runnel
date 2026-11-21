@@ -203,6 +203,14 @@ export const SearchIcon = (p: P) => (
   </Icon>
 );
 
+/** Data preview (mockup S44): an eye. */
+export const EyeIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+
 /** Detect fields (mockup S46): lines of a list with a magnifier. */
 export const DetectIcon = (p: P) => (
   <Icon {...p}>
