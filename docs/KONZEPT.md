@@ -79,7 +79,7 @@ Ein Ordner im Dateisystem – die Einheit für Versionierung (Git), Deployment u
 
 ```
 my-project/
-├─ project.yaml              # Name, Version, Default-Environment, Plugin-Pfade
+├─ project.yaml              # Name, Version, Default-Environment
 ├─ environments/
 │   ├─ dev.yaml              # Variablen je Umgebung
 │   └─ prod.yaml
@@ -93,6 +93,8 @@ my-project/
 │   └─ nightly-import.workflow.yaml
 ├─ pipelines/
 │   └─ customers-to-crm.pipeline.yaml
+├─ plugins/
+│   └─ sap-rfc/               # plugin.yaml + ausführbare Datei (ADR 0019)
 └─ scripts/                  # gemeinsam genutzte JS-/PowerShell-Skripte
 ```
 
@@ -816,28 +818,35 @@ Drei Stufen – von einfach bis mächtig:
 
 ### 7.3 Stufe 3: Externe Plugins (beliebige Sprache)
 
-Go-eigene Plugins (`plugin`-Paket) funktionieren unter Windows nicht – deshalb ein **prozessbasiertes Protokoll** (ähnlich LSP/HashiCorp go-plugin):
+Go-eigene Plugins (`plugin`-Paket) funktionieren unter Windows nicht – deshalb ein **prozessbasiertes Protokoll**
+([ADR 0019](adr/0019-plugin-protokoll.md)); `hashicorp/go-plugin` wird bewusst nicht verwendet (Lizenz, Port unter
+Windows, gRPC für andere Sprachen).
 
-- Plugin = ausführbare Datei + `plugin.yaml` im Ordner `plugins/<name>/`.
+- Plugin = Ordner `plugins/<name>/` im Projekt mit `plugin.yaml` (`kind: Plugin`) und ausführbarer Datei; Plugins
+  gibt es nur im Projekt.
 - Jedes Plugin hat **einen eigenen Namensraum** (`namespace:`) und bietet nur Typen darin an; die Namensräume der
-  eingebauten Bausteine sind reserviert ([ADR 0013](adr/0013-typnamen-namensraeume.md)).
-- Kommunikation: **JSON-RPC 2.0 über stdin/stdout** (NDJSON), Logs über stderr.
+  eingebauten Bausteine sind reserviert ([ADR 0013](adr/0013-typnamen-namensraeume.md)). Welche Typen es anbietet,
+  meldet es mit `describe`.
+- Kommunikation: **JSON-RPC 2.0 über stdin/stdout** (eine Nachricht je Zeile), Logs über stderr; Handshake mit
+  Protokollversion (`initialize`).
 - Methoden:
-  - `describe` → liefert Liste der Actions/Transforms inkl. JSON-Schema der Eigenschaften, Icon (SVG), Kategorie, Ports
-  - `action.execute` → einmaliger Aufruf, Ergebnis zurück
-  - `transform.open` / `transform.batch` / `transform.close` → Streaming von Record-Batches
-- Der Prozess wird pro Run (oder gepoolt) gestartet; Absturz eines Plugins reißt den Runner nicht mit.
-- SDKs: Go (Referenz), Python, C#/.NET, Node – jeweils dünne Wrapper (~200 Zeilen).
+  - `describe` → Descriptoren der Actions/Transforms inkl. JSON-Schema der Eigenschaften (Kap. 7.4)
+  - `action.execute` → einmaliger Aufruf, `outputs` zurück
+  - `transform.open` / `transform.batch` / `transform.end`, vom Plugin `transform.emit` / `transform.closed` →
+    Streaming von Record-Batches; Feldkopf einmal, Records als Arrays, Flusssteuerung über Kredite (`$/ack`)
+- **Ein Prozess je Plugin und Lauf**; unter Windows in einem Job Object, damit beim Abbruch auch Kindprozesse enden.
+  Absturz eines Plugins lässt die Bausteine scheitern, nicht den Server.
+- Plugins nutzen **keine Dienste des Hosts**: Variablen, Ausdrücke und Secrets löst der Host vorher in der `config` auf.
+- SDKs: Go (Referenz, `pkg/sdk`), später Python, C#/.NET, Node – jeweils dünne Wrapper.
 
 ```yaml
 # plugins/sap-rfc/plugin.yaml
+kind: Plugin
+apiVersion: runnel/v1
 name: sap-rfc
 version: 1.0.0
 namespace: sap
 executable: sap-rfc-plugin.exe
-provides:
-  actions: [sap.rfc-call]
-  transforms: [sap.table-input]
 ```
 
 ### 7.4 Registry & UI-Integration

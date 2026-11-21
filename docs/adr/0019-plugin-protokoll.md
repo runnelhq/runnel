@@ -1,6 +1,6 @@
 # ADR 0019: Plugin-Protokoll – eigene Prozesse, JSON-RPC über stdin/stdout
 
-- **Status:** Vorgeschlagen
+- **Status:** Angenommen
 - **Datum:** 2026-11-21
 - **Bezug:** [ADR 0002 – Go-Backend](0002-go-backend.md), [ADR 0004 – MIT-Lizenz](0004-lizenz-mit.md),
   [ADR 0007 – Typsystem in Pipelines](0007-typsystem-pipelines.md), [ADR 0012 – KI-Fähigkeit](0012-ki-faehigkeit.md),
@@ -46,7 +46,9 @@ wird nicht verwendet; einige Ideen daraus (Handshake, Protokollversion, Log übe
 
 ### Plugin und Ablage
 
-- Ein Plugin ist ein Ordner **`plugins/<name>/`** im Projekt mit **`plugin.yaml`** und der ausführbaren Datei:
+- Ein Plugin ist ein Ordner **`plugins/<name>/`** im Projekt mit **`plugin.yaml`** und der ausführbaren Datei.
+  Plugins gibt es **nur im Projekt**: Ein Projektordner enthält alles, was er zum Laufen braucht (Git, Deployment);
+  einen Ordner für alle Projekte oder Plugin-Pfade in `project.yaml` gibt es nicht.
 
   ```yaml
   kind: Plugin
@@ -131,7 +133,9 @@ Konfigurationen, Fehler erscheinen wie bei eingebauten Bausteinen mit Position i
 ### Prozesse
 
 - **Ein Prozess je Plugin und Lauf**, gestartet beim ersten Baustein des Plugins; Actions und Transforms des Plugins
-  in diesem Lauf teilen ihn. Ein Pool über Läufe hinweg ist eine spätere Optimierung.
+  in diesem Lauf teilen ihn, mit dem Lauf endet er. Läufe sind so voneinander getrennt (kein Zustand aus einem früheren
+  Lauf, ein hängendes Plugin trifft nur seinen Lauf). Ein Pool über Läufe hinweg ist nicht vorgesehen; braucht es ihn
+  (z. B. für viele kurze HTTP-Läufe), gibt es dafür eine neue ADR.
 - `describe` wird beim Laden des Projekts aufgerufen und zwischengespeichert, solange sich `plugin.yaml` und die
   ausführbare Datei (Größe, Änderungszeit) nicht ändern; Palette, `runnel catalog` und die Prüfung nutzen den Cache.
 - **Zeitgrenzen:** `initialize` und `describe` je 10 s; nach `shutdown` 5 s, dann wird der Prozess beendet.
@@ -140,6 +144,13 @@ Konfigurationen, Fehler erscheinen wie bei eingebauten Bausteinen mit Position i
 - **Absturz** (Prozess endet, ungültiges JSON, Zeile zu lang): Die laufenden Bausteine des Plugins scheitern mit einer
   Meldung samt den letzten Zeilen von stderr; der Lauf behandelt das wie jeden Fehler (Fehlerpfad, Retry), der Server
   läuft weiter.
+
+### Nur Host → Plugin
+
+Der Host ruft das Plugin; das Plugin ruft den Host nicht (außer `$/ack` und den Notifications seines Stroms). Es gibt
+**keine Dienste des Hosts** für Plugins – keinen Zugriff auf Secret-Store, Verbindungen oder Ausdrücke. Alles, was ein
+Baustein braucht, steht aufgelöst in seiner `config` (Variablen und Ausdrücke wertet der Host vorher aus, wie bei
+eingebauten Bausteinen). Dienste des Hosts wären eine Erweiterung mit neuer ADR.
 
 ### Gemeinsamer Unterbau
 
@@ -170,13 +181,9 @@ Paket (`internal/jsonrpc`), das auch der MCP-Server (S53) nutzt.
   Feldern. Wird es deutlich verfehlt, folgt ein Binärformat über `encodings` als eigener Schritt – nicht vorher.
 - **Roadmap:** S49 umfasst Ablage, `kind: Plugin`, Handshake, Prozesse, `describe` und `action.execute`; S50 die Ströme
   mit Krediten; S51 das Go-SDK; S52 die Anzeige im Editor (Fehler beim Laden sichtbar).
-- KONZEPT Kap. 7.3 wird mit der Annahme dieser ADR angepasst (Methodennamen, `kind: Plugin`, `provides` entfällt).
+- KONZEPT Kap. 2.1 und 7.3 sind angepasst (Ordner `plugins/`, Methodennamen, `kind: Plugin`, `provides` und Plugin-Pfade in `project.yaml` entfallen).
 
-## Offene Punkte zur Abstimmung
+## Abstimmung
 
-1. **Ablage:** nur `plugins/` im Projekt, oder zusätzlich ein Ordner für alle Projekte (z. B. neben `runnel.exe`)?
-   Das Konzept nennt „Plugin-Pfade“ in `project.yaml`.
-2. **Prozess je Lauf** (einfach, isoliert) oder gleich ein Pool (schnellerer Start bei vielen kurzen Läufen, z. B.
-   HTTP-Trigger)?
-3. **Dienste des Hosts für Plugins** (z. B. Secret-Store, Verbindungen, Ausdrücke auswerten): vorerst keine – nur
-   Host → Plugin. Später als Anfragen Plugin → Host über dasselbe Protokoll möglich.
+Mit dem Maintainer am 2026-11-21 abgestimmt: Plugins nur unter `plugins/` im Projekt, ein Prozess je Plugin und Lauf,
+keine Dienste des Hosts für Plugins.
