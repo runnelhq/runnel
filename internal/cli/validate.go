@@ -14,8 +14,6 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions"
-	"github.com/runnelhq/runnel/internal/engine/pipeline"
-	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -156,24 +154,15 @@ func (v *validator) file(file string) error {
 	if !found && v.opts.env != "" {
 		return fmt.Errorf("--env %s: no project (%s) found for %s", v.opts.env, model.ProjectFile, file)
 	}
-	if !found || p != nil {
-		contexts, err := model.VarContexts(w, p, v.opts.env, v.params)
-		if err != nil {
-			return err
-		}
-		diags = append(diags, w.CheckVariables(contexts)...)
+	projectDir := ""
+	if root, found, _ := model.FindProjectDir(filepath.Dir(file)); found {
+		projectDir = root
 	}
-	// Action types, configurations and calls of other workflows are only checked on an
-	// otherwise valid workflow, like before a run.
-	if !diags.HasErrors() {
-		diags = append(diags, workflow.Check(w, workflow.Options{Registry: v.registry})...)
-		projectDir := ""
-		if root, found, _ := model.FindProjectDir(filepath.Dir(file)); found {
-			projectDir = root
-		}
-		diags = append(diags, runs.CheckCalls(w, projectDir, file)...)
+	diags, err = runs.CheckWorkflow(w, diags, runs.WorkflowCheck{Variables: !found || p != nil, Project: p,
+		Env: v.opts.env, Params: v.params, Registry: v.registry, ProjectDir: projectDir, File: file})
+	if err != nil {
+		return err
 	}
-	diags.Sort()
 	v.report(diags)
 	return nil
 }
@@ -190,12 +179,7 @@ func (v *validator) pipeline(file string) error {
 		v.report(diags)
 		return nil
 	}
-	diags := p.Validate()
-	if !diags.HasErrors() {
-		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: v.transforms})...)
-		diags.Sort()
-	}
-	v.report(diags)
+	v.report(runs.CheckPipeline(p, p.Validate(), v.transforms))
 	return nil
 }
 

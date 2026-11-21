@@ -77,38 +77,54 @@ func scan(folder, pattern string) (map[string]fileState, error) {
 // checkFolder looks into the folder of a file trigger and starts runs for the files
 // that are ready.
 func (s *Scheduler) checkFolder(e *entry, now time.Time) {
-	t := e.t
 	s.mu.Lock()
 	w := e.files
 	s.mu.Unlock()
 
-	cur, err := scan(w.folder, t.FilePattern())
-	s.mu.Lock()
+	cur, err := scan(w.folder, e.t.FilePattern())
 	if err != nil {
-		msg := fmt.Sprintf("cannot read folder %s: %v", w.folder, err)
-		if errors.Is(err, fs.ErrNotExist) {
-			msg = fmt.Sprintf("folder %s not found", w.folder)
-		}
-		if msg != w.problem {
-			w.problem = msg
-			e.last = &Fired{Time: now, Error: msg}
-			s.mu.Unlock()
-			s.opts.Warn(fmt.Sprintf("trigger %q: %s; trying again every %s", t.Name, msg, t.PollInterval()))
-			return
-		}
-		s.mu.Unlock()
+		s.folderProblem(e, w, now, err)
 		return
 	}
-	if w.problem != "" {
-		w.problem = ""
-		s.opts.Log(fmt.Sprintf("trigger %q: folder %s can be read again", t.Name, w.folder))
+	s.mu.Lock()
+	readable := w.problem != ""
+	w.problem = ""
+	ready := w.ready(cur, e.t.With.Existing)
+	s.mu.Unlock()
+	if readable {
+		s.opts.Log(fmt.Sprintf("trigger %q: folder %s can be read again", e.t.Name, w.folder))
 	}
+	s.startFiles(e, w, now, cur, ready)
+}
+
+// folderProblem notes that the folder cannot be read; it is logged once until it
+// changes or the folder can be read again.
+func (s *Scheduler) folderProblem(e *entry, w *watch, now time.Time, err error) {
+	msg := fmt.Sprintf("cannot read folder %s: %v", w.folder, err)
+	if errors.Is(err, fs.ErrNotExist) {
+		msg = fmt.Sprintf("folder %s not found", w.folder)
+	}
+	s.mu.Lock()
+	repeated := msg == w.problem
+	if !repeated {
+		w.problem = msg
+		e.last = &Fired{Time: now, Error: msg}
+	}
+	s.mu.Unlock()
+	if !repeated {
+		s.opts.Warn(fmt.Sprintf("trigger %q: %s; trying again every %s", e.t.Name, msg, e.t.PollInterval()))
+	}
+}
+
+// ready takes the files now in the folder and returns those that are ready: new or
+// changed, and unchanged since the last check (sorted). At the first check with
+// existing: ignore, the files already there count as seen. s.mu must be held.
+func (w *watch) ready(cur map[string]fileState, existing string) []string {
 	if !w.primed {
 		w.primed = true
-		if t.With.Existing == model.ExistingIgnore {
+		if existing == model.ExistingIgnore {
 			w.seen = cur
-			s.mu.Unlock()
-			return
+			return nil
 		}
 	}
 	for p := range w.seen {
@@ -128,18 +144,24 @@ func (s *Scheduler) checkFolder(e *entry, now time.Time) {
 		pending[p] = st
 	}
 	w.pending = pending
-	s.mu.Unlock()
-
 	slices.Sort(ready)
-	if len(ready) == 0 {
-		return
-	}
+	return ready
+}
+
+// startFiles starts the runs for the ready files: one for all (mode: batch) or one per
+// file. A file counts as processed once its run was started; the others are tried
+// again at the next check.
+func (s *Scheduler) startFiles(e *entry, w *watch, now time.Time, cur map[string]fileState, ready []string) {
+	t := e.t
 	done := func(files ...string) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		for _, p := range files {
 			w.seen[p] = cur[p]
 		}
+	}
+	if len(ready) == 0 {
+		return
 	}
 	if t.FileMode() == model.FileBatch {
 		list, _ := json.Marshal(ready)
@@ -150,7 +172,7 @@ func (s *Scheduler) checkFolder(e *entry, now time.Time) {
 	}
 	for _, p := range ready {
 		if !s.start(e, now, map[string]string{t.With.Param: p}, []string{p}) {
-			return // the others are tried again at the next check
+			return
 		}
 		done(p)
 		if t.OverlapMode() == model.OverlapSkip {

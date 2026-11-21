@@ -108,37 +108,26 @@ func pipelineOutput(res pipeline.Result) map[string]any {
 }
 
 // forwardPipeline writes the events of a called pipeline to the log of the calling
-// action, with the same words as the log of a pipeline run.
+// action, with the words of the log of a pipeline run (DescribePipeline).
 func forwardPipeline(log func(slog.Level, string)) func(pipeline.Event) {
 	if log == nil {
 		return nil
 	}
 	name := ""
 	return func(e pipeline.Event) {
-		at := name + "/" + e.TransformID + ": "
+		kind := stepLine
 		switch e.Kind {
 		case pipeline.RunStarted:
-			name = e.Message
-			log(slog.LevelDebug, fmt.Sprintf("pipeline %q started, run %s", name, e.RunID))
-		case pipeline.Log:
-			log(e.Level, at+e.Message)
-		case pipeline.TransformFinished:
-			counts := fmt.Sprintf("read %d, written %d", e.Counts.Read, e.Counts.Written)
-			if e.Counts.Errors > 0 {
-				counts += fmt.Sprintf(", errors %d", e.Counts.Errors)
-			}
-			switch {
-			case e.Status == pipeline.Cancelled:
-				log(slog.LevelWarn, fmt.Sprintf("%scancelled after %s (%s)", at, round(e.Duration), counts))
-			case e.Err != nil:
-				log(slog.LevelWarn, fmt.Sprintf("%sfailed after %s (%s): %v", at, round(e.Duration), counts, e.Err))
-			default:
-				log(slog.LevelDebug, fmt.Sprintf("%s%s in %s", at, counts, round(e.Duration)))
-			}
+			name, kind = e.Message, startLine
 		case pipeline.RunFinished:
-			if e.Status == pipeline.Succeeded {
-				log(slog.LevelInfo, fmt.Sprintf("pipeline %q succeeded in %s", name, round(e.Duration)))
-			}
+			kind = endLine
+		case pipeline.Log:
+			kind = logLine
+		case pipeline.TransformStarted:
+			return // not in the log of the calling action
+		}
+		if l, ok := DescribePipeline(name, "", e); ok {
+			nested(log, name, l, kind)
 		}
 	}
 }

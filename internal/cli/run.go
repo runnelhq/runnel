@@ -162,50 +162,27 @@ type runLogger struct {
 }
 
 func (l *runLogger) event(e workflow.Event) {
-	switch e.Kind {
-	case workflow.RunStarted:
-		where := ""
-		if l.env != nil {
-			where = fmt.Sprintf(" (environment %s)", l.env.Name)
-		}
-		l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("workflow %q started%s, run %s", l.workflow, where, e.RunID))
-	case workflow.ActionStarted:
-		if l.verbose {
-			l.line(e.Time, slog.LevelDebug, e.ActionID, "started ("+e.ActionType+")")
-		}
-	case workflow.Log:
-		if e.Level >= slog.LevelInfo || l.verbose {
-			l.line(e.Time, e.Level, e.ActionID, e.Message)
-		}
-	case workflow.ActionWaiting:
-		if l.verbose {
-			l.line(e.Time, slog.LevelDebug, e.ActionID, e.Message)
-		}
-	case workflow.ActionSkipped:
-		if l.verbose {
-			l.line(e.Time, slog.LevelDebug, e.ActionID, "skipped (no incoming link applies)")
-		}
-	case workflow.ActionFinished:
-		switch {
-		case e.Status == workflow.Cancelled:
-			l.line(e.Time, slog.LevelWarn, e.ActionID, fmt.Sprintf("cancelled after %s", round(e.Duration)))
-		case e.Err != nil:
-			l.line(e.Time, slog.LevelError, e.ActionID, fmt.Sprintf("failed after %s: %v", round(e.Duration), e.Err))
-		case l.verbose:
-			l.line(e.Time, slog.LevelDebug, e.ActionID, fmt.Sprintf("%s in %s", e.Status, round(e.Duration)))
-		}
-	case workflow.RunFinished:
+	if e.Kind == workflow.RunFinished {
 		for _, name := range slices.Sorted(maps.Keys(e.Outputs)) {
 			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("output %s = %s", name, formatValue(e.Outputs[name])))
 		}
-		switch e.Status {
-		case workflow.Succeeded:
-			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("workflow %q succeeded in %s", l.workflow, round(e.Duration)))
-		case workflow.Cancelled:
-			l.line(e.Time, slog.LevelWarn, "", fmt.Sprintf("workflow %q cancelled after %s", l.workflow, round(e.Duration)))
-		default:
-			l.line(e.Time, slog.LevelError, "", fmt.Sprintf("workflow %q failed after %s: %v", l.workflow, round(e.Duration), e.Err))
-		}
+	}
+	if line, ok := runs.Describe(l.workflow, l.envName(), e); ok {
+		l.show(e.Time, line)
+	}
+}
+
+func (l *runLogger) envName() string {
+	if l.env == nil {
+		return ""
+	}
+	return l.env.Name
+}
+
+// show prints a line of the run; details only with -v.
+func (l *runLogger) show(t time.Time, line runs.Line) {
+	if !line.Detail || l.verbose {
+		l.line(t, line.Level, line.Step, line.Msg)
 	}
 }
 
@@ -224,11 +201,4 @@ func formatValue(v any) string {
 		return fmt.Sprint(v)
 	}
 	return string(data)
-}
-
-func round(d time.Duration) time.Duration {
-	if d < time.Second {
-		return d.Round(time.Millisecond)
-	}
-	return d.Round(10 * time.Millisecond)
 }

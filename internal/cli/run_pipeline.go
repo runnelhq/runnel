@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"path/filepath"
 
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
@@ -79,43 +78,7 @@ type pipelineLogger struct {
 }
 
 func (l *pipelineLogger) event(e pipeline.Event) {
-	name := l.workflow
-	switch e.Kind {
-	case pipeline.RunStarted:
-		where := ""
-		if l.env != nil {
-			where = fmt.Sprintf(" (environment %s)", l.env.Name)
-		}
-		l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("pipeline %q started%s, run %s", name, where, e.RunID))
-	case pipeline.TransformStarted:
-		if l.verbose {
-			l.line(e.Time, slog.LevelDebug, e.TransformID, "started ("+e.TransformType+")")
-		}
-	case pipeline.Log:
-		if e.Level >= slog.LevelInfo || l.verbose {
-			l.line(e.Time, e.Level, e.TransformID, e.Message)
-		}
-	case pipeline.TransformFinished:
-		counts := fmt.Sprintf("read %d, written %d", e.Counts.Read, e.Counts.Written)
-		if e.Counts.Errors > 0 {
-			counts += fmt.Sprintf(", errors %d", e.Counts.Errors)
-		}
-		switch e.Status {
-		case pipeline.Cancelled:
-			l.line(e.Time, slog.LevelWarn, e.TransformID, fmt.Sprintf("cancelled after %s (%s)", round(e.Duration), counts))
-		case pipeline.Failed:
-			l.line(e.Time, slog.LevelError, e.TransformID, fmt.Sprintf("failed after %s (%s): %v", round(e.Duration), counts, e.Err))
-		default:
-			l.line(e.Time, slog.LevelInfo, e.TransformID, fmt.Sprintf("%s in %s", counts, round(e.Duration)))
-		}
-	case pipeline.RunFinished:
-		switch e.Status {
-		case pipeline.Succeeded:
-			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("pipeline %q succeeded in %s", name, round(e.Duration)))
-		case pipeline.Cancelled:
-			l.line(e.Time, slog.LevelWarn, "", fmt.Sprintf("pipeline %q cancelled after %s", name, round(e.Duration)))
-		default:
-			l.line(e.Time, slog.LevelError, "", fmt.Sprintf("pipeline %q failed after %s: %v", name, round(e.Duration), e.Err))
-		}
+	if line, ok := runs.DescribePipeline(l.workflow, l.envName(), e); ok {
+		l.show(e.Time, line)
 	}
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
-	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -133,12 +132,9 @@ func (s *Server) validatePipeline(name string, data []byte) (*model.Pipeline, ma
 	diags = append(diags, p.Validate()...)
 	var schemas map[string]pipeline.TransformSchemas
 	if !diags.HasErrors() && s.transforms != nil {
-		opts := pipeline.Options{Registry: s.transforms}
-		diags = append(diags, pipeline.Check(p, opts)...)
-		schemas = pipeline.Schemas(p, opts)
+		schemas = pipeline.Schemas(p, pipeline.Options{Registry: s.transforms})
 	}
-	diags.Sort()
-	return p, schemas, diags, nil
+	return p, schemas, runs.CheckPipeline(p, diags, s.transforms), nil
 }
 
 // validate returns the parsed workflow (nil if it cannot be parsed) and all problems.
@@ -164,18 +160,11 @@ func (s *Server) validate(name string, data []byte) (*model.Workflow, model.Erro
 	} else if err != nil {
 		return nil, nil, err
 	}
-	if p != nil {
-		contexts, err := model.VarContexts(wf, p, "", nil)
-		if err != nil {
-			return nil, nil, err
-		}
-		diags = append(diags, wf.CheckVariables(contexts)...)
+	diags, err = runs.CheckWorkflow(wf, diags, runs.WorkflowCheck{Variables: p != nil, Project: p, Registry: s.registry,
+		ProjectDir: s.dir, File: filepath.Join(s.dir, filepath.FromSlash(name))})
+	if err != nil {
+		return nil, nil, err
 	}
-	if !diags.HasErrors() {
-		diags = append(diags, workflow.Check(wf, workflow.Options{Registry: s.registry})...)
-		diags = append(diags, runs.CheckCalls(wf, s.dir, filepath.Join(s.dir, filepath.FromSlash(name)))...)
-	}
-	diags.Sort()
 	return wf, diags, nil
 }
 

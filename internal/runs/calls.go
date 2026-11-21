@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
@@ -116,49 +115,60 @@ func onlyErrors(diags model.Errors) string {
 }
 
 // forward writes the events of a called workflow to the log of the calling action,
-// with the same words and levels as the log of a run.
+// with the words of the log of a run (Describe).
 func forward(log func(slog.Level, string)) func(workflow.Event) {
 	if log == nil {
 		return nil
 	}
 	name := ""
 	return func(e workflow.Event) {
-		at := name + "/" + e.ActionID + ": "
-		if e.ActionID == "" {
-			at = name + ": " // a message of the run itself
-		}
+		kind := stepLine
 		switch e.Kind {
 		case workflow.RunStarted:
-			name = e.Message
-			log(slog.LevelDebug, fmt.Sprintf("workflow %q started, run %s", name, e.RunID))
-		case workflow.ActionStarted:
-			log(slog.LevelDebug, at+"started ("+e.ActionType+")")
-		case workflow.Log:
-			log(e.Level, at+e.Message)
-		case workflow.ActionWaiting:
-			log(slog.LevelDebug, at+e.Message)
-		case workflow.ActionSkipped:
-			log(slog.LevelDebug, at+"skipped (no incoming link applies)")
-		case workflow.ActionFinished:
-			switch {
-			case e.Status == workflow.Cancelled:
-				log(slog.LevelWarn, at+"cancelled after "+round(e.Duration).String())
-			case e.Err != nil:
-				log(slog.LevelWarn, fmt.Sprintf("%sfailed after %s: %v", at, round(e.Duration), e.Err))
-			default:
-				log(slog.LevelDebug, fmt.Sprintf("%s%s in %s", at, e.Status, round(e.Duration)))
-			}
+			name, kind = e.Message, startLine
 		case workflow.RunFinished:
-			if e.Status == workflow.Succeeded {
-				log(slog.LevelInfo, fmt.Sprintf("workflow %q succeeded in %s", name, round(e.Duration)))
-			}
+			kind = endLine
+		case workflow.Log:
+			kind = logLine
+		}
+		if l, ok := Describe(name, "", e); ok {
+			nested(log, name, l, kind)
 		}
 	}
 }
 
-func round(d time.Duration) time.Duration {
-	if d < time.Second {
-		return d.Round(time.Millisecond)
+// lineKind tells nested what a line of a called run is about.
+type lineKind int
+
+const (
+	stepLine  lineKind = iota // an action or transform started, waits, ended …
+	logLine                   // a message logged by the run
+	startLine                 // the run started
+	endLine                   // the run ended
+)
+
+// nested writes a line of a called run to the log of the calling action. The calling
+// action reports a failure itself, so problems of the called run are warnings and the
+// end of the run is only told on success; the messages it logs keep their levels; all
+// else is a detail (debug). Lines of steps are prefixed with "name/step: ".
+func nested(log func(slog.Level, string), name string, l Line, kind lineKind) {
+	level := l.Level
+	switch {
+	case kind == logLine:
+	case kind == endLine && level > slog.LevelInfo:
+		return
+	case kind == endLine:
+	case level >= slog.LevelWarn:
+		level = slog.LevelWarn
+	default:
+		level = slog.LevelDebug
 	}
-	return d.Round(10 * time.Millisecond)
+	switch {
+	case kind == startLine || kind == endLine:
+		log(level, l.Msg)
+	case l.Step == "":
+		log(level, name+": "+l.Msg)
+	default:
+		log(level, name+"/"+l.Step+": "+l.Msg)
+	}
 }
