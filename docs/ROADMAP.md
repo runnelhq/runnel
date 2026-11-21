@@ -144,7 +144,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| E13 | Icons aller Bausteine | Eigene Icons für die 11 eingebauten Actions und Transforms, die noch das allgemeine Symbol zeigen (`core.run-workflow`, `core.run-pipeline`, `file.*`, `http.respond`, `http.response`), und ein neues für `core.dummy`; Mockup [`e13-icons.html`](../design/mockups/e13-icons.html) | Palette und Canvas im Editor |
+| E13 ✅ | Icons aller Bausteine | Eigene Icons für die 11 eingebauten Actions und Transforms, die noch das allgemeine Symbol zeigen (`core.run-workflow`, `core.run-pipeline`, `file.*`, `http.respond`, `http.response`), und ein neues für `core.dummy`; Mockup [`e13-icons.html`](../design/mockups/e13-icons.html) | Palette und Canvas im Editor |
 | S49 | Plugin-Protokoll | JSON-RPC über stdin/stdout ([ADR 0019](adr/0019-plugin-protokoll.md)): `kind: Plugin` unter `plugins/<name>/`, Handshake, Prozess je Lauf, `describe`, `action.execute` | Beispiel-Plugin in Go |
 | S50 | Plugin-Transforms | `transform.open/batch/end`, `emit`/`closed`, Kredite (Streaming, ADR 0019) | Beispiel-Plugin; Benchmark mit Echo-Plugin (Ziel ≥ 300.000 Records/s) |
 | S51 | Go-SDK | `pkg/sdk` mit Beispielen | Beispiel-Plugin baut nur mit SDK |

@@ -18,7 +18,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e9-yaml.html`](e9-yaml.html) | E9 – YAML bearbeiten | `edit`, `problem`, `syntax`, `canvas` | freigegeben mit PR #90, umgesetzt mit E9 |
 | [`e11-files.html`](e11-files.html) | E11 – Dateien anlegen und löschen | `new`, `name`, `rename`, `delete`, `folder` | freigegeben mit PR #96, umgesetzt mit E11 |
 | [`e12-organize.html`](e12-organize.html) | E12 – Projekt organisieren | `drag`, `moveto`, `refs`, `triggers` | freigegeben mit PR #99, umgesetzt mit E12 |
-| [`e13-icons.html`](e13-icons.html) | E13 – Icons aller Bausteine | `overview`, `sizes`, `canvas` | zur Freigabe |
+| [`e13-icons.html`](e13-icons.html) | E13 – Icons aller Bausteine | `overview`, `sizes`, `canvas` | freigegeben vom Maintainer, umgesetzt mit E13 (im selben PR) |
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 

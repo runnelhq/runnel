@@ -22,6 +22,11 @@ function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: Reac
 
 type P = SVGProps<SVGSVGElement>;
 
+// Shapes shared by several icons of mockup E13.
+const filePage = "M13 21H6V3h8l4 4v5M14 3v4h4";
+const folderPath = "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z";
+const replyPath = "M9 7L4 12l5 5M4 12h9a7 7 0 0 1 7 7";
+
 export const MonitorIcon = (p: P) => (
   <Icon {...p}>
     <rect x="3" y="4" width="18" height="12" rx="2" />
@@ -44,7 +49,7 @@ export const MoonIcon = (p: P) => (
 
 export const FolderIcon = (p: P) => (
   <Icon {...p}>
-    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <path d={folderPath} />
   </Icon>
 );
 
@@ -251,7 +256,13 @@ const actionIcons: Record<string, ReactNode> = {
     </>
   ),
   "core.log": <path d="M5 6h14M5 12h14M5 18h9" />,
-  "core.dummy": <path d="M4 6h5l4 6-4 6H4M13 12h7" />,
+  // A step that does nothing: an empty, dashed place on the line (mockup E13).
+  "core.dummy": (
+    <>
+      <path d="M2.5 12h4M17.5 12h4" />
+      <circle cx="12" cy="12" r="5" strokeDasharray="2.6 2.2" />
+    </>
+  ),
   "core.success": (
     <>
       <circle cx="12" cy="12" r="8" />
@@ -264,6 +275,32 @@ const actionIcons: Record<string, ReactNode> = {
       <path d="M9 9l6 6M15 9l-6 6" />
     </>
   ),
+  // Execution: the symbols of workflow and pipeline files in the explorer (mockup E13).
+  "core.run-workflow": (
+    <>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="18" cy="18" r="2.5" />
+      <path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3" />
+    </>
+  ),
+  "core.run-pipeline": <path d="M3 7h5l3 5-3 5H3M11 12h10M17 8l4 4-4 4" />,
+  // Files: a page with a sign for files, a folder for folders and lists (mockup E13).
+  "file.copy": <path d="M9 7V3h6l4 4v10h-4M5 7h6l4 4v10H5z" />,
+  "file.delete": <path d={`${filePage}M15.5 15.5l5 5M20.5 15.5l-5 5`} />,
+  "file.exists": <path d={`${filePage}M14.5 18l2.5 2.5 4.5-5`} />,
+  "file.wait": (
+    <>
+      <path d={filePage} />
+      <circle cx="18" cy="18" r="3.5" />
+      <path d="M18 16.3V18l1.2 1" />
+    </>
+  ),
+  "file.list": <path d={`${folderPath}M7.5 11h9M7.5 14.5h6`} />,
+  "file.mkdir": <path d={`${folderPath}M12 9.5v6M9 12.5h6`} />,
+  "file.move": <path d={`${folderPath}M9 13h7M13.5 10.5L16 13l-2.5 2.5`} />,
+  // Network: answering the caller; the same sign for the action and the transform.
+  "http.respond": <path d={replyPath} />,
+  "http.response": <path d={replyPath} />,
   // Transforms (design/mockups/s25a-pipeline.html); core.log and core.dummy as above.
   "csv.input": <path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6" />,
   "csv.output": <path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v7M9 15l3 3 3-3" />,
