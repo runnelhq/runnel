@@ -181,10 +181,18 @@ func (s *Server) handlePutFile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, map[string]string{"path": name, "etag": etag(data)})
 }
 
+// projectFileNeeded refuses to delete, rename or move project.yaml: without it,
+// "runnel serve" does not start again (or finds another project above the folder).
+const projectFileNeeded = model.ProjectFile + " cannot be deleted, renamed or moved: the project needs it"
+
 func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	name, err := filePath(r.PathValue("path"))
 	if err != nil {
 		writeErr(w, err)
+		return
+	}
+	if name == model.ProjectFile {
+		writeError(w, http.StatusConflict, projectFileNeeded)
 		return
 	}
 	s.writeMu.Lock()

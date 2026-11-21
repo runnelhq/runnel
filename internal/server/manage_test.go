@@ -50,6 +50,7 @@ func TestRename(t *testing.T) {
 		{`{"from": "input", "to": "input"}`, http.StatusBadRequest, "the old one"},
 		{`{"from": "none.yaml", "to": "x.yaml"}`, http.StatusNotFound, "file not found"},
 		{`{"from": "input", "to": "../x"}`, http.StatusBadRequest, "invalid path"},
+		{`{"from": "project.yaml", "to": "old/project.yaml"}`, http.StatusConflict, "the project needs it"},
 		{`{"from": "input"}`, http.StatusBadRequest, "missing file path"},
 	} {
 		expect(t, do(t, s, "POST", "/api/v1/rename", tt.body), tt.status, tt.want)

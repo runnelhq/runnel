@@ -108,3 +108,32 @@ test("names the files that refer to a workflow before deleting it", async ({ pag
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(row(page, "hello.workflow.yaml")).toBeVisible();
 });
+
+test("keeps project.yaml and creates it again if it is missing", async ({ page }) => {
+  await page.goto("/");
+  // project.yaml cannot be renamed, moved or deleted: without it the project is not found.
+  const menu = await menuOf(page, "project.yaml");
+  for (const name of [/^Rename/, /^Move to/, /^Delete/]) await expect(menu.getByRole("menuitem", { name })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await expect(page.getByRole("menu", { name: "New" }).getByRole("menuitem", { name: /^Project file/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // Deleted outside the editor: "New" offers to create it, named after the project folder.
+  await page.route("**/api/v1/projects/current/tree", async (route) => {
+    const tree = await (await route.fetch()).json();
+    tree.children = tree.children.filter((e: { path: string }) => e.path !== "project.yaml");
+    await route.fulfill({ json: tree });
+  });
+  let created = "";
+  await page.route("**/api/v1/files/project.yaml", async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    created = route.request().postData() ?? "";
+    await route.fulfill({ status: 201, body: "" });
+  });
+  await page.reload();
+  await expect(row(page, "project.yaml")).toHaveCount(0);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menu", { name: "New" }).getByRole("menuitem", { name: /^Project file/ }).click();
+  await expect.poll(() => created).toMatch(/^kind: Project\napiVersion: runnel\/v1\nname: [A-Za-z0-9_-]+\n$/);
+});

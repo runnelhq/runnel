@@ -222,6 +222,12 @@ func TestDeleteFile(t *testing.T) {
 		t.Errorf("file still exists: %v", err)
 	}
 	expect(t, do(t, s, "DELETE", path, "", "If-Match", tag), http.StatusPreconditionFailed, "deleted in the meantime")
+
+	// project.yaml stays: without it the project would no longer be found.
+	expect(t, do(t, s, "DELETE", "/api/v1/files/project.yaml", "", "If-Match", "*"), http.StatusConflict, "the project needs it")
+	if _, err := os.Stat(filepath.Join(dir, "project.yaml")); err != nil {
+		t.Errorf("project.yaml deleted: %v", err)
+	}
 }
 
 func TestFilePath(t *testing.T) {
