@@ -132,7 +132,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
 | S44 | Datenvorschau | Pipeline bis Transform X mit Limit, Records je Link als Tabelle/JSON | Manuell im Editor |
-| S46 | Felder ermitteln | „Felder ermitteln“ für CSV (JSON mit S19) schreibt `fields:` in die Datei | Playwright-Test |
+| S46 | Felder ermitteln | „Felder ermitteln“ für CSV schreibt `fields:` in die Datei; Mockup [`s46-fields.html`](../design/mockups/s46-fields.html). Die Erkennung ist eine optionale Schnittstelle der Eingabe-Transforms: neue Eingabe-Formate (JSON mit S19, später XML, Excel, Datenbank) setzen sie gleich mit um | Playwright-Test |
 | E9 | YAML bearbeiten | Workflows und Pipelines in der YAML-Ansicht bearbeiten (Editor mit Hervorhebung, Prüfung beim Tippen über `/validate`, Rückgängig gemeinsam mit dem Canvas, Umgang mit Fehlern, die keinen Graph mehr erlauben); vorher Mockup. Bis dahin ist die YAML-Ansicht als „Read-only“ gekennzeichnet | Playwright |
 
 ---
@@ -167,7 +167,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S16 (Teil) | `core.calculate` | Felder per Ausdruck berechnen | S08 |
 | S24 (Teil) | Ergebnis-Datensätze auslagern | `resultSpillRows`: große Ergebnisse in eine temporäre Datei statt in den Speicher | S24a |
 | S17 (Teil) | `maxErrors` | Schwelle für Fehler-Links: mehr als n fehlerhafte Datensätze brechen die Pipeline ab | S17a |
-| S19 | JSON | `json.input`, `json.output` (JSON und NDJSON) | danach S46 auch für JSON |
+| S19 | JSON | `json.input`, `json.output` (JSON und NDJSON), mit „Felder ermitteln“ (S46) | – |
 | S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | – |
 | S21 | DB-Ausgabe | `db.table-output` (Insert, `commitSize`), `db.upsert` | S20 |
 | S22 (Teil) | `core.dedupe` | Duplikate entfernen (zunächst im Speicher) | – |

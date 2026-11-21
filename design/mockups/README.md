@@ -15,6 +15,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | freigegeben mit PR #43, umgesetzt mit S35a (Editor im Panel, Link-Bedingung) und S35b (`expanded`) |
 | [`s25a-pipeline.html`](s25a-pipeline.html) | S25a – Pipeline-Canvas (dazu K10/K11 im Workflow-Panel) | `canvas`, `link`, `run`, `problems`, `foreach` | freigegeben mit PR #62; Umsetzung in S25a1a (Server), S25a1b, S25a2, S25a3; `foreach` mit E7c ✅ |
 | [`e7c-parameters.html`](e7c-parameters.html) | E7c – Parameter und Outputs im Editor | `parameters`, `add`, `outputs`, `problems` | freigegeben mit PR #69, umgesetzt mit E7c (zusammen mit `foreach` aus S25a) |
+| [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | zur Freigabe |
 
 ## Entscheidungen
 
@@ -62,6 +63,14 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E7c | Felder eines Parameters: Name, Type, Required, Default (Ausdruckseditor aus S35; bei Required ohne Wirkung), Allowed values (`enum`, als Chips), Description. Outputs: Name, Type, Value (Ausdruckseditor), Description |
 | E7c | Umbenennen eines Parameters ändert keine Verweise (`${NAME}`, `params.NAME`) – der Hinweis am Feld sagt das; Meldungen zu fehlenden Namen erscheinen danach über `/validate` |
 | E7c | Pipelines haben denselben Abschnitt „Parameters“, ohne Outputs. `forEach`/`parallel`/`stopOnError` und das Schlüssel/Wert-Feld für `params` folgen dem freigegebenen Mockup S25a (Zustand `foreach`) |
+| S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
+| S46 | Vorschlag in einem Dialog (das Panel ist für eine Tabelle zu schmal): je Spalte Auswahl, Name, Type, Format, gelesene Werte und eine Begründung; geschrieben wird erst mit „Write n fields“ |
+| S46 | Gelesen wird mit der aktuellen (auch ungespeicherten) Konfiguration des Transforms; Variablen im Pfad mit den Standardwerten der Parameter und dem Standard-Environment (wie Run ohne Dialog); höchstens die ersten 1.000 Zeilen |
+| S46 | Ein Typ wird nur vorgeschlagen, wenn jeder gelesene Wert passt; sonst `string` mit Begründung (z. B. „3 of 4 values are decimal“). Zahlen mit führender Null bleiben Text; `ja`/`nein` ist kein `bool` (das Format kennt true/false, 1/0, yes/no) |
+| S46 | Schreiben ist ein Schritt für Rückgängig (Hinweis „Wrote n fields · Undo“ wie in E6a); gespeichert wird weiter mit Save |
+| S46 | Erneut ermitteln bei vorhandenen Feldern: aufgeführte Felder behalten Typ und Format („listed“), neue Spalten sind nicht ausgewählt („new“), aufgeführte Felder, die in der Datei fehlen, werden markiert und lassen sich abwählen |
+| S46 | Das Panel zeigt die Felder als Liste (Name, Typ, Format); einzelne Felder ändert man bis E9 in der YAML-Ansicht |
+| S46 | Datei nicht lesbar: Meldung im Dialog mit dem Ordner, auf den sich relative Pfade beziehen; keine Meldung am Feld, weil `/validate` keine Dateien liest |
 | S35 | Größerer Editor: Die Zeile unten zeigt die Meldungen des Felds beim Öffnen; geänderter Text wird erst nach Apply geprüft („Checked when applied“), statt bei jeder Eingabe den ganzen Workflow zu prüfen |
 
 ## Screenshots erzeugen
@@ -76,6 +85,7 @@ node design/mockups/screenshots.cjs e8-run run,running,done,cancelled,unsaved
 node design/mockups/screenshots.cjs s35-expressions complete,functions,error,condition,expanded
 node design/mockups/screenshots.cjs s25a-pipeline canvas,link,run,problems,foreach
 node design/mockups/screenshots.cjs e7c-parameters parameters,add,outputs,problems
+node design/mockups/screenshots.cjs s46-fields fields,detect,written,update,error
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
