@@ -18,6 +18,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e9-yaml.html`](e9-yaml.html) | E9 – YAML bearbeiten | `edit`, `problem`, `syntax`, `canvas` | freigegeben mit PR #90, umgesetzt mit E9 |
 | [`e11-files.html`](e11-files.html) | E11 – Dateien anlegen und löschen | `new`, `name`, `rename`, `delete`, `folder` | freigegeben mit PR #96, umgesetzt mit E11 |
 | [`e12-organize.html`](e12-organize.html) | E12 – Projekt organisieren | `drag`, `moveto`, `refs`, `triggers` | freigegeben mit PR #99, umgesetzt mit E12 |
+| [`e13-icons.html`](e13-icons.html) | E13 – Icons aller Bausteine | `overview`, `sizes`, `canvas` | freigegeben vom Maintainer, umgesetzt mit E13 (im selben PR) |
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 
@@ -83,6 +84,12 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | S44 | Die Tabelle bleibt ohne neue Abhängigkeit (höchstens 1.000 Zeilen, keine Virtualisierung nötig); das Konzept nannte `@tanstack/react-table` – erst bei Bedarf |
 | S44 | „Refresh“ führt die Vorschau nach Änderungen erneut aus; ein Fehler zeigt, an welchem Transform die Vorschau stehen blieb, mit der Meldung |
 | S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
+| E13 | Jeder eingebaute Baustein hat ein eigenes Icon; das allgemeine Symbol (Quadrat mit Strich) bleibt nur für Typen ohne eigenes Icon (z. B. aus Plugins, bis der Descriptor `icon` liefert) |
+| E13 | Linien-Icons wie bisher (24 × 24, Strich 1,6, `currentColor`, weiß auf der Kachel in der Kategoriefarbe); lesbar ab 13 px (Palette) |
+| E13 | `core.run-workflow` und `core.run-pipeline` zeigen die Symbole der Workflow- und Pipeline-Dateien aus dem Explorer – derselbe Begriff, dasselbe Zeichen |
+| E13 | Datei-Actions: ein Blatt mit Zeichen unten rechts für Dateien (`file.copy` zwei Blätter, `file.delete` ✕, `file.exists` ✓, `file.wait` Uhr), ein Ordner für Ordner und Listen (`file.mkdir` +, `file.move` →, wie „Move to…“ im Explorer, `file.list` Zeilen) |
+| E13 | `http.respond` (Action) und `http.response` (Transform) teilen sich einen Antwortpfeil, wie `core.log` und `core.dummy` in Workflow und Pipeline |
+| E13 | `core.dummy` bekommt ein neues Icon (bisher dem Pipeline-Symbol zu ähnlich): eine leere, gestrichelte Stelle auf der Linie – ein Schritt, der nichts tut |
 | E12 | Ordner sind frei: nach Art (`workflows/`, `pipelines/`) oder nach Thema (z. B. `import/` mit den Workflows und der Pipeline, die nur sie nutzen; `shared/` für gemeinsam genutzte Pipelines). Ob eine Datei Workflow oder Pipeline ist, entscheidet die Endung; `workflows/` und `pipelines/` sind nur die Vorgabe für „+“ im Kopf des Explorers. Nur Trigger (`triggers/`) und Environments (`environments/`) haben feste Ordner |
 | E12 | Verschieben auf zwei Wegen: Ziehen und Ablegen im Explorer (der Zielordner wird hervorgehoben, ein Hinweis nennt den Zielordner) und „Move to…“ im Menü einer Datei oder eines Ordners mit einer Ordnerauswahl (aktueller Ordner ausgegraut, „New folder“ im Dialog) |
 | E12 | Beim Verschieben und Umbenennen fragt ein Dialog „Update the references?“, wenn andere Dateien auf den alten Pfad verweisen (Trigger-Ziel, `core.run-workflow`, `core.run-pipeline` mit festem Pfad, wie die Rückfrage beim Löschen in E11): je Verweis Datei, Stelle und alter → neuer Pfad, standardmäßig ausgewählt; „Move and update n references“, „Move only“ oder „Cancel“. Ohne Verweise kein Dialog |
@@ -114,6 +121,7 @@ node design/mockups/screenshots.cjs e9-yaml edit,problem,syntax,canvas
 node design/mockups/screenshots.cjs s44-preview preview,json,link,error
 node design/mockups/screenshots.cjs e11-files new,name,rename,delete,folder
 node design/mockups/screenshots.cjs e12-organize drag,moveto,refs,triggers
+node design/mockups/screenshots.cjs e13-icons overview,sizes,canvas
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
