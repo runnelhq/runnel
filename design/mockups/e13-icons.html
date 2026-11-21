@@ -1,0 +1,207 @@
+<!doctype html>
+<!--
+  Mockup E13 – Icons for the built-in actions and transforms that still show the generic
+  symbol (core.run-workflow, core.run-pipeline, file.*, http.respond, http.response), and a
+  new icon for core.dummy (the old one looked like the pipeline symbol).
+  Line icons as in web/src/components/Icons.tsx: 24 × 24, stroke 1.6, currentColor,
+  white on the tile in the colour of the category. Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                          (default light)
+    state = overview | sizes | canvas             (default overview)
+    controls = 0                                  hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icons – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5;
+         color: var(--foreground); background: var(--background); -webkit-font-smoothing: antialiased; }
+  code, .mono { font-family: var(--rn-font-mono); }
+  svg.i { flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .page { padding: 20px 28px; }
+  h1 { font-size: var(--rn-text-lg); margin: 0 0 2px; }
+  .sub { margin: 0 0 6px; color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  h2 { font-size: var(--rn-text-sm); margin: 14px 0 6px; } h2 small { color: var(--muted-foreground); font-weight: 400; }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .tile { display: grid; place-items: center; border-radius: var(--rn-radius-md); color: var(--rn-tiefe-0); flex: none; }
+
+  /* overview */
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .card { position: relative; display: flex; gap: 8px; align-items: center; height: 46px; padding: 0 8px;
+          border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--card); min-width: 0; }
+  .card.new { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring) inset; }
+  .card .t { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+  .card b { font-weight: 500; font-size: var(--rn-text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card code { font-size: 10px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { position: absolute; top: -7px; right: 6px; font-size: 9px; font-weight: 600; padding: 0 5px; border-radius: 999px;
+           background: var(--primary); color: var(--primary-foreground); letter-spacing: .04em; }
+  .legend { display: flex; gap: 14px; align-items: center; font-size: var(--rn-text-xs); color: var(--muted-foreground); margin-top: 12px; }
+
+  /* sizes */
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 3px 10px; border-bottom: 1px solid var(--border); font-size: var(--rn-text-xs); }
+  th { font-weight: 600; color: var(--muted-foreground); }
+  td .mono { color: var(--muted-foreground); font-size: 11px; }
+  td.c { text-align: center; } th.c { text-align: center; }
+  .plain { color: var(--foreground); }
+
+  /* canvas */
+  .ctx { display: grid; grid-template-columns: 248px 1fr; height: 100%; }
+  aside { background: var(--sidebar); color: var(--sidebar-foreground); border-right: 1px solid var(--sidebar-border); padding: 10px 8px; }
+  .pal-row { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: var(--rn-radius-md); }
+  .pal-row small { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .pal-row span.n { line-height: 1.2; }
+  .pal-cat { margin: 10px 8px 4px; }
+  .canvas { position: relative; background-color: var(--canvas, var(--background));
+            background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 16px 16px; }
+  .node { position: absolute; width: 196px; height: 52px; display: flex; align-items: center; gap: 10px;
+          padding: 0 12px 0 10px; background: var(--node); border: 1px solid var(--node-border);
+          border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-sm); }
+  .node .id { font-weight: 600; } .node .type { font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .node .text { line-height: 1.25; }
+  .canvas svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .canvas svg.edges path { stroke: var(--link-success); stroke-width: 1.5; fill: none; }
+  .canvas .title { position: absolute; left: 20px; top: 14px; }
+
+  .app { height: 100vh; overflow: hidden; } .app.with-controls { height: calc(100vh - 40px); }
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E13</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="overview" href="#">overview</a> <a data-state="sizes" href="#">sizes</a> <a data-state="canvas" href="#">canvas</a>
+</div>
+<div class="app" id="app"></div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "overview";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const svg = (body, size) => `<svg class="i" viewBox="0 0 24 24" width="${size}" height="${size}">${body}</svg>`;
+  const tile = (d, box, size) => `<span class="tile" style="width:${box}px;height:${box}px;background:var(--rn-kategorie-${color[d.category]})">${svg(icons[d.type], size)}</span>`;
+  const color = { general: "allgemein", execution: "ausfuehrung", files: "dateien", network: "netzwerk", input: "eingabe",
+                  transform: "transformation", flow: "fluss", combine: "transformation", output: "ausgabe" };
+
+  // Page outline shared by the file actions; the sign in the lower right tells them apart.
+  const doc = '<path d="M13 21H6V3h8l4 4v5M14 3v4h4"/>';
+  const folder = '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>';
+  const reply = '<path d="M9 7L4 12l5 5M4 12h9a7 7 0 0 1 7 7"/>';
+  const fresh = {
+    // Execution: the symbols of workflow and pipeline files in the explorer, with a start mark.
+    "core.run-workflow": '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    "core.run-pipeline": '<path d="M3 7h5l3 5-3 5H3M11 12h10M17 8l4 4-4 4"/>',
+    // Files: a page with a sign, or a folder for folders and lists.
+    "file.copy": '<path d="M9 7V3h6l4 4v10h-4"/><path d="M5 7h6l4 4v10H5z"/>',
+    "file.delete": doc + '<path d="M15.5 15.5l5 5M20.5 15.5l-5 5"/>',
+    "file.exists": doc + '<path d="M14.5 18l2.5 2.5 4.5-5"/>',
+    "file.list": folder + '<path d="M7.5 11h9M7.5 14.5h6"/>',
+    "file.mkdir": folder + '<path d="M12 9.5v6M9 12.5h6"/>',
+    "file.move": folder + '<path d="M9 13h7M13.5 10.5L16 13l-2.5 2.5"/>',
+    "file.wait": doc + '<circle cx="18" cy="18" r="3.5"/><path d="M18 16.3V18l1.2 1"/>',
+    // Network: answering the caller – the same sign for the action and the transform.
+    "http.respond": reply,
+    "http.response": reply,
+    // A step that does nothing: an empty, dashed place on the line (until now it looked like a pipeline).
+    "core.dummy": '<path d="M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="5" stroke-dasharray="2.6 2.2"/>',
+  };
+  const icons = Object.assign({
+    "core.start": '<path d="M8 5l11 7-11 7z" fill="currentColor"/>',
+    "core.wait": '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    "core.log": '<path d="M5 6h14M5 12h14M5 18h9"/>',
+    "core.success": '<circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+    "core.abort": '<circle cx="12" cy="12" r="8"/><path d="M9 9l6 6M15 9l-6 6"/>',
+    "csv.input": '<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6"/>',
+    "csv.output": '<path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v7M9 15l3 3 3-3"/>',
+    "core.generate-rows": '<path d="M4 6h16M4 12h16M4 18h16M19 3v6M16 6h6"/>',
+    "core.from-result": '<path d="M4 12h11M11 8l4 4-4 4M15 4h5v16h-5"/>',
+    "core.to-result": '<path d="M9 12h11M16 8l4 4-4 4M9 4H4v16h5"/>',
+    "core.convert": '<path d="M5 8h11l-3-3M19 16H8l3 3"/>',
+    "core.filter": '<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',
+    "core.select-fields": '<path d="M5 6h14M5 12h9M5 18h5M17 15l2 2 3-4"/>',
+    "core.constant": '<path d="M12 5v14M5 12h14"/>',
+    "core.switch": '<path d="M4 12h6M10 12l8-6M10 12l8 6M10 12h8"/>',
+    "core.sort": '<path d="M7 4v16M4 17l3 3 3-3M14 6h6M14 12h4M14 18h2"/>',
+    "core.group-by": '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><path d="M7.5 11v4h9v-4M12 15v5"/>',
+  }, fresh);
+
+  const actions = [
+    ["core.abort","Abort","general"],["core.dummy","Dummy","general"],["core.log","Log","general"],["core.start","Start","general"],
+    ["core.success","Success","general"],["core.wait","Wait","general"],
+    ["core.run-pipeline","Run Pipeline","execution"],["core.run-workflow","Run Workflow","execution"],
+    ["file.copy","Copy Files","files"],["file.delete","Delete Files","files"],["file.exists","File Exists","files"],["file.list","List Files","files"],
+    ["file.mkdir","Create Folder","files"],["file.move","Move Files","files"],["file.wait","Wait for File","files"],
+    ["http.respond","HTTP Response","network"]].map(([type,label,category]) => ({type,label,category}));
+  const transforms = [
+    ["core.generate-rows","Generate Rows","input"],["csv.input","CSV Input","input"],
+    ["core.constant","Add Constants","transform"],["core.convert","Convert Types","transform"],["core.filter","Filter","transform"],["core.select-fields","Select Fields","transform"],
+    ["core.dummy","Dummy","flow"],["core.switch","Switch","flow"],
+    ["core.from-result","Records from Workflow","execution"],["core.to-result","Records to Workflow","execution"],
+    ["core.group-by","Group By","combine"],["core.sort","Sort","combine"],
+    ["core.log","Log","output"],["csv.output","CSV Output","output"],["http.response","HTTP Response","output"]].map(([type,label,category]) => ({type,label,category}));
+  const card = d => `<div class="card ${fresh[d.type] ? "new" : ""}">${fresh[d.type] ? '<span class="badge">NEW</span>' : ""}${tile(d, 28, 16)}<span class="t"><b>${d.label}</b><code>${d.type}</code></span></div>`;
+  const app = document.getElementById("app");
+
+  if (state === "overview") {
+    app.innerHTML = `<div class="page">
+      <h1>Icons of actions and transforms</h1>
+      <p class="sub">12 new icons (marked): 11 replace the generic symbol, core.dummy no longer looks like a pipeline. Tiles as on the canvas: 28 px, icon 16 px, colour of the category.</p>
+      <h2>Actions <small>16</small></h2><div class="grid">${actions.map(card).join("")}</div>
+      <h2>Transforms <small>15</small></h2><div class="grid">${transforms.map(card).join("")}</div>
+      <div class="legend"><span>Files: page or folder with a sign (copy, ✕ delete, ✓ exists, lines = list, + new folder, → move, clock = wait)</span></div>
+      <div class="legend"><span>Execution: the symbols of workflow and pipeline files from the explorer</span><span>·</span><span>Network: reply arrow, the same for action and transform</span><span>·</span><span>Dummy: an empty, dashed step on the line</span></div>
+    </div>`;
+  }
+  if (state === "sizes") {
+    const rows = Object.keys(fresh).map(t => {
+      const d = [...actions, ...transforms].find(x => x.type === t);
+      return `<tr><td><b>${d.label}</b> <span class="mono">${t}</span></td>
+        <td class="c">${tile(d, 22, 13)}</td><td class="c">${tile(d, 28, 16)}</td><td class="c">${tile(d, 40, 24)}</td>
+        <td class="c plain">${svg(icons[t], 16)}</td><td class="c plain">${svg(icons[t], 24)}</td></tr>`;
+    }).join("");
+    app.innerHTML = `<div class="page">
+      <h1>New icons in all sizes</h1>
+      <p class="sub">Palette 22/13 px, canvas node 28/16 px, properties panel 40/24 px, and without a tile.</p>
+      <table><thead><tr><th>Type</th><th class="c">Palette</th><th class="c">Node</th><th class="c">Panel</th><th class="c">16 px</th><th class="c">24 px</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }
+  if (state === "canvas") {
+    const palRow = d => `<div class="pal-row">${tile(d, 22, 13)}<span class="n">${d.label}<small>${d.type}</small></span></div>`;
+    const byCat = c => actions.filter(d => d.category === c).map(palRow).join("");
+    const nodes = [
+      ["start","core.start",40,60],["exists","file.exists",280,60],["wait","file.wait",520,60],
+      ["copy","file.copy",280,170],["archive","file.mkdir",520,170],["move","file.move",760,170],
+      ["list","file.list",280,280],["import","core.run-pipeline",520,280],["report","core.run-workflow",760,280],
+      ["cleanup","file.delete",520,390],["answer","http.respond",760,390],["skip","core.dummy",280,390]];
+    const find = t => actions.find(d => d.type === t);
+    const edges = [[0,1],[1,2],[3,4],[4,5],[6,7],[7,8],[9,10],[11,9]];
+    const at = i => nodes[i];
+    const path = ([a,b]) => { const [, , x1, y1] = at(a), [, , x2, y2] = at(b); const sx = x1 + 196, sy = y1 + 26 + 46, ex = x2, ey = y2 + 26 + 46;
+      return `<path d="M${sx} ${sy} C ${sx + 30} ${sy}, ${ex - 30} ${ey}, ${ex} ${ey}"/>`; };
+    app.innerHTML = `<div class="ctx">
+      <aside><div class="label pal-cat">Execution</div>${byCat("execution")}<div class="label pal-cat">Files</div>${byCat("files")}<div class="label pal-cat">Network</div>${byCat("network")}</aside>
+      <div class="canvas"><div class="title label">Workflow · import.workflow.yaml</div>
+        <svg class="edges">${edges.map(path).join("")}</svg>
+        ${nodes.map(([id, t, x, y]) => `<div class="node" style="left:${x}px;top:${y + 46}px">${tile(find(t), 28, 16)}<span class="text"><span class="id">${id}</span><br><span class="type">${t}</span></span></div>`).join("")}
+      </div></div>`;
+  }
+</script>
+</body>
+</html>
