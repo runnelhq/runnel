@@ -445,6 +445,9 @@ export function FileView(props: {
       if (!wf) return;
       try {
         await startRun(settings, wf);
+        // A run ends the data preview: the canvas shows the counts of the run, not those
+        // of the preview with its limit of 100 or 1000 records per input.
+        endPreview();
         setBottomTab("log"); // the log opens when a run starts and follows it (mockup E8)
         setEditError(null);
       } catch (err) {
@@ -453,7 +456,7 @@ export function FileView(props: {
         if (err instanceof StartError && err.problems.length > 0) setBottomTab("problems");
       }
     },
-    [graph, startRun],
+    [graph, startRun, endPreview],
   );
   const proceedRun = useCallback(
     (dialog: boolean) => {

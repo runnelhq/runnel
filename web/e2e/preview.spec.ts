@@ -63,3 +63,24 @@ test("tells where the preview stopped", async ({ page, request }) => {
   await expect(alert).toContainText("customer.csv");
   await expect(page.getByTestId("node-read")).toHaveAttribute("data-run", "failed");
 });
+
+test("a run ends the preview and shows its own counts", async ({ page, request }) => {
+  const rowsPath = "pipelines/rows.pipeline.yaml";
+  const rows = "kind: Pipeline\napiVersion: runnel/v1\nname: rows\ntransforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 250 } }\n  - { id: pass, type: core.dummy }\nlinks:\n  - { from: gen, to: pass }\n";
+  await request.put(`/api/v1/files/${rowsPath}`, { headers: { "If-Match": "*" }, data: rows });
+  await page.goto("/");
+  await page.getByRole("tree").getByText("rows.pipeline.yaml", { exact: true }).click();
+  await page.getByTestId("node-pass").click();
+  await page.getByRole("button", { name: "Preview data" }).click();
+  // The preview reads the first 100 records per input …
+  await expect(page.getByTestId("node-pass").getByTestId("counts")).toHaveText("100 → 100");
+
+  // … a run all of them, and the canvas shows its counts.
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Run rows.pipeline.yaml" });
+  // The first run asks for the environment (the project has two).
+  await dialog.getByRole("button", { name: "Run" }).click();
+  await expect(page.getByTestId("preview-hint")).toHaveCount(0);
+  await expect(page.getByTestId("node-pass").getByTestId("counts")).toHaveText("250 → 250");
+  await request.delete(`/api/v1/files/${rowsPath}`, { headers: { "If-Match": "*" } });
+});
