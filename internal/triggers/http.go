@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 )
@@ -83,7 +84,7 @@ func (s *Scheduler) local() bool {
 	if err != nil {
 		return true
 	}
-	return isLoopbackHost(host)
+	return httpx.IsLoopback(host)
 }
 
 func (l *listener) close() {
@@ -107,23 +108,15 @@ func (s *Scheduler) HTTPAddress() string {
 	return s.listener.addr
 }
 
-type errorBody struct {
-	Error string `json:"error"`
-}
-
 type acceptedBody struct {
 	RunID  string `json:"runId"`
 	Status string `json:"status"`
 }
 
-func reply(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
+func reply(w http.ResponseWriter, status int, v any) { httpx.WriteJSON(w, status, v, false) }
 
 func fail(w http.ResponseWriter, status int, format string, args ...any) {
-	reply(w, status, errorBody{fmt.Sprintf(format, args...)})
+	reply(w, status, httpx.ErrorBody{Error: fmt.Sprintf(format, args...)})
 }
 
 // ServeHTTP answers the requests to http triggers (S38a, ADR 0018): it finds the
@@ -132,7 +125,7 @@ func fail(w http.ResponseWriter, status int, format string, args ...any) {
 func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Web pages in a browser must not start runs: cross-site requests send an Origin
 	// header; on a local listener, DNS rebinding sends a foreign Host.
-	if s.local() && !isLoopbackHost(r.Host) {
+	if s.local() && !httpx.IsLoopback(r.Host) {
 		fail(w, http.StatusForbidden, "requests must be addressed to localhost or 127.0.0.1")
 		return
 	}
@@ -205,19 +198,6 @@ func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.answer(w, r, e, start)
-}
-
-// isLoopbackHost reports whether a Host header names the loopback interface.
-func isLoopbackHost(hostport string) bool {
-	host, _, err := net.SplitHostPort(hostport)
-	if err != nil {
-		host = hostport
-	}
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(strings.Trim(host, "[]"))
-	return ip != nil && ip.IsLoopback()
 }
 
 // route finds the http trigger for a method and path; with a matching path but
@@ -393,10 +373,14 @@ func (s *Scheduler) targetParams(t *model.Trigger, inputs map[string]string) (ma
 // project is reached; it answers the caller itself if the run is not started.
 func (s *Scheduler) startHTTP(w http.ResponseWriter, e *entry, start StartRequest) (string, bool) {
 	t := e.t
-	e.startMu.Lock()
-	defer e.startMu.Unlock()
+	if t.With.MaxConcurrent > 0 {
+		// Counting the running runs and starting one must not interleave; without a
+		// limit, requests start their runs at the same time.
+		e.startMu.Lock()
+		defer e.startMu.Unlock()
+	}
+	s.dropEnded(e)
 	s.mu.Lock()
-	e.active = slices.DeleteFunc(e.active, func(id string) bool { return !s.opts.Running(id) })
 	running := len(e.active)
 	s.mu.Unlock()
 	if limit := t.With.MaxConcurrent; limit > 0 && running >= limit {

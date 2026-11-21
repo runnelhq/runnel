@@ -1,8 +1,8 @@
 // Package record defines the records that flow through pipelines (ADR 0007): an
 // ordered list of fields, name → value. The order is kept (important for CSV and
 // Excel). Field names starting with "_" are reserved for metadata (_error, _source,
-// _rowNumber). Values are plain Go values for now; the value types of ADR 0007 and
-// schemas follow with roadmap S14 without changing this type's methods.
+// _rowNumber). Values have the value types of ADR 0007 (types.go); schemas describe the
+// fields a transform passes on (schema.go).
 package record
 
 // Field is a name and its value.

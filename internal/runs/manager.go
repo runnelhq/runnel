@@ -534,6 +534,14 @@ func (m *Manager) Wait(ctx context.Context, id string) (Detail, bool) {
 	return detailOf(e), true
 }
 
+// IsRunning reports whether a run is running, without copying its state like Get.
+func (m *Manager) IsRunning(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e := m.runs[id]
+	return e != nil && e.run.Status == StatusRunning
+}
+
 // Cancel stops a running run. It reports whether the run exists and whether it was
 // still running.
 func (m *Manager) Cancel(id string) (found, running bool) {

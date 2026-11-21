@@ -248,8 +248,7 @@ func (s *Server) waitRun(ctx context.Context, id string) (triggers.Outcome, bool
 
 // running reports whether a run is still running.
 func (s *Server) running(id string) bool {
-	d, ok := s.runs.Get(id)
-	return ok && d.Status == runs.StatusRunning
+	return s.runs.IsRunning(id)
 }
 
 // triggersResponse lists the triggers of the project and the problems of trigger files.

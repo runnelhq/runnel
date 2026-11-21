@@ -207,11 +207,11 @@ func TestRunPipelineCallWithInvalidRows(t *testing.T) {
 		t.Errorf("%v", res.Err)
 	}
 	// A list of plain values becomes records with the field value.
-	rows, err := toRecords([]map[string]any{{"value": "x"}, {"b": 2, "a": 1}})
+	rows, err := Records([]map[string]any{{"value": "x"}, {"b": 2, "a": 1}})
 	if err != nil || len(rows) != 2 || strings.Join(rows[1].Names(), ",") != "a,b" {
 		t.Errorf("%v %v", rows, err)
 	}
-	if _, err := toRecords([]map[string]any{{"x": struct{}{}}}); err == nil || !strings.Contains(err.Error(), "rows[0].x") {
+	if _, err := Records([]map[string]any{{"x": struct{}{}}}); err == nil || !strings.Contains(err.Error(), "rows[0].x") {
 		t.Errorf("invalid value: %v", err)
 	}
 }

@@ -10,17 +10,15 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
-	"net"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/triggers"
@@ -145,7 +143,7 @@ func (s *Server) Handler() http.Handler {
 // guard rejects requests that do not come from a local client of this server.
 func guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !isLoopbackHost(r.Host) {
+		if !httpx.IsLoopback(r.Host) {
 			writeError(w, http.StatusForbidden, "requests must be addressed to localhost or 127.0.0.1")
 			return
 		}
@@ -157,31 +155,11 @@ func guard(next http.Handler) http.Handler {
 	})
 }
 
-// isLoopbackHost reports whether a Host header names this machine's loopback interface.
-func isLoopbackHost(hostport string) bool {
-	host, _, err := net.SplitHostPort(hostport)
-	if err != nil {
-		host = hostport
-	}
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(strings.Trim(host, "[]"))
-	return ip != nil && ip.IsLoopback()
-}
-
 // apiError is the body of all error responses.
-type apiError struct {
-	Error string `json:"error"`
-}
+type apiError = httpx.ErrorBody
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(v)
-}
+// writeJSON writes v as indented JSON (readable when the API is used by hand).
+func writeJSON(w http.ResponseWriter, status int, v any) { httpx.WriteJSON(w, status, v, true) }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, apiError{Error: msg})

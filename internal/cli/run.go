@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -194,7 +195,7 @@ func (l *runLogger) event(e workflow.Event) {
 			l.line(e.Time, slog.LevelDebug, e.ActionID, fmt.Sprintf("%s in %s", e.Status, round(e.Duration)))
 		}
 	case workflow.RunFinished:
-		for _, name := range sortedKeys(e.Outputs) {
+		for _, name := range slices.Sorted(maps.Keys(e.Outputs)) {
 			l.line(e.Time, slog.LevelInfo, "", fmt.Sprintf("output %s = %s", name, formatValue(e.Outputs[name])))
 		}
 		switch e.Status {
@@ -214,15 +215,6 @@ func (l *runLogger) line(t time.Time, level slog.Level, actionID, msg string) {
 		prefix = "[" + actionID + "] "
 	}
 	_, _ = fmt.Fprintf(l.out, "%s %-5s %s%s\n", t.Format("15:04:05.000"), level.String(), prefix, msg)
-}
-
-func sortedKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 // formatValue shows output values as JSON, so that types are visible ("1" vs 1).

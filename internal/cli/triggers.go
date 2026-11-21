@@ -25,12 +25,9 @@ func newTriggersCommand() *cobra.Command {
 			if len(args) == 1 {
 				dir = args[0]
 			}
-			root, found, err := model.FindProjectDir(dir)
+			root, err := findProject(dir)
 			if err != nil {
 				return err
-			}
-			if !found {
-				return fmt.Errorf("no project (%s) found in %s or above", model.ProjectFile, dir)
 			}
 			list, problems := triggers.Load(displayPath(root))
 			out := cmd.OutOrStdout()

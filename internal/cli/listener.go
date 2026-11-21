@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/tlscert"
 	"github.com/runnelhq/runnel/internal/triggers"
 )
@@ -79,11 +80,7 @@ func (o listenerOptions) check() error {
 	if n, err := strconv.Atoi(port); err != nil || n < 0 || n > 65535 {
 		return fmt.Errorf("invalid --triggers %q (port 0–65535)", o.Address)
 	}
-	local := host == "localhost"
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		local = true
-	}
-	if !local && !o.secure() && !o.Insecure {
+	if !httpx.IsLoopback(host) && !o.secure() && !o.Insecure {
 		return fmt.Errorf("--triggers %s listens on the network: use HTTPS with --triggers-tls auto or --triggers-cert and --triggers-key; "+
 			"for plain HTTP in a trusted network add --triggers-insecure", o.Address)
 	}

@@ -39,7 +39,7 @@ func (spec Spec) pipelines(envName string) action.PipelineRunner {
 		} else if err != nil {
 			return nil, fmt.Errorf("cannot read pipeline file %s: %w", name, err)
 		}
-		rows, err := toRecords(call.Rows)
+		rows, err := Records(call.Rows)
 		if err != nil {
 			return nil, err
 		}
@@ -70,13 +70,10 @@ func (spec Spec) pipelines(envName string) action.PipelineRunner {
 	}
 }
 
-// Records turns rows (e.g. the JSON list in the body of a request to an http trigger)
-// into records for core.from-result; the fields are ordered by name.
-func Records(rows []map[string]any) ([]record.Record, error) { return toRecords(rows) }
-
-// toRecords turns the rows of core.run-pipeline into records; the fields of an object
+// Records turns rows into records for core.from-result: the rows of core.run-pipeline
+// or the JSON list in the body of a request to an http trigger. The fields of an object
 // are ordered by name, as objects have no order.
-func toRecords(rows []map[string]any) ([]record.Record, error) {
+func Records(rows []map[string]any) ([]record.Record, error) {
 	if rows == nil {
 		return nil, nil
 	}

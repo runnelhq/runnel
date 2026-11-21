@@ -85,6 +85,11 @@ fuzz:
 	go test ./internal/vars -run '^$$' -fuzz FuzzParseExpand -fuzztime $(FUZZTIME)
 	go test ./internal/model -run '^$$' -fuzz FuzzParseWorkflow -fuzztime $(FUZZTIME)
 	go test ./internal/expr -run '^$$' -fuzz FuzzCompile -fuzztime $(FUZZTIME)
+	go test ./internal/model -run '^$$' -fuzz FuzzParsePipeline -fuzztime $(FUZZTIME)
+	go test ./internal/model -run '^$$' -fuzz FuzzParseTrigger -fuzztime $(FUZZTIME)
+	go test ./internal/format -run '^$$' -fuzz FuzzParse -fuzztime $(FUZZTIME)
+	go test ./internal/transforms/csv -run '^$$' -fuzz FuzzInput -fuzztime $(FUZZTIME)
+	go test ./internal/triggers -run '^$$' -fuzz FuzzRequest -fuzztime $(FUZZTIME)
 
 ## bench: run the benchmarks (load probes, e.g. requests to an http trigger)
 bench:

@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/runnelhq/runnel/internal/logfile"
-	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/winsvc"
 )
 
@@ -125,12 +124,9 @@ func newServiceInstallCommand() *cobra.Command {
 			if len(args) == 1 {
 				dir = args[0]
 			}
-			root, found, err := model.FindProjectDir(dir)
+			root, err := findProject(dir)
 			if err != nil {
 				return err
-			}
-			if !found {
-				return fmt.Errorf("no project (%s) found in %s or above", model.ProjectFile, dir)
 			}
 			if root, err = filepath.Abs(root); err != nil {
 				return err
