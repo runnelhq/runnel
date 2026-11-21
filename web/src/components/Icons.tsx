@@ -203,6 +203,15 @@ export const SearchIcon = (p: P) => (
   </Icon>
 );
 
+/** Detect fields (mockup S46): lines of a list with a magnifier. */
+export const DetectIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 6h10M4 12h7M4 18h5" />
+    <circle cx="17" cy="15" r="3.5" />
+    <path d="M19.5 17.5L22 20" />
+  </Icon>
+);
+
 export const TrashIcon = (p: P) => (
   <Icon {...p}>
     <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />

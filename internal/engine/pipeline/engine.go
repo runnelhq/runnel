@@ -771,3 +771,9 @@ func (r *Runner) input(ctx context.Context, links []chan transform.Batch, in []i
 	}()
 	return merged
 }
+
+// ExpandConfig resolves the ${…} references in the configuration of a transform as
+// Prepare does, e.g. for "Detect fields" in the editor (S46).
+func ExpandConfig(with map[string]any, scope *vars.Scope) (map[string]any, error) {
+	return expand(with, scope)
+}

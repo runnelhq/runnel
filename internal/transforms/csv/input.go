@@ -25,6 +25,7 @@ var inputDefinition = transform.Definition{
 	Description:  "Reads the rows of a CSV file as records",
 	Config:       input{},
 	New:          newInput,
+	DetectFields: detectFields,
 }
 
 type input struct {

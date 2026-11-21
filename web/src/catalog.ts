@@ -25,6 +25,8 @@ export interface Descriptor {
   recordErrors?: boolean;
   /** Transforms: can run in several copies. */
   parallel?: boolean;
+  /** Input transforms: can propose their fields ("Detect fields", S46). */
+  detectFields?: boolean;
 }
 
 /** Category colours of the tiles (design/README.md, chapter 3.3); transforms: KONZEPT 12.2. */

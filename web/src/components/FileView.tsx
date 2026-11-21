@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
 import {
   editWorkflow,
+  fieldsList,
   graphOf,
   problemTarget,
   validate,
@@ -15,6 +16,7 @@ import {
 import { Canvas, type Selection } from "./Canvas";
 import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { RunDialog } from "./RunDialog";
+import { DetectFieldsDialog } from "./DetectFieldsDialog";
 import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
@@ -63,6 +65,11 @@ export function fileSummary(path: string, text: string, encoding: string): strin
 
 const historyLimit = 100;
 
+/** The path of an input as written, if it has variables (shown in "Detect fields"). */
+function rawPathOf(v: unknown): string | undefined {
+  return typeof v === "string" && v.includes("${") ? v : undefined;
+}
+
 /**
  * Shows one file. Workflows and pipelines (S25a) open as canvas and can be edited there (E6a, E6b): every change
  * is applied to the text by the server; undo/redo keep text versions; saving uses the
@@ -104,6 +111,8 @@ export function FileView(props: {
   // A field of the properties panel to show and focus, e.g. after clicking a problem.
   const [focusField, setFocusField] = useState<{ key: string; seq: number } | null>(null);
   const [panel, setPanel] = useState(true);
+  // The transform whose fields are being detected (S46).
+  const [detecting, setDetecting] = useState<string | null>(null);
 
   const doc = state.status === "loaded" ? state.doc : null;
   const dirty = doc !== null && doc.text !== doc.saved;
@@ -280,6 +289,15 @@ export function FileView(props: {
   const onSetMap = useCallback(
     (id: string, field: string, map: { key: string; value: string }[]) =>
       void applyEdit({ set: [{ id, field, value: null, ...(map.length > 0 ? { map } : {}) }] }, `${id}:${field}`),
+    [applyEdit],
+  );
+  // "Detect fields" (S46): the selected fields replace "fields:" as one undo step.
+  const onWriteFields = useCallback(
+    async (id: string, fields: { name: string; type: string; format?: string }[]) => {
+      const list = fieldsList(fields);
+      const next = await applyEdit({ set: [{ id, field: "with.fields", value: null, ...(list.length > 0 ? { list } : {}) }] });
+      if (next !== null) setToast(`Wrote ${fields.length} ${fields.length === 1 ? "field" : "fields"} to ${id}`);
+    },
     [applyEdit],
   );
   // Parameters and outputs (E7c): typing in one field of an entry is one undo step; a deleted entry can be restored.
@@ -701,9 +719,24 @@ export function FileView(props: {
             onRename(from, to);
           }}
           onHide={() => setPanel(false)}
+          onDetectFields={graphKind === "pipeline" ? setDetecting : undefined}
         />
       )}
       </div>
+      {detecting && doc && (
+        <DetectFieldsDialog
+          path={path}
+          content={doc.text}
+          transform={detecting}
+          rawPath={rawPathOf(graph?.actions?.find((a) => a.id === detecting)?.with?.path)}
+          onCancel={() => setDetecting(null)}
+          onWrite={(fields) => {
+            const id = detecting;
+            setDetecting(null);
+            void onWriteFields(id, fields);
+          }}
+        />
+      )}
       {runDialog && (
         <RunDialog
           path={path}

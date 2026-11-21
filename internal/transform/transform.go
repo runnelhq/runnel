@@ -192,6 +192,10 @@ type Definition struct {
 	// because each record is handled on its own; not for inputs and outputs, which would
 	// read or write twice.
 	Parallel bool
+	// DetectFields proposes the fields of an input transform from the first rows (at most
+	// limit) of its input, for "Detect fields" in the editor (S46); nil if it cannot.
+	// with is the configuration with variables resolved.
+	DetectFields func(with map[string]any, limit int) (*Detection, error)
 }
 
 // Descriptor describes a transform type for the editor, the API and tools (ADR 0014).
@@ -206,6 +210,8 @@ type Descriptor struct {
 	RecordErrors bool `json:"recordErrors,omitempty"`
 	// Parallel: the transform can run in several copies (Definition.Parallel).
 	Parallel bool `json:"parallel,omitempty"`
+	// DetectFields: the transform can propose its fields (Definition.DetectFields).
+	DetectFields bool `json:"detectFields,omitempty"`
 }
 
 // Registry holds the available transform types.
@@ -236,7 +242,8 @@ func (r *Registry) Register(d Definition) {
 		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
 	}
 	r.defs[d.Type] = d
-	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, RecordErrors: d.RecordErrors, Parallel: d.Parallel}
+	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
+		DetectFields: d.DetectFields != nil}
 }
 
 // Lookup returns the definition of a transform type.

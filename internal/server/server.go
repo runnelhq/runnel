@@ -126,6 +126,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
 	mux.HandleFunc("POST "+APIPrefix+"/workflows/edit", s.handleEditWorkflow)
 	mux.HandleFunc("POST "+APIPrefix+"/pipelines/edit", s.handleEditPipeline)
+	mux.HandleFunc("POST "+APIPrefix+"/pipelines/fields", s.handleDetectFields)
 	mux.HandleFunc("POST "+APIPrefix+"/runs", s.handleStartRun)
 	mux.HandleFunc("GET "+APIPrefix+"/runs", s.handleListRuns)
 	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}", s.handleGetRun)
