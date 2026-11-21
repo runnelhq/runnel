@@ -16,6 +16,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s25a-pipeline.html`](s25a-pipeline.html) | S25a – Pipeline-Canvas (dazu K10/K11 im Workflow-Panel) | `canvas`, `link`, `run`, `problems`, `foreach` | freigegeben mit PR #62; Umsetzung in S25a1a (Server), S25a1b, S25a2, S25a3; `foreach` mit E7c ✅ |
 | [`e7c-parameters.html`](e7c-parameters.html) | E7c – Parameter und Outputs im Editor | `parameters`, `add`, `outputs`, `problems` | freigegeben mit PR #69, umgesetzt mit E7c (zusammen mit `foreach` aus S25a) |
 | [`e9-yaml.html`](e9-yaml.html) | E9 – YAML bearbeiten | `edit`, `problem`, `syntax`, `canvas` | freigegeben mit PR #90, umgesetzt mit E9 |
+| [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | zur Freigabe |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 
 ## Entscheidungen
@@ -69,6 +70,11 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E9 | Ein Rückgängig für alles: Jede Tipp-Pause ist ein Schritt im selben Verlauf wie Änderungen auf dem Canvas und im Panel; Strg+Z und Strg+Y wirken in beiden Ansichten (der eigene Verlauf von CodeMirror ist aus). Speichern wie bisher mit Save, kein automatisches Speichern |
 | E9 | Ist der Text kein lesbarer Workflow (Syntaxfehler), bleibt der Wechsel zum Canvas möglich; er zeigt den Hinweis aus E5 („can’t be shown as a graph“) mit „Show YAML at line n“, die Änderungen bleiben erhalten. Der Knopf „Canvas“ trägt dann einen roten Punkt. Fehler in Feldern verhindern den Canvas wie bisher nicht |
 | E9 | Der Hinweis „Read-only“ entfällt bei Workflows und Pipelines; andere Dateien (`project.yaml`, Environments, Trigger) bleiben in E9 schreibgeschützt und kommen mit einem eigenen Schritt (E10). Die Hinweise im Panel „in your text editor for now“ verweisen danach auf die YAML-Ansicht |
+| S44 | „Preview data“ im Panel eines Transforms führt die Pipeline bis zu diesem Transform aus (nur die Transforms davor und er selbst); Ausgaben (`csv.output` …) laufen nie, es wird nichts geschrieben. Ein Hinweis oben im Canvas („Preview up to …“, × beendet die Vorschau); Transforms und Links außerhalb der Vorschau sind blass |
+| S44 | Jede Eingabe liest höchstens die ersten N Datensätze (100, wählbar 1.000); Werte wie beim Run ohne Dialog (gemerkte Parameter und Environment); gelesen wird der Text im Editor, auch ungespeichert. Die Vorschau ist kein Lauf: nicht in der Liste der Läufe und nicht im Log |
+| S44 | Die Datensätze stehen im neuen Tab „Preview“ unter dem Canvas, als Tabelle (Spalten mit Typ, Zahlen rechtsbündig, Fehlerfelder `_error…` blass) oder als JSON; die Auswahl links wählt Ausgabe des Transforms oder einen Link (auch Fehler-Links); ein Klick auf einen Link im Canvas zeigt dessen Datensätze. Die Zähler an Links und Knoten wie nach einem Run (S25a), gestrichelt umrandet |
+| S44 | Die Tabelle bleibt ohne neue Abhängigkeit (höchstens 1.000 Zeilen, keine Virtualisierung nötig); das Konzept nannte `@tanstack/react-table` – erst bei Bedarf |
+| S44 | „Refresh“ führt die Vorschau nach Änderungen erneut aus; ein Fehler zeigt, an welchem Transform die Vorschau stehen blieb, mit der Meldung |
 | S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
 | S46 | Vorschlag in einem Dialog (das Panel ist für eine Tabelle zu schmal): je Spalte Auswahl, Name, Type, Format, gelesene Werte und eine Begründung; geschrieben wird erst mit „Write n fields“ |
 | S46 | Gelesen wird mit der aktuellen (auch ungespeicherten) Konfiguration des Transforms; Variablen im Pfad mit den Standardwerten der Parameter und dem Standard-Environment (wie Run ohne Dialog); höchstens die ersten 1.000 Zeilen |
@@ -93,6 +99,7 @@ node design/mockups/screenshots.cjs s25a-pipeline canvas,link,run,problems,forea
 node design/mockups/screenshots.cjs e7c-parameters parameters,add,outputs,problems
 node design/mockups/screenshots.cjs s46-fields fields,detect,written,update,error
 node design/mockups/screenshots.cjs e9-yaml edit,problem,syntax,canvas
+node design/mockups/screenshots.cjs s44-preview preview,json,link,error
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
