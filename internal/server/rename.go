@@ -77,6 +77,9 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 	case from == to:
 		writeError(w, http.StatusBadRequest, "the new name is the old one")
 		return
+	case from == model.ProjectFile:
+		writeError(w, http.StatusConflict, projectFileNeeded)
+		return
 	case strings.HasPrefix(to, from+"/"):
 		writeError(w, http.StatusBadRequest, "a folder cannot be moved into itself")
 		return

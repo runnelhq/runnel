@@ -7,6 +7,8 @@ import {
   fetchReferences,
   movedPath,
   newKinds,
+  projectFile,
+  projectTemplate,
   renamePath,
   suffixOf,
   template,
@@ -112,7 +114,20 @@ export function Explorer(props: {
   };
   const startRename = (entry: Entry) => {
     setMenu(null);
+    if (entry.path === projectFile) return setProblem(`${projectFile} cannot be renamed: the project needs it`);
     if (!hasUnsaved(entry)) setEditing({ rename: entry });
+  };
+  /** Creates project.yaml again, named after the project folder (template in files.ts). */
+  const createProject = async () => {
+    setMenu(null);
+    if (!changes) return;
+    try {
+      await createFile(projectFile, projectTemplate(changes.projectDir));
+      props.onReload();
+      changes.onCreated(projectFile);
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : String(err));
+    }
   };
   const startMoveTo = (entry: Entry) => {
     setMenu(null);
@@ -313,6 +328,8 @@ export function Explorer(props: {
           onRename={startRename}
           onMove={startMoveTo}
           onDelete={startDelete}
+          projectMissing={!!props.tree && !exists(projectFile)}
+          onCreateProject={() => void createProject()}
         />
       )}
       {drag?.over != null && (
@@ -442,7 +459,7 @@ function Node(props: {
       <div
         tabIndex={0}
         title={entry.path}
-        draggable={!!props.drag}
+        draggable={!!props.drag && entry.path !== projectFile}
         onDragStart={(e) => props.drag?.onStart(entry, e)}
         onDragEnd={() => props.drag?.onEnd()}
         onDragOver={(e) => props.drag?.onOver(dropDir, e)}
@@ -581,6 +598,9 @@ function ContextMenu(props: {
   onRename: (e: Entry) => void;
   onMove: (e: Entry) => void;
   onDelete: (e: Entry) => void;
+  /** project.yaml is missing (deleted outside the editor): "New" offers to create it. */
+  projectMissing: boolean;
+  onCreateProject: () => void;
 }) {
   const { menu } = props;
   const ref = useRef<HTMLDivElement>(null);
@@ -632,7 +652,13 @@ function ContextMenu(props: {
   const sep = (key: string) => <hr key={key} className="my-1 border-0 border-t border-border" />;
   let content;
   if (!entry) {
-    content = [<div key="l" className="label-caps px-2 pt-1.5 pb-0.5">New</div>, ...kindItems(), sep("s1"), item("Folder", <FolderIcon />, () => props.onCreate("folder", ""))];
+    content = [
+      <div key="l" className="label-caps px-2 pt-1.5 pb-0.5">New</div>,
+      ...kindItems(),
+      sep("s1"),
+      item("Folder", <FolderIcon />, () => props.onCreate("folder", "")),
+      ...(props.projectMissing ? [item("Project file", <ProjectIcon />, props.onCreateProject, { hint: projectFile })] : []),
+    ];
   } else if (entry.type === "dir") {
     const empty = (entry.children?.length ?? 0) === 0;
     content = [
@@ -648,10 +674,12 @@ function ContextMenu(props: {
       item("Copy path", <CopyIcon />, () => copy(entry.path)),
     ];
   } else {
+    // project.yaml stays where it is: without it the project is not found (runnel serve).
+    const fixed = entry.path === projectFile ? { disabled: true, hint: "required" } : {};
     content = [
-      item("Rename", <span className="text-xs">✎</span>, () => props.onRename(entry), { hint: "F2" }),
-      item("Move to…", <MoveIcon />, () => props.onMove(entry)),
-      item("Delete", <TrashIcon />, () => props.onDelete(entry), { danger: true }),
+      item("Rename", <span className="text-xs">✎</span>, () => props.onRename(entry), { hint: "F2", ...fixed }),
+      item("Move to…", <MoveIcon />, () => props.onMove(entry), fixed),
+      item("Delete", <TrashIcon />, () => props.onDelete(entry), { danger: true, ...fixed }),
       sep("s1"),
       item("Copy path", <CopyIcon />, () => copy(entry.path)),
     ];

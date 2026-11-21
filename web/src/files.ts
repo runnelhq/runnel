@@ -213,6 +213,18 @@ export function template(kind: NewKind, name: string, firstWorkflow?: string): s
   return "";
 }
 
+export const projectFile = "project.yaml";
+
+/**
+ * A new project.yaml (when it was deleted outside the editor): named after the project
+ * folder, with characters other than letters, digits, "-" and "_" replaced by "-".
+ */
+export function projectTemplate(projectDir: string | null): string {
+  const folder = (projectDir ?? "").split(/[\\/]/).filter(Boolean).pop() ?? "";
+  const name = folder.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "project";
+  return `kind: Project\napiVersion: runnel/v1\nname: ${name}\n`;
+}
+
 /** The kind and name ending of a file for renaming: the ending stays as it is. */
 export function suffixOf(path: string): string {
   for (const s of [".workflow.yaml", ".pipeline.yaml"]) if (path.endsWith(s)) return s;
