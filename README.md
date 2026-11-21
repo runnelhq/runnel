@@ -16,7 +16,7 @@ inspiriert vom Modell von Apache Hop: Workflows und Pipelines aus Actions bzw. T
 - **Runner** – Ausführung per CLI, als Server mit Scheduler oder als Windows-Dienst
 - **Eine `runnel.exe`**, keine Runtime, keine externe Datenbank, Definitionen als YAML (Git-freundlich)
 
-Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Testplan: [docs/TESTPLAN.md](docs/TESTPLAN.md) · Mitarbeiten: [CONTRIBUTING.md](CONTRIBUTING.md) · Entscheidungen: [docs/adr](docs/adr/README.md) · Corporate Design: [design/](design/README.md)
+Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Testplan: [docs/TESTPLAN.md](docs/TESTPLAN.md) · Mitarbeiten: [CONTRIBUTING.md](CONTRIBUTING.md) · Entscheidungen: [docs/adr](docs/adr/README.md) · Corporate Design: [design/](design/README.md) · Sicherheit: [SECURITY.md](SECURITY.md)
 
 ## Verwendung
 
@@ -117,9 +117,10 @@ Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`) und für den Edi
 | Editor-Tests (Playwright) | `make e2e` | – |
 | Windows-/Linux-Binaries | `make dist` | `$env:GOOS="windows"; go build -o bin/runnel-windows-amd64.exe ./cmd/runnel` |
 | Tests | `make test` (mit Race-Detector) | `go test ./...` |
-| Lint | `make lint` | `golangci-lint run ./...` |
+| Lint (Linux- und Windows-Code) | `make lint` | `golangci-lint run ./...` und `$env:GOOS="windows"; golangci-lint run ./...` |
 | Formatieren | `make fmt` | `golangci-lint fmt ./...` |
-| Fuzz-Tests (Parser, Variablen) | `make fuzz` | – |
+| Fuzz-Tests (Parser, Variablen, Ausdrücke) | `make fuzz` | – |
+| Benchmarks | `make bench` | `go test ./... -run '^$' -bench . -benchmem` |
 | Bekannte Sicherheitslücken prüfen | `make vulncheck` | `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` |
 | SBOMs erzeugen | `make sbom` | – |
 
@@ -127,7 +128,8 @@ Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`) und für den Edi
 bin/runnel version
 ```
 
-Die CI (`.github/workflows/ci.yml`) führt Lint, `govulncheck`, Tests unter Linux und Windows sowie Build und Packen
+Die CI (`.github/workflows/ci.yml`) führt Lint (Linux- und Windows-Code), `govulncheck`, Tests unter Linux und Windows,
+die Editor-Prüfung (Typprüfung, Playwright) sowie Build und Packen
 (inkl. SBOMs) für beide Plattformen aus – bei jedem PR, auf `main` und wöchentlich, damit neu bekannt gewordene
 Sicherheitslücken auffallen.
 

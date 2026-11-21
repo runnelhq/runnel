@@ -82,7 +82,7 @@ Bei `response: run` antwortet der Lauf auf zwei Wegen – **beide** sind vorgese
   - **Pipeline:** Ausgabe-Transform **`http.response`**: die Datensätze als JSON-Body (Liste, oder ein Objekt mit
     `single: true`), `status` und `headers` aus der Konfiguration. Unterschiedliche Status entstehen über mehrere
     `http.response` hinter `core.switch` (z. B. kein Datensatz → `404`; umgesetzt mit `whenEmpty` als Rückfallantwort,
-    siehe Ergänzungen S38c); es antwortet der erste, der Datensätze erhält,
+    siehe Nachtrag); es antwortet der erste, der Datensätze erhält,
     oder – wenn keiner welche erhält – der mit `whenEmpty: true`.
 
 ### Listener
@@ -98,68 +98,56 @@ dafür nicht nötig.
 - Läufe eines HTTP-Triggers tragen `trigger = http:<name>` und die Client-Adresse.
 - `history` steuert, welche Läufe behalten werden; bis zur Lauf-Historie (S26) zählen HTTP-Läufe gegen ein eigenes
   Limit im Speicher, damit Läufe aus Editor und Cron nicht verdrängt werden.
-- Vorbereitete Workflows und Pipelines werden zwischengespeichert (umgesetzt für alle Starts, siehe Ergänzungen S38b2)
+- Vorbereitete Workflows und Pipelines werden zwischengespeichert (umgesetzt für alle Starts, siehe Nachtrag)
   und bei Änderung der Datei neu geprüft,
   statt bei jeder Anfrage.
 - Run-Queue: Priorität manuell > HTTP > zeitgesteuerte Trigger.
 
-## Ergänzungen bei der Umsetzung (S38a)
+## Nachtrag 2026-11-21 (Umsetzung S38a–S38c)
 
-Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
+Beim Umsetzen mit dem Maintainer abgestimmt bzw. festgelegt (zusammengefasst aus den Schritten S38a, S40a, S38b1, S38b2
+und S38c):
 
+**Eingaben und Routing**
 - **Feste `params` gewinnen:** Werte, die der Trigger unter `params` festlegt, kann die Anfrage nicht ändern; ein
   Pfad-Platzhalter mit demselben Namen ist ein Fehler.
 - **Body auch als Formular:** neben einem JSON-Objekt `application/x-www-form-urlencoded` (einfache Geräte, `curl -d`).
-- **Token nur aus der Umgebung:** `token` muss genau `${env:NAME}` sein; ein Token in der Datei ist ein Fehler.
+  Eine **JSON-Liste** im Body nur für Pipelines (Datensätze, Felder nach Namen sortiert wie `rows` bei
+  `core.run-pipeline`); `request` steht in Pipelines (noch) nicht zur Verfügung.
 - **Routing ohne Groß-/Kleinschreibung** in den festen Teilen des Pfads (wie unter Windows üblich); die Prüfung auf
   Überschneidungen folgt derselben Regel.
+
+**Absicherung und Listener**
+- **Token nur aus der Umgebung:** `token` muss genau `${env:NAME}` sein; ein Token in der Datei ist ein Fehler.
+  `request.headers` enthält `Authorization` nicht.
 - **Listener nur bei Bedarf:** Er öffnet sich erst, wenn ein HTTP-Trigger aktiv ist – Projekte ohne HTTP-Trigger
-  belegen keinen Port. Solange er nur lokal lauscht (bis S40a), lehnt er Anfragen aus Webseiten (`Origin`) und an
-  fremde Host-Namen (DNS-Rebinding) mit `403` ab.
-
-## Ergänzungen bei der Umsetzung (S40a)
-
+  belegen keinen Port.
 - **Optionen am Server, nicht im Projekt:** `--triggers`, `--triggers-tls auto`, `--triggers-cert`/`--triggers-key`
-  und `--triggers-insecure` bei `runnel serve` und `runnel service install` – Adresse und Zertifikat hängen am
-  Rechner, nicht am Projekt.
-- **Im Netz nur mit TLS**, außer ausdrücklich `--triggers-insecure` (Warnung bei jedem Start).
-- **Selbst erzeugtes Zertifikat** neben den Logs (`%ProgramData%\runnel\tls\` bzw. `%LOCALAPPDATA%\runnel\tls\`),
-  nie im Projekt; ein eigenes Zertifikat wird nach dem Erneuern ohne Neustart übernommen.
-- Die Prüfung des `Host`-Headers gilt nur für einen lokalen Listener; Anfragen aus Webseiten (`Origin`) bleiben
-  überall abgelehnt.
+  und `--triggers-insecure` bei `runnel serve` und `runnel service install` – Adresse und Zertifikat hängen am Rechner.
+- **Im Netz nur mit TLS**, außer ausdrücklich `--triggers-insecure` (Warnung bei jedem Start). Das selbst erzeugte
+  Zertifikat liegt neben den Logs (`%ProgramData%\runnel\tls\` bzw. `%LOCALAPPDATA%\runnel\tls\`), nie im Projekt;
+  ein eigenes wird nach dem Erneuern ohne Neustart übernommen.
+- Anfragen aus Webseiten (`Origin`) werden immer mit `403` abgelehnt, bei einem lokalen Listener auch Anfragen an
+  fremde Host-Namen (DNS-Rebinding).
 
-## Ergänzungen bei der Umsetzung (S38b1)
-
-- **Schnitt:** S38b ist geteilt in S38b1 (`response: run`, `timeout`, Standardantwort, `http.respond`, `request`) und
-  S38b2 (`history`, eigenes Limit im Lauf-Speicher, Zwischenspeicher vorbereiteter Workflows).
+**Antwort**
 - **Sub-Workflows:** Der wartende Aufrufer und `request` werden an aufgerufene Workflows weitergereicht; die erste
   `http.respond` irgendwo im Lauf antwortet.
-- **Nach dem Timeout** läuft der Lauf weiter; eine spätere `http.respond` wird mit Warnung ignoriert.
-- `request.headers` enthält `Authorization` nicht, damit das Token nicht in Läufe und Logs gelangt. Zahlen im JSON-Body
-  behalten in `request.body` ihren Typ.
-- Jede Antwort bei `response: run` trägt den Header `Runnel-Run-Id`.
-
-## Ergänzungen bei der Umsetzung (S38c)
-
+- **Nach dem Timeout** läuft der Lauf weiter; eine spätere Antwort wird mit Warnung ignoriert. Jede Antwort bei
+  `response: run` trägt den Header `Runnel-Run-Id`.
 - **`whenEmpty` ist immer Rückfallantwort:** Ein `http.response` mit `whenEmpty: true` antwortet – mit oder ohne
   Datensätze – erst am Ende des Laufs und nur, wenn kein anderer geantwortet hat. Damit genügen für „gefunden → `200`,
   sonst `404`“ zwei `http.response` hinter demselben Transform, ohne `core.switch`.
 - **JSON der Datensätze:** Felder in ihrer Reihenfolge, Dezimalzahlen als Zahl, Datum als `yyyy-mm-dd`, Zeitpunkte nach
   RFC 3339; höchstens `maxRows` (Standard 10.000) Datensätze im Speicher.
-- **JSON-Liste im Body** nur für Pipelines; die Felder eines Objekts werden nach Namen sortiert (wie `rows` bei
-  `core.run-pipeline`). `request` steht in Pipelines (noch) nicht zur Verfügung; Pfad und Query kommen als Parameter.
 
-## Ergänzungen bei der Umsetzung (S38b2)
-
-- **`history: none`** behält den Lauf nicht und veröffentlicht auch keine Ereignisse (Editor, `/events`); `errors`
-  behält nur gescheiterte. Die Standardantwort aus `outputs` funktioniert trotzdem, weil der wartende Aufrufer den
-  Lauf bis zu seinem Ende festhält.
+**Historie und Last**
+- **`history: none`** behält den Lauf nicht und veröffentlicht keine Ereignisse; `errors` behält nur gescheiterte. Die
+  Standardantwort aus `outputs` funktioniert trotzdem.
 - **Eigenes Limit:** die letzten 100 Läufe von HTTP-Triggern, zusätzlich zu den letzten 100 übrigen.
-- **Zwischenspeicher** nicht je Trigger, sondern für alle Starts: geprüfte Dateien nach dem Hash ihres Inhalts, das
-  Projekt nach Größe und Zeit seiner Dateien, übersetzte Ausdrücke nach ihrem Text. Nur fehlerfreie Ergebnisse werden
-  behalten; eine geänderte Datei hat einen anderen Hash und wird neu geprüft. Aufrufe anderer Workflows
-  (`CheckCalls`) werden bei jedem Start geprüft, da sie von anderen Dateien abhängen. Gemessen: ein kleiner Workflow
-  mit `http.respond` von 1,1 ms auf 0,23 ms je Anfrage (ein Kern), 5.550 auf 675 Allokationen.
+- **Zwischenspeicher für alle Starts**, nicht je Trigger: geprüfte Dateien nach dem Hash ihres Inhalts, das Projekt nach
+  Größe und Zeit seiner Dateien, übersetzte Ausdrücke nach ihrem Text; nur fehlerfreie Ergebnisse. Aufrufe anderer
+  Workflows werden bei jedem Start geprüft, da sie von anderen Dateien abhängen.
 
 ## Konsequenzen
 
@@ -171,5 +159,5 @@ Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
   Standardantwort aus `outputs` braucht gar keinen eigenen Baustein.
 - Die Bearbeitung von Trigger-Dateien im Editor ist ein eigener Schritt mit Mockup; bis dahin sind es YAML-Dateien.
 - Umsetzung in Schritten (Roadmap Phase 0.5): **S38a** HTTP-Trigger asynchron (`accepted`, lokal), **S40a** Listener
-  und TLS, **S38b** Antwort aus dem Workflow (`run`, `http.respond`, `request`; geteilt in S38b1 und S38b2), **S38c** Antwort aus der Pipeline
+  und TLS, **S38b** Antwort aus dem Workflow (`run`, `http.respond`, `request`), **S38c** Antwort aus der Pipeline
   (`http.response`, Datensätze aus dem Body). Voraussetzung für alle: die Trigger-Grundlage aus S37.

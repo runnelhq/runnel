@@ -21,5 +21,24 @@
 | [0017](0017-sub-workflows.md) | Sub-Workflows – Aufruf, Parameter, Pfade und Log | Angenommen |
 | [0018](0018-http-trigger.md) | HTTP-Trigger – Läufe per HTTP starten und aus dem Lauf antworten | Angenommen |
 
-Neue ADRs: nächste freie Nummer, Aufbau wie die bestehenden (Kontext, Entscheidung, Konsequenzen).
-Wird eine Entscheidung revidiert, erhält die alte ADR den Status „Ersetzt durch ADR xxxx“.
+## Wann eine ADR?
+
+Siehe [AGENTS.md, „Arbeitsweise“](../../AGENTS.md#arbeitsweise): neuer Dateityp oder `kind`, geänderte
+Ausführungssemantik, neue Laufzeitabhängigkeit, neue Netzwerk- oder Sicherheitsgrenze, Namens- oder Sprachregeln, Abkehr
+von einer bestehenden ADR. Nicht für neue Actions/Transforms nach bestehenden Regeln, neue Optionen oder Editor-Funktionen
+nach freigegebenem Mockup.
+
+Neue ADRs: nächste freie Nummer, Aufbau wie die bestehenden (Kontext, Entscheidung, Konsequenzen; bei neuer
+Angriffsfläche ein Abschnitt „Sicherheit“), vorher mit dem Maintainer abstimmen, hier eintragen.
+
+## Nachträge
+
+- **Präzisierungen**, die die Entscheidung nicht ändern (z. B. Standardwerte, Grenzfälle, beim Umsetzen festgelegte
+  Details), kommen als Abschnitt „Nachtrag JJJJ-MM-TT (Schritt)“ ans Ende der ADR – nur mit Entscheidungsinhalt.
+  Schnittvermerke („S38b ist geteilt …“) und Messwerte gehören in die Roadmap bzw. das Konzept.
+- **Widerspricht** etwas der Entscheidung oder regelt einen neuen Aspekt grundsätzlich (neues Format, neue Abhängigkeit,
+  Sicherheitsmodell), gibt es eine **neue ADR**; die alte erhält den Status „Ergänzt durch ADR xxxx“ bzw. „Ersetzt durch
+  ADR xxxx“.
+- **Konsolidieren:** Mehr als drei Nachträge oder Nachträge länger als die Entscheidung selbst werden zu einem Nachtrag
+  zusammengefasst, nach Themen gegliedert.
+- Stellen im ursprünglichen Text, die ein Nachtrag überholt, bekommen einen kurzen Hinweis darauf.
