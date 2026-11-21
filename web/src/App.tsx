@@ -100,7 +100,31 @@ export function App() {
             className="flex min-h-[120px] flex-col"
             style={{ flex: "0 1 auto", height: explorerHeight ?? undefined }}
           >
-            <Explorer tree={tree} error={treeError} selected={active} onOpen={open} onReload={loadTree} />
+            <Explorer
+              tree={tree}
+              error={treeError}
+              selected={active}
+              onOpen={open}
+              onReload={loadTree}
+              changes={{
+                projectDir: project?.dir ?? null,
+                isDirty: (path) => dirty.has(path),
+                onCreated: open,
+                // Tabs of a renamed file or of the files of a renamed folder follow (E11).
+                onRenamed: (from, to) => {
+                  const moved = (p: string) => (p === from ? to : p.startsWith(from + "/") ? to + p.slice(from.length) : p);
+                  setTabs((t) => t.map(moved));
+                  setActive((a) => (a ? moved(a) : a));
+                },
+                onDeleted: (path) => {
+                  const gone = tabs.filter((p) => p === path || p.startsWith(path + "/"));
+                  const rest = tabs.filter((p) => !gone.includes(p));
+                  gone.forEach((p) => onDirty(p, false));
+                  setTabs(rest);
+                  if (active && gone.includes(active)) setActive(rest[0] ?? null);
+                },
+              }}
+            />
           </div>
           <Splitter container={sidebar} explorer={explorer} height={explorerHeight} onHeight={setExplorerHeight} />
           <Palette target={active ? paletteTarget : null} />

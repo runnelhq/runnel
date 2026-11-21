@@ -31,6 +31,10 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | GET | `/files/{path}` | Inhalt der Datei, Header `ETag` |
 | PUT | `/files/{path}` | Datei speichern (Body = Inhalt, max. 10 MiB); Antwort `{path, etag}` und Header `ETag` |
 | DELETE | `/files/{path}` | Datei löschen, `204` |
+| POST | `/folders` | Ordner anlegen (E11): `{"path": "data/archive"}` → `201`; fehlende Elternordner entstehen mit, `409`, wenn es ihn schon gibt |
+| DELETE | `/folders/{path}` | leeren Ordner löschen (E11): `204`; `409`, wenn er Dateien enthält (auch versteckte), `400` für eine Datei |
+| POST | `/rename` | Datei oder Ordner umbenennen oder verschieben (E11): `{"from": "workflows/a.workflow.yaml", "to": "workflows/b.workflow.yaml"}` → `{path}`; `409`, wenn der neue Name vergeben ist (nur die Schreibweise zu ändern ist erlaubt), `400` für einen Ordner in sich selbst. Verweise in anderen Dateien bleiben unverändert |
+| GET | `/references/{path}` | gespeicherte Dateien, die auf einen Workflow oder eine Pipeline verweisen (E11, vor dem Löschen): `{"references": [{"file": "triggers/hourly.yaml", "what": "target"}, {"file": "workflows/main.workflow.yaml", "what": "action call (core.run-workflow)"}]}` – Trigger-Ziele und Aufrufe mit festem Pfad |
 | GET | `/catalog` | `{"actions": [Descriptor …], "transforms": [Descriptor …]}` wie `runnel catalog --json` ([ADR 0014](../adr/0014-action-descriptor-schema.md)); `kind` ist `action` bzw. `transform` |
 | GET | `/expressions` | Referenz für den Ausdruckseditor (S35): `{"roots": [Doc …], "functions": [Doc …], "variables": [{name, value, source} …]}`; `Doc` = `{name, signature?, type, description, example?, group?, fields?}` aus `internal/expr/docs.go`; `variables` aus `project.yaml` und dem Standard-Environment (Wert wie in der Datei, `source` z. B. `environments/dev.yaml`). Ist das Projekt fehlerhaft, fehlen nur die Variablen |
 | POST | `/validate` | Workflow oder Pipeline prüfen, siehe unten |
