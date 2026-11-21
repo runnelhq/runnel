@@ -81,3 +81,51 @@ export function highlightLine(line: string): Token[] {
   if (d) return [{ kind: "text", text: d[1] }, { kind: "punct", text: d[2] }, ...restTokens(d[3])];
   return restTokens(line);
 }
+
+/**
+ * Where the steps and links of a workflow or pipeline are in its text, line by line, so
+ * that switching between canvas and YAML view keeps the selected element. Works on the
+ * text as it is (also with errors); only block lists directly under the top-level keys
+ * are understood, which is how the editor writes them.
+ */
+export interface Item {
+  /** First and last line (1-based) of the list item. */
+  from: number;
+  to: number;
+  /** The id of a step; empty for links. */
+  id: string;
+}
+
+const topKey = /^([A-Za-z_][\w-]*)\s*:/;
+const idValue = /(?:^|[{,\s])id:\s*["']?([A-Za-z0-9_-]+)["']?/;
+
+/** The items of the top-level list key (e.g. "actions", "links") with their lines. */
+export function listItems(text: string, key: string): Item[] {
+  const lines = text.split("\n");
+  const items: Item[] = [];
+  let inList = false;
+  let indent = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\r$/, "");
+    const top = topKey.exec(line);
+    if (top) {
+      inList = top[1] === key;
+      indent = -1;
+      continue;
+    }
+    if (!inList || line.trim() === "" || line.trim().startsWith("#")) continue;
+    const dash = /^(\s*)-(\s|$)/.exec(line);
+    if (dash && (indent < 0 || dash[1].length === indent)) {
+      indent = dash[1].length;
+      items.push({ from: i + 1, to: i + 1, id: "" });
+    }
+    const item = items[items.length - 1];
+    if (!item) continue;
+    item.to = i + 1;
+    if (!item.id) {
+      const m = idValue.exec(dash ? line.slice(dash[0].length - 1) : line);
+      if (m && (dash || /^\s*(\{.*\s)?id:/.test(line))) item.id = m[1];
+    }
+  }
+  return items;
+}

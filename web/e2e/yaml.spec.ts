@@ -164,3 +164,32 @@ test.describe("other files of the project", () => {
     await request.delete("/api/v1/files/notes.txt");
   });
 });
+
+test("keeps the selected element when switching between canvas and YAML", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tree").getByText("typed.workflow.yaml", { exact: true }).click();
+  const selected = (id: string) => page.locator(".react-flow__node.selected").getByTestId(`node-${id}`);
+
+  // The YAML view opens at the selected action.
+  await page.getByTestId("node-pause").click();
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  const at = original.split("\n").findIndex((l) => l.includes("id: pause")) + 1;
+  await expect(page.getByTestId("file-summary")).toContainText(`Ln ${at},`);
+
+  // Back without moving the cursor: the action is still selected.
+  await page.getByRole("button", { name: "Canvas", exact: true }).click();
+  await expect(selected("pause")).toBeVisible();
+
+  // The canvas selects what the cursor of the YAML view is in.
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  await line(page, "type: core.success").click();
+  await page.getByRole("button", { name: "Canvas", exact: true }).click();
+  await expect(selected("done")).toBeVisible();
+  await expect(selected("pause")).toHaveCount(0);
+
+  // A link: its line in the YAML view and back.
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  await line(page, "{ from: start, to: greet }").click();
+  await page.getByRole("button", { name: "Canvas", exact: true }).click();
+  await expect(page.locator(".react-flow__edge.selected")).toHaveCount(1);
+});

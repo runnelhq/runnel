@@ -215,10 +215,17 @@ function Graph(props: CanvasProps) {
     setMenu(null);
   }, [computedEdges, setEdges]);
 
+  // React Flow reports an empty selection once when it starts, before it shows the nodes
+  // selected above; that report would drop the selection kept while the YAML view was shown.
+  const started = useRef(false);
   const onSelectionChange = useCallback(
     ({ nodes, edges }: { nodes: { id: string }[]; edges: { id: string }[] }) => {
       const ids = nodes.map((n) => n.id);
       const links = edges.map((e) => e.id);
+      if (!started.current) {
+        started.current = true;
+        if (ids.length === 0 && links.length === 0) return;
+      }
       const same = sameSet(selectedRef.current, ids) && sameSet(selectedLinksRef.current, links);
       selectedRef.current = new Set(ids);
       selectedLinksRef.current = new Set(links);

@@ -18,6 +18,7 @@ import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { RunDialog } from "./RunDialog";
 import { DetectFieldsDialog } from "./DetectFieldsDialog";
 import { PreviewPanel, type PreviewSelection } from "./PreviewPanel";
+import { listItems, type Item } from "../yaml";
 import { previewRun, runPreview, type PreviewResult } from "../preview";
 import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
@@ -125,6 +126,11 @@ export function FileView(props: {
   const [yamlFocus, setYamlFocus] = useState<{ line: number; seq: number } | null>(null);
   const flushTyping = useRef<(() => void) | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
+  // The line of the cursor in the YAML view: switching to the canvas selects what is there.
+  const cursorLine = useRef<number | null>(null);
+  // The canvas reports an empty selection while it goes away; only the shown canvas selects.
+  const viewRef = useRef(view);
+  viewRef.current = view;
   // The data preview of a pipeline (S44): up to which transform, its result and what is shown.
   const [preview, setPreview] = useState<{
     upTo: string;
@@ -135,7 +141,11 @@ export function FileView(props: {
     selected: PreviewSelection;
   } | null>(null);
   const previewSeq = useRef(0);
-  useEffect(() => setCursor(null), [view]);
+  // Leaving the YAML view forgets its cursor; entering it, the editor reports where it is
+  // (this effect runs after the editor's own, so it must not reset then).
+  useEffect(() => {
+    if (view !== "yaml") setCursor(null);
+  }, [view]);
 
   const doc = state.status === "loaded" ? state.doc : null;
   const dirty = doc !== null && doc.text !== doc.saved;
@@ -286,6 +296,7 @@ export function FileView(props: {
   // While a rename from the panel is on its way, the canvas briefly has no selection; keep the new id.
   const renamedTo = useRef<string | null>(null);
   const onSelect = useCallback((next: Selection) => {
+    if (viewRef.current !== "canvas") return;
     const ids = next.actions;
     const to = renamedTo.current;
     if (to && !ids.includes(to)) {
@@ -517,6 +528,34 @@ export function FileView(props: {
     setYamlFocus((f) => ({ line, seq: (f?.seq ?? 0) + 1 }));
   }, []);
 
+  // Switching keeps the element (focus fix): the YAML view opens at the selected step or
+  // link, the canvas selects the step or link the cursor of the YAML view is in.
+  const switchView = useCallback(
+    (next: View) => {
+      if (next === view) return;
+      const text = doc?.text ?? "";
+      const steps = graphKind === "pipeline" ? "transforms" : "actions";
+      if (next === "yaml") {
+        cursorLine.current = null;
+        const action = selection.actions.length === 1 && selection.links.length === 0 ? selection.actions[0] : null;
+        const link = selection.links.length === 1 && selection.actions.length === 0 ? selection.links[0] : null;
+        const item = action ? listItems(text, steps).find((i) => i.id === action) : link !== null ? listItems(text, "links")[link] : undefined;
+        if (item) return showInYAML(item.from);
+        setView("yaml");
+        return;
+      }
+      const line = cursorLine.current;
+      setView(next);
+      if (line === null || !graph) return;
+      const at = (items: Item[]) => items.findIndex((i) => line >= i.from && line <= i.to);
+      const step = listItems(text, steps)[at(listItems(text, steps))];
+      const linkIndex = at(listItems(text, "links"));
+      if (step?.id && graph.actions?.some((a) => a.id === step.id)) setSelection({ actions: [step.id], links: [] });
+      else if (linkIndex >= 0 && graph.links && linkIndex < graph.links.length) setSelection({ actions: [], links: [linkIndex] });
+    },
+    [view, doc, graphKind, selection, graph, showInYAML],
+  );
+
   // A click on a problem selects what it belongs to and shows the field in the properties panel.
   const openProblem = useCallback(
     (p: Problem) => {
@@ -676,7 +715,7 @@ export function FileView(props: {
         )}
         {isGraph && (
           <>
-            <ViewSwitch view={view} onView={setView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
+            <ViewSwitch view={view} onView={switchView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
             {/* Always there, so that nothing moves: pressed while the panel is shown. */}
             <IconButton
               title={
@@ -719,7 +758,10 @@ export function FileView(props: {
             onUndo={doUndo}
             onRedo={doRedo}
             registerFlush={(f) => (flushTyping.current = f)}
-            onCursor={(line, column) => setCursor(`Ln ${line}, Col ${column}`)}
+            onCursor={(line, column) => {
+              cursorLine.current = line;
+              setCursor(`Ln ${line}, Col ${column}`);
+            }}
           />
         ) : view === "yaml" ? (
           <CodeView text={doc.text} yaml={isYAML(path)} focusLine={focusLine} />
