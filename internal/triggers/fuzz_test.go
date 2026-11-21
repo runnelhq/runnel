@@ -23,7 +23,7 @@ func FuzzRequest(f *testing.F) {
 			return
 		}
 		r := &http.Request{Method: "POST", URL: u, Header: http.Header{"Content-Type": {contentType}}, Host: u.Host}
-		_, _, _, _ = requestValues(r, []byte(body), list)
+		_, _, _ = requestValues(r, []byte(body), list)
 		_, _ = match(segments, strings.Split(strings.Trim(u.Path, "/"), "/"))
 		_ = requestOf(r, nil, "127.0.0.1")
 	})

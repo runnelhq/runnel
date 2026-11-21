@@ -58,7 +58,7 @@ type Scheduler struct {
 	problems model.Errors
 	sig      string // state of the files the triggers were loaded from
 
-	listener listener // http triggers
+	http httpTriggers
 }
 
 type entry struct {
@@ -136,7 +136,9 @@ func New(opts Options) *Scheduler {
 	if opts.Warn == nil {
 		opts.Warn = opts.Log
 	}
-	return &Scheduler{opts: opts}
+	s := &Scheduler{opts: opts}
+	s.http.s = s
+	return s
 }
 
 // Reload reads the trigger files and the project again. Triggers with problems are not
@@ -361,9 +363,9 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 // files (and project files) are picked up within PollInterval.
 func (s *Scheduler) Run(ctx context.Context) {
 	s.Reload()
-	defer s.listener.close()
+	defer s.http.close()
 	for {
-		s.listen()
+		s.http.listen()
 		now := s.opts.Now()
 		next := s.Tick(now)
 		wait := PollInterval

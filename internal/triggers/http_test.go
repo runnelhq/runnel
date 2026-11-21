@@ -177,7 +177,7 @@ func TestHTTPListener(t *testing.T) {
 	_, _, s, _ := setup(t, nil)
 	s.opts.Listen = "127.0.0.1:0"
 	s.opts.Now = time.Now
-	s.listen()
+	s.http.listen()
 	if s.HTTPAddress() != "" {
 		t.Fatal("listening without http triggers")
 	}
@@ -264,8 +264,8 @@ func TestHTTPOnNetwork(t *testing.T) {
 	if w := (call{method: "GET", path: "/open?ID=1", origin: "https://evil.example"}).do(s); w.Code != 403 {
 		t.Errorf("origin: %d", w.Code)
 	}
-	s.listen()
-	defer s.listener.close()
+	s.http.listen()
+	defer s.http.close()
 	logs := strings.Join(f.logs, "\n")
 	if !strings.Contains(logs, `trigger "open": auth: none on the network; anyone who reaches 0.0.0.0:0 can start runs`) ||
 		strings.Contains(logs, `trigger "items": auth: none`) ||

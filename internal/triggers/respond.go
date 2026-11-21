@@ -12,44 +12,70 @@ import (
 	"github.com/runnelhq/runnel/internal/httpx"
 )
 
+// answerBox takes the answers a run gives its waiting caller (http.respond): the
+// first one counts; a fallback (http.response with whenEmpty) only if no other comes.
+// Once closed, it takes no more answers.
+type answerBox struct {
+	once    sync.Once
+	answers chan action.Response
+
+	mu       sync.Mutex
+	fallback *action.Response
+}
+
+func newAnswerBox() *answerBox { return &answerBox{answers: make(chan action.Response, 1)} }
+
+// respond is the action.Responder of the run; it reports whether the answer is taken.
+func (b *answerBox) respond(resp action.Response) bool {
+	if resp.Fallback {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		if b.fallback == nil {
+			b.fallback = &resp
+		}
+		return true
+	}
+	first := false
+	b.once.Do(func() {
+		first = true
+		b.answers <- resp
+	})
+	return first
+}
+
+// close ends taking answers and returns the one given before, if any.
+func (b *answerBox) close() (action.Response, bool) {
+	b.once.Do(func() {})
+	select {
+	case resp := <-b.answers:
+		return resp, true
+	default:
+		return action.Response{}, false
+	}
+}
+
+// fallbackAnswer returns the fallback, if one was given.
+func (b *answerBox) fallbackAnswer() (action.Response, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.fallback == nil {
+		return action.Response{}, false
+	}
+	return *b.fallback, true
+}
+
 // answer starts the run of a request with response: run and answers the caller with
 // the first http.respond of the run, or with the default answer when the run has ended
 // (outputs: 200, failed: 500), or with 504 after the timeout (S38b1). The run goes on
 // after the answer and after the timeout.
-func (s *Scheduler) answer(w http.ResponseWriter, r *http.Request, e *entry, start StartRequest) {
-	answers := make(chan action.Response, 1)
-	var once sync.Once
-	var mu sync.Mutex
-	var fallback *action.Response // http.response with whenEmpty: only if no other answer comes
-	start.Respond = func(resp action.Response) bool {
-		if resp.Fallback {
-			mu.Lock()
-			defer mu.Unlock()
-			if fallback == nil {
-				fallback = &resp
-			}
-			return true
-		}
-		first := false
-		once.Do(func() {
-			first = true
-			answers <- resp
-		})
-		return first
-	}
-	// close ends accepting answers and returns the one given before, if any.
-	closeAnswers := func() (action.Response, bool) {
-		once.Do(func() {})
-		select {
-		case resp := <-answers:
-			return resp, true
-		default:
-			return action.Response{}, false
-		}
-	}
-	id, ok := s.startHTTP(w, e, start)
-	if !ok {
-		closeAnswers()
+func (h *httpTriggers) answer(w http.ResponseWriter, r *http.Request, e *entry, start StartRequest) {
+	s := h.s
+	box := newAnswerBox()
+	start.Respond = box.respond
+	id, herr := h.start(e, start)
+	if herr != nil {
+		box.close()
+		herr.write(w)
 		return
 	}
 	w.Header().Set("Runnel-Run-Id", id)
@@ -65,18 +91,15 @@ func (s *Scheduler) answer(w http.ResponseWriter, r *http.Request, e *entry, sta
 		}()
 	}
 	select {
-	case resp := <-answers:
+	case resp := <-box.answers:
 		writeResponse(w, resp)
 	case out := <-ended:
-		if resp, ok := closeAnswers(); ok {
+		if resp, ok := box.close(); ok {
 			writeResponse(w, resp)
 			return
 		}
-		mu.Lock()
-		fb := fallback
-		mu.Unlock()
-		if fb != nil {
-			writeResponse(w, *fb)
+		if resp, ok := box.fallbackAnswer(); ok {
+			writeResponse(w, resp)
 			return
 		}
 		if out.Status == "succeeded" {
@@ -90,7 +113,7 @@ func (s *Scheduler) answer(w http.ResponseWriter, r *http.Request, e *entry, sta
 		s.opts.Warn(fmt.Sprintf("trigger %q: run %s %s without an answer: %s", e.t.Name, id, out.Status, out.Error))
 		reply(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("the run %s; see run %s", out.Status, id), "runId": id})
 	case <-ctx.Done():
-		if resp, ok := closeAnswers(); ok {
+		if resp, ok := box.close(); ok {
 			writeResponse(w, resp)
 			return
 		}
