@@ -194,7 +194,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 // startTrigger starts a run of a trigger's target (the saved file), with its
 // environment and parameters (S37); extra are set by the trigger itself, e.g. the
 // path of a new file (S38).
-func (s *Server) startTrigger(t *model.Trigger, extra map[string]string) (string, error) {
+func (s *Server) startTrigger(t *model.Trigger, extra map[string]string, client string) (string, error) {
 	name := t.Target
 	data, err := s.readFile(name)
 	if err != nil {
@@ -209,10 +209,10 @@ func (s *Server) startTrigger(t *model.Trigger, extra map[string]string) (string
 	var run runs.Run
 	if fileKind(name) == "pipeline" {
 		run, _, err = s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
-			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger})
+			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger, Client: client})
 	} else {
 		run, _, err = s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
-			ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger})
+			ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger, Client: client})
 	}
 	return run.ID, err
 }
@@ -226,9 +226,11 @@ func (s *Server) running(id string) bool {
 // triggersResponse lists the triggers of the project and the problems of trigger files.
 type triggersResponse struct {
 	Triggers []triggers.Info `json:"triggers"`
-	Problems []Problem       `json:"problems"`
+	// HTTP is the address of the listener of http triggers, once it is open (S38a).
+	HTTP     string    `json:"http,omitempty"`
+	Problems []Problem `json:"problems"`
 }
 
 func (s *Server) handleTriggers(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, triggersResponse{Triggers: s.triggers.List(), Problems: s.response(s.triggers.Problems()).Problems})
+	writeJSON(w, http.StatusOK, triggersResponse{Triggers: s.triggers.List(), HTTP: s.triggers.HTTPAddress(), Problems: s.response(s.triggers.Problems()).Problems})
 }

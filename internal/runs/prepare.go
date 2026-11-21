@@ -41,6 +41,8 @@ type Spec struct {
 	RunID      string
 	// Trigger names what started the run, e.g. "cron:nightly"; empty: started by hand.
 	Trigger string
+	// Client is the address of the caller of an http trigger.
+	Client string
 
 	// chain lists the workflows that called this one (core.run-workflow).
 	chain []caller

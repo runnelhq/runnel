@@ -36,7 +36,7 @@ Windows-Code (`*_windows.go`) zusätzlich `GOOS=windows go vet ./...` und `GOOS=
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
 | `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |
-| `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt |
+| `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, HTTP-Trigger mit eigenem Listener in `http.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt |
 | `internal/winsvc/` | Windows-Dienst: Installieren, Steuern, Ausführen, Ereignisanzeige (`*_windows.go`; sonst `ErrNotSupported`) |
 | `internal/logfile/` | Log-Datei mit Rotation nach Größe (Dienst) |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Läufe und Ereignisse im Speicher |

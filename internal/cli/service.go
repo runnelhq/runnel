@@ -54,9 +54,9 @@ func nameOpt(name string) string {
 
 // installOptions are the flags of "runnel service install".
 type installOptions struct {
-	name, account, start string
-	port                 int
-	stopTimeout          time.Duration
+	name, account, start, triggers string
+	port                           int
+	stopTimeout                    time.Duration
 }
 
 // serviceConfig checks the options and works out the service for the project in root,
@@ -74,6 +74,9 @@ func serviceConfig(o installOptions, root, exe string) (winsvc.Config, error) {
 	if o.stopTimeout < 0 {
 		return winsvc.Config{}, fmt.Errorf("invalid --stop-timeout %s (expected 0 or more, e.g. 30s)", o.stopTimeout)
 	}
+	if err := checkTriggersAddress(o.triggers); err != nil {
+		return winsvc.Config{}, err
+	}
 	display := "Runnel"
 	if o.name != winsvc.DefaultName {
 		display += " (" + o.name + ")"
@@ -84,7 +87,7 @@ func serviceConfig(o installOptions, root, exe string) (winsvc.Config, error) {
 		Description: fmt.Sprintf("Runnel server for the project %s (http://127.0.0.1:%d)", root, o.port),
 		Exe:         exe,
 		Args: []string{"service", "run", "--name", o.name, "--port", strconv.Itoa(o.port),
-			"--stop-timeout", o.stopTimeout.String(), root},
+			"--stop-timeout", o.stopTimeout.String(), "--triggers", o.triggers, root},
 		Account: winsvc.NormalizeAccount(o.account),
 		Start:   o.start,
 		LogDir:  winsvc.LogDir(),
@@ -150,6 +153,7 @@ func newServiceInstallCommand() *cobra.Command {
 	}
 	nameFlag(cmd, &o.name)
 	cmd.Flags().IntVar(&o.port, "port", DefaultPort, "TCP port on 127.0.0.1 for the API and the editor")
+	triggersFlag(cmd, &o.triggers)
 	cmd.Flags().StringVar(&o.account, "account", "LocalService", "account the service runs as")
 	cmd.Flags().StringVar(&o.start, "start", winsvc.StartDelayed, "start type: auto, delayed (auto, shortly after Windows has started) or manual")
 	cmd.Flags().DurationVar(&o.stopTimeout, "stop-timeout", DefaultStopTimeout, "time running runs get to end when the service stops, before they are cancelled")
@@ -250,7 +254,7 @@ func newServiceStatusCommand() *cobra.Command {
 
 // newServiceRunCommand is the command line of the installed service; Windows starts it.
 func newServiceRunCommand() *cobra.Command {
-	var name string
+	var name, listen string
 	var port int
 	var stopTimeout time.Duration
 	cmd := &cobra.Command{
@@ -263,19 +267,20 @@ func newServiceRunCommand() *cobra.Command {
 				return fmt.Errorf(`"runnel service run" is started by Windows for an installed service; to run the server in this console, use "runnel serve"`)
 			}
 			return winsvc.Run(name, stopTimeout, func(ctx context.Context, events winsvc.Logger) error {
-				return runService(ctx, events, name, args[0], port, stopTimeout)
+				return runService(ctx, events, name, args[0], port, stopTimeout, listen)
 			})
 		},
 	}
 	nameFlag(cmd, &name)
 	cmd.Flags().IntVar(&port, "port", DefaultPort, "TCP port on 127.0.0.1")
+	triggersFlag(cmd, &listen)
 	cmd.Flags().DurationVar(&stopTimeout, "stop-timeout", DefaultStopTimeout, "time running runs get to end when stopping")
 	return cmd
 }
 
 // runService serves the project for the service: the whole log goes to the log file,
 // start, stop, warnings and errors also to the Event Viewer.
-func runService(ctx context.Context, events winsvc.Logger, name, dir string, port int, stopTimeout time.Duration) error {
+func runService(ctx context.Context, events winsvc.Logger, name, dir string, port int, stopTimeout time.Duration, listen string) error {
 	path := filepath.Join(winsvc.LogDir(), name+".log")
 	lf, err := logfile.Open(path, 0)
 	if err != nil {
@@ -286,7 +291,7 @@ func runService(ctx context.Context, events winsvc.Logger, name, dir string, por
 	line := func(level, msg string) {
 		_, _ = fmt.Fprintf(lf, "%s %-5s %s\n", time.Now().Format("2006-01-02 15:04:05"), level, msg)
 	}
-	err = runServer(ctx, serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout,
+	err = runServer(ctx, serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen,
 		Log:   func(msg string) { line("INFO", msg) },
 		Warn:  func(msg string) { line("WARN", msg); events.Warn(msg) },
 		Print: func(msg string) { line("INFO", msg); events.Info(msg) },

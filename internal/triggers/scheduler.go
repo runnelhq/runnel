@@ -26,8 +26,9 @@ type Options struct {
 	// Dir is the project directory.
 	Dir string
 	// Start starts a run of the trigger's target and returns its id. params are set in
-	// addition to those of the trigger (the path of a file for file triggers).
-	Start func(t *model.Trigger, params map[string]string) (string, error)
+	// addition to those of the trigger (the path of a file for file triggers, the values
+	// of a request for http triggers); client is the address of the caller (http).
+	Start func(t *model.Trigger, params map[string]string, client string) (string, error)
 	// Running reports whether a run is still running (for overlap: skip).
 	Running func(runID string) bool
 	// Log receives messages for the server log, e.g. started and skipped runs.
@@ -37,6 +38,9 @@ type Options struct {
 	Warn func(msg string)
 	// Now returns the current time; defaults to time.Now (tests use a simulated clock).
 	Now func() time.Time
+	// Listen is the address of the listener of http triggers (S38a), e.g.
+	// 127.0.0.1:7301; it is opened once an http trigger is enabled. Empty: none.
+	Listen string
 }
 
 // Scheduler starts the runs of the triggers of a project. Missed times (while the
@@ -48,6 +52,8 @@ type Scheduler struct {
 	entries  []*entry // in the order of the files
 	problems model.Errors
 	sig      string // state of the files the triggers were loaded from
+
+	listener listener // http triggers
 }
 
 type entry struct {
@@ -56,6 +62,8 @@ type entry struct {
 	last   *Fired
 	active []string // runs started by the trigger that may still run
 	files  *watch   // file triggers
+	// startMu makes counting the running runs and starting one atomic (http).
+	startMu sync.Mutex
 }
 
 // Fired is what happened at the last due time of a trigger.
@@ -141,7 +149,7 @@ func (s *Scheduler) Reload() {
 	}
 	active := 0
 	for _, e := range s.entries {
-		if !e.next.IsZero() {
+		if e.t.IsEnabled() {
 			active++
 		}
 	}
@@ -263,7 +271,7 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 	if busy {
 		f.Skipped = true
 		msg = fmt.Sprintf("trigger %q: skipped, the previous run %s is still running (overlap: skip)", t.Name, running)
-	} else if id, err := s.opts.Start(t, params); err != nil {
+	} else if id, err := s.opts.Start(t, params, ""); err != nil {
 		f.Error = err.Error()
 		msg = fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, what, err)
 	} else {
@@ -292,7 +300,9 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 // files (and project files) are picked up within PollInterval.
 func (s *Scheduler) Run(ctx context.Context) {
 	s.Reload()
+	defer s.listener.close()
 	for {
+		s.listen()
 		now := s.opts.Now()
 		next := s.Tick(now)
 		wait := PollInterval

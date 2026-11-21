@@ -55,8 +55,8 @@ func TestParseTriggerErrors(t *testing.T) {
 	for _, c := range []struct {
 		old, new, want string
 	}{
-		{"type: cron", "type: http", `trigger type "http" is not supported yet (roadmap S38a, ADR 0018)`},
-		{"type: cron", "type: hourly", `unknown trigger type "hourly" (expected cron, interval or file)`},
+		{"type: cron", "type: http", `missing required field "method"`},
+		{"type: cron", "type: hourly", `unknown trigger type "hourly" (expected cron, interval, file or http)`},
 		{"type: cron", "type: interval", "schedule is not used by interval triggers (fields: every, overlap)"},
 		{"type: cron", "type: interval", `missing required field "every" (e.g. 15m)`},
 		{"type: cron", "type: file", `missing required field "path"`},

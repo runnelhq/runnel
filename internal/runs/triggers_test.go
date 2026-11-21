@@ -180,3 +180,41 @@ func TestDrain(t *testing.T) {
 		t.Errorf("start after drain: %v", err)
 	}
 }
+
+// An http trigger is checked against its target: placeholders are parameters that are
+// not fixed, the token is set; required parameters may come with the request (S38a).
+func TestCheckHTTPTrigger(t *testing.T) {
+	dir := project(t, map[string]string{"workflows/target.workflow.yaml": triggerTarget})
+	p, err := model.LoadProject(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	http := func(path, auth, params string) *model.Trigger {
+		t.Helper()
+		tr, err := model.ParseTrigger("triggers/h.yaml", []byte("kind: Trigger\napiVersion: runnel/v1\nname: h\ntype: http\ntarget: workflows/target.workflow.yaml\n"+
+			params+"with:\n  method: GET\n  path: "+path+"\n  auth: "+auth+"\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tr
+	}
+	t.Setenv("RUNNEL_TEST_TOKEN", "x")
+	if errs := CheckTrigger(http("/days/{DAYS}", `{ token: "${env:RUNNEL_TEST_TOKEN}" }`, "params: { MODE: full }\n"), p, dir); len(errs) != 0 {
+		t.Errorf("valid: %v", errs)
+	}
+	if errs := CheckTrigger(http("/run", "none", ""), p, dir); len(errs) != 0 {
+		t.Errorf("DAYS may come with the request: %v", errs)
+	}
+	for _, c := range []struct{ path, auth, params, want string }{
+		{"/x/{WEEKS}", "none", "", "placeholder {WEEKS} is not a parameter of workflow workflows/target.workflow.yaml (declared: DAYS, MODE)"},
+		{"/x/{MODE}", "none", "params: { MODE: full }\n", "placeholder {MODE} is also set under params"},
+		{"/x", "none", "params: { MODE: half }\n", "parameter MODE (string) of workflow workflows/target.workflow.yaml"},
+		{"/x", "none", "params: { YEARS: 1 }\n", "parameter YEARS is not declared"},
+		{"/x", `{ token: "${env:RUNNEL_TEST_UNSET}" }`, "", "environment variable RUNNEL_TEST_UNSET with the token is not set"},
+	} {
+		errs := CheckTrigger(http(c.path, c.auth, c.params), p, dir)
+		if len(errs) == 0 || !strings.Contains(errs.Error(), c.want) {
+			t.Errorf("%s %s: got %v, want %q", c.path, c.params, errs, c.want)
+		}
+	}
+}

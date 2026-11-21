@@ -247,7 +247,8 @@ func TestTriggers(t *testing.T) {
 	dir, s := newRunProject(t)
 	writeFile(t, filepath.Join(dir, "triggers", "often.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: often\ntype: cron\n"+
 		"target: workflows/wait.workflow.yaml\nenvironment: dev\nparams: { DELAY: 1ms }\nwith: { schedule: \"* * * * *\" }\n")
-	writeFile(t, filepath.Join(dir, "triggers", "bad.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: bad\ntype: http\ntarget: workflows/wait.workflow.yaml\n")
+	writeFile(t, filepath.Join(dir, "triggers", "bad.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: bad\ntype: http\ntarget: workflows/wait.workflow.yaml\n"+
+		"with: { method: GET, path: /bad, auth: none, response: run }\n")
 	s.triggers.Reload()
 	rec := do(t, s, "GET", "/api/v1/triggers", "")
 	var res triggersResponse
@@ -294,6 +295,30 @@ func TestFileTrigger(t *testing.T) {
 	d := waitRun(t, s, last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
 	want, _ := filepath.Abs(filepath.Join(dir, "inbox", "a.csv"))
 	if d.Status != "succeeded" || d.Trigger != "file:inbox" || d.Params["FILE"] != want {
+		t.Errorf("run %+v", d.Run)
+	}
+}
+
+// A request to an http trigger starts its target with the values of the request and
+// the address of the caller (S38a).
+func TestHTTPTrigger(t *testing.T) {
+	dir, s := newRunProject(t)
+	writeFile(t, filepath.Join(dir, "triggers", "hook.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: hook\ntype: http\n"+
+		"target: workflows/wait.workflow.yaml\nenvironment: dev\nwith: { method: POST, path: /hooks/wait, auth: none }\n")
+	s.triggers.Reload()
+	if p := s.triggers.Problems(); len(p) != 0 {
+		t.Fatal(p)
+	}
+	r := httptest.NewRequest("POST", "/hooks/wait", strings.NewReader(`{"DELAY": "1ms"}`))
+	r.Host, r.RemoteAddr = "127.0.0.1:7301", "127.0.0.1:50000"
+	w := httptest.NewRecorder()
+	s.triggers.ServeHTTP(w, r)
+	var res struct{ RunID string }
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil || w.Code != http.StatusAccepted {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	d := waitRun(t, s, res.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
+	if d.Status != "succeeded" || d.Trigger != "http:hook" || d.Client != "127.0.0.1" || d.Params["DELAY"] != "1ms" {
 		t.Errorf("run %+v", d.Run)
 	}
 }

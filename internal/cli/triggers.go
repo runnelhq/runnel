@@ -50,6 +50,8 @@ func newTriggersCommand() *cobra.Command {
 					case !t.IsEnabled():
 					case t.Type == model.TriggerFile:
 						next = "on new files"
+					case t.Type == model.TriggerHTTP:
+						next = "on request"
 					default:
 						next = t.Next(now).Format("2006-01-02 15:04 MST")
 					}
