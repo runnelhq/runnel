@@ -112,3 +112,83 @@ export async function saveFile(path: string, text: string, etag: string): Promis
   );
   return res.headers.get("ETag") ?? "*";
 }
+
+const encodePath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
+const postJSON = (url: string, body: unknown) =>
+  fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+/** Creates a file; fails if it exists (E11). */
+export async function createFile(path: string, text: string): Promise<void> {
+  await check(await fetch(fileURL(path), { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: text }));
+}
+
+/** Deletes a file for good (E11). */
+export async function deleteFile(path: string): Promise<void> {
+  await check(await fetch(fileURL(path), { method: "DELETE", headers: { "If-Match": "*" } }));
+}
+
+export async function createFolder(path: string): Promise<void> {
+  await check(await postJSON(`${apiBase}/folders`, { path }));
+}
+
+/** Deletes an empty folder. */
+export async function deleteFolder(path: string): Promise<void> {
+  await check(await fetch(`${apiBase}/folders/${encodePath(path)}`, { method: "DELETE" }));
+}
+
+/** Renames or moves a file or folder within the project. */
+export async function renamePath(from: string, to: string): Promise<void> {
+  await check(await postJSON(`${apiBase}/rename`, { from, to }));
+}
+
+/** A saved file that refers to another one, e.g. a trigger with it as target. */
+export interface Reference {
+  file: string;
+  what: string;
+}
+
+export async function fetchReferences(path: string): Promise<Reference[]> {
+  const res = await check(await fetch(`${apiBase}/references/${encodePath(path)}`));
+  return ((await res.json()) as { references: Reference[] }).references;
+}
+
+/** What can be created in the explorer (mockup E11), with its folder and file name ending. */
+export type NewKind = "workflow" | "pipeline" | "trigger" | "environment" | "file" | "folder";
+
+export const newKinds: Record<NewKind, { label: string; folder: string; suffix: string; name: string }> = {
+  workflow: { label: "Workflow", folder: "workflows", suffix: ".workflow.yaml", name: "new-workflow" },
+  pipeline: { label: "Pipeline", folder: "pipelines", suffix: ".pipeline.yaml", name: "new-pipeline" },
+  trigger: { label: "Trigger", folder: "triggers", suffix: ".yaml", name: "new-trigger" },
+  environment: { label: "Environment", folder: "environments", suffix: ".yaml", name: "new-environment" },
+  file: { label: "File", folder: "", suffix: "", name: "new-file.csv" },
+  folder: { label: "Folder", folder: "", suffix: "", name: "new-folder" },
+};
+
+/**
+ * The text of a new file: a small valid template with the name of the file (decision for
+ * mockup E11). A new trigger points to the first workflow and starts disabled.
+ */
+export function template(kind: NewKind, name: string, firstWorkflow?: string): string {
+  const head = (k: string) => `kind: ${k}\napiVersion: runnel/v1\nname: ${name}\n`;
+  switch (kind) {
+    case "workflow":
+      return head("Workflow") + "actions:\n  - id: start\n    type: core.start\nlayout:\n  start: { x: 40, y: 120 }\n";
+    case "pipeline":
+      return head("Pipeline") + "transforms:\n  - id: rows\n    type: core.generate-rows\n    with:\n      rows: 3\nlayout:\n  rows: { x: 40, y: 120 }\n";
+    case "trigger":
+      return (
+        head("Trigger") +
+        `description: Runs every hour once enabled\ntype: interval\ntarget: ${firstWorkflow ?? "workflows/main.workflow.yaml"}\nenabled: false\nwith:\n  every: 1h\n`
+      );
+    case "environment":
+      return head("Environment") + "variables: {}\n";
+  }
+  return "";
+}
+
+/** The kind and name ending of a file for renaming: the ending stays as it is. */
+export function suffixOf(path: string): string {
+  for (const s of [".workflow.yaml", ".pipeline.yaml"]) if (path.endsWith(s)) return s;
+  if (/^(environments|triggers)\/[^/]+\.yaml$/.test(path)) return ".yaml";
+  return "";
+}

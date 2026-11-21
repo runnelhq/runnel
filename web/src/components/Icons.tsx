@@ -203,6 +203,14 @@ export const SearchIcon = (p: P) => (
   </Icon>
 );
 
+/** Trigger files (mockup E11): a stopwatch. */
+export const TriggerIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l3 2M9 2h6" />
+  </Icon>
+);
+
 /** Data preview (mockup S44): an eye. */
 export const EyeIcon = (p: P) => (
   <Icon {...p}>
@@ -302,6 +310,8 @@ export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
       return <LinesIcon {...p} />;
     case "project":
       return <ProjectIcon {...p} />;
+    case "trigger":
+      return <TriggerIcon {...p} />;
     default:
       return <FileIcon {...p} />;
   }
