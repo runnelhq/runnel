@@ -144,8 +144,8 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| S49 | Plugin-Protokoll | JSON-RPC über stdin/stdout, `describe`, `action.execute` | Beispiel-Plugin in Go |
-| S50 | Plugin-Transforms | `transform.open/batch/close` (Streaming) | Beispiel-Plugin |
+| S49 | Plugin-Protokoll | JSON-RPC über stdin/stdout ([ADR 0019](adr/0019-plugin-protokoll.md)): `kind: Plugin` unter `plugins/<name>/`, Handshake, Prozess je Lauf, `describe`, `action.execute` | Beispiel-Plugin in Go |
+| S50 | Plugin-Transforms | `transform.open/batch/end`, `emit`/`closed`, Kredite (Streaming, ADR 0019) | Beispiel-Plugin; Benchmark mit Echo-Plugin (Ziel ≥ 300.000 Records/s) |
 | S51 | Go-SDK | `pkg/sdk` mit Beispielen | Beispiel-Plugin baut nur mit SDK |
 | S52 | Plugin-Verwaltung | Plugins im Editor anzeigen, Fehler beim Laden sichtbar | Manuell |
 | S53 | MCP-Server (vormals S11a) | `runnel mcp` (stdio): Workflows eines Projekts als MCP-Tools; Eingabe-Schema aus `parameters`, Ergebnis aus `outputs`, Log als Fortschrittsmeldungen ([ADR 0012](adr/0012-ki-faehigkeit.md)) | MCP Inspector; Claude Desktop/Claude Code ruft `examples/hello` auf |
