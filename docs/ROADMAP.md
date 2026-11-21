@@ -144,7 +144,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
-| S49 | Plugin-Protokoll | JSON-RPC über stdin/stdout, `describe`, `action.execute` | Beispiel-Plugin in Go |
+| S49 | Plugin-Protokoll | JSON-RPC über stdin/stdout ([ADR 0019](adr/0019-plugin-protokoll.md), Entwurf), `describe`, `action.execute` | Beispiel-Plugin in Go |
 | S50 | Plugin-Transforms | `transform.open/batch/close` (Streaming) | Beispiel-Plugin |
 | S51 | Go-SDK | `pkg/sdk` mit Beispielen | Beispiel-Plugin baut nur mit SDK |
 | S52 | Plugin-Verwaltung | Plugins im Editor anzeigen, Fehler beim Laden sichtbar | Manuell |

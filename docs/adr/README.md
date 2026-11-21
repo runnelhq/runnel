@@ -20,6 +20,7 @@
 | [0016](0016-live-events-sse.md) | Live-Events per Server-Sent Events statt WebSocket | Angenommen |
 | [0017](0017-sub-workflows.md) | Sub-Workflows – Aufruf, Parameter, Pfade und Log | Angenommen |
 | [0018](0018-http-trigger.md) | HTTP-Trigger – Läufe per HTTP starten und aus dem Lauf antworten | Angenommen |
+| [0019](0019-plugin-protokoll.md) | Plugin-Protokoll – eigene Prozesse, JSON-RPC über stdin/stdout | Vorgeschlagen |
 
 ## Wann eine ADR?
 
