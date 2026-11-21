@@ -126,8 +126,8 @@ type TriggerSettings struct {
 	Response string `yaml:"response,omitempty" json:"response,omitempty"`
 	// MaxConcurrent limits the running runs of the trigger (http; 0: no own limit).
 	MaxConcurrent int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty"`
-	// Timeout is how long the caller waits with response: run (default 30s); History
-	// follows with S38b2.
+	// Timeout is how long the caller waits with response: run (default 30s). History
+	// is all, errors or none: which runs are kept when they have ended.
 	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	History string   `yaml:"history,omitempty" json:"history,omitempty"`
 }
@@ -285,7 +285,7 @@ var fieldsOf = map[string][]string{
 	TriggerCron:     {"schedule", "timezone", "overlap"},
 	TriggerInterval: {"every", "overlap"},
 	TriggerFile:     {"path", "pattern", "interval", "param", "mode", "existing", "overlap"},
-	TriggerHTTP:     {"method", "path", "auth", "response", "timeout", "maxConcurrent"},
+	TriggerHTTP:     {"method", "path", "auth", "response", "timeout", "maxConcurrent", "history"},
 }
 
 // unusedFields reports fields under with: that the type does not use, e.g. schedule in
@@ -300,9 +300,6 @@ func (t *Trigger) unusedFields() Errors {
 	}
 	var errs Errors
 	for _, f := range sortedKeys(set) {
-		if t.Type == TriggerHTTP && f == "history" {
-			continue // reported by checkHTTP: it follows with S38b2
-		}
 		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
 			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))
 		}

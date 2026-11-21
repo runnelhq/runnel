@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	exprlang "github.com/expr-lang/expr"
@@ -132,7 +133,39 @@ func Check(s string, roots []string) error {
 	return err
 }
 
+// programs caches compiled expressions by code and roots (S38b2): the same workflow
+// runs again and again, e.g. for each request to an http trigger. Programs can be run
+// by several goroutines at once. The cache is cleared when it is full.
+var programs = struct {
+	sync.Mutex
+	m map[string]*vm.Program
+}{m: map[string]*vm.Program{}}
+
+// maxPrograms is the number of compiled expressions kept.
+const maxPrograms = 4096
+
 func compile(code string, roots []string) (*vm.Program, error) {
+	key := code + "\x00" + strings.Join(roots, ",")
+	programs.Lock()
+	prog := programs.m[key]
+	programs.Unlock()
+	if prog != nil {
+		return prog, nil
+	}
+	prog, err := compileProgram(code, roots)
+	if err != nil {
+		return nil, err
+	}
+	programs.Lock()
+	if len(programs.m) >= maxPrograms {
+		clear(programs.m)
+	}
+	programs.m[key] = prog
+	programs.Unlock()
+	return prog, nil
+}
+
+func compileProgram(code string, roots []string) (*vm.Program, error) {
 	// The roots are maps with any keys; row (forEach) can be any value: a number, a
 	// text or an object.
 	env := make(types.Map, len(roots))

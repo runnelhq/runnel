@@ -48,6 +48,9 @@ type Spec struct {
 	// called workflows (S38b1).
 	Request map[string]any
 	Respond action.Responder
+	// History decides whether the run is kept when it has ended: all (default),
+	// errors or none (runs of http triggers, S38b2).
+	History string
 
 	// chain lists the workflows that called this one (core.run-workflow).
 	chain []caller
@@ -82,12 +85,11 @@ type Prepared struct {
 // environment or parameters as plain errors.
 func Prepare(spec Spec) (*Prepared, error) {
 	p := &Prepared{}
-	w, err := model.ParseWorkflow(spec.Name, spec.Data)
+	w, diags, err := parseWorkflow(spec.Name, spec.Data)
 	if err != nil {
 		return p, err
 	}
 	p.Workflow = w
-	diags := w.Validate()
 	diags = append(diags, CheckCalls(w, spec.ProjectDir, spec.file())...)
 	if diags.HasErrors() {
 		diags.Sort()
@@ -96,7 +98,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 	p.Warnings = diags
 
 	if spec.ProjectDir != "" {
-		if p.Project, err = model.LoadProject(spec.ProjectDir); err != nil {
+		if p.Project, err = loadProject(spec.ProjectDir); err != nil {
 			return p, err
 		}
 		if p.Env, err = p.Project.SelectEnvironment(spec.Env); err != nil {

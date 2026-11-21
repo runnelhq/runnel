@@ -82,6 +82,8 @@ type StartRequest struct {
 	Request map[string]any
 	// Rows are the records of a JSON list in the body (http, pipelines: core.from-result).
 	Rows []map[string]any
+	// History tells which runs are kept: all, errors or none (http, S38b2).
+	History string
 	// Respond answers the waiting caller (http with response: run; http.respond).
 	Respond action.Responder
 }

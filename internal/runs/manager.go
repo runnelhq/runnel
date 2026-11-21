@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,9 @@ import (
 const (
 	// MaxRuns is the number of runs kept; the oldest finished runs are dropped first.
 	MaxRuns = 100
+	// MaxHTTPRuns is the number of runs of http triggers kept besides them (S38b2), so
+	// that many requests do not push out the runs started in the editor or by schedule.
+	MaxHTTPRuns = 100
 	// MaxLogLines is the number of log lines kept per run.
 	MaxLogLines = 5000
 	// MaxEvents is the number of events kept for clients that reconnect.
@@ -131,6 +135,11 @@ type entry struct {
 	log          []LogLine
 	logTruncated bool
 	cancel       context.CancelFunc
+	// history is all (default), errors (drop the run when it succeeded) or none (drop
+	// it when it ends and publish no events), for runs of http triggers (S38b2).
+	history string
+	// done is closed when the run has ended (Wait).
+	done chan struct{}
 }
 
 // NewManager creates a manager. Runs are cancelled by Shutdown.
@@ -182,7 +191,7 @@ func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
 		steps[i] = [2]string{a.ID, a.Type}
 	}
 	run, err := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client},
-		p.Env, steps, limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns), func(ctx context.Context) { p.Runner.Run(ctx) })
+		p.Env, steps, limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns), spec.History, func(ctx context.Context) { p.Runner.Run(ctx) })
 	return run, p, err
 }
 
@@ -205,19 +214,19 @@ func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedP
 	}
 	run, err := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
 		LinkRows: make([]int64, len(p.Pipeline.Links))}, p.Env, steps, limitsOf(p.Project, 0),
-		func(ctx context.Context) { p.Runner.Run(ctx) })
+		spec.History, func(ctx context.Context) { p.Runner.Run(ctx) })
 	return run, p, err
 }
 
 // add registers a run with its steps (id and type of the actions or transforms) and
 // runs it in the background, unless a limit of runs at the same time is reached.
-func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, lim limits, start func(context.Context)) (Run, error) {
+func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, lim limits, history string, start func(context.Context)) (Run, error) {
 	ctx, cancel := context.WithCancel(m.ctx)
 	run.Status, run.Started = StatusRunning, time.Now()
 	if env != nil {
 		run.Environment = env.Name
 	}
-	e := &entry{run: run, byID: map[string]*ActionState{}, cancel: cancel}
+	e := &entry{run: run, byID: map[string]*ActionState{}, cancel: cancel, history: history, done: make(chan struct{})}
 	for _, st := range steps {
 		s := &ActionState{ID: st[0], Type: st[1], Status: StatusPending}
 		e.actions = append(e.actions, s)
@@ -246,6 +255,9 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 		defer m.wg.Done()
 		defer cancel()
 		start(ctx)
+		m.mu.Lock()
+		m.ended(e)
+		m.mu.Unlock()
 	}()
 	return out, nil
 }
@@ -304,16 +316,56 @@ func (m *Manager) recordPipeline(id string, pe pipeline.Event) {
 	m.apply(id, we, counts, pe.LinkRows)
 }
 
-// prune drops the oldest finished runs beyond MaxRuns. m.mu must be held.
+// prune drops the oldest finished runs beyond MaxRuns, and those of http triggers
+// beyond MaxHTTPRuns. m.mu must be held.
 func (m *Manager) prune() {
-	for i := 0; len(m.order) > MaxRuns && i < len(m.order); {
-		id := m.order[i]
-		if m.runs[id].run.Status == StatusRunning {
-			i++
-			continue
+	for _, http := range []bool{false, true} {
+		limit := MaxRuns
+		if http {
+			limit = MaxHTTPRuns
 		}
-		delete(m.runs, id)
-		m.order = slices.Delete(m.order, i, i+1)
+		n := 0
+		for _, id := range m.order {
+			if isHTTP(m.runs[id]) == http {
+				n++
+			}
+		}
+		for i := 0; n > limit && i < len(m.order); {
+			e := m.runs[m.order[i]]
+			if isHTTP(e) != http || e.run.Status == StatusRunning {
+				i++
+				continue
+			}
+			m.remove(i)
+			n--
+		}
+	}
+}
+
+func isHTTP(e *entry) bool { return strings.HasPrefix(e.run.Trigger, model.TriggerHTTP+":") }
+
+// remove drops the run at position i of m.order. m.mu must be held.
+func (m *Manager) remove(i int) {
+	delete(m.runs, m.order[i])
+	m.order = slices.Delete(m.order, i, i+1)
+}
+
+// Values of Spec.History (S38b2).
+const (
+	HistoryAll    = "all"
+	HistoryErrors = "errors"
+	HistoryNone   = "none"
+)
+
+// ended applies the history of a run that has ended. m.mu must be held.
+func (m *Manager) ended(e *entry) {
+	close(e.done)
+	drop := e.history == HistoryNone || (e.history == HistoryErrors && e.run.Status == workflow.Succeeded)
+	if !drop {
+		return
+	}
+	if i := slices.Index(m.order, e.run.ID); i >= 0 {
+		m.remove(i)
 	}
 }
 
@@ -379,7 +431,9 @@ func (m *Manager) apply(id string, we workflow.Event, counts *pipeline.Counts, r
 		e.run.Outputs, ev.Outputs = we.Outputs, we.Outputs
 		ev.Message = e.run.Workflow
 	}
-	m.publish(ev)
+	if e.history != HistoryNone {
+		m.publish(ev)
+	}
 }
 
 // publish stores an event and wakes all subscribers. m.mu must be held.
@@ -444,6 +498,11 @@ func (m *Manager) Get(id string) (Detail, bool) {
 	if e == nil {
 		return Detail{}, false
 	}
+	return detailOf(e), true
+}
+
+// detailOf returns the state of a run. m.mu must be held.
+func detailOf(e *entry) Detail {
 	d := Detail{Run: e.run, Log: slices.Clone(e.log), LogTruncated: e.logTruncated}
 	d.LinkRows = slices.Clone(e.run.LinkRows)
 	for _, a := range e.actions {
@@ -453,24 +512,26 @@ func (m *Manager) Get(id string) (Detail, bool) {
 	if d.Log == nil {
 		d.Log = []LogLine{}
 	}
-	return d, true
+	return d
 }
 
 // Wait waits until a run has ended or ctx is done and returns its state; false if
-// there is no such run.
+// there is no such run. It also returns the state of a run that history drops when it
+// ends, if it was running when Wait was called.
 func (m *Manager) Wait(ctx context.Context, id string) (Detail, bool) {
-	for {
-		_, _, wake := m.EventsSince(m.LastSeq())
-		d, ok := m.Get(id)
-		if !ok || d.Status != StatusRunning {
-			return d, ok
-		}
-		select {
-		case <-wake:
-		case <-ctx.Done():
-			return d, true
-		}
+	m.mu.Lock()
+	e := m.runs[id]
+	m.mu.Unlock()
+	if e == nil {
+		return Detail{}, false
 	}
+	select {
+	case <-e.done:
+	case <-ctx.Done():
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return detailOf(e), true
 }
 
 // Cancel stops a running run. It reports whether the run exists and whether it was

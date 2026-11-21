@@ -598,6 +598,7 @@ with:
   response: accepted         # sofort 202 mit der Lauf-ID; run: Antwort aus dem Lauf (seit S38b1)
   timeout: 30s               # nur bei run: so lange wartet der Aufrufer höchstens (Standard 30s)
   maxConcurrent: 5           # laufende Runs dieses Triggers, darüber 429; 0 (Standard): kein eigenes Limit
+  history: all               # all | errors | none – welche Läufe behalten werden (seit S38b2)
 ```
 
 - **Listener:** HTTP-Trigger laufen auf einem eigenen Listener, getrennt vom Editor: `--triggers` bei `runnel serve`
@@ -646,6 +647,15 @@ with:
     sein; sie kommt wie `rows` bei `core.run-pipeline` als Datensätze an (`core.from-result`, Felder nach Namen
     sortiert). Parameter kommen dann aus Pfad und Query.
   - Kommt bis `timeout` keine Antwort: `504`; der Lauf läuft weiter.
+- **Historie und Last (seit S38b2):**
+  - `history` bestimmt, welche Läufe nach dem Ende behalten werden: `all`, `errors` (nur gescheiterte) oder `none`
+    (keine; der Lauf erzeugt auch keine Ereignisse für den Editor). Standard: `all` bei `accepted`, `errors` bei `run`.
+  - Läufe von HTTP-Triggern haben im Lauf-Speicher ein eigenes Limit (die letzten 100), damit viele Anfragen die Läufe
+    aus Editor und Zeitplänen nicht verdrängen.
+  - Geprüfte Workflows und Pipelines (nach Inhalt der Datei), das Projekt (nach Stand von `project.yaml` und
+    `environments/`) und übersetzte Ausdrücke werden zwischengespeichert; eine geänderte Datei wird beim nächsten Start
+    neu geprüft. Aufgerufene Workflows werden beim Aufruf geprüft. Richtwert: ein kleiner Workflow mit Antwort braucht
+    unter 0,1 ms Rechenzeit je Anfrage (`go test ./internal/server -bench HTTPTrigger`).
   - Jede Antwort trägt den Header `Runnel-Run-Id`.
 - **`request` in Ausdrücken (seit S38b1):** `request.method`, `.path`, `.headers`, `.query`, `.body` (JSON-Wert oder
   Felder des Formulars) und `.client`; ohne HTTP-Aufrufer ist `request` leer (`nil`), z. B.

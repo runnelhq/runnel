@@ -214,12 +214,12 @@ func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (string
 		}
 		run, _, err := s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
 			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger, Client: r.Client,
-			Rows: rows, Respond: r.Respond})
+			Rows: rows, Respond: r.Respond, History: r.History})
 		return run.ID, err
 	}
 	run, _, err := s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
 		ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger, Client: r.Client,
-		Request: r.Request, Respond: r.Respond})
+		Request: r.Request, Respond: r.Respond, History: r.History})
 	return run.ID, err
 }
 

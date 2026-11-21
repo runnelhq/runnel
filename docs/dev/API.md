@@ -166,7 +166,8 @@ Bei einem Pipeline-Lauf ist `kind` `pipeline` und `workflow` der Name der Pipeli
 der Transform davor beendet ist. Das Ereignis `action.finished` eines Transforms trägt `counts` und `linkRows` seiner
 ausgehenden Links (`{ "1": 2, "2": 2 }`).
 
-Läufe liegen **nur im Speicher**: die letzten 100, laufende werden nie verworfen. Beim Beenden des Servers (Strg+C)
+Läufe liegen **nur im Speicher**: die letzten 100, dazu die letzten 100 von HTTP-Triggern (seit S38b2; Läufe mit
+`history: errors` nur, wenn sie gescheitert sind, mit `history: none` gar nicht), laufende werden nie verworfen. Beim Beenden des Servers (Strg+C)
 werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26 (zurückgestellt, siehe Backlog der Roadmap), ohne dass sich diese API ändert.
 
 ## HTTP-Trigger (eigener Listener)
