@@ -136,6 +136,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 | E9 ✅ | YAML bearbeiten | Workflows und Pipelines in der YAML-Ansicht bearbeiten (Editor mit Hervorhebung, Prüfung beim Tippen über `/validate`, Rückgängig gemeinsam mit dem Canvas, Umgang mit Fehlern, die keinen Graph mehr erlauben); Mockup [`e9-yaml.html`](../design/mockups/e9-yaml.html). Bis dahin ist die YAML-Ansicht als „Read-only“ gekennzeichnet | Playwright |
 | E10 ✅ | Weitere Dateien bearbeiten | `project.yaml`, Environments und Trigger in der YAML-Ansicht bearbeiten wie Workflows und Pipelines in E9 (Prüfung beim Tippen, Rückgängig, Speichern); bis dahin schreibgeschützt | Playwright |
 | E11 ✅ | Dateien anlegen und löschen | Im Explorer: neue Workflows, Pipelines, Trigger und Environments aus einer kleinen gültigen Vorlage, neue Dateien und Ordner, Umbenennen, Löschen mit Rückfrage (mit Hinweis auf Verweise anderer Dateien), Ordner nur leer löschen – damit ein Projekt komplett im Editor entsteht; Mockup [`e11-files.html`](../design/mockups/e11-files.html) | Playwright |
+| E12 | Projekt organisieren | Dateien und Ordner im Explorer verschieben (Ziehen und Ablegen, „Move to…“); beim Umbenennen und Verschieben anbieten, Verweise anderer Dateien anzupassen (Trigger-Ziele, `core.run-workflow`, `core.run-pipeline`, über `/references`); Trigger auch in Unterordnern von `triggers/` (bis dahin werden sie nicht gelesen, K14); vorher Mockup | Playwright |
 
 ---
 
@@ -209,6 +210,7 @@ Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-
 | Transforms | Pivot/Unpivot, Feld teilen, Wertzuordnung, String-/Datum-Funktionen als eigene Transforms, Sequenz, externes Sortieren (große Datenmengen) |
 | KI ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Connections für Modell-Anbieter (Anthropic, OpenAI-kompatibel, Ollama); `ai.chat` (inkl. strukturierter Ausgabe per JSON Schema); `ai.agent` mit Werkzeugen (Workflows, Actions, MCP-Tools) und Positivliste; `mcp.call-tool` und MCP-Server als Plugin-Quelle; `core.approval` (Freigabe abwarten); Chat-Trigger mit Streaming und Gesprächsgedächtnis; Transforms `ai.chunk`, `ai.embed`, Vektor-Ausgabe (pgvector, Qdrant); MCP über HTTP (Token, später OAuth); Token-/Kosten-Erfassung und Rate-Limit je Connection; Link-Typ `tool` im Editor |
 | Plugin-SDKs | Python, C#/.NET, Node |
+| Projekte | Bibliotheken: gemeinsame Workflows und Pipelines für mehrere Projekte, z. B. als Eintrag in `project.yaml` mit eigenem Präfix in Aufrufen (`lib:…`); Prüfung, Editor und Explorer sehen sie mit. Bis dahin nur über absolute Pfade; braucht eine ADR |
 | Später (Konzept) | Mappings, Remote-Runner (`RunConfig type: remote`), Git-Integration im Editor, Breakpoints, Import aus Apache Hop, Tray-Icon, `runnel update`, `winget`, Code-Signing |
 
 ---
