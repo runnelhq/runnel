@@ -3,6 +3,7 @@ package csv
 import (
 	"bufio"
 	"bytes"
+	"context"
 	stdcsv "encoding/csv"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/format"
+	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
@@ -21,7 +23,7 @@ const sampleValues = 5
 // detectFields proposes the fields of csv.input from the first rows of its file (S46):
 // the names from the header (else field1, field2 …), a type and format per column from
 // its values (format.Propose).
-func detectFields(with map[string]any, limit int) (*transform.Detection, error) {
+func detectFields(ctx context.Context, with map[string]any, limit int) (*transform.Detection, error) {
 	t := &input{}
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
@@ -30,7 +32,7 @@ func detectFields(with map[string]any, limit int) (*transform.Detection, error) 
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.Open(t.Path)
+	f, err := os.Open(paths.Resolve(ctx, t.Path))
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %q: %w", t.Path, plain(err))
 	}

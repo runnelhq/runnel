@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -36,6 +37,10 @@ func (s *Server) handleExpressions(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	vars := map[string]variableDoc{}
+	// The built-in folder of the project (ADR 0020); project and environment may override it.
+	if dir, err := filepath.Abs(s.dir); err == nil {
+		vars[model.ProjectDirVariable] = variableDoc{Name: model.ProjectDirVariable, Value: dir, Source: "built-in"}
+	}
 	for name, v := range p.Variables {
 		vars[name] = variableDoc{Name: name, Value: v, Source: model.ProjectFile}
 	}

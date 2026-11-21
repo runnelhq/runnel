@@ -44,7 +44,7 @@ func (spec Spec) pipelines(envName string) action.PipelineRunner {
 			return nil, err
 		}
 		p, err := PreparePipeline(PipelineSpec{
-			Name: name, Data: data, ProjectDir: spec.ProjectDir, Env: envName, Params: call.Params,
+			Name: name, File: file, Data: data, ProjectDir: spec.ProjectDir, Env: envName, Params: call.Params,
 			Registry: spec.Transforms, Observer: forwardPipeline(call.Log), Rows: rows,
 		})
 		if err == nil && len(p.Undeclared) > 0 {

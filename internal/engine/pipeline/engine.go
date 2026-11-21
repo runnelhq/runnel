@@ -21,6 +21,7 @@ import (
 	"github.com/runnelhq/runnel/internal/engine/runid"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/vars"
@@ -53,6 +54,9 @@ type Options struct {
 	Rows []record.Record
 	// Respond answers the waiting caller of an http trigger (http.response, S38c); nil if none.
 	Respond action.Responder
+	// BaseDir is the folder relative paths of transforms refer to (ADR 0020): the
+	// project folder, or the folder of the pipeline file; empty: the working directory.
+	BaseDir string
 	// InputLimit stops each input (a transform without incoming links) after that many
 	// records, as if its input had ended (data preview, S44); 0: no limit.
 	InputLimit int
@@ -512,6 +516,7 @@ func (r *Runner) emit(e Event) {
 
 // Run executes the pipeline and returns when all transforms have finished.
 func (r *Runner) Run(parent context.Context) Result {
+	parent = paths.WithBase(parent, r.opts.BaseDir)
 	now := r.opts.Now
 	started := now()
 	runID := r.opts.RunID

@@ -14,3 +14,7 @@
 /web/node_modules/
 /web/test-results/
 /web/playwright-report/
+
+# Output of the examples (relative paths refer to the project folder, ADR 0020)
+/examples/*/out/*
+!/examples/*/out/.gitkeep

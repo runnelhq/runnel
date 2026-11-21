@@ -172,7 +172,7 @@ func TestRunCSVExample(t *testing.T) {
 		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
 	}
 	for _, want := range []string{
-		"[read] read 3 rows from examples/pipelines/data/orders.csv",
+		"[read] read 3 rows from data/orders.csv",
 		"[large] kept 2 of 3 records, dropped 1",
 		"[show] #1 {Nr: 1001, Betrag: 1234.5}",
 		"[write] wrote 2 rows to " + target,
@@ -236,7 +236,7 @@ func TestRunSwitchExample(t *testing.T) {
 		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
 	}
 	for _, want := range []string{
-		"[read] read 4 rows from examples/pipelines/data/customers.csv, 1 with errors",
+		"[read] read 4 rows from data/customers.csv, 1 with errors",
 		`[invalid] #1 {kdnr: "4714", name: "Klein KG", umsatz: "k. A.", _error: `,
 		"[segment] key-accounts 1, standard 1, dropped 1",
 	} {
@@ -351,10 +351,14 @@ func TestRunForEachExample(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
 	}
+	inbox, err := filepath.Abs(filepath.Join("examples", "pipelines", "inbox"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, want := range []string{
-		// The paths come from file.list, with the separator of the system.
-		"[totals] [1/2] total/read: read 2 rows from " + filepath.FromSlash("examples/pipelines/inbox/orders-2026-11-18.csv"),
-		"[totals] [2/2] total/read: read 3 rows from " + filepath.FromSlash("examples/pipelines/inbox/orders-2026-11-19.csv"),
+		// The paths come from file.list: the inbox folder of the project, made absolute (ADR 0020).
+		"[totals] [1/2] total/read: read 2 rows from " + filepath.Join(inbox, "orders-2026-11-18.csv"),
+		"[totals] [2/2] total/read: read 3 rows from " + filepath.Join(inbox, "orders-2026-11-19.csv"),
 		"[report] orders-2026-11-18.csv: 2 orders, 350.5; orders-2026-11-19.csv: 3 orders, 1145.25",
 		"output FILES = 2",
 	} {

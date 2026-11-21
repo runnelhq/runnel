@@ -1,5 +1,4 @@
-# A workflow that runs a CSV pipeline (roadmap S18). Run it from the folder that
-# contains "examples":
+# A workflow that runs a CSV pipeline (roadmap S18). Relative paths refer to the project folder (output in out/); for example:
 #   runnel run -v examples/pipelines/workflows/import.workflow.yaml
 # - "prepare" runs pipelines/customers.pipeline.yaml with a batch number from the
 #   parameters; the log of the pipeline appears in its log as "customers/<transform>: …".
@@ -15,7 +14,7 @@ parameters:
     default: "7"
   - name: OUT_DIR
     description: Folder for the files of the pipeline
-    default: .
+    default: out
 outputs:
   - name: EXPORTED
     type: integer

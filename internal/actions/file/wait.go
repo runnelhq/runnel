@@ -9,6 +9,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // file.wait waits until files exist (e.g. a delivery from another system) and,
@@ -24,7 +25,7 @@ var waitDefinition = action.Definition{
 }
 
 type wait struct {
-	Path      string `json:"path" doc:"File to wait for; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
+	Path      string `json:"path" doc:"File to wait for, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
 	Interval  string `json:"interval" doc:"How often to look, e.g. 5s or 1m" schema:"format=runnel-duration,default=5s"`
 	MaxWait   string `json:"maxWait" doc:"Give up and fail after this time; empty: wait until the action's timeout or the end of the run" schema:"format=runnel-duration,example=30m"`
 	StableFor string `json:"stableFor" doc:"The size of the files must not change for this time, e.g. 10s; empty: do not check" schema:"format=runnel-duration,example=10s"`
@@ -63,7 +64,7 @@ func (a *wait) Execute(ctx context.Context, ec *action.ExecContext) (action.Resu
 	var stableSince time.Time
 	ec.Logf(slog.LevelDebug, "waiting for %s", a.Path)
 	for {
-		found, err := matchKind(a.Path, "file")
+		found, err := matchKind(paths.Resolve(ctx, a.Path), "file")
 		if err != nil {
 			return action.Result{}, err
 		}

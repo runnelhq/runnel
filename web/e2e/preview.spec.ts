@@ -4,18 +4,18 @@ import { expect, test, type Page } from "@playwright/test";
 // Data preview (mockup design/mockups/s44-preview.html): a pipeline runs up to a transform
 // with the first records of its inputs; nothing is written. Against the server on a
 // temporary copy of examples/hello (e2e/serve-copy.mjs); relative paths of inputs refer
-// to the folder the server was started in (web/).
+// to the project folder.
 test.use({ baseURL: "http://127.0.0.1:7398" });
 test.describe.configure({ mode: "serial" });
 
 const path = "pipelines/preview.pipeline.yaml";
 const fileURL = `/api/v1/files/${path}`;
-const original = readFileSync(new URL("../../examples/pipelines/pipelines/customers.pipeline.yaml", import.meta.url), "utf8").replace(
-  "path: examples/pipelines/data/customers.csv",
-  "path: ../examples/pipelines/data/customers.csv",
-);
+const original = readFileSync(new URL("../../examples/pipelines/pipelines/customers.pipeline.yaml", import.meta.url), "utf8");
+// The pipeline reads data/customers.csv, relative to the project folder (ADR 0020).
+const customers = readFileSync(new URL("../../examples/pipelines/data/customers.csv", import.meta.url));
 
 test.beforeEach(async ({ request }) => {
+  await request.put("/api/v1/files/data/customers.csv", { headers: { "If-Match": "*" }, data: customers });
   await request.put(fileURL, { headers: { "If-Match": "*" }, data: original });
 });
 

@@ -1,5 +1,4 @@
-# Runs a pipeline for each file of a folder (roadmap S24b). Run it from the folder that
-# contains "examples":
+# Runs a pipeline for each file of a folder (roadmap S24b). Relative paths refer to the project folder (output in out/); for example:
 #   runnel run -v examples/pipelines/workflows/each-file.workflow.yaml
 # - "list" lists the order files of the inbox.
 # - "totals" runs pipelines/total.pipeline.yaml once per file (forEach); row is the
@@ -13,7 +12,7 @@ apiVersion: runnel/v1
 name: each-file
 parameters:
   - name: INBOX
-    default: examples/pipelines/inbox
+    default: inbox
 outputs:
   - name: FILES
     type: integer

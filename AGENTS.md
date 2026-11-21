@@ -38,6 +38,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`, `triggers`, `service`) |
 | `internal/model/` | Dateiformate (Workflow, Pipeline, Project, Environment, Trigger), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
+| `internal/paths/` | Relative Pfade von Actions und Transforms auflösen: Bezugsordner eines Laufs im Kontext (Projektordner, ADR 0020) |
 | `internal/expr/` | Ausdrücke `{{ … }}` (expr-lang), Funktionsbibliothek, Dokumentation für den Editor |
 | `internal/format/` | Zahlen- und Datumsformate (z. B. `#.##0,00`, `dd.MM.yyyy`), Typvorschlag für „Felder ermitteln“ (`propose.go`) |
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |

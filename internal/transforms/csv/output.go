@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/runnelhq/runnel/internal/format"
+	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -28,7 +29,7 @@ var outputDefinition = transform.Definition{
 }
 
 type output struct {
-	Path      string     `json:"path" doc:"CSV file to write; relative paths refer to the working directory of runnel" schema:"required,example=C:\\out\\orders.csv"`
+	Path      string     `json:"path" doc:"CSV file to write, relative to the project folder or absolute" schema:"required,example=C:\\out\\orders.csv"`
 	Delimiter string     `json:"delimiter" doc:"Character between the values, e.g. ; or \\t for tab; empty: comma" schema:"example=;"`
 	Header    *bool      `json:"header" doc:"Whether the first row holds the names of the columns" schema:"default=true"`
 	Encoding  string     `json:"encoding" doc:"Encoding of the file; utf-8-bom lets Excel recognize umlauts" schema:"enum=utf-8-bom|utf-8|windows-1252,default=utf-8-bom"`
@@ -124,7 +125,8 @@ func (t *output) Process(ctx context.Context, in <-chan transform.Batch, out *tr
 	if err := checkIfExists(t.IfExists); err != nil {
 		return err
 	}
-	f, appending, err := t.open()
+	file := paths.Resolve(ctx, t.Path)
+	f, appending, err := t.open(file)
 	if err != nil {
 		return err
 	}
@@ -135,7 +137,7 @@ func (t *output) Process(ctx context.Context, in <-chan transform.Batch, out *tr
 	if !appending {
 		// replace: the file is complete, or it is not written at all.
 		if err == nil {
-			if rerr := os.Rename(f.Name(), t.Path); rerr != nil {
+			if rerr := os.Rename(f.Name(), file); rerr != nil {
 				err = fmt.Errorf("cannot write %q: %w", t.Path, plainLink(rerr))
 			}
 		}
@@ -267,13 +269,13 @@ func (t *output) writeRow(cw *stdcsv.Writer, row []string, check func(string) er
 	return cw.Write(row)
 }
 
-// open opens the file to write into: for replace a temporary file next to the target,
+// open opens file (t.Path resolved, ADR 0020) to write into: for replace a temporary file next to the target,
 // renamed when all records are written; for append the file itself.
-func (t *output) open() (f *os.File, appending bool, err error) {
+func (t *output) open(file string) (f *os.File, appending bool, err error) {
 	if t.Path == "" {
 		return nil, false, errors.New("path: no file given")
 	}
-	info, err := os.Stat(t.Path)
+	info, err := os.Stat(file)
 	exists := err == nil
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, false, fmt.Errorf("cannot write %q: %w", t.Path, plain(err))
@@ -288,14 +290,14 @@ func (t *output) open() (f *os.File, appending bool, err error) {
 		}
 	case "append":
 		if exists && info.Size() > 0 {
-			f, err := os.OpenFile(t.Path, os.O_WRONLY|os.O_APPEND, 0)
+			f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0)
 			if err != nil {
 				return nil, false, fmt.Errorf("cannot write %q: %w", t.Path, plain(err))
 			}
 			return f, true, nil
 		}
 	}
-	dir, base := filepath.Split(t.Path)
+	dir, base := filepath.Split(file)
 	if dir == "" {
 		dir = "."
 	}

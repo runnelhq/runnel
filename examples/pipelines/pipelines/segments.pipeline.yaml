@@ -1,4 +1,4 @@
-# Splits customers by revenue into two files. Run it from the folder that contains "examples":
+# Splits customers by revenue into two files. Relative paths refer to the project folder (output in out/); for example:
 #   runnel run examples/pipelines/pipelines/segments.pipeline.yaml
 # - "read" reads the customers with types; a row whose revenue is not a number ("k. A.")
 #   goes over the error link to "invalid" instead of stopping the pipeline.
@@ -15,12 +15,12 @@ parameters:
     default: "10000"
   - name: OUT_DIR
     description: Folder for the two files
-    default: .
+    default: out
 transforms:
   - id: read
     type: csv.input
     with:
-      path: examples/pipelines/data/customers.csv
+      path: data/customers.csv
       delimiter: ";"
       fields:
         - { name: kdnr, type: int }

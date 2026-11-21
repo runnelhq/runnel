@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
@@ -32,8 +32,8 @@ type fieldsResponse struct {
 // fieldsProblem is the answer when the input cannot be read: the message and the
 // folder relative paths refer to.
 type fieldsProblem struct {
-	Error      string `json:"error"`
-	WorkingDir string `json:"workingDir,omitempty"`
+	Error   string `json:"error"`
+	BaseDir string `json:"baseDir,omitempty"`
 }
 
 // handleDetectFields proposes the fields of an input transform from the first rows of
@@ -99,11 +99,8 @@ func (s *Server) handleDetectFields(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res.Variables = hasVariables(t.With)
-	if res.Detection, err = def.DetectFields(with, transform.DetectLimit); err != nil {
-		problem := fieldsProblem{Error: err.Error()}
-		if wd, err := os.Getwd(); err == nil {
-			problem.WorkingDir = filepath.Clean(wd)
-		}
+	if res.Detection, err = def.DetectFields(paths.WithBase(r.Context(), s.dir), with, transform.DetectLimit); err != nil {
+		problem := fieldsProblem{Error: err.Error(), BaseDir: filepath.Clean(s.dir)}
 		writeJSON(w, http.StatusUnprocessableEntity, problem)
 		return
 	}

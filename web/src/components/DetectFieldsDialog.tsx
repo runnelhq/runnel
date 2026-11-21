@@ -9,7 +9,7 @@ const formatTypes = new Set(["int", "decimal", "float", "date", "datetime"]);
 
 type State =
   | { status: "loading" }
-  | { status: "error"; message: string; workingDir?: string }
+  | { status: "error"; message: string; baseDir?: string }
   | { status: "loaded"; detection: Detection; fields: DetectedField[] };
 
 /**
@@ -44,7 +44,7 @@ export function DetectFieldsDialog(props: {
         setState({
           status: "error",
           message: err instanceof Error ? err.message : String(err),
-          workingDir: err instanceof DetectError ? err.workingDir : undefined,
+          baseDir: err instanceof DetectError ? err.baseDir : undefined,
         }),
     );
     return () => {
@@ -100,10 +100,10 @@ export function DetectFieldsDialog(props: {
               <b>The input cannot be read</b>
               <p className="mt-1 mb-0 text-foreground">
                 {state.message}
-                {state.workingDir && (
+                {state.baseDir && (
                   <>
                     {" "}
-                    Relative paths refer to the folder runnel was started in: <span className="font-mono text-2xs">{state.workingDir}</span>
+                    Relative paths refer to the project folder: <span className="font-mono text-2xs">{state.baseDir}</span>
                   </>
                 )}
               </p>

@@ -19,7 +19,7 @@ transforms:
   - id: read
     type: csv.input
     with:
-      path: examples/pipelines/data/customers.csv
+      path: data/customers.csv
       delimiter: ";"
   - id: types
     type: core.convert

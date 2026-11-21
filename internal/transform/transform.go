@@ -195,7 +195,7 @@ type Definition struct {
 	// DetectFields proposes the fields of an input transform from the first rows (at most
 	// limit) of its input, for "Detect fields" in the editor (S46); nil if it cannot.
 	// with is the configuration with variables resolved.
-	DetectFields func(with map[string]any, limit int) (*Detection, error)
+	DetectFields func(ctx context.Context, with map[string]any, limit int) (*Detection, error)
 }
 
 // Descriptor describes a transform type for the editor, the API and tools (ADR 0014).
