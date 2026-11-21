@@ -69,7 +69,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | S46 | Ein Typ wird nur vorgeschlagen, wenn jeder gelesene Wert passt; sonst `string` mit Begründung (z. B. „3 of 4 values are decimal“). Zahlen mit führender Null bleiben Text; `ja`/`nein` ist kein `bool` (das Format kennt true/false, 1/0, yes/no) |
 | S46 | Schreiben ist ein Schritt für Rückgängig (Hinweis „Wrote n fields · Undo“ wie in E6a); gespeichert wird weiter mit Save |
 | S46 | Erneut ermitteln bei vorhandenen Feldern: aufgeführte Felder behalten Typ und Format („listed“), neue Spalten sind nicht ausgewählt („new“), aufgeführte Felder, die in der Datei fehlen, werden markiert und lassen sich abwählen |
-| S46 | Das Panel zeigt die Felder als Liste (Name, Typ, Format); einzelne Felder ändert man bis E9 in der YAML-Ansicht |
+| S46 | Das Panel zeigt die Felder als Liste (Name, Typ, Format); einzelne Felder ändert man bis E9 in der Datei mit einem Texteditor (die YAML-Ansicht ist bis dahin nur zum Lesen; gleicher Hinweis wie heute bei Listen im Panel) |
 | S46 | Datei nicht lesbar: Meldung im Dialog mit dem Ordner, auf den sich relative Pfade beziehen; keine Meldung am Feld, weil `/validate` keine Dateien liest |
 | S35 | Größerer Editor: Die Zeile unten zeigt die Meldungen des Felds beim Öffnen; geänderter Text wird erst nach Apply geprüft („Checked when applied“), statt bei jeder Eingabe den ganzen Workflow zu prüfen |
 

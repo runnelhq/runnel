@@ -697,7 +697,7 @@
   if (state === "written" || orders) {
     const rows = orders ? ordersFields : detected;
     fieldsSection = `<div class="section"><h4>${chev}Fields<span class="sum">${rows.length}</span></h4>` + fieldRows(rows) +
-      `<div class="field">${detectBtn("Detect fields…")}<div class="help">Only the listed columns are read. Change single fields in the YAML view for now.</div></div></div>`;
+      `<div class="field">${detectBtn("Detect fields…")}<div class="help">Only the listed columns are read. Change single fields in your text editor for now.</div></div></div>`;
   } else {
     fieldsSection = `<div class="section"><h4>${chev}Fields<span class="sum">none</span></h4>` +
       `<p class="note">Without fields, all columns are read as text, and the fields are only known when the pipeline runs.</p>` +
