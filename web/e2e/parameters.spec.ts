@@ -182,3 +182,27 @@ test("pipelines have parameters, but no outputs", async ({ page, request }) => {
   await expect(field(page, "parameters[0].name").getByRole("textbox")).toHaveValue("PARAM_1");
   expect(await yaml(page)).toContain("name: p\nparameters:\n  - name: PARAM_1\ntransforms:");
 });
+
+// Values typed before the server has answered the previous change are kept (a slow
+// server used to drop the first of two quickly added values).
+test("keeps quickly added allowed values with a slow server", async ({ page }) => {
+  await page.route("**/api/v1/workflows/edit", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.continue();
+  });
+  await open(page);
+  await openRow(page, "parameters", 0);
+  const values = field(page, "parameters[0].enum").getByRole("textbox");
+  for (const v of ["5s", "10s", "20s"]) {
+    await values.fill(v);
+    await values.press("Enter");
+  }
+  for (const v of ["5s", "10s", "20s"]) {
+    await expect(field(page, "parameters[0].enum").getByRole("button", { name: `Remove ${v}` })).toBeVisible();
+  }
+  await expect.poll(() => yaml(page)).toContain("    enum: [5s, 10s, 20s]\n");
+  // Removing works on the current list, too.
+  await openRow(page, "parameters", 0);
+  await field(page, "parameters[0].enum").getByRole("button", { name: "Remove 10s" }).click();
+  await expect.poll(() => yaml(page)).toContain("    enum: [5s, 20s]\n");
+});
