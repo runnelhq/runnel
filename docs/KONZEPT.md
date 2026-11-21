@@ -595,7 +595,8 @@ with:
   method: POST               # GET, POST, PUT, PATCH, DELETE
   path: /hooks/import/{DAYS} # Platzhalter {name} werden zu Parametern des Ziels
   auth: { token: ${env:IMPORT_TOKEN} }   # oder: auth: none
-  response: accepted         # sofort 202 mit der Lauf-ID; run (Antwort aus dem Lauf) folgt mit S38b
+  response: accepted         # sofort 202 mit der Lauf-ID; run: Antwort aus dem Lauf (seit S38b1)
+  timeout: 30s               # nur bei run: so lange wartet der Aufrufer höchstens (Standard 30s)
   maxConcurrent: 5           # laufende Runs dieses Triggers, darüber 429; 0 (Standard): kein eigenes Limit
 ```
 
@@ -624,7 +625,21 @@ with:
   feste `params` des Triggers gewinnen. JSON-Werte, die kein Text sind, kommen als JSON-Text an (für Parameter vom Typ
   `json`). Fehlt ein Pflichtparameter oder passt ein Typ nicht: `400` mit der Meldung, ohne Lauf. Andere Formate:
   `415`, Body über 1 MiB: `413`.
-- **Antwort:** `202` mit `{ "runId": …, "status": "/api/v1/runs/…" }` (der Status steht in der API des Editors).
+- **Antwort bei `accepted`:** `202` mit `{ "runId": …, "status": "/api/v1/runs/…" }` (der Status steht in der API des
+  Editors).
+- **Antwort bei `run` (seit S38b1):** Der Aufrufer wartet auf den Lauf, höchstens `timeout`.
+  - Die erste ausgeführte Action **`http.respond`** antwortet (`status`, `headers`, `body` mit Ausdrücken; ein Text geht
+    als Text, andere Werte als JSON); spätere schreiben eine Warnung ins Log. Der Workflow arbeitet nach der Antwort
+    weiter. Auch eine `http.respond` in einem aufgerufenen Workflow (`core.run-workflow`) antwortet. Ohne wartenden
+    Aufrufer (Editor, `runnel run`, andere Trigger) tut sie nichts.
+  - Ohne `http.respond`: Endet der Lauf erfolgreich, sind die `outputs` als JSON-Objekt die Antwort (`200`; bei einer
+    Pipeline die Zähler der Transforms); scheitert er, `500` mit der Lauf-ID, ohne Details (die stehen im Log).
+  - Kommt bis `timeout` keine Antwort: `504`; der Lauf läuft weiter.
+  - Jede Antwort trägt den Header `Runnel-Run-Id`.
+- **`request` in Ausdrücken (seit S38b1):** `request.method`, `.path`, `.headers`, `.query`, `.body` (JSON-Wert oder
+  Felder des Formulars) und `.client`; ohne HTTP-Aufrufer ist `request` leer (`nil`), z. B.
+  `{{ request?.body?.name ?? 'none' }}`. Der Header `Authorization` steht nicht darin. Aufgerufene Workflows sehen
+  denselben `request`.
   `maxConcurrent` oder `settings.maxConcurrentRuns` erreicht: `429`; Server wird beendet: `503`. Der Lauf trägt
   `trigger = http:<name>` und die Adresse des Aufrufers (`client`).
 
@@ -974,7 +989,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen, Log schreiben, Schleife (ForEach über Liste/Dateien) |
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils optional `forEachRow`), JavaScript, PowerShell, Programm starten |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, ZIP/Entpacken, Dateiliste |
-| Netzwerk | HTTP-Request, SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
+| Netzwerk | HTTP-Request, HTTP-Antwort (`http.respond`, seit S38b1), SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,

@@ -36,7 +36,22 @@ type ExecContext struct {
 	// result (the counts of its transforms and its result records); nil where it is
 	// not supported. rows are passed to core.from-result.
 	RunPipeline func(ctx context.Context, path string, params map[string]string, rows []map[string]any) (map[string]any, error)
+	// Respond answers the waiting caller of an http trigger (http.respond, S38b1); nil
+	// if the run has no waiting caller.
+	Respond Responder
 }
+
+// Response is the answer of a run to the waiting caller of an http trigger.
+type Response struct {
+	Status  int
+	Headers map[string]string
+	// Body is sent as JSON, or as text if it is a string.
+	Body any
+}
+
+// Responder delivers the answer of a run to the waiting caller of an http trigger and
+// reports whether it was the first one: only the first answer is sent.
+type Responder func(Response) bool
 
 // WorkflowCall is a call of another workflow from an action (core.run-workflow).
 type WorkflowCall struct {

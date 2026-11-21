@@ -1,0 +1,16 @@
+# A small service (roadmap S38b1): GET /answer/{NAME} waits for the answer of the
+# workflow (response: run) – at most timeout, then 504. Without http.respond the
+# outputs of the workflow would be the answer (200), a failed run gives 500.
+kind: Trigger
+apiVersion: runnel/v1
+name: answer
+description: Answers with a greeting
+type: http
+target: workflows/answer.workflow.yaml
+environment: dev
+with:
+  method: GET
+  path: /answer/{NAME}
+  auth: none
+  response: run
+  timeout: 10s

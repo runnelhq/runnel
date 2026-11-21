@@ -19,12 +19,15 @@ type fake struct {
 	started []string // trigger names
 	params  []map[string]string
 	clients []string
-	running map[string]bool
-	logs    []string
-	fail    error
+	// requests are the starts as given (http).
+	requests []StartRequest
+	running  map[string]bool
+	logs     []string
+	fail     error
 }
 
-func (f *fake) start(t *model.Trigger, params map[string]string, client string) (string, error) {
+func (f *fake) start(t *model.Trigger, r StartRequest) (string, error) {
+	params, client := r.Params, r.Client
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.fail != nil {
@@ -34,6 +37,7 @@ func (f *fake) start(t *model.Trigger, params map[string]string, client string) 
 	f.started = append(f.started, t.Name)
 	f.params = append(f.params, params)
 	f.clients = append(f.clients, client)
+	f.requests = append(f.requests, r)
 	f.running[id] = true
 	return id, nil
 }

@@ -437,6 +437,38 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "type": "http.respond",
+      "kind": "action",
+      "category": "network",
+      "label": "HTTP Response",
+      "description": "Answers the caller of an HTTP trigger with status, headers and body; output: sent and status",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "HTTP status code, e.g. 200, 404 or 422",
+            "default": "200",
+            "examples": [
+              "200"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers of the answer, e.g. Content-Type",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "body": {
+            "description": "Body: a text is sent as text, other values (maps, lists, numbers) as JSON"
+          }
+        },
+        "additionalProperties": false
+      }
     }
   ],
   "transforms": [

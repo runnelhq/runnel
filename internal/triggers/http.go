@@ -168,7 +168,7 @@ func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	inputs, status, err := requestValues(r, body)
+	inputs, bodyValue, status, err := requestValues(r, body)
 	if err != nil {
 		fail(w, status, "%v", err)
 		return
@@ -191,7 +191,15 @@ func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if host, _, err := net.SplitHostPort(client); err == nil {
 		client = host
 	}
-	s.startHTTP(w, e, params, client)
+	start := StartRequest{Params: params, Client: client, Request: requestOf(r, bodyValue, client)}
+	if !t.WaitsForRun() {
+		if id, ok := s.startHTTP(w, e, start); ok {
+			w.Header().Set("Location", "/api/v1/runs/"+id)
+			reply(w, http.StatusAccepted, acceptedBody{RunID: id, Status: "/api/v1/runs/" + id})
+		}
+		return
+	}
+	s.answer(w, r, e, start)
 }
 
 // isLoopbackHost reports whether a Host header names the loopback interface.
@@ -264,27 +272,32 @@ func authorized(t *model.Trigger, r *http.Request) bool {
 }
 
 // requestValues returns the values of the query and the body (a JSON object or a
-// form); the query wins over the body. Non-text JSON values are given as JSON.
-func requestValues(r *http.Request, body []byte) (map[string]string, int, error) {
+// form) as text, and the body as a value for request.body; the query wins over the
+// body. Non-text JSON values are given as JSON.
+func requestValues(r *http.Request, body []byte) (map[string]string, any, int, error) {
 	values := map[string]string{}
+	var bodyValue any
 	if len(bytes.TrimSpace(body)) > 0 {
 		media, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		switch {
 		case media == "application/x-www-form-urlencoded":
 			form, err := url.ParseQuery(string(body))
 			if err != nil {
-				return nil, http.StatusBadRequest, fmt.Errorf("cannot read the form in the body: %w", err)
+				return nil, nil, http.StatusBadRequest, fmt.Errorf("cannot read the form in the body: %w", err)
 			}
+			fields := map[string]any{}
 			for k, v := range form {
-				values[k] = v[0]
+				values[k], fields[k] = v[0], v[0]
 			}
+			bodyValue = fields
 		case media == "" || media == "application/json" || strings.HasSuffix(media, "+json"):
 			dec := json.NewDecoder(bytes.NewReader(body))
 			dec.UseNumber()
 			var obj map[string]any
 			if err := dec.Decode(&obj); err != nil || obj == nil {
-				return nil, http.StatusBadRequest, errors.New("the body must be a JSON object, e.g. {\"id\": 4711}")
+				return nil, nil, http.StatusBadRequest, errors.New("the body must be a JSON object, e.g. {\"id\": 4711}")
 			}
+			bodyValue = numbers(obj)
 			for k, v := range obj {
 				switch v := v.(type) {
 				case nil:
@@ -300,13 +313,13 @@ func requestValues(r *http.Request, body []byte) (map[string]string, int, error)
 				}
 			}
 		default:
-			return nil, http.StatusUnsupportedMediaType, fmt.Errorf("unsupported content type %q (expected application/json or application/x-www-form-urlencoded)", media)
+			return nil, nil, http.StatusUnsupportedMediaType, fmt.Errorf("unsupported content type %q (expected application/json or application/x-www-form-urlencoded)", media)
 		}
 	}
 	for k, v := range r.URL.Query() {
 		values[k] = v[0]
 	}
-	return values, 0, nil
+	return values, bodyValue, 0, nil
 }
 
 type badRequest struct{ msg string }
@@ -352,8 +365,8 @@ func (s *Scheduler) targetParams(t *model.Trigger, inputs map[string]string) (ma
 }
 
 // startHTTP starts the run of a request unless maxConcurrent or a limit of the
-// project is reached.
-func (s *Scheduler) startHTTP(w http.ResponseWriter, e *entry, params map[string]string, client string) {
+// project is reached; it answers the caller itself if the run is not started.
+func (s *Scheduler) startHTTP(w http.ResponseWriter, e *entry, start StartRequest) (string, bool) {
 	t := e.t
 	e.startMu.Lock()
 	defer e.startMu.Unlock()
@@ -367,30 +380,29 @@ func (s *Scheduler) startHTTP(w http.ResponseWriter, e *entry, params map[string
 			runsText = "1 run"
 		}
 		fail(w, http.StatusTooManyRequests, "trigger %q is already running %s (maxConcurrent: %d); try again later", t.Name, runsText, limit)
-		return
+		return "", false
 	}
 	now := s.opts.Now()
-	id, err := s.opts.Start(t, params, client)
+	id, err := s.opts.Start(t, start)
 	switch {
 	case errors.As(err, new(*runs.LimitError)):
 		fail(w, http.StatusTooManyRequests, "%v", err)
-		return
+		return "", false
 	case errors.Is(err, runs.ErrShutdown):
 		fail(w, http.StatusServiceUnavailable, "%v", err)
-		return
+		return "", false
 	case err != nil:
 		s.opts.Warn(fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, t.Target, err))
 		s.mu.Lock()
 		e.last = &Fired{Time: now, Error: err.Error()}
 		s.mu.Unlock()
 		fail(w, http.StatusInternalServerError, "the run could not be started; see the server log")
-		return
+		return "", false
 	}
 	s.mu.Lock()
 	e.active = append(e.active, id)
 	e.last = &Fired{Time: now, RunID: id}
 	s.mu.Unlock()
-	s.opts.Log(fmt.Sprintf("trigger %q: started %s for %s, run %s", t.Name, t.Target, client, id))
-	w.Header().Set("Location", "/api/v1/runs/"+id)
-	reply(w, http.StatusAccepted, acceptedBody{RunID: id, Status: "/api/v1/runs/" + id})
+	s.opts.Log(fmt.Sprintf("trigger %q: started %s for %s, run %s", t.Name, t.Target, start.Client, id))
+	return id, true
 }

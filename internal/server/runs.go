@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -194,7 +195,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 // startTrigger starts a run of a trigger's target (the saved file), with its
 // environment and parameters (S37); extra are set by the trigger itself, e.g. the
 // path of a new file (S38).
-func (s *Server) startTrigger(t *model.Trigger, extra map[string]string, client string) (string, error) {
+func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (string, error) {
 	name := t.Target
 	data, err := s.readFile(name)
 	if err != nil {
@@ -202,19 +203,43 @@ func (s *Server) startTrigger(t *model.Trigger, extra map[string]string, client 
 	}
 	trigger := t.Type + ":" + t.Name
 	params := runs.TriggerParams(t)
-	if len(extra) > 0 && params == nil {
+	if len(r.Params) > 0 && params == nil {
 		params = map[string]string{}
 	}
-	maps.Copy(params, extra)
+	maps.Copy(params, r.Params)
 	var run runs.Run
 	if fileKind(name) == "pipeline" {
 		run, _, err = s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
-			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger, Client: client})
+			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger, Client: r.Client})
 	} else {
 		run, _, err = s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
-			ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger, Client: client})
+			ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger, Client: r.Client,
+			Request: r.Request, Respond: r.Respond})
 	}
 	return run.ID, err
+}
+
+// waitRun waits until a run has ended (or ctx is done) for the default answer of an
+// http trigger with response: run (S38b1): the outputs of a workflow, the counts of the
+// transforms of a pipeline.
+func (s *Server) waitRun(ctx context.Context, id string) (triggers.Outcome, bool) {
+	d, ok := s.runs.Wait(ctx, id)
+	if !ok {
+		return triggers.Outcome{}, false
+	}
+	out := triggers.Outcome{Status: string(d.Status), Error: d.Error}
+	if d.Kind == "pipeline" {
+		counts := map[string]any{}
+		for _, a := range d.Actions {
+			if a.Counts != nil {
+				counts[a.ID] = a.Counts
+			}
+		}
+		out.Body = map[string]any{"transforms": counts}
+	} else if d.Outputs != nil {
+		out.Body = d.Outputs
+	}
+	return out, true
 }
 
 // running reports whether a run is still running.

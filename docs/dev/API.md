@@ -176,7 +176,10 @@ HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem 
 
 | Antwort | Bedeutung |
 |---|---|
-| `202` + `{"runId", "status"}`, Header `Location` | Lauf gestartet; `status` ist der Pfad des Laufs in dieser API |
+| `202` + `{"runId", "status"}`, Header `Location` | `response: accepted`: Lauf gestartet; `status` ist der Pfad des Laufs in dieser API |
+| Status, Header und Body von `http.respond` | `response: run` (seit S38b1): die erste Antwort des Laufs |
+| `200` + `outputs` / `500` + `{"error", "runId"}` | `response: run` ohne `http.respond`: Lauf erfolgreich bzw. gescheitert |
+| `504` + `{"error", "runId"}` | `response: run`: keine Antwort innerhalb von `timeout`; der Lauf läuft weiter |
 | `400` | Pflichtparameter fehlt, Wert passt nicht zum Typ, Body ist kein JSON-Objekt |
 | `401` | Token fehlt oder falsch (`Authorization: Bearer <token>`) |
 | `403` | Anfrage aus einer Webseite (`Origin`) oder – bei einem lokalen Listener – an einen fremden Host-Namen |
@@ -184,6 +187,8 @@ HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem 
 | `413` / `415` | Body über 1 MiB / weder JSON noch Formular |
 | `429` | `maxConcurrent` des Triggers oder `settings.maxConcurrentRuns` erreicht |
 | `500` / `503` | Ziel kann nicht gestartet werden (Meldung im Server-Log) / Server wird beendet |
+
+Bei `response: run` trägt jede Antwort den Header `Runnel-Run-Id`.
 
 ## Live-Ereignisse (`/events`)
 

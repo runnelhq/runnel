@@ -71,6 +71,8 @@ Zeitzone), in einem festen Abstand (`interval`), für neue Dateien in einem Ordn
 `curl -X POST http://127.0.0.1:7301/greet/Moin` bei `runnel serve examples/hello`); das Server-Log zeigt jeden Start.
 Aus dem Netz erreichbar werden HTTP-Trigger mit HTTPS, z. B. `runnel serve --triggers 0.0.0.0:7301 --triggers-tls auto`
 (selbst erzeugtes Zertifikat, Fingerabdruck im Log) oder mit eigenem Zertifikat (`--triggers-cert`, `--triggers-key`).
+Mit `response: run` wartet der Aufrufer auf die Antwort des Workflows (Action `http.respond` oder die `outputs`), z. B.
+`curl http://127.0.0.1:7301/answer/Anna` bei `runnel serve examples/hello`.
 
 ```powershell
 runnel service install D:\flows

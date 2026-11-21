@@ -1,0 +1,34 @@
+# Answers an HTTP request (roadmap S38b1); called by triggers/answer.yaml while
+# "runnel serve examples/hello" runs:
+#   curl -i http://127.0.0.1:7301/answer/Anna
+#   curl -i http://127.0.0.1:7301/answer/nobody
+# - "reply" answers the waiting caller: status, a header and a JSON body, with
+#   expressions; request.* describes the request.
+# - "done" runs after the answer; the caller does not wait for it.
+# Started from the editor or with "runnel run", http.respond does nothing.
+kind: Workflow
+apiVersion: runnel/v1
+name: answer
+parameters:
+  - name: NAME
+    description: Who to greet
+    required: true
+actions:
+  - id: start
+    type: core.start
+  - id: reply
+    type: http.respond
+    with:
+      status: "{{ params.NAME == 'nobody' ? 404 : 200 }}"
+      headers:
+        Cache-Control: no-store
+      body:
+        greeting: "{{ params.NAME == 'nobody' ? 'nobody to greet' : 'Hello, ' + params.NAME + '!' }}"
+        method: "{{ request?.method ?? 'none' }}"
+  - id: done
+    type: core.log
+    with:
+      message: "answered with {{ results.reply.output.status }} (sent: {{ results.reply.output.sent }})"
+links:
+  - { from: start, to: reply }
+  - { from: reply, to: done }

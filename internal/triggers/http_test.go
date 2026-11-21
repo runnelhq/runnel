@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/tlscert"
 )
@@ -269,5 +271,86 @@ func TestHTTPOnNetwork(t *testing.T) {
 		strings.Contains(logs, `trigger "items": auth: none`) ||
 		!strings.Contains(logs, "http triggers: listening on the network without TLS (--triggers-insecure)") {
 		t.Errorf("logs %v", f.logs)
+	}
+}
+
+// With response: run the caller gets the first answer of the run, the default answer
+// when the run ends, or 504 after the timeout (S38b1).
+func TestHTTPResponseRun(t *testing.T) {
+	t.Setenv("RUNNEL_TEST_TOKEN", "s3cret")
+	dir, f, s, _ := setup(t, map[string]string{
+		"svc.yaml": httpTrigger("svc", "POST", "/svc/{ID}", "") + "  auth: { token: \"${env:RUNNEL_TEST_TOKEN}\" }\n  response: run\n  timeout: 1s\n",
+	})
+	write(t, dir, "workflows/api.workflow.yaml", apiTarget)
+	s.Reload()
+	var behave func(id string, r StartRequest) // what the simulated run does
+	outcomes := map[string]Outcome{}
+	s.opts.Start = func(tr *model.Trigger, r StartRequest) (string, error) {
+		id, err := f.start(tr, r)
+		go behave(id, r)
+		return id, err
+	}
+	s.opts.Wait = func(ctx context.Context, id string) (Outcome, bool) {
+		f.mu.Lock()
+		out, ok := outcomes[id]
+		f.mu.Unlock()
+		if !ok {
+			<-ctx.Done()
+			return Outcome{Status: "running"}, true
+		}
+		return out, true
+	}
+	post := func(body string) *httptest.ResponseRecorder {
+		return call{method: "POST", path: "/svc/7?q=1", token: "s3cret", contentType: "application/json", body: body}.do(s)
+	}
+
+	// The first http.respond answers; a second one is refused.
+	second := make(chan bool, 1)
+	behave = func(_ string, r StartRequest) {
+		r.Respond(action.Response{Status: 201, Headers: map[string]string{"X-Item": "7"}, Body: map[string]any{"created": true}})
+		second <- r.Respond(action.Response{Status: 500})
+	}
+	w := post(`{"NAME": "a", "DATA": {"n": 3, "x": 1.5}}`)
+	if w.Code != 201 || w.Header().Get("X-Item") != "7" || w.Header().Get("Runnel-Run-Id") != "run-1" ||
+		w.Header().Get("Content-Type") != "application/json; charset=utf-8" || strings.TrimSpace(w.Body.String()) != `{"created":true}` {
+		t.Errorf("respond: %d %v %s", w.Code, w.Header(), w.Body)
+	}
+	if <-second {
+		t.Error("second answer accepted")
+	}
+	req := f.requests[0].Request
+	body, _ := req["body"].(map[string]any)
+	headers, _ := req["headers"].(map[string]any)
+	if req["method"] != "POST" || req["path"] != "/svc/7" || req["query"].(map[string]any)["q"] != "1" || req["client"] != "192.0.2.7" ||
+		body["NAME"] != "a" || body["DATA"].(map[string]any)["n"] != int64(3) || body["DATA"].(map[string]any)["x"] != 1.5 ||
+		headers["Content-Type"] != "application/json" || headers["Authorization"] != nil {
+		t.Errorf("request %v", req)
+	}
+
+	// A text answer is sent as text.
+	behave = func(_ string, r StartRequest) { r.Respond(action.Response{Status: 422, Body: "missing name"}) }
+	if w := post(""); w.Code != 422 || w.Body.String() != "missing name" || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/plain") {
+		t.Errorf("text: %d %v %q", w.Code, w.Header(), w.Body)
+	}
+
+	// Without http.respond: the outputs when the run has succeeded, 500 when it failed.
+	behave = func(string, StartRequest) {}
+	f.mu.Lock()
+	outcomes["run-3"] = Outcome{Status: "succeeded", Body: map[string]any{"MESSAGE": "hi"}}
+	outcomes["run-4"] = Outcome{Status: "failed", Error: "disk full"}
+	f.mu.Unlock()
+	if w := post(""); w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"MESSAGE":"hi"}` {
+		t.Errorf("default: %d %s", w.Code, w.Body)
+	}
+	if w := post(""); w.Code != 500 || !strings.Contains(w.Body.String(), `"error":"the run failed; see run run-4"`) || strings.Contains(w.Body.String(), "disk full") {
+		t.Errorf("failed: %d %s", w.Code, w.Body)
+	}
+	if !strings.Contains(strings.Join(f.logs, "\n"), `trigger "svc": run run-4 failed without an answer: disk full`) {
+		t.Errorf("logs %v", f.logs)
+	}
+
+	// No answer within the timeout: 504; the run goes on.
+	if w := post(""); w.Code != 504 || !strings.Contains(w.Body.String(), "no answer within 1s; the run run-5 goes on") {
+		t.Errorf("timeout: %d %s", w.Code, w.Body)
 	}
 }

@@ -126,6 +126,17 @@ Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
 - Die Prüfung des `Host`-Headers gilt nur für einen lokalen Listener; Anfragen aus Webseiten (`Origin`) bleiben
   überall abgelehnt.
 
+## Ergänzungen bei der Umsetzung (S38b1)
+
+- **Schnitt:** S38b ist geteilt in S38b1 (`response: run`, `timeout`, Standardantwort, `http.respond`, `request`) und
+  S38b2 (`history`, eigenes Limit im Lauf-Speicher, Zwischenspeicher vorbereiteter Workflows).
+- **Sub-Workflows:** Der wartende Aufrufer und `request` werden an aufgerufene Workflows weitergereicht; die erste
+  `http.respond` irgendwo im Lauf antwortet.
+- **Nach dem Timeout** läuft der Lauf weiter; eine spätere `http.respond` wird mit Warnung ignoriert.
+- `request.headers` enthält `Authorization` nicht, damit das Token nicht in Läufe und Logs gelangt. Zahlen im JSON-Body
+  behalten in `request.body` ihren Typ.
+- Jede Antwort bei `response: run` trägt den Header `Runnel-Run-Id`.
+
 ## Konsequenzen
 
 - Ein Begriff „Trigger“ für alles, was Läufe automatisch startet: `cron`, `file`, `interval`, `http`. Der Typ `webhook`

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 )
@@ -26,10 +27,11 @@ var PollInterval = 5 * time.Second
 type Options struct {
 	// Dir is the project directory.
 	Dir string
-	// Start starts a run of the trigger's target and returns its id. params are set in
-	// addition to those of the trigger (the path of a file for file triggers, the values
-	// of a request for http triggers); client is the address of the caller (http).
-	Start func(t *model.Trigger, params map[string]string, client string) (string, error)
+	// Start starts a run of the trigger's target and returns its id.
+	Start func(t *model.Trigger, r StartRequest) (string, error)
+	// Wait waits until a run has ended or ctx is done and returns its outcome, for the
+	// default answer of http triggers with response: run; false if the run is unknown.
+	Wait func(ctx context.Context, runID string) (Outcome, bool)
 	// Running reports whether a run is still running (for overlap: skip).
 	Running func(runID string) bool
 	// Log receives messages for the server log, e.g. started and skipped runs.
@@ -67,6 +69,30 @@ type entry struct {
 	files  *watch   // file triggers
 	// startMu makes counting the running runs and starting one atomic (http).
 	startMu sync.Mutex
+}
+
+// StartRequest describes a start of a trigger's target.
+type StartRequest struct {
+	// Params are set in addition to those of the trigger: the path of a file (file),
+	// the values of a request (http).
+	Params map[string]string
+	// Client is the address of the caller (http).
+	Client string
+	// Request is the request of the caller (http; request in expressions).
+	Request map[string]any
+	// Respond answers the waiting caller (http with response: run; http.respond).
+	Respond action.Responder
+}
+
+// Outcome is the state of a run when it has ended.
+type Outcome struct {
+	// Status is running (still running), succeeded, failed or cancelled.
+	Status string
+	// Body is the default answer of a succeeded run: the outputs of a workflow, the
+	// counts of the transforms of a pipeline.
+	Body any
+	// Error is the reason of a failure.
+	Error string
 }
 
 // Fired is what happened at the last due time of a trigger.
@@ -281,7 +307,7 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 	if busy {
 		f.Skipped = true
 		msg = fmt.Sprintf("trigger %q: skipped, the previous run %s is still running (overlap: skip)", t.Name, running)
-	} else if id, err := s.opts.Start(t, params, ""); err != nil {
+	} else if id, err := s.opts.Start(t, StartRequest{Params: params}); err != nil {
 		f.Error = err.Error()
 		msg = fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, what, err)
 	} else {

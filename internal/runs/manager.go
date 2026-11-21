@@ -456,6 +456,23 @@ func (m *Manager) Get(id string) (Detail, bool) {
 	return d, true
 }
 
+// Wait waits until a run has ended or ctx is done and returns its state; false if
+// there is no such run.
+func (m *Manager) Wait(ctx context.Context, id string) (Detail, bool) {
+	for {
+		_, _, wake := m.EventsSince(m.LastSeq())
+		d, ok := m.Get(id)
+		if !ok || d.Status != StatusRunning {
+			return d, ok
+		}
+		select {
+		case <-wake:
+		case <-ctx.Done():
+			return d, true
+		}
+	}
+}
+
 // Cancel stops a running run. It reports whether the run exists and whether it was
 // still running.
 func (m *Manager) Cancel(id string) (found, running bool) {

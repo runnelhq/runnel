@@ -30,7 +30,7 @@ const MaxLength = 4096
 const maxNodes = 2000
 
 // WorkflowRoots are the names a workflow expression can refer to (ADR 0006).
-var WorkflowRoots = []string{"vars", "params", "env", "run", "result", "results"}
+var WorkflowRoots = []string{"vars", "params", "env", "run", "result", "results", "request"}
 
 // RowRoots are the names an expression in the configuration of a workflow action with
 // forEach can refer to: the workflow names and row, the current entry (S24b).

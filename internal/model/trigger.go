@@ -121,11 +121,13 @@ type TriggerSettings struct {
 	Method string `yaml:"method,omitempty" json:"method,omitempty"`
 	// Auth is none or { token: ${env:NAME} } (http).
 	Auth any `yaml:"auth,omitempty" json:"auth,omitempty"`
-	// Response is accepted (default: 202 with the run id at once); run follows with S38b.
+	// Response is accepted (default: 202 with the run id at once) or run (the caller
+	// waits for the answer of the run, at most timeout).
 	Response string `yaml:"response,omitempty" json:"response,omitempty"`
 	// MaxConcurrent limits the running runs of the trigger (http; 0: no own limit).
 	MaxConcurrent int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty"`
-	// Timeout and History belong to response: run (S38b).
+	// Timeout is how long the caller waits with response: run (default 30s); History
+	// follows with S38b2.
 	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	History string   `yaml:"history,omitempty" json:"history,omitempty"`
 }
@@ -283,7 +285,7 @@ var fieldsOf = map[string][]string{
 	TriggerCron:     {"schedule", "timezone", "overlap"},
 	TriggerInterval: {"every", "overlap"},
 	TriggerFile:     {"path", "pattern", "interval", "param", "mode", "existing", "overlap"},
-	TriggerHTTP:     {"method", "path", "auth", "response", "maxConcurrent"},
+	TriggerHTTP:     {"method", "path", "auth", "response", "timeout", "maxConcurrent"},
 }
 
 // unusedFields reports fields under with: that the type does not use, e.g. schedule in
@@ -298,8 +300,8 @@ func (t *Trigger) unusedFields() Errors {
 	}
 	var errs Errors
 	for _, f := range sortedKeys(set) {
-		if t.Type == TriggerHTTP && (f == "timeout" || f == "history") {
-			continue // reported by checkHTTP: they follow with response: run
+		if t.Type == TriggerHTTP && f == "history" {
+			continue // reported by checkHTTP: it follows with S38b2
 		}
 		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
 			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))

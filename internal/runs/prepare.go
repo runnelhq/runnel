@@ -43,6 +43,11 @@ type Spec struct {
 	Trigger string
 	// Client is the address of the caller of an http trigger.
 	Client string
+	// Request is the request of the caller of an http trigger (request in
+	// expressions) and Respond answers it (http.respond); both are passed on to
+	// called workflows (S38b1).
+	Request map[string]any
+	Respond action.Responder
 
 	// chain lists the workflows that called this one (core.run-workflow).
 	chain []caller
@@ -125,6 +130,8 @@ func Prepare(spec Spec) (*Prepared, error) {
 		Environment: envName,
 		Workflows:   spec.workflows(envName),
 		Pipelines:   spec.pipelines(envName),
+		Request:     spec.Request,
+		Respond:     spec.Respond,
 	})
 	return p, err
 }

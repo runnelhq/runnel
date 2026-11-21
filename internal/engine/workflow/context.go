@@ -21,6 +21,9 @@ type runContext struct {
 	env     map[string]any
 	run     map[string]any
 	results map[string]any
+	// request is the request of the caller of an http trigger; nil (untyped) otherwise,
+	// so that request == nil holds in expressions.
+	request any
 }
 
 // newRunContext evaluates expressions in parameter defaults and prepares the context.
@@ -37,6 +40,7 @@ func (r *Runner) newRunContext(runID string, started time.Time) (*runContext, er
 			"startedAt": started, "lastError": "",
 		},
 		results: map[string]any{},
+		request: requestValue(r.opts.Request),
 	}
 
 	// Defaults of parameters that were not given may be expressions; they are evaluated
@@ -89,6 +93,7 @@ func (c *runContext) values(result any) map[string]any {
 		"run":     maps.Clone(c.run),
 		"results": maps.Clone(c.results),
 		"result":  result,
+		"request": c.request,
 	}
 }
 
@@ -205,4 +210,11 @@ func (r *Runner) evalValue(v any, scope *vars.Scope, values map[string]any) (any
 		return out, nil
 	}
 	return v, nil
+}
+
+func requestValue(r map[string]any) any {
+	if r == nil {
+		return nil
+	}
+	return r
 }
