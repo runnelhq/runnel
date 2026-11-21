@@ -66,8 +66,9 @@ runnel triggers examples/hello
 
 `runnel triggers [projektordner]` listet die Trigger des Projekts (`triggers/*.yaml`) mit Zeitplan, Ziel und nächstem
 Zeitpunkt. Solange `runnel serve` läuft, starten sie ihre Workflows bzw. Pipelines: zu festen Zeiten (Cron-Ausdruck mit
-Zeitzone), in einem festen Abstand (`interval`) oder für neue Dateien in einem Ordner (`file`, z. B.
-`runnel serve examples/files`); das Server-Log zeigt jeden Start.
+Zeitzone), in einem festen Abstand (`interval`), für neue Dateien in einem Ordner (`file`, z. B.
+`runnel serve examples/files`) oder auf Anfrage per HTTP (`http`, eigener Listener auf `127.0.0.1:7301`, z. B.
+`curl -X POST http://127.0.0.1:7301/greet/Moin` bei `runnel serve examples/hello`); das Server-Log zeigt jeden Start.
 
 ```powershell
 runnel service install D:\flows

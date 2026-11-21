@@ -18,12 +18,13 @@ type fake struct {
 	mu      sync.Mutex
 	started []string // trigger names
 	params  []map[string]string
+	clients []string
 	running map[string]bool
 	logs    []string
 	fail    error
 }
 
-func (f *fake) start(t *model.Trigger, params map[string]string) (string, error) {
+func (f *fake) start(t *model.Trigger, params map[string]string, client string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.fail != nil {
@@ -32,6 +33,7 @@ func (f *fake) start(t *model.Trigger, params map[string]string) (string, error)
 	id := fmt.Sprintf("run-%d", len(f.started)+1)
 	f.started = append(f.started, t.Name)
 	f.params = append(f.params, params)
+	f.clients = append(f.clients, client)
 	f.running[id] = true
 	return id, nil
 }

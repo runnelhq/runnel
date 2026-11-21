@@ -43,6 +43,8 @@ type Options struct {
 	Log func(msg string)
 	// Warn receives problems for the server log (e.g. trigger files with errors); nil: Log.
 	Warn func(msg string)
+	// TriggerListen is the address of the listener of http triggers (S38a); empty: none.
+	TriggerListen string
 }
 
 // Server serves the API for one project.
@@ -75,7 +77,8 @@ func New(opts Options) (*Server, error) {
 	}
 	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
 		stop: make(chan struct{})}
-	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Running: s.running, Log: opts.Log, Warn: opts.Warn})
+	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Running: s.running, Log: opts.Log, Warn: opts.Warn,
+		Listen: opts.TriggerListen})
 	return s, nil
 }
 

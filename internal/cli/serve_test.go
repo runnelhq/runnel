@@ -162,3 +162,21 @@ func writeFiles(t *testing.T, dir string, files map[string]string) {
 		}
 	}
 }
+
+func TestCheckTriggersAddress(t *testing.T) {
+	for _, ok := range []string{"", "127.0.0.1:7301", "[::1]:0", "localhost:8080"} {
+		if err := checkTriggersAddress(ok); err != nil {
+			t.Errorf("%q: %v", ok, err)
+		}
+	}
+	for addr, want := range map[string]string{
+		"7301":            "expected an address with a port",
+		"127.0.0.1:x":     "port 0–65535",
+		"0.0.0.0:7301":    "listening on the network follows with TLS (roadmap S40a)",
+		"192.0.2.10:7301": "for now use 127.0.0.1 or ::1",
+	} {
+		if err := checkTriggersAddress(addr); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v, want %q", addr, err, want)
+		}
+	}
+}

@@ -1,0 +1,14 @@
+# Like greet.yaml without the greeting in the path: it may come in the body (JSON or a
+# form) or in the query (?GREETING=Hi), otherwise the default of the workflow applies.
+kind: Trigger
+apiVersion: runnel/v1
+name: greet-default
+description: Greets on request, greeting from the body
+type: http
+target: workflows/hello.workflow.yaml
+environment: dev
+with:
+  method: POST
+  path: /greet
+  auth: none
+  maxConcurrent: 2          # more running runs of this trigger: 429

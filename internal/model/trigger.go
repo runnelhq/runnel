@@ -21,8 +21,8 @@ const KindTrigger = "Trigger"
 // TriggersDir is the folder of the trigger files in a project.
 const TriggersDir = "triggers"
 
-// Trigger types (KONZEPT, chapter 2.7): cron (roadmap S37), file and interval (S38);
-// http follows with S38a (ADR 0018).
+// Trigger types (KONZEPT, chapter 2.7): cron (roadmap S37), file and interval (S38),
+// http (S38a, ADR 0018).
 const (
 	TriggerCron     = "cron"
 	TriggerFile     = "file"
@@ -115,6 +115,19 @@ type TriggerSettings struct {
 	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
 	// Existing is process (default) or ignore: files already there when the server starts.
 	Existing string `yaml:"existing,omitempty" json:"existing,omitempty"`
+
+	// Method is the HTTP method (http): GET, POST, PUT, PATCH or DELETE. Path (above) is
+	// the URL path with placeholders, e.g. /api/customers/{id}.
+	Method string `yaml:"method,omitempty" json:"method,omitempty"`
+	// Auth is none or { token: ${env:NAME} } (http).
+	Auth any `yaml:"auth,omitempty" json:"auth,omitempty"`
+	// Response is accepted (default: 202 with the run id at once); run follows with S38b.
+	Response string `yaml:"response,omitempty" json:"response,omitempty"`
+	// MaxConcurrent limits the running runs of the trigger (http; 0: no own limit).
+	MaxConcurrent int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty"`
+	// Timeout and History belong to response: run (S38b).
+	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	History string   `yaml:"history,omitempty" json:"history,omitempty"`
 }
 
 // EveryValue returns the time between two runs of an interval trigger.
@@ -227,13 +240,11 @@ func (t *Trigger) validate() error {
 		errs = append(errs, s.errorf("$.name", "invalid trigger name %q (letters, digits, - and _, starting with a letter)", t.Name))
 	}
 	switch t.Type {
-	case TriggerCron, TriggerFile, TriggerInterval:
+	case TriggerCron, TriggerFile, TriggerInterval, TriggerHTTP:
 	case "":
-		errs = append(errs, s.errorf("$", `missing required field "type" (expected cron, interval or file)`))
-	case TriggerHTTP:
-		errs = append(errs, s.errorf("$.type", "trigger type %q is not supported yet (roadmap S38a, ADR 0018)", t.Type))
+		errs = append(errs, s.errorf("$", `missing required field "type" (expected cron, interval, file or http)`))
 	default:
-		errs = append(errs, s.errorf("$.type", "unknown trigger type %q (expected cron, interval or file)", t.Type))
+		errs = append(errs, s.errorf("$.type", "unknown trigger type %q (expected cron, interval, file or http)", t.Type))
 	}
 	switch {
 	case t.Target == "":
@@ -255,9 +266,13 @@ func (t *Trigger) validate() error {
 		errs = append(errs, t.checkInterval()...)
 	case TriggerFile:
 		errs = append(errs, t.checkFile()...)
+	case TriggerHTTP:
+		errs = append(errs, t.checkHTTP()...)
 	}
 	if t.Type == TriggerCron || t.Type == TriggerInterval || t.Type == TriggerFile {
 		errs = append(errs, t.checkOverlap()...)
+	}
+	if fieldsOf[t.Type] != nil {
 		errs = append(errs, t.unusedFields()...)
 	}
 	return errs.errOrNil()
@@ -268,6 +283,7 @@ var fieldsOf = map[string][]string{
 	TriggerCron:     {"schedule", "timezone", "overlap"},
 	TriggerInterval: {"every", "overlap"},
 	TriggerFile:     {"path", "pattern", "interval", "param", "mode", "existing", "overlap"},
+	TriggerHTTP:     {"method", "path", "auth", "response", "maxConcurrent"},
 }
 
 // unusedFields reports fields under with: that the type does not use, e.g. schedule in
@@ -277,9 +293,14 @@ func (t *Trigger) unusedFields() Errors {
 		"schedule": t.With.Schedule != "", "timezone": t.With.Timezone != "", "overlap": t.With.Overlap != "",
 		"every": t.With.Every != "", "path": t.With.Path != "", "pattern": t.With.Pattern != "",
 		"interval": t.With.Interval != "", "param": t.With.Param != "", "mode": t.With.Mode != "", "existing": t.With.Existing != "",
+		"method": t.With.Method != "", "auth": t.With.Auth != nil, "response": t.With.Response != "", "maxConcurrent": t.With.MaxConcurrent != 0,
+		"timeout": t.With.Timeout != "", "history": t.With.History != "",
 	}
 	var errs Errors
 	for _, f := range sortedKeys(set) {
+		if t.Type == TriggerHTTP && (f == "timeout" || f == "history") {
+			continue // reported by checkHTTP: they follow with response: run
+		}
 		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
 			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))
 		}
@@ -415,6 +436,8 @@ func LoadTriggers(projectDir string) ([]*Trigger, error) {
 		names[t.Name] = file
 		out = append(out, t)
 	}
+	out, conflicts := checkRoutes(out)
+	errs = append(errs, conflicts...)
 	return out, errs.errOrNil()
 }
 
@@ -434,6 +457,8 @@ func (t *Trigger) Describe() string {
 		return "every " + string(t.With.Every)
 	case TriggerFile:
 		return fmt.Sprintf("new %s in %s", t.FilePattern(), t.With.Path)
+	case TriggerHTTP:
+		return t.HTTPMethod() + " " + t.With.Path
 	}
 	return t.Type
 }

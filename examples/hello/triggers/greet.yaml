@@ -1,0 +1,18 @@
+# Greets on request while "runnel serve examples/hello" runs (roadmap S38a). Try it:
+#   curl -X POST http://127.0.0.1:7301/greet/Moin
+#   curl -X POST -H "Content-Type: application/json" -d "{\"GREETING\": \"Hi\"}" http://127.0.0.1:7301/greet
+# The answer is 202 with the run id; follow the run in the editor or under the API:
+#   http://127.0.0.1:7300/api/v1/runs/<runId>
+# auth: none is meant for this computer and the internal network; elsewhere use
+# auth: { token: ${env:NAME} } and send "Authorization: Bearer <token>".
+kind: Trigger
+apiVersion: runnel/v1
+name: greet
+description: Greets on request
+type: http
+target: workflows/hello.workflow.yaml
+environment: dev
+with:
+  method: POST
+  path: /greet/{GREETING}   # the placeholder fills the parameter GREETING
+  auth: none

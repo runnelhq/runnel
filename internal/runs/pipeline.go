@@ -25,6 +25,8 @@ type PipelineSpec struct {
 	RunID    string
 	// Trigger names what started the run, e.g. "cron:nightly"; empty: started by hand.
 	Trigger string
+	// Client is the address of the caller of an http trigger.
+	Client string
 	// Rows are records for core.from-result (from core.run-pipeline).
 	Rows []record.Record
 }

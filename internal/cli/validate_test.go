@@ -30,7 +30,7 @@ func TestValidateExamples(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("examples/hello: exit code %d, stderr %q, stdout:\n%s", code, errOut, out)
 	}
-	if want := "3 workflow files and 2 trigger files checked: 0 errors, 0 warnings\n"; out != want {
+	if want := "3 workflow files and 4 trigger files checked: 0 errors, 0 warnings\n"; out != want {
 		t.Errorf("examples/hello output = %q, want %q", out, want)
 	}
 

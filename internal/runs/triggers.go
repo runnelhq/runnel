@@ -27,28 +27,10 @@ func CheckTrigger(t *model.Trigger, p *model.Project, projectDir string) model.E
 		}
 		errs = append(errs, t.ErrorAt("$.environment", "environment %q not found (%s)", t.Environment, hint))
 	}
-	file := filepath.Join(projectDir, filepath.FromSlash(t.Target))
-	data, err := os.ReadFile(file)
-	if errors.Is(err, fs.ErrNotExist) {
-		return append(errs, t.ErrorAt("$.target", "target %s not found in the project", t.Target))
-	} else if err != nil {
-		return append(errs, t.ErrorAt("$.target", "cannot read target %s: %v", t.Target, err))
-	}
-	var params []model.Parameter
-	what := "workflow " + t.Target
-	if strings.HasSuffix(t.Target, ".pipeline.yaml") {
-		what = "pipeline " + t.Target
-		pl, err := model.ParsePipeline(t.Target, data)
-		if err != nil {
-			return append(errs, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what))
-		}
-		params = pl.Parameters
-	} else {
-		w, err := model.ParseWorkflow(t.Target, data)
-		if err != nil {
-			return append(errs, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what))
-		}
-		params = w.Parameters
+	params, what, err := TargetParams(t, projectDir)
+	var located *model.Error
+	if errors.As(err, &located) {
+		return append(errs, located)
 	}
 	given := t.Params
 	if t.Type == model.TriggerFile {
@@ -61,7 +43,86 @@ func CheckTrigger(t *model.Trigger, p *model.Project, projectDir string) model.E
 			given[t.With.Param] = nil // set at start; not a fixed value to check
 		}
 	}
+	if t.Type == model.TriggerHTTP {
+		errs = append(errs, checkHTTPTrigger(t, params, what)...)
+		return errs // the required parameters may come with the request
+	}
 	return append(errs, checkGivenParams(t.ErrorAt, "$", "", params, what, given)...)
+}
+
+// TargetParams reads the target of a trigger and returns its parameters and a
+// description such as "workflow workflows/a.workflow.yaml"; the error is located at
+// the target of the trigger.
+func TargetParams(t *model.Trigger, projectDir string) ([]model.Parameter, string, error) {
+	file := filepath.Join(projectDir, filepath.FromSlash(t.Target))
+	data, err := os.ReadFile(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, "", t.ErrorAt("$.target", "target %s not found in the project", t.Target)
+	} else if err != nil {
+		return nil, "", t.ErrorAt("$.target", "cannot read target %s: %v", t.Target, err)
+	}
+	what := "workflow " + t.Target
+	if strings.HasSuffix(t.Target, ".pipeline.yaml") {
+		what = "pipeline " + t.Target
+		pl, err := model.ParsePipeline(t.Target, data)
+		if err != nil {
+			return nil, what, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what)
+		}
+		return pl.Parameters, what, nil
+	}
+	w, err := model.ParseWorkflow(t.Target, data)
+	if err != nil {
+		return nil, what, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what)
+	}
+	return w.Parameters, what, nil
+}
+
+// checkHTTPTrigger checks an http trigger against its target: the fixed params fit,
+// each placeholder of the path is a parameter that is not fixed, and the environment
+// variable of the token is set.
+func checkHTTPTrigger(t *model.Trigger, params []model.Parameter, what string) model.Errors {
+	var errs model.Errors
+	declared := map[string]bool{}
+	for _, p := range params {
+		declared[p.Name] = true
+	}
+	for _, key := range slices.Sorted(maps.Keys(t.Params)) {
+		if !declared[key] {
+			errs = append(errs, t.ErrorAt("$.params."+key, "parameter %s is not declared by %s (declared: %s)", key, what, declaredOf(params)))
+		}
+	}
+	errs = append(errs, checkFixedValues(t, params, what)...)
+	for _, name := range t.Placeholders() {
+		switch {
+		case !declared[name]:
+			errs = append(errs, t.ErrorAt("$.with.path", "placeholder {%s} is not a parameter of %s (declared: %s)", name, what, declaredOf(params)))
+		case t.Params[name] != nil:
+			errs = append(errs, t.ErrorAt("$.with.path", "placeholder {%s} is also set under params; fixed values cannot come from the request", name))
+		}
+	}
+	if v := t.TokenVariable(); v != "" {
+		if _, ok := t.Token(); !ok {
+			errs = append(errs, t.ErrorAt("$.with.auth.token", "environment variable %s with the token is not set; set it for the server (for a service: as a system variable, then restart it)", v))
+		}
+	}
+	return errs
+}
+
+// checkFixedValues checks the fixed values under params against the types of the target.
+func checkFixedValues(t *model.Trigger, params []model.Parameter, what string) model.Errors {
+	var errs model.Errors
+	for _, p := range params {
+		v, ok := t.Params[p.Name]
+		if !ok {
+			continue
+		}
+		if text, fixed := staticText(v); fixed {
+			if _, err := p.CheckValue(text); err != nil {
+				errs = append(errs, t.ErrorAt("$.params."+p.Name, "parameter %s (%s) of %s: %v", p.Name, p.Type.OrString(), what, err))
+			}
+		}
+	}
+	return errs
 }
 
 // checkFileParam checks the parameter that receives the path (mode each, type string)

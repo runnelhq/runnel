@@ -40,7 +40,9 @@ type Run struct {
 	// Workflow is the name of the workflow or pipeline.
 	Workflow string `json:"workflow"`
 	// Trigger names what started the run, e.g. "cron:nightly" (S37); empty: by hand.
-	Trigger     string            `json:"trigger,omitempty"`
+	Trigger string `json:"trigger,omitempty"`
+	// Client is the address of the caller of an http trigger (S38a).
+	Client      string            `json:"client,omitempty"`
 	Environment string            `json:"environment,omitempty"`
 	Params      map[string]string `json:"params,omitempty"`
 	Status      workflow.Status   `json:"status"`
@@ -179,7 +181,7 @@ func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
 	for i, a := range p.Workflow.Actions {
 		steps[i] = [2]string{a.ID, a.Type}
 	}
-	run, err := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger},
+	run, err := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client},
 		p.Env, steps, limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns), func(ctx context.Context) { p.Runner.Run(ctx) })
 	return run, p, err
 }
@@ -201,7 +203,7 @@ func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedP
 	for i, t := range p.Pipeline.Transforms {
 		steps[i] = [2]string{t.ID, t.Type}
 	}
-	run, err := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger,
+	run, err := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
 		LinkRows: make([]int64, len(p.Pipeline.Links))}, p.Env, steps, limitsOf(p.Project, 0),
 		func(ctx context.Context) { p.Runner.Run(ctx) })
 	return run, p, err

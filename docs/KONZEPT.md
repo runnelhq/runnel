@@ -177,7 +177,7 @@ Der Secret-Store ist lokal verschlüsselt (siehe Kap. 8).
 |---|---|
 | `manual` | Start über UI oder CLI |
 | `cron` | Zeitplan (Cron-Syntax + Zeitzone), Optionen: kein paralleler Lauf, Nachholen verpasster Läufe |
-| `http` | HTTP-Endpunkt mit Methode und Pfad (`/api/customers/{id}`); Pfad, Query und Body werden zu Parametern. Als Webhook sofort `202` (`response: accepted`) oder als Dienst mit Antwort aus dem Lauf (`response: run`, Action `http.respond` bzw. Transform `http.response`) – [ADR 0018](adr/0018-http-trigger.md) |
+| `http` | (seit S38a) HTTP-Endpunkt mit Methode und Pfad (`/api/customers/{id}`); Pfad, Query und Body werden zu Parametern. Als Webhook sofort `202` (`response: accepted`) oder als Dienst mit Antwort aus dem Lauf (`response: run`, Action `http.respond` bzw. Transform `http.response`) – [ADR 0018](adr/0018-http-trigger.md) |
 | `file` | Ordner-Überwachung (Ordner + Pattern), z. B. neue CSV im Eingangsordner: ein Lauf je neuer Datei oder einer für alle neuen Dateien; der Ordner wird abgefragt (Polling), damit Netzlaufwerke und UNC-Pfade gleich funktionieren |
 | `interval` | fester Abstand, z. B. alle 15 Minuten; der erste Lauf nach dem ersten Abstand |
 
@@ -585,8 +585,38 @@ Ziel-Parameter prüft `runnel validate`: `param` muss das Ziel deklarieren (`str
 nicht zusätzlich unter `params` stehen. Ein Trigger startet Workflows und Pipelines gleich; Pipelines bekommen den Pfad
 ebenso als Parameter (z. B. für `csv.input`).
 
-Ein HTTP-Trigger (`type: http`) hat statt `schedule` Methode, Pfad, Absicherung und Antwortmodus unter `with:`;
-Format und Verhalten in [ADR 0018](adr/0018-http-trigger.md).
+HTTP-Trigger (seit S38a; Grundlage [ADR 0018](adr/0018-http-trigger.md)) – ein Aufruf startet einen Lauf:
+
+```yaml
+type: http
+target: workflows/import.workflow.yaml
+params: { MODE: full }       # feste Werte; die Anfrage kann sie nicht ändern
+with:
+  method: POST               # GET, POST, PUT, PATCH, DELETE
+  path: /hooks/import/{DAYS} # Platzhalter {name} werden zu Parametern des Ziels
+  auth: { token: ${env:IMPORT_TOKEN} }   # oder: auth: none
+  response: accepted         # sofort 202 mit der Lauf-ID; run (Antwort aus dem Lauf) folgt mit S38b
+  maxConcurrent: 5           # laufende Runs dieses Triggers, darüber 429; 0 (Standard): kein eigenes Limit
+```
+
+- **Listener:** HTTP-Trigger laufen auf einem eigenen Listener, getrennt vom Editor: `--triggers` bei `runnel serve`
+  und `runnel service install`, Standard `127.0.0.1:7301`. Er öffnet sich erst, wenn ein HTTP-Trigger aktiv ist. Bis
+  S40a (TLS) nur auf diesem Rechner (`127.0.0.1`, `::1`); Anfragen aus Webseiten (`Origin`-Header) und an fremde
+  Host-Namen werden mit `403` abgelehnt.
+- **Routing:** Methode und Pfad sind im Projekt eindeutig; feste Teile ohne Rücksicht auf Groß-/Kleinschreibung.
+  Überschneidungen (`/a/{x}` und `/a/b`) meldet `runnel validate`, der spätere Trigger bleibt inaktiv. Unbekannter
+  Pfad oder deaktivierter Trigger: `404`, falsche Methode: `405`.
+- **Absicherung:** `auth: { token: ${env:NAME} }` erwartet `Authorization: Bearer <token>` (sonst `401`). Das Token steht
+  nur in einer Umgebungsvariablen, nie in der Datei; fehlt sie beim Laden, ist der Trigger inaktiv. `auth: none` ist
+  ausdrücklich anzugeben.
+- **Parameter:** Pfad-Platzhalter, Query und Body (JSON-Objekt oder Formular `application/x-www-form-urlencoded`) werden
+  zu Parametern des Ziels; bei gleichem Namen gilt Pfad vor Query vor Body. Nicht deklarierte Felder werden ignoriert,
+  feste `params` des Triggers gewinnen. JSON-Werte, die kein Text sind, kommen als JSON-Text an (für Parameter vom Typ
+  `json`). Fehlt ein Pflichtparameter oder passt ein Typ nicht: `400` mit der Meldung, ohne Lauf. Andere Formate:
+  `415`, Body über 1 MiB: `413`.
+- **Antwort:** `202` mit `{ "runId": …, "status": "/api/v1/runs/…" }` (der Status steht in der API des Editors).
+  `maxConcurrent` oder `settings.maxConcurrentRuns` erreicht: `429`; Server wird beendet: `503`. Der Lauf trägt
+  `trigger = http:<name>` und die Adresse des Aufrufers (`client`).
 
 ---
 

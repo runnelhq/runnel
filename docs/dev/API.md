@@ -41,7 +41,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
 | POST | `/runs/{id}/cancel` | Lauf abbrechen: `202`; bereits beendet `409` |
 | GET | `/events` | Live-Ereignisse (Server-Sent Events), siehe unten |
-| GET | `/triggers` | Trigger des Projekts (S37, S38): `{"triggers": [{name, file, type, target, schedule, timezone, enabled, next, last} …], "problems": [Problem …]}`. `schedule` ist der Cron-Ausdruck, `every 15m` (`interval`) oder `new *.csv in inbox` (`file`); `timezone` nur bei `cron`. `next` ist der nächste Zeitpunkt, bei `file` die nächste Abfrage des Ordners (fehlt bei deaktivierten Triggern), `last` das Ergebnis des letzten fälligen Zeitpunkts seit dem Start des Servers (`{time, runId}`, `{time, skipped: true}` bei `overlap: skip` oder `{time, error}`, bei `file` zusätzlich `files` mit den absoluten Pfaden; ein nicht lesbarer Ordner steht als `error`); `problems` sind Fehler in Trigger-Dateien (Format wie `/validate`), solche Trigger sind nicht aktiv |
+| GET | `/triggers` | Trigger des Projekts (S37, S38): `{"triggers": [{name, file, type, target, schedule, timezone, enabled, next, last} …], "problems": [Problem …]}`. `schedule` ist der Cron-Ausdruck, `every 15m` (`interval`), `new *.csv in inbox` (`file`) oder `POST /hooks/import` (`http`, seit S38a); `http` ist die Adresse des Listeners der HTTP-Trigger, sobald er offen ist; `timezone` nur bei `cron`. `next` ist der nächste Zeitpunkt, bei `file` die nächste Abfrage des Ordners (fehlt bei deaktivierten Triggern), `last` das Ergebnis des letzten fälligen Zeitpunkts seit dem Start des Servers (`{time, runId}`, `{time, skipped: true}` bei `overlap: skip` oder `{time, error}`, bei `file` zusätzlich `files` mit den absoluten Pfaden; ein nicht lesbarer Ordner steht als `error`); `problems` sind Fehler in Trigger-Dateien (Format wie `/validate`), solche Trigger sind nicht aktiv |
 
 ## Konfliktschutz (ETag)
 
@@ -141,6 +141,7 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft. Seit 
   "kind": "workflow",
   "workflow": "parallel",
   "trigger": "cron:nightly",
+  "client": "127.0.0.1",
   "environment": "dev",
   "status": "running",
   "started": "2026-11-19T14:20:50.898Z",
@@ -150,6 +151,9 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft. Seit 
   "outputs": { "MESSAGE": "Hello" }
 }
 ```
+
+`trigger` nennt, was den Lauf gestartet hat (`cron:<name>`, `interval:<name>`, `file:<name>`, `http:<name>`; fehlt bei
+Starts von Hand), `client` bei `http` die Adresse des Aufrufers.
 
 `status` eines Laufs: `running`, `succeeded`, `failed`, `cancelled`. `GET /runs/{id}` ergänzt `actions` – je Action
 `id`, `type`, `status` (`pending`, `waiting`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), Zeiten, `durationMs`,
@@ -164,6 +168,22 @@ ausgehenden Links (`{ "1": 2, "2": 2 }`).
 
 Läufe liegen **nur im Speicher**: die letzten 100, laufende werden nie verworfen. Beim Beenden des Servers (Strg+C)
 werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26 (zurückgestellt, siehe Backlog der Roadmap), ohne dass sich diese API ändert.
+
+## HTTP-Trigger (eigener Listener)
+
+HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem eigenen Listener (`--triggers`, Standard
+`127.0.0.1:7301`) unter den Pfaden ihrer Trigger-Dateien; Format und Regeln in KONZEPT 5.3.
+
+| Antwort | Bedeutung |
+|---|---|
+| `202` + `{"runId", "status"}`, Header `Location` | Lauf gestartet; `status` ist der Pfad des Laufs in dieser API |
+| `400` | Pflichtparameter fehlt, Wert passt nicht zum Typ, Body ist kein JSON-Objekt |
+| `401` | Token fehlt oder falsch (`Authorization: Bearer <token>`) |
+| `403` | Anfrage aus einer Webseite (`Origin`) oder an einen fremden Host-Namen |
+| `404` / `405` | kein Trigger für den Pfad bzw. deaktiviert / andere Methode (Header `Allow`) |
+| `413` / `415` | Body über 1 MiB / weder JSON noch Formular |
+| `429` | `maxConcurrent` des Triggers oder `settings.maxConcurrentRuns` erreicht |
+| `500` / `503` | Ziel kann nicht gestartet werden (Meldung im Server-Log) / Server wird beendet |
 
 ## Live-Ereignisse (`/events`)
 

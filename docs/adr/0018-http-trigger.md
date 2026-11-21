@@ -101,6 +101,20 @@ dafür nicht nötig.
   statt bei jeder Anfrage.
 - Run-Queue: Priorität manuell > HTTP > zeitgesteuerte Trigger.
 
+## Ergänzungen bei der Umsetzung (S38a)
+
+Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
+
+- **Feste `params` gewinnen:** Werte, die der Trigger unter `params` festlegt, kann die Anfrage nicht ändern; ein
+  Pfad-Platzhalter mit demselben Namen ist ein Fehler.
+- **Body auch als Formular:** neben einem JSON-Objekt `application/x-www-form-urlencoded` (einfache Geräte, `curl -d`).
+- **Token nur aus der Umgebung:** `token` muss genau `${env:NAME}` sein; ein Token in der Datei ist ein Fehler.
+- **Routing ohne Groß-/Kleinschreibung** in den festen Teilen des Pfads (wie unter Windows üblich); die Prüfung auf
+  Überschneidungen folgt derselben Regel.
+- **Listener nur bei Bedarf:** Er öffnet sich erst, wenn ein HTTP-Trigger aktiv ist – Projekte ohne HTTP-Trigger
+  belegen keinen Port. Solange er nur lokal lauscht (bis S40a), lehnt er Anfragen aus Webseiten (`Origin`) und an
+  fremde Host-Namen (DNS-Rebinding) mit `403` ab.
+
 ## Konsequenzen
 
 - Ein Begriff „Trigger“ für alles, was Läufe automatisch startet: `cron`, `file`, `interval`, `http`. Der Typ `webhook`
