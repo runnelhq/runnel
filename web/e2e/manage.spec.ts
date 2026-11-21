@@ -14,8 +14,18 @@ async function menuOf(page: Page, name: string) {
   return page.getByRole("menu", { name: `Actions for ${name}` });
 }
 
+// A new trigger points to the first workflow of the project. Other specs create and delete
+// workflows on the same server at the same time (e.g. call.workflow.yaml), so this one is
+// first by name and stays while the tests run.
+const firstWorkflow = "workflows/0-first.workflow.yaml";
+
+test.beforeAll(async ({ request }) => {
+  const text = "kind: Workflow\napiVersion: runnel/v1\nname: 0-first\nactions:\n  - id: start\n    type: core.start\n";
+  expect((await request.put(`/api/v1/files/${firstWorkflow}`, { headers: { "If-Match": "*" }, data: text })).ok()).toBe(true);
+});
+
 test.afterAll(async ({ request }) => {
-  for (const f of ["workflows/import.workflow.yaml", "workflows/loader.workflow.yaml", "triggers/new-trigger.yaml"]) {
+  for (const f of [firstWorkflow, "workflows/import.workflow.yaml", "workflows/loader.workflow.yaml", "triggers/new-trigger.yaml"]) {
     await request.delete(`/api/v1/files/${f}`, { headers: { "If-Match": "*" } });
   }
   await request.delete("/api/v1/folders/archive");
@@ -56,7 +66,7 @@ test("creates a trigger that starts disabled", async ({ page, request }) => {
   await expect(page.getByRole("tab", { name: /new-trigger\.yaml/ })).toBeVisible();
   const text = await (await request.get("/api/v1/files/triggers/new-trigger.yaml")).text();
   expect(text).toContain("enabled: false\n");
-  expect(text).toMatch(/target: workflows\/\w+\.workflow\.yaml/);
+  expect(text).toContain(`target: ${firstWorkflow}\n`);
   await expect(page.getByTestId("error-count")).toHaveCount(0);
 });
 
