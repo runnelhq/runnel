@@ -733,7 +733,12 @@
                   "description": "Text between the values of concat; empty: comma and space",
                   "examples": [
                     " / "
-                  ]
+                  ],
+                  "x-runnel-only": {
+                    "function": [
+                      "concat"
+                    ]
+                  }
                 }
               },
               "required": [
@@ -902,6 +907,7 @@
                 "when": {
                   "type": "string",
                   "description": "Condition, e.g. {{ record.country == 'DE' }}; a comparison with an empty value is false",
+                  "format": "runnel-text",
                   "examples": [
                     "{{ record.amount \u003e 0 }}"
                   ]

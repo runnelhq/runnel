@@ -437,3 +437,18 @@
 .runnel-yaml .cm-searchMatch-selected {
   background: var(--accent);
 }
+/* Compact expression fields in the tables of lists (mockup E14). */
+.runnel-expr-sm .runnel-expr .cm-editor {
+  min-height: 26px;
+}
+.runnel-expr-sm .runnel-expr .cm-content {
+  padding: 3px 0;
+}
+.runnel-expr-sm .runnel-expr .cm-line {
+  padding: 0 6px;
+}
+.runnel-expr-sm .runnel-expr .cm-content.cm-lineWrapping {
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+}

@@ -12,6 +12,8 @@ export interface Schema {
   properties?: Record<string, Schema>;
   required?: string[];
   items?: Schema;
+  /** The property applies only when a sibling has one of these values (x-runnel-only, E14). */
+  "x-runnel-only"?: Record<string, unknown[]>;
 }
 
 /** Descriptor of an action or transform type (GET /catalog, ADR 0014). */

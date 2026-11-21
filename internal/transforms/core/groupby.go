@@ -36,7 +36,7 @@ type aggregate struct {
 	Name      string `json:"name" doc:"Name of the new field" schema:"required,example=total"`
 	Function  string `json:"function" doc:"count: records (or values of field), countDistinct: different values, sum, avg, min, max, first, last, concat: values as text" schema:"required,enum=count|countDistinct|sum|avg|min|max|first|last|concat"`
 	Field     string `json:"field" doc:"Field the function is applied to; empty for count: all records" schema:"example=amount"`
-	Separator string `json:"separator" doc:"Text between the values of concat; empty: comma and space" schema:"example= / "`
+	Separator string `json:"separator" doc:"Text between the values of concat; empty: comma and space" schema:"example= / ,only=function:concat"`
 }
 
 var aggregateFunctions = []string{"count", "countDistinct", "sum", "avg", "min", "max", "first", "last", "concat"}

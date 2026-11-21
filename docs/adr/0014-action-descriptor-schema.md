@@ -134,3 +134,12 @@ der Form, in der `/catalog` (E2) sie ausliefert.
 - Transforms (S12 ff.) verwenden denselben Generator und dieselben Tags.
 - Golden-Dateien (`internal/cli/testdata/catalog*.golden*`) zeigen jede Änderung an Descriptors im PR-Diff.
 - Die Tag-Syntax erlaubt keine Kommas in Werten von `default`, `enum` und `example`.
+
+## Nachtrag 2026-11-21 (E14a)
+
+- **Option `only=<feld>:<a>|<b>`:** Eine Eigenschaft gilt nur, wenn eine Geschwister-Eigenschaft einen der Werte hat
+  (z. B. `separator` von `core.group-by` nur bei `function: concat`). Im Schema steht sie als
+  `"x-runnel-only": {"function": ["concat"]}`; der Editor blendet die Eigenschaft sonst aus und schreibt sie nicht.
+  Ein Name, der keine Geschwister-Eigenschaft ist, ist ein Fehler beim Erzeugen des Schemas.
+- **`runnel-text`** kennzeichnet auch Bedingungen in Listen (`when` von `core.switch`): lange Texte, die der Editor als
+  Karte statt als Tabellenzelle zeigt (Mockup E14).

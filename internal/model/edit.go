@@ -55,6 +55,9 @@ type SetField struct {
 	// on one line, e.g. with.fields as "- { name: kdnr, type: int }" (S46); Value and
 	// Map must then be nil.
 	List [][]KeyValue `json:"list,omitempty"`
+	// Texts sets a field of the configuration to a list of texts, written as
+	// "[a, b]", e.g. groupBy of core.group-by (E14); Value, Map and List must then be nil.
+	Texts []string `json:"texts,omitempty"`
 }
 
 var (
@@ -378,6 +381,12 @@ func checkSetField(f SetField, fields map[string]bool) error {
 	if (!ok || !configKeyPattern.MatchString(name)) && !fields[f.Field] {
 		return fmt.Errorf("field %q cannot be changed here", f.Field)
 	}
+	if len(f.Texts) > 0 {
+		if !ok || f.Value != nil || len(f.Map) > 0 || len(f.List) > 0 {
+			return fmt.Errorf("%s: a list of texts can only be set for a field of the configuration", f.Field)
+		}
+		return nil
+	}
 	if len(f.List) > 0 {
 		if !ok || f.Value != nil || len(f.Map) > 0 {
 			return fmt.Errorf("%s: a list can only be set for a field of the configuration", f.Field)
@@ -389,6 +398,11 @@ func checkSetField(f SetField, fields map[string]bool) error {
 					return fmt.Errorf("%s: invalid or duplicate key %q", f.Field, kv.Key)
 				}
 				seen[kv.Key] = true
+				switch kv.Value.(type) {
+				case string, bool, float64, int:
+				default:
+					return fmt.Errorf("%s: %s: only a text, a number or true/false can be set here", f.Field, kv.Key)
+				}
 			}
 		}
 		return nil
@@ -403,6 +417,9 @@ func checkSetField(f SetField, fields map[string]bool) error {
 				return fmt.Errorf("%s: invalid or duplicate key %q", f.Field, kv.Key)
 			}
 			seen[kv.Key] = true
+			if _, text := kv.Value.(string); !text {
+				return fmt.Errorf("%s: %s: the values of a mapping are texts", f.Field, kv.Key)
+			}
 		}
 		return nil
 	}
@@ -523,6 +540,9 @@ func (e *editor) set(f SetField) error {
 	value := f.Value
 	if len(f.List) > 0 {
 		value = mappingList(f.List)
+	}
+	if len(f.Texts) > 0 {
+		value = rawValue(flowList(f.Texts))
 	}
 	if len(f.Map) > 0 {
 		value = inFileOrder(f.Map, entries(valueOf(entries(valueOf(itemEntries, "with")), strings.TrimPrefix(f.Field, "with."))))
@@ -721,7 +741,7 @@ func entryLines(indent, key string, value any) ([]string, error) {
 		for _, item := range v {
 			parts := make([]string, len(item))
 			for i, kv := range item {
-				parts[i] = kv.Key + ": " + flowScalar(kv.Value)
+				parts[i] = kv.Key + ": " + flowValue(kv.Value)
 			}
 			lines = append(lines, indent+"  - { "+strings.Join(parts, ", ")+" }")
 		}

@@ -33,7 +33,7 @@ type switchRecords struct {
 }
 
 type switchCase struct {
-	When string `json:"when" doc:"Condition, e.g. {{ record.country == 'DE' }}; a comparison with an empty value is false" schema:"required,example={{ record.amount > 0 }}"`
+	When string `json:"when" doc:"Condition, e.g. {{ record.country == 'DE' }}; a comparison with an empty value is false" schema:"required,format=runnel-text,example={{ record.amount > 0 }}"`
 	To   string `json:"to" doc:"Id of the transform the record goes to; a data link must lead there" schema:"required,example=germany"`
 }
 

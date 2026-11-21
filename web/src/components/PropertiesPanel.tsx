@@ -11,6 +11,7 @@ import {
   valueTypes,
   type Action,
   type EntryEdit,
+  type KeyValue,
   type Output,
   type Parameter,
   type Problem,
@@ -25,6 +26,7 @@ import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
 import { ExpressionInput } from "./ExpressionInput";
 import { ExpressionDialog } from "./ExpressionDialog";
+import { ListField } from "./ListField";
 
 /** A value written to a field; null removes the field from the file. */
 export type FieldValue = string | number | boolean | null;
@@ -42,6 +44,9 @@ export interface PropertiesProps {
   onSetWorkflow: (field: string, value: FieldValue) => void;
   /** Sets a mapping of the configuration of an action, e.g. with.params; an empty one removes it. */
   onSetMap?: (id: string, field: string, map: { key: string; value: string }[]) => void;
+  /** Sets a list of the configuration (E14): of mappings, or of texts; null removes it. */
+  onSetList?: (id: string, field: string, list: KeyValue[][] | null) => void;
+  onSetTexts?: (id: string, field: string, texts: string[] | null) => void;
   /** Changes the list of parameters or outputs (E7c). */
   onEntry?: (edit: EntryEdit) => void;
   /** Changes a link; when is success, failure, always or an expression "{{ … }}"; type (pipelines) data or error. */
@@ -186,6 +191,8 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       owner={action.id}
       onChange={set(`with.${name}`)}
       onChangeMap={props.onSetMap ? (m) => props.onSetMap!(action.id, `with.${name}`, m) : undefined}
+      onChangeList={props.onSetList ? (l) => props.onSetList!(action.id, `with.${name}`, l) : undefined}
+      onChangeTexts={props.onSetTexts ? (t) => props.onSetTexts!(action.id, `with.${name}`, t) : undefined}
       mapHelp={name === "params" ? declared : undefined}
     />
   ));
@@ -533,6 +540,9 @@ function SchemaField(props: {
   onChangeMap?: (map: { key: string; value: string }[]) => void;
   /** Help for a mapping, e.g. the parameters a called workflow declares. */
   mapHelp?: string;
+  /** Sets a list (E14); without them, lists are changed in the YAML view. */
+  onChangeList?: (list: KeyValue[][] | null) => void;
+  onChangeTexts?: (texts: string[] | null) => void;
 }) {
   const { name, schema: s, value } = props;
   const [localError, setLocalError] = useState<string | null>(null);
@@ -555,6 +565,16 @@ function SchemaField(props: {
         owner={props.owner}
         onChange={props.onChangeMap}
       />
+    );
+  }
+  // A list, edited as table, cards or chips (mockup E14).
+  if (s.type === "array" && props.onChangeList && props.onChangeTexts && (value === undefined || value === null || Array.isArray(value))) {
+    return (
+      <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={props.problems}>
+        {(p) => (
+          <ListField name={name} labelId={p.labelId} schema={s} value={value} ctx={props.ctx} onList={props.onChangeList!} onTexts={props.onChangeTexts!} />
+        )}
+      </Field>
     );
   }
   if (!scalar || s.type === "array" || s.type === "object") {
