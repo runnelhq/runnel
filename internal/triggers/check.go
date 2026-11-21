@@ -1,17 +1,32 @@
-package runs
+package triggers
 
 import (
 	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/runs"
 )
+
+// TargetParams reads the target of a trigger and returns its parameters and a
+// description such as "workflow workflows/a.workflow.yaml"; the error is located at
+// the target of the trigger.
+func TargetParams(t *model.Trigger, projectDir string) ([]model.Parameter, string, error) {
+	params, what, err := runs.ReadParameters(projectDir, t.Target)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, "", t.ErrorAt("$.target", "target %s not found in the project", t.Target)
+	case errors.Is(err, runs.ErrHasErrors):
+		return nil, what, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what)
+	case err != nil:
+		return nil, "", t.ErrorAt("$.target", "cannot read target %s: %v", t.Target, err)
+	}
+	return params, what, nil
+}
 
 // CheckTrigger checks what a trigger refers to (roadmap S37): the target exists in the
 // project and has no errors, the environment exists and the parameters fit the target
@@ -47,34 +62,7 @@ func CheckTrigger(t *model.Trigger, p *model.Project, projectDir string) model.E
 		errs = append(errs, checkHTTPTrigger(t, params, what)...)
 		return errs // the required parameters may come with the request
 	}
-	return append(errs, checkGivenParams(t.ErrorAt, "$", "", params, what, given)...)
-}
-
-// TargetParams reads the target of a trigger and returns its parameters and a
-// description such as "workflow workflows/a.workflow.yaml"; the error is located at
-// the target of the trigger.
-func TargetParams(t *model.Trigger, projectDir string) ([]model.Parameter, string, error) {
-	file := filepath.Join(projectDir, filepath.FromSlash(t.Target))
-	data, err := os.ReadFile(file)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, "", t.ErrorAt("$.target", "target %s not found in the project", t.Target)
-	} else if err != nil {
-		return nil, "", t.ErrorAt("$.target", "cannot read target %s: %v", t.Target, err)
-	}
-	what := "workflow " + t.Target
-	if strings.HasSuffix(t.Target, ".pipeline.yaml") {
-		what = "pipeline " + t.Target
-		pl, _, err := parsePipeline(t.Target, data)
-		if err != nil {
-			return nil, what, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what)
-		}
-		return pl.Parameters, what, nil
-	}
-	w, _, err := parseWorkflow(t.Target, data)
-	if err != nil {
-		return nil, what, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what)
-	}
-	return w.Parameters, what, nil
+	return append(errs, runs.CheckGivenParams(t.ErrorAt, "$", "", params, what, given)...)
 }
 
 // checkHTTPTrigger checks an http trigger against its target: the fixed params fit,
@@ -88,14 +76,14 @@ func checkHTTPTrigger(t *model.Trigger, params []model.Parameter, what string) m
 	}
 	for _, key := range slices.Sorted(maps.Keys(t.Params)) {
 		if !declared[key] {
-			errs = append(errs, t.ErrorAt("$.params."+key, "parameter %s is not declared by %s (declared: %s)", key, what, declaredOf(params)))
+			errs = append(errs, t.ErrorAt("$.params."+key, "parameter %s is not declared by %s (declared: %s)", key, what, runs.DeclaredOf(params)))
 		}
 	}
 	errs = append(errs, checkFixedValues(t, params, what)...)
 	for _, name := range t.Placeholders() {
 		switch {
 		case !declared[name]:
-			errs = append(errs, t.ErrorAt("$.with.path", "placeholder {%s} is not a parameter of %s (declared: %s)", name, what, declaredOf(params)))
+			errs = append(errs, t.ErrorAt("$.with.path", "placeholder {%s} is not a parameter of %s (declared: %s)", name, what, runs.DeclaredOf(params)))
 		case t.Params[name] != nil:
 			errs = append(errs, t.ErrorAt("$.with.path", "placeholder {%s} is also set under params; fixed values cannot come from the request", name))
 		}
@@ -116,7 +104,7 @@ func checkFixedValues(t *model.Trigger, params []model.Parameter, what string) m
 		if !ok {
 			continue
 		}
-		if text, fixed := staticText(v); fixed {
+		if text, fixed := runs.StaticText(v); fixed {
 			if _, err := p.CheckValue(text); err != nil {
 				errs = append(errs, t.ErrorAt("$.params."+p.Name, "parameter %s (%s) of %s: %v", p.Name, p.Type.OrString(), what, err))
 			}
@@ -134,7 +122,7 @@ func checkFileParam(t *model.Trigger, params []model.Parameter, what string) mod
 	}
 	i := slices.IndexFunc(params, func(p model.Parameter) bool { return p.Name == name })
 	if i < 0 {
-		return model.Errors{t.ErrorAt("$.with.param", "parameter %s is not declared by %s (declared: %s)", name, what, declaredOf(params))}
+		return model.Errors{t.ErrorAt("$.with.param", "parameter %s is not declared by %s (declared: %s)", name, what, runs.DeclaredOf(params))}
 	}
 	want := model.TypeString
 	if t.FileMode() == model.FileBatch {
@@ -157,7 +145,7 @@ func TriggerParams(t *model.Trigger) map[string]string {
 	}
 	out := make(map[string]string, len(t.Params))
 	for k, v := range t.Params {
-		if s, ok := staticText(v); ok {
+		if s, ok := runs.StaticText(v); ok {
 			out[k] = s
 		} else {
 			out[k] = fmt.Sprint(v) // ${…} is resolved like a value given at start

@@ -20,6 +20,7 @@ import (
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/transforms"
+	"github.com/runnelhq/runnel/internal/triggers"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -215,7 +216,7 @@ func (v *validator) trigger(file string) error {
 	if err != nil {
 		return err
 	}
-	diags := runs.CheckTrigger(t, p, root)
+	diags := triggers.CheckTrigger(t, p, root)
 	if v.triggerNames == nil {
 		v.triggerNames = map[string]map[string]string{}
 	}

@@ -48,7 +48,7 @@ func (spec Spec) pipelines(envName string) action.PipelineRunner {
 			Registry: spec.Transforms, Observer: forwardPipeline(call.Log), Rows: rows,
 		})
 		if err == nil && len(p.Undeclared) > 0 {
-			err = fmt.Errorf("parameter(s) %v not declared by pipeline %q (declared: %s)", p.Undeclared, p.Pipeline.Name, declaredOf(p.Pipeline.Parameters))
+			err = fmt.Errorf("parameter(s) %v not declared by pipeline %q (declared: %s)", p.Undeclared, p.Pipeline.Name, DeclaredOf(p.Pipeline.Parameters))
 		}
 		if err != nil {
 			var diags model.Errors

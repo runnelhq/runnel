@@ -11,7 +11,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/triggers"
 )
@@ -53,28 +55,7 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	var run runs.Run
-	if kind == "pipeline" {
-		run, _, err = s.runs.StartPipeline(name, runs.PipelineSpec{
-			Name:       name,
-			Data:       data,
-			ProjectDir: s.dir,
-			Env:        req.Environment,
-			Params:     req.Params,
-			Registry:   s.transforms,
-		})
-	} else {
-		run, _, err = s.runs.Start(name, runs.Spec{
-			Name:       name,
-			File:       filepath.Join(s.dir, filepath.FromSlash(name)),
-			Data:       data,
-			ProjectDir: s.dir,
-			Env:        req.Environment,
-			Params:     req.Params,
-			Registry:   s.registry,
-			Transforms: s.transforms,
-		})
-	}
+	run, err := s.startFile(name, data, startOptions{env: req.Environment, params: req.Params})
 	var diags model.Errors
 	switch {
 	case errors.As(err, &diags):
@@ -201,26 +182,41 @@ func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (string
 	if err != nil {
 		return "", err
 	}
-	trigger := t.Type + ":" + t.Name
-	params := runs.TriggerParams(t)
+	params := triggers.TriggerParams(t)
 	if len(r.Params) > 0 && params == nil {
 		params = map[string]string{}
 	}
 	maps.Copy(params, r.Params)
+	rows, err := runs.Records(r.Rows)
+	if err != nil {
+		return "", err
+	}
+	run, err := s.startFile(name, data, startOptions{env: t.Environment, params: params, trigger: t.Type + ":" + t.Name,
+		client: r.Client, request: r.Request, respond: r.Respond, history: r.History, rows: rows})
+	return run.ID, err
+}
+
+// startOptions describe a start of a saved file, from the API or a trigger.
+type startOptions struct {
+	env, trigger, client, history string
+	params                        map[string]string
+	request                       map[string]any  // workflows (http triggers)
+	rows                          []record.Record // pipelines (JSON list of an http request)
+	respond                       action.Responder
+}
+
+// startFile starts a run of the saved workflow or pipeline name of the project.
+func (s *Server) startFile(name string, data []byte, o startOptions) (runs.Run, error) {
 	if fileKind(name) == "pipeline" {
-		rows, err := runs.Records(r.Rows)
-		if err != nil {
-			return "", err
-		}
 		run, _, err := s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
-			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger, Client: r.Client,
-			Rows: rows, Respond: r.Respond, History: r.History})
-		return run.ID, err
+			Env: o.env, Params: o.params, Registry: s.transforms, Trigger: o.trigger, Client: o.client,
+			Rows: o.rows, Respond: o.respond, History: o.history})
+		return run, err
 	}
 	run, _, err := s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
-		ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger, Client: r.Client,
-		Request: r.Request, Respond: r.Respond, History: r.History})
-	return run.ID, err
+		ProjectDir: s.dir, Env: o.env, Params: o.params, Registry: s.registry, Transforms: s.transforms, Trigger: o.trigger,
+		Client: o.client, Request: o.request, Respond: o.respond, History: o.history})
+	return run, err
 }
 
 // waitRun waits until a run has ended (or ctx is done) for the default answer of an

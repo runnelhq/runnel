@@ -133,3 +133,31 @@ func projectStamp(dir string) string {
 	}
 	return b.String()
 }
+
+// ErrHasErrors is returned by ReadParameters for a file that cannot be read as a
+// workflow or pipeline; "runnel validate" shows why.
+var ErrHasErrors = errors.New("the file has errors")
+
+// ReadParameters reads the workflow or pipeline rel of the project (by its file name)
+// and returns its parameters and a description for messages, e.g. "workflow
+// workflows/a.workflow.yaml". Errors: fs.ErrNotExist, ErrHasErrors or a read error.
+func ReadParameters(projectDir, rel string) ([]model.Parameter, string, error) {
+	data, err := os.ReadFile(filepath.Join(projectDir, filepath.FromSlash(rel)))
+	if err != nil {
+		return nil, "", err
+	}
+	if strings.HasSuffix(rel, ".pipeline.yaml") {
+		what := "pipeline " + rel
+		pl, _, err := parsePipeline(rel, data)
+		if err != nil {
+			return nil, what, ErrHasErrors
+		}
+		return pl.Parameters, what, nil
+	}
+	what := "workflow " + rel
+	w, _, err := parseWorkflow(rel, data)
+	if err != nil {
+		return nil, what, ErrHasErrors
+	}
+	return w.Parameters, what, nil
+}

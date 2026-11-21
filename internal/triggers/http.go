@@ -335,29 +335,19 @@ func (b *badRequest) Error() string { return b.msg }
 // then the values of the request for the other declared parameters (others are
 // ignored). A wrong or missing value is a badRequest.
 func (s *Scheduler) targetParams(t *model.Trigger, inputs map[string]string) (map[string]string, error) {
-	declared, what, err := runs.TargetParams(t, s.opts.Dir)
+	declared, what, err := TargetParams(t, s.opts.Dir)
 	if err != nil {
 		return nil, err
 	}
-	params := runs.TriggerParams(t)
+	params := TriggerParams(t)
 	if params == nil {
 		params = map[string]string{}
 	}
-	var problems, missing []string
+	fixed := func(name string) bool { _, ok := params[name]; return ok }
+	problems, missing := runs.CheckValues(declared, inputs, fixed)
 	for _, p := range declared {
-		if _, fixed := params[p.Name]; fixed {
-			continue
-		}
-		v, given := inputs[p.Name]
-		switch {
-		case given:
-			if _, err := p.CheckValue(v); err != nil {
-				problems = append(problems, fmt.Sprintf("parameter %s (%s): %v", p.Name, p.Type.OrString(), err))
-				continue
-			}
+		if v, given := inputs[p.Name]; given && !fixed(p.Name) {
 			params[p.Name] = v
-		case p.Required && p.Default == "":
-			missing = append(missing, p.Name)
 		}
 	}
 	if len(missing) > 0 {
