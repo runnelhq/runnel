@@ -44,7 +44,7 @@ stehen in [AGENTS.md](AGENTS.md).
 | Neue Action entwickeln | [docs/dev/ACTIONS.md](docs/dev/ACTIONS.md) |
 | Server-API | [docs/dev/API.md](docs/dev/API.md) |
 | Editor (Frontend) | [docs/dev/EDITOR.md](docs/dev/EDITOR.md) |
-| Neue Transforms | folgt mit Roadmap-Schritt S12/S13 |
+| Neue Transforms | [docs/dev/TRANSFORMS.md](docs/dev/TRANSFORMS.md) |
 | Plugins | folgt mit Roadmap-Schritt S49–S51 |
 | Testen, bekannte Einschränkungen | [docs/TESTPLAN.md](docs/TESTPLAN.md) |
 | Release erstellen | [README – Releases](README.md#releases) |

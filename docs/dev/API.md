@@ -1,6 +1,6 @@
 # Server-API (`runnel serve`)
 
-Stand: E8b. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
+Stand: S38c. Die API ist die einzige Schnittstelle des Editors zum Server und ebenso für Skripte nutzbar
 ([Konzept, Kap. 10](../KONZEPT.md#10-api-server-modus)).
 
 ```bash
@@ -14,7 +14,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 
 | Thema | Regel |
 |---|---|
-| Adresse | nur `127.0.0.1` (Netzwerkbetrieb mit Zugangsschlüssel und TLS folgt mit S39) |
+| Adresse | nur `127.0.0.1` (Netzwerkbetrieb des Editors mit Zugangsschlüssel und TLS folgt mit S40b; HTTP-Trigger haben seit S38a/S40a einen eigenen Listener, siehe unten) |
 | Präfix | alle Endpunkte unter `/api/v1` |
 | Format | JSON (UTF-8, eingerückt); Dateiinhalte als Rohdaten |
 | Fehler | Statuscode und `{"error": "…"}` mit englischer, verständlicher Meldung |

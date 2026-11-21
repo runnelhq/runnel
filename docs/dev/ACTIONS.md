@@ -1,7 +1,7 @@
 # Eine neue Action entwickeln
 
-Anleitung für eingebaute Actions (Bausteine in Workflows). Für Transforms (Pipelines) folgt eine eigene Anleitung mit
-S12/S13; für Plugins mit S49–S51.
+Anleitung für eingebaute Actions (Bausteine in Workflows). Für Transforms (Pipelines) gilt ergänzend
+[TRANSFORMS.md](TRANSFORMS.md); eine Anleitung für Plugins folgt mit S49–S51.
 
 Grundlagen: [ADR 0013](../adr/0013-typnamen-namensraeume.md) (Typnamen, Namensräume, Code-Aufbau),
 [ADR 0014](../adr/0014-action-descriptor-schema.md) (Descriptor, Schema aus dem Konfigurations-Struct),

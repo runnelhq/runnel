@@ -16,7 +16,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Bauen | `make build` → `bin/runnel` (mit Editor; Node 22 nötig) · `make build-go` (nur Go) |
 | Tests (mit Race-Detector) | `make test` |
 | Lint (golangci-lint v2.15.0) | `make lint` |
-| Formatieren | `make fmt` (oder `gofmt -w`) |
+| Formatieren | `make fmt` (oder `golangci-lint fmt ./...`) |
 | Fuzzing | `make fuzz FUZZTIME=1m` |
 | Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – danach Diff prüfen |
@@ -33,8 +33,11 @@ Windows-Code (`*_windows.go`) zusätzlich `GOOS=windows go vet ./...` und `GOOS=
 | `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`, `triggers`, `service`) |
 | `internal/model/` | Dateiformate (Workflow, Pipeline, Project, Environment, Trigger), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
+| `internal/expr/` | Ausdrücke `{{ … }}` (expr-lang), Funktionsbibliothek, Dokumentation für den Editor |
+| `internal/format/` | Zahlen- und Datumsformate (z. B. `#.##0,00`, `dd.MM.yyyy`) |
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
+| `internal/engine/runid/` | Lauf-IDs (ULID) |
 | `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |
 | `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, HTTP-Trigger mit eigenem Listener in `http.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt |
 | `internal/winsvc/` | Windows-Dienst: Installieren, Steuern, Ausführen, Ereignisanzeige (`*_windows.go`; sonst `ErrNotSupported`) |
@@ -42,6 +45,7 @@ Windows-Code (`*_windows.go`) zusätzlich `GOOS=windows go vet ./...` und `GOOS=
 | `internal/tlscert/` | Zertifikate des Trigger-Listeners: selbst erzeugt und wiederverwendet, eigene PEM-Dateien mit Neuladen |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Läufe und Ereignisse im Speicher |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
+| `internal/version/` | Versionsinformationen (`runnel version`, `/api/v1/version`) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
 | `internal/engine/pipeline/` | Pipeline-Engine: Goroutine je Transform, gepufferte Kanäle, Batches, Zähler |

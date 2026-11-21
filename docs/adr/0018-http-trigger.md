@@ -59,7 +59,7 @@ with:
 - **Absicherung:** `auth: { token: … }` erwartet `Authorization: Bearer <token>` (falsch oder fehlend: `401`);
   `auth: none` ist ausdrücklich anzugeben und für das interne Netz gedacht. Das Token kommt bis zum Secret-Store (S39)
   aus einer Umgebungsvariablen (`${env:…}`). Eine HMAC-Signaturprüfung (für Anbieter mit eigenem Format) folgt später
-  als weitere `auth`-Variante. Ein Body-Limit gilt immer (Standard 1 MiB, `413`).
+  als weitere `auth`-Variante. Ein Body-Limit gilt immer (1 MiB, fest, `413`).
 
 ### Antwort
 
@@ -81,7 +81,8 @@ Bei `response: run` antwortet der Lauf auf zwei Wegen – **beide** sind vorgese
     bleibt auf jedem Weg startbar.
   - **Pipeline:** Ausgabe-Transform **`http.response`**: die Datensätze als JSON-Body (Liste, oder ein Objekt mit
     `single: true`), `status` und `headers` aus der Konfiguration. Unterschiedliche Status entstehen über mehrere
-    `http.response` hinter `core.switch` (z. B. kein Datensatz → `404`); es antwortet der erste, der Datensätze erhält,
+    `http.response` hinter `core.switch` (z. B. kein Datensatz → `404`; umgesetzt mit `whenEmpty` als Rückfallantwort,
+    siehe Ergänzungen S38c); es antwortet der erste, der Datensätze erhält,
     oder – wenn keiner welche erhält – der mit `whenEmpty: true`.
 
 ### Listener
@@ -97,7 +98,8 @@ dafür nicht nötig.
 - Läufe eines HTTP-Triggers tragen `trigger = http:<name>` und die Client-Adresse.
 - `history` steuert, welche Läufe behalten werden; bis zur Lauf-Historie (S26) zählen HTTP-Läufe gegen ein eigenes
   Limit im Speicher, damit Läufe aus Editor und Cron nicht verdrängt werden.
-- Vorbereitete Workflows und Pipelines werden je Trigger zwischengespeichert und bei Änderung der Datei neu geprüft,
+- Vorbereitete Workflows und Pipelines werden zwischengespeichert (umgesetzt für alle Starts, siehe Ergänzungen S38b2)
+  und bei Änderung der Datei neu geprüft,
   statt bei jeder Anfrage.
 - Run-Queue: Priorität manuell > HTTP > zeitgesteuerte Trigger.
 
@@ -169,5 +171,5 @@ Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
   Standardantwort aus `outputs` braucht gar keinen eigenen Baustein.
 - Die Bearbeitung von Trigger-Dateien im Editor ist ein eigener Schritt mit Mockup; bis dahin sind es YAML-Dateien.
 - Umsetzung in Schritten (Roadmap Phase 0.5): **S38a** HTTP-Trigger asynchron (`accepted`, lokal), **S40a** Listener
-  und TLS, **S38b** Antwort aus dem Workflow (`run`, `http.respond`, `request`), **S38c** Antwort aus der Pipeline
+  und TLS, **S38b** Antwort aus dem Workflow (`run`, `http.respond`, `request`; geteilt in S38b1 und S38b2), **S38c** Antwort aus der Pipeline
   (`http.response`, Datensätze aus dem Body). Voraussetzung für alle: die Trigger-Grundlage aus S37.

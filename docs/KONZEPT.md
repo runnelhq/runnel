@@ -3,7 +3,7 @@
 > Leichtgewichtige Workflow- und Datenintegrations-Plattform für Windows.
 > Eine einzige ausführbare Datei, kein Docker, keine Java-/Node-Runtime, keine externe Datenbank.
 
-Status: Entwurf v0.1 · Stand: 2026-11-18
+Status: Entwurf v0.1 · Stand: 2026-11-21 (nach Phase 0.5)
 
 ---
 
@@ -175,8 +175,8 @@ Der Secret-Store ist lokal verschlüsselt (siehe Kap. 8).
 
 | Typ | Beschreibung |
 |---|---|
-| `manual` | Start über UI oder CLI |
-| `cron` | Zeitplan (Cron-Syntax + Zeitzone), Optionen: kein paralleler Lauf, Nachholen verpasster Läufe |
+| `manual` | Start über UI oder CLI (kein Typ in Trigger-Dateien) |
+| `cron` | Zeitplan (Cron-Syntax + Zeitzone), Option `overlap` (kein paralleler Lauf); Nachholen verpasster Läufe später (Backlog) |
 | `http` | (seit S38a) HTTP-Endpunkt mit Methode und Pfad (`/api/customers/{id}`); Pfad, Query und Body werden zu Parametern. Als Webhook sofort `202` (`response: accepted`) oder als Dienst mit Antwort aus dem Lauf (`response: run`, Action `http.respond` bzw. Transform `http.response`) – [ADR 0018](adr/0018-http-trigger.md) |
 | `file` | Ordner-Überwachung (Ordner + Pattern), z. B. neue CSV im Eingangsordner: ein Lauf je neuer Datei oder einer für alle neuen Dateien; der Ordner wird abgefragt (Polling), damit Netzlaufwerke und UNC-Pfade gleich funktionieren |
 | `interval` | fester Abstand, z. B. alle 15 Minuten; der erste Lauf nach dem ersten Abstand |
@@ -190,10 +190,10 @@ Details: [ADR 0008](adr/0008-ausfuehrungsvarianten.md).
 | Variante | Umsetzung |
 |---|---|
 | Workflow oder einzelne Pipeline direkt ausführen | CLI, Editor, API, Trigger |
-| **Run-Konfiguration** (wie wird ausgeführt) | Metadaten-Objekt `RunConfig` (`local`, später `remote`): Puffergrößen, Parallelität, Sampling, Log-Level, Timeout. Auswahl per CLI, Editor, Trigger oder aufrufender Action |
+| **Run-Konfiguration** (wie wird ausgeführt; S42, Backlog) | Metadaten-Objekt `RunConfig` (`local`, später `remote`): Puffergrößen, Parallelität, Sampling, Log-Level, Timeout. Auswahl per CLI, Editor, Trigger oder aufrufender Action |
 | Dynamisches Ziel | `pipeline: "pipelines/import-${MANDANT}.pipeline.yaml"`, optional eingeschränkt über `allowedTargets` |
 | Ausführung pro Datensatz (Pipeline) | `core.pipeline-executor`, `core.workflow-executor` – pro Datensatz, pro Gruppe fester Größe oder pro Feldwechsel |
-| Ausführung pro Datensatz (Workflow) | `forEachRow` an `core.run-pipeline` / `core.run-workflow`, optional parallel |
+| Ausführung pro Datensatz (Workflow) | `forEach` an jeder Action (seit S24b), optional `parallel`, z. B. an `core.run-pipeline` / `core.run-workflow` |
 | Datensätze zwischen Pipelines weitergeben | `core.to-result` / `core.from-result` |
 | Teilausführung | Editor: „Ab hier ausführen“, „Nur diese Action ausführen“, Pipeline-Vorschau bis Transform X |
 | Später | Mappings (wiederverwendbare Unter-Pipelines), Remote-Ausführung |
@@ -260,12 +260,14 @@ flowchart LR
 
 | Modus | Befehl | Einsatz |
 |---|---|---|
-| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v] [--run-config name]` | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet, 130 abgebrochen |
-| Server | `runnel serve [--project D:\flows]` | Editor + Scheduler + HTTP-Trigger (eigener Listener) |
-| Desktop | `runnel desktop` | Server + WebView2-Fenster (Einzelplatz) |
-| Windows-Dienst | `runnel service install/start/stop/uninstall` | Dauerbetrieb auf Server |
-| Validierung | `runnel validate <datei/ordner>` | Lint/Prüfung in CI |
-| Portable | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
+| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v]` (`--run-config` mit S42, Backlog) | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet, 130 abgebrochen |
+| Server | `runnel serve [projektordner] [--port 7300] [--triggers 127.0.0.1:7301] [--stop-timeout]` | Editor + Scheduler + HTTP-Trigger (eigener Listener) |
+| Desktop | `runnel desktop` (geplant) | Server + WebView2-Fenster (Einzelplatz) |
+| Windows-Dienst | `runnel service install/start/stop/status/uninstall` (seit S41) | Dauerbetrieb auf Server |
+| Validierung | `runnel validate <datei/ordner>` (Workflows, Pipelines, Trigger) | Lint/Prüfung in CI |
+| Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
+| Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
+| Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
 
@@ -287,18 +289,23 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 
 ### 4.2 Bibliotheken (Backend)
 
+Eingesetzt (fest gepinnt in `go.mod`): `goccy/go-yaml`, `expr-lang/expr`, `shopspring/decimal`, `robfig/cron/v3`,
+`spf13/cobra` (CLI), `golang.org/x/text` (Kodierungen) und `golang.org/x/sys` (Windows-Dienst, Ereignisanzeige). Die
+übrigen Einträge sind geplant und kommen mit ihrem Roadmap-Schritt.
+
 | Zweck | Bibliothek |
 |---|---|
+| CLI | `spf13/cobra` |
 | HTTP-Router | `net/http` (Go 1.22+ Routing) |
 | Live-Events | Server-Sent Events mit `net/http` ([ADR 0016](adr/0016-live-events-sse.md)) |
 | Lokale DB | `modernc.org/sqlite` (pure Go, kein CGO) |
-| YAML | `gopkg.in/yaml.v3` / `goccy/go-yaml` (bessere Fehlermeldungen mit Zeilennummer) |
-| JSON-Schema-Validierung | `santhosh-tekuri/jsonschema` |
+| YAML | `goccy/go-yaml` (Fehlermeldungen mit Zeilennummer, zeilengenaues Bearbeiten über den AST) |
+| JSON Schema | eigenes Paket `internal/schema` (Schemas aus Konfigurations-Structs, ADR 0014); Validierung über Schemas bei Bedarf später |
 | Ausdrücke | `expr-lang/expr` (kompiliert, schnell, ohne Seiteneffekte) |
 | Skript-Bausteine | `dop251/goja` (JavaScript, eingebettet, sandboxbar) |
 | Exakte Dezimalzahlen | `shopspring/decimal` |
 | Cron | `robfig/cron/v3` |
-| Dateiüberwachung | `fsnotify/fsnotify` |
+| Dateiüberwachung | keine Bibliothek: Polling des Ordners (S38), damit Netzlaufwerke und UNC-Pfade gleich funktionieren |
 | Windows-Dienst / DPAPI / EventLog | `golang.org/x/sys/windows`, `.../svc`, `.../svc/eventlog` |
 | SQL Server | `microsoft/go-mssqldb` (inkl. Windows-Authentifizierung) |
 | PostgreSQL | `jackc/pgx/v5` |
@@ -502,8 +509,8 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
   (ID) über alle Fehler-Links des Transforms (ab dem zweiten als Kopie); ohne Fehler-Link bricht die Pipeline ab. Der
   Datensatz ist der eingehende, unverändert (bei `csv.input` die Werte der Zeile als Text). Fehler-Links nutzen
   `csv.input`, `csv.output`, `core.convert` und `core.filter`; an anderen Transforms warnt `runnel validate`, dass der
-  Link nie genutzt wird. Das Schema eines Fehler-Links ist das eingehende mit den drei Feldern. `type: info` folgt mit S23;
-  bis dahin meldet `runnel validate` beide als „noch nicht unterstützt“ (der Editor zeigt Pipelines bis S25a nur als YAML).
+  Link nie genutzt wird. Das Schema eines Fehler-Links ist das eingehende mit den drei Feldern. `type: info` folgt mit S23
+  (Backlog); bis dahin meldet `runnel validate` ihn als „noch nicht unterstützt“.
 - Graph: mindestens ein Transform, eindeutige IDs, Links nur zwischen vorhandenen Transforms, keine Links auf sich
   selbst und **keine Zyklen** (Datensätze fließen nur vorwärts). Warnungen: doppelte Links, Transforms ohne Verbindung.
 - Je Transform `copies: n` (1–64 parallele Instanzen, die sich die eingehenden Datensätze teilen; nur für Transforms,
@@ -536,8 +543,8 @@ Trigger-Dateien liegen unter `triggers/*.yaml`. Gestartet wird nur, solange `run
 übernimmt der Server ohne Neustart. Verpasste Zeitpunkte (Server lief nicht) werden nicht nachgeholt. `runnel triggers`
 listet die Trigger mit ihrem nächsten Zeitpunkt, `runnel validate` prüft sie (Zeitplan, Ziel, Environment, Parameter).
 `overlap: skip` startet keinen Lauf, solange der vorige dieses Triggers läuft. Felder unter `with:`, die der Typ nicht
-kennt (z. B. `schedule` bei `interval`), sind ein Fehler. `runConfig` (S42), `overlap: queue`, das Nachholen verpasster
-Läufe und der Typ `http` (ADR 0018) folgen später.
+kennt (z. B. `schedule` bei `interval`), sind ein Fehler. `runConfig` (S42), `overlap: queue` und das Nachholen
+verpasster Läufe stehen im Backlog.
 
 Intervall (seit S38) – der erste Lauf kommt einen Abstand nach dem Start des Servers, danach je ein Abstand nach dem
 fälligen Zeitpunkt; ein unveränderter Trigger behält beim Neuladen seinen nächsten Zeitpunkt:
@@ -655,8 +662,9 @@ with:
   - Geprüfte Workflows und Pipelines (nach Inhalt der Datei), das Projekt (nach Stand von `project.yaml` und
     `environments/`) und übersetzte Ausdrücke werden zwischengespeichert; eine geänderte Datei wird beim nächsten Start
     neu geprüft. Aufgerufene Workflows werden beim Aufruf geprüft. Richtwert: ein kleiner Workflow mit Antwort braucht
-    unter 0,1 ms Rechenzeit je Anfrage (`go test ./internal/server -bench HTTPTrigger`).
-  - Jede Antwort trägt den Header `Runnel-Run-Id`.
+    etwa 0,23 ms je Anfrage auf einem Kern, parallel auf vier Kernen etwa 0,08 ms
+    (`go test ./internal/server -run XXX -bench HTTPTrigger`).
+  - Bei `response: run` trägt jede Antwort den Header `Runnel-Run-Id`.
 - **`request` in Ausdrücken (seit S38b1):** `request.method`, `.path`, `.headers`, `.query`, `.body` (JSON-Wert oder
   Felder des Formulars) und `.client`; ohne HTTP-Aufrufer ist `request` leer (`nil`), z. B.
   `{{ request?.body?.name ?? 'none' }}`. Der Header `Authorization` steht nicht darin. Aufgerufene Workflows sehen
@@ -783,7 +791,7 @@ type Transform interface {
 - Globales Limit gleichzeitiger Runs (`settings.maxConcurrentRuns` in `project.yaml`), zusätzlich pro Workflow
   (`settings.maxConcurrentRuns`). Seit S37 wird ein Start über dem Limit abgelehnt (Editor/API: `429`, Trigger: Meldung
   im Server-Log); eine Warteschlange, die ihn später startet, steht im Backlog.
-- Prioritäten (manuell > HTTP-Trigger > zeitgesteuerte Trigger).
+- Prioritäten (manuell > HTTP-Trigger > zeitgesteuerte Trigger) – mit der Run-Queue (Backlog).
 - Graceful Shutdown: Dienst-Stopp wartet konfigurierbar auf laufende Runs (`--stop-timeout`, beim Dienst Standard 30 s,
   bei `runnel serve` 0), startet in der Zeit keine neuen und bricht danach ab – Status `cancelled` (seit S41; Fortsetzen
   abgebrochener Runs folgt mit der Run-Historie).
@@ -868,8 +876,8 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 
 | Thema | Lösung |
 |---|---|
-| Netzwerk | Server bindet standardmäßig nur an `127.0.0.1` und nimmt nur Anfragen an `localhost`/`127.0.0.1` ohne fremden `Origin` an (Schutz vor DNS-Rebinding und Anfragen fremder Webseiten). Für Netzzugriff explizit `--listen 0.0.0.0:7300` + TLS (eigenes Zertifikat oder selbstsigniert erzeugt) |
-| Authentifizierung | **Keine Benutzerverwaltung** ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)). Lokal-Modus ohne Zugangsschutz; im Netzmodus ein gemeinsamer Zugangsschlüssel für den Server (+ TLS), gleichzeitig nutzbar als API-Token |
+| Netzwerk | Server bindet standardmäßig nur an `127.0.0.1` und nimmt nur Anfragen an `localhost`/`127.0.0.1` ohne fremden `Origin` an (Schutz vor DNS-Rebinding und Anfragen fremder Webseiten). Für Netzzugriff auf den Editor später `--listen 0.0.0.0:7300` + TLS (S40b, Backlog). HTTP-Trigger haben einen eigenen Listener, im Netz nur mit TLS (seit S40a) |
+| Authentifizierung | **Keine Benutzerverwaltung** ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)). Lokal-Modus ohne Zugangsschutz; im Netzmodus (S40b) ein gemeinsamer Zugangsschlüssel für den Server (+ TLS), gleichzeitig nutzbar als API-Token. HTTP-Trigger: Token je Trigger oder `auth: none` (seit S38a) |
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
 | Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `RUNNEL_MASTER_KEY` |
 | Secrets im Log | Automatische Maskierung aller bekannten Secret-Werte in Logs und Vorschauen |
@@ -948,17 +956,18 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/projects/current` · `/projects/current/tree` | Projekt (Name, Ordner) · Dateibaum des Projekts |
 | GET/PUT/DELETE | `/files/{path}` | Workflow/Pipeline/Trigger lesen, speichern (mit ETag gegen Überschreiben) |
 | POST | `/validate` | Definition prüfen (auch ungespeicherten Inhalt), Fehler mit Zeilen- und Knotenbezug (YAML-Pfad) |
-| POST | `/workflows/edit` | Änderung vom Canvas zeilengenau auf den YAML-Text anwenden (verschieben, löschen, anlegen, umbenennen, Links), Kommentare bleiben erhalten (seit E6a/E6b) |
+| POST | `/workflows/edit` · `/pipelines/edit` | Änderung vom Canvas zeilengenau auf den YAML-Text anwenden (verschieben, löschen, anlegen, umbenennen, Links), Kommentare bleiben erhalten (seit E6a/E6b, Pipelines seit S25a) |
 | GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
-| POST | `/runs` | Run starten `{ path, environment, params, runConfig, startAt?, only?, reuseResultsFrom? }` |
+| GET | `/expressions` · `/version` | Wurzeln, Funktionen und Variablen für den Ausdruckseditor · Version des Servers |
+| POST | `/runs` | Run starten `{ path, environment, params }`; später `runConfig`, `startAt`, `only`, `reuseResultsFrom` |
 | GET | `/runs?status=&path=` | Historie (seit E3 im Speicher, Filter folgen mit S26 – zurückgestellt) |
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
-| POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern |
-| POST | `/preview` | Pipeline-Vorschau bis Transform X |
-| GET/PUT | `/secrets/{name}` | Secrets setzen (Wert nie lesbar zurück) |
-| GET/POST | `/triggers`, `/triggers/{name}/enable` | Trigger verwalten |
+| POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern (`resume` mit S29, Backlog) |
+| POST | `/preview` | Pipeline-Vorschau bis Transform X (geplant, S44) |
+| GET/PUT | `/secrets/{name}` | Secrets setzen, Wert nie lesbar zurück (geplant, S39) |
+| GET | `/triggers` | Trigger mit nächstem Zeitpunkt, letztem Ergebnis und Problemen (seit S37); ein-/ausschalten über die Datei (`enabled`) |
 | ANY | Pfade der HTTP-Trigger | auf dem eigenen Listener der Trigger, nicht unter `/api/v1` ([ADR 0018](adr/0018-http-trigger.md)) |
-| GET | `/events?since=&run=` | Live-Events als Server-Sent Events ([ADR 0016](adr/0016-live-events-sse.md)): `run.started`, `run.finished`, `action.started`, `action.finished`, `action.skipped`, `log`; später Metriken und `file.changed` |
+| GET | `/events?since=&run=` | Live-Events als Server-Sent Events ([ADR 0016](adr/0016-live-events-sse.md)): `run.started`, `run.finished`, `action.waiting`, `action.started`, `action.finished`, `action.skipped`, `log`, `reset`; später Metriken und `file.changed` |
 
 ---
 
@@ -1008,7 +1017,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Kategorie | Actions |
 |---|---|
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen, Log schreiben, Schleife (ForEach über Liste/Dateien) |
-| Ausführung | Pipeline ausführen, Workflow ausführen (jeweils optional `forEachRow`), JavaScript, PowerShell, Programm starten |
+| Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell, Programm starten |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, ZIP/Entpacken, Dateiliste |
 | Netzwerk | HTTP-Request, HTTP-Antwort (`http.respond`, seit S38b1), SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
@@ -1052,7 +1061,7 @@ Workflow des Projekts auf und wartet auf sein Ende.
 - Scheitert das Kind, scheitert die Action; ein Abbruch bricht auch das Kind ab.
 - Meldungen des Kinds erscheinen im Log der Action als `import-region/check: …`.
 - Feste Aufrufe prüft schon `runnel validate` (Datei, Parameter, Typen, Selbstaufruf); Pfade mit `${…}`/`{{ … }}` erst
-  beim Lauf. `runConfig:` und `forEachRow` folgen mit S24.
+  beim Lauf. Für mehrere Aufrufe dient `forEach` (seit S24b); `runConfig:` folgt mit S42 (Backlog).
 
 **Pipelines aus Workflows (umgesetzt mit S18):** `core.run-pipeline` ruft eine Pipeline des Projekts auf, mit denselben
 Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, Log mit Präfix
@@ -1108,8 +1117,9 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
-Umgesetzt (Stand S22): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
-`core.constant`, `core.convert`, `core.switch`, `core.sort`, `core.group-by` sowie `csv.input` und `csv.output`:
+Umgesetzt (Stand S38c): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
+`core.constant`, `core.convert`, `core.switch`, `core.sort`, `core.group-by`, `core.from-result`, `core.to-result`,
+`csv.input`, `csv.output` und `http.response`:
 
 - **`core.sort`** sortiert stabil nach `fields: [{ name, descending, ignoreCase }]`; leere Werte zuletzt (auch absteigend),
   Zahlen exakt über `int`, `decimal` und `float` hinweg, Text nach Unicode-Codepunkten (Großbuchstaben zuerst) oder mit
@@ -1166,7 +1176,8 @@ Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dat
 - **Dienst** (seit S41): `runnel service install D:\flows` registriert über den Service Control Manager einen Dienst,
   der das Projekt wie `runnel serve` bedient und seine Trigger ausführt. `runnel service start|stop|status|uninstall`
   steuern ihn; Installieren, Entfernen, Starten und Stoppen brauchen eine Konsole „als Administrator“.
-  - **Name:** `--name` (Standard `runnel`) unterscheidet mehrere Dienste, z. B. einen je Projekt mit eigenem `--port`.
+  - **Name:** `--name` (Standard `runnel`) unterscheidet mehrere Dienste, z. B. einen je Projekt mit eigenem `--port`
+    und – wenn das Projekt HTTP-Trigger hat – eigenem `--triggers` (Standard `127.0.0.1:7301`).
   - **Konto:** standardmäßig `NT AUTHORITY\LocalService` (wenige Rechte, kein Passwort; Netzfreigaben nur, wenn sie
     für jeden lesbar sind). `--account` wählt `NetworkService`, `LocalSystem`, ein Benutzerkonto `DOMAIN\user` (das
     Passwort wird ohne Anzeige abgefragt; das Konto braucht das Recht „Als Dienst anmelden“) oder ein gMSA
@@ -1197,41 +1208,40 @@ Repository: `github.com/runnelhq/runnel` · Go-Modul: `github.com/runnelhq/runne
 
 ```
 runnel/
-├─ cmd/runnel/              # main.go – CLI (cobra o. ä.): run, serve, desktop, service, validate
+├─ cmd/runnel/              # main.go – Einstieg, Signalbehandlung
 ├─ internal/
-│  ├─ model/                # Workflow, Pipeline, Link, Trigger – Structs + YAML-(De)Serialisierung
-│  ├─ schema/               # JSON-Schema aus Konfigurations-Structs (ADR 0014); später Schemas für Dateien
-│  ├─ vars/                 # Variablen-Auflösung, Scopes
-│  ├─ expr/                 # expr-lang + goja, gemeinsame Funktionsbibliothek (now, formatDate …)
+│  ├─ cli/                  # Befehle (cobra): version, validate, run, catalog, serve, triggers, service
+│  ├─ model/                # Workflow, Pipeline, Projekt, Environment, Trigger – Laden, Prüfen, zeilengenaues Bearbeiten
+│  ├─ schema/               # JSON Schema aus Konfigurations-Structs (ADR 0014)
+│  ├─ vars/                 # ${…}-Variablen, Ebenen
+│  ├─ expr/                 # Ausdrücke (expr-lang), Funktionsbibliothek, Dokumentation für den Editor
+│  ├─ format/               # Zahlen- und Datumsformate (z. B. #.##0,00, dd.MM.yyyy)
+│  ├─ record/               # Record: geordnete Felder, Werttypen, Schemas (ADR 0007)
 │  ├─ engine/
-│  │  ├─ workflow/          # Workflow-Engine, Link-Auswertung, Retry, Resume
-│  │  ├─ pipeline/          # Pipeline-Engine, Channels, Batches, Metriken
-│  │  └─ runid/             # Lauf-IDs (ULID) für Workflows und Pipelines
-│  ├─ registry/             # Katalog aller Actions/Transforms
+│  │  ├─ workflow/          # Workflow-Engine: Links, Join, Parallelität, Retry, Timeout, forEach
+│  │  ├─ pipeline/          # Pipeline-Engine: Goroutine je Transform, Kanäle, Batches, Zähler
+│  │  └─ runid/             # Lauf-IDs (ULID)
 │  ├─ action/               # Schnittstelle Engine ↔ Actions, Registry, Descriptors
-│  ├─ actions/              # eingebaute Actions: actions.go (Builtin, Vertragstest), je Namensraum ein Paket
-│  │  ├─ core/              #   register.go + eine Datei je Action (start.go, log.go …) mit Test daneben
-│  │  └─ actiontest/        #   Test-Hilfen
-│  ├─ record/               # Record: geordnete Felder (ADR 0007)
+│  ├─ actions/              # eingebaute Actions: core/, file/, http/ (eine Datei je Action), actiontest/
 │  ├─ transform/            # Schnittstelle Engine ↔ Transforms, Registry, Descriptors
-│  ├─ transforms/           # eingebaute Transforms, gleicher Aufbau (csv, json, db, core …), transformtest/
-│  ├─ connections/          # DB-/HTTP-/SMTP-Verbindungen, Pooling
-│  ├─ secrets/              # Secret-Store, DPAPI, Maskierung
-│  ├─ store/                # SQLite-Zugriff, Migrationen
-│  ├─ scheduler/            # Cron, File-Watch, Interval, Run-Queue
-│  ├─ server/               # REST, Server-Sent Events, Webhooks, Zugangsschutz, eingebettete UI
-│  ├─ runs/                 # Läufe vorbereiten (CLI und Server), laufende Läufe und Ereignisse verwalten
-│  ├─ plugin/               # Externes Plugin-Protokoll (JSON-RPC Host)
-│  └─ winsvc/               # Windows-Dienst, EventLog (build tag windows)
-├─ pkg/sdk/                 # Öffentliches Go-SDK für Plugin-Entwickler
+│  ├─ transforms/           # eingebaute Transforms: core/, csv/, http/, transformtest/
+│  ├─ runs/                 # Läufe vorbereiten (CLI und Server), Lauf-Speicher, Ereignisse, Zwischenspeicher
+│  ├─ triggers/             # Scheduler (cron, interval), Ordner-Überwachung, HTTP-Trigger mit eigenem Listener
+│  ├─ server/               # API für den Editor, Server-Sent Events, Zugangsschutz
+│  ├─ webui/                # eingebetteter Editor-Build (go:embed)
+│  ├─ tlscert/              # Zertifikate des Trigger-Listeners (selbst erzeugt oder eigene)
+│  ├─ logfile/              # Log-Datei mit Rotation (Dienst)
+│  ├─ winsvc/               # Windows-Dienst, Ereignisanzeige (build tag windows)
+│  ├─ version/              # Versionsinformationen
+│  │                        # geplant: connections/, secrets/ (S39), store/ (SQLite, S26), plugin/ (S49)
 ├─ web/                     # Editor (React + Vite + TypeScript; Build → internal/webui/dist, per go:embed eingebettet)
 ├─ examples/                # Beispielprojekte
 ├─ docs/                    # Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (docs/dev/)
-├─ design/                  # Corporate Design: Logos, Design Tokens, Social-Grafiken
-└─ build/                   # WiX-Installer, Signierung, CI-Skripte
+├─ design/                  # Corporate Design: Logos, Design Tokens, Mockups
+│                           # geplant: pkg/sdk/ (Go-SDK für Plugins), build/ (WiX-Installer, Signierung)
 ```
 
-**Build**: `make build` → `web` wird mit Vite gebaut, nach `internal/server/ui/dist` kopiert, per `go:embed` eingebettet,
+**Build**: `make build` → `web` wird mit Vite gebaut, nach `internal/webui/dist` geschrieben, per `go:embed` eingebettet,
 dann `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w"`. CI über GitHub Actions
 (Windows-Runner für Tests von Dienst/DPAPI/PowerShell).
 
@@ -1251,9 +1261,9 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 |---|---|---|
 | **0.1 – Runner-Basis** ✅ | S01–S07, S05a, Q1–Q4: Projektgerüst, Workflow-Format & Validierung, Variablen, typisierte Parameter & Outputs, Engine (sequenziell, parallel/Join, Retry/Timeout/Abbruch), Core-Actions | Workflows per CLI / Aufgabenplanung |
 | **0.2 – Editor-Grundlage** ✅ | E1–E8: Action-Descriptor & Schema, Server mit Datei- und Run-API, Live-Events, Editor (Canvas, Bearbeiten, Eigenschaften, Ausführen) | Workflows visuell bauen und testen |
-| **0.3 – Workflow-Ausbau** | S08, S09, S11, S35: Ausdrücke, Datei-Actions, Sub-Workflows, Ausdruckseditor | Praxistaugliche Workflows |
-| **0.4 – Pipelines** | S12–S18, S22, S24, S25a: Pipeline-Engine, Typsystem, CSV, Transforms, Workflow ↔ Pipeline, Ausführung pro Datensatz, Pipeline-Canvas | ETL per CLI und Editor |
-| **0.5 – Betrieb** | S37, S38, S41, dann S38a, S40a, S38b, S38c: Cron-, Datei- und Intervall-Trigger, Windows-Dienst; danach HTTP-Trigger (auch als Dienst mit Antwort aus dem Lauf) mit Listener und TLS | Dauerbetrieb auf einem Windows-Rechner, von anderen Systemen per HTTP ansprechbar |
+| **0.3 – Workflow-Ausbau** ✅ | S08, S09, S11, S35: Ausdrücke, Datei-Actions, Sub-Workflows, Ausdruckseditor | Praxistaugliche Workflows |
+| **0.4 – Pipelines** ✅ | S12–S18, S22, S24, S25a: Pipeline-Engine, Typsystem, CSV, Transforms, Workflow ↔ Pipeline, Ausführung pro Datensatz, Pipeline-Canvas | ETL per CLI und Editor |
+| **0.5 – Betrieb** ✅ | S37, S38, S41, dann S38a, S40a, S38b1, S38b2, S38c: Cron-, Datei- und Intervall-Trigger, Windows-Dienst; danach HTTP-Trigger (auch als Dienst mit Antwort aus dem Lauf) mit Listener und TLS | Dauerbetrieb auf einem Windows-Rechner, von anderen Systemen per HTTP ansprechbar |
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |

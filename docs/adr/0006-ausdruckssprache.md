@@ -109,7 +109,8 @@ when:      "{{ result.rows > 0 }}"
   Wahrheitswert oder – in Anführungszeichen – als Text passt.
 - **Kontext:** `vars` (alle Variablen, aufgelöst), `params` (deklarierte Parameter mit ihrem Typ, z. B. `integer` als
   Zahl), `env`, `run` (`id`, `workflow`, `environment`, `startedAt`, `lastError` – die Meldung der zuletzt
-  fehlgeschlagenen Action; `trigger` folgt mit den Triggern), `results` (alle bisher beendeten Actions nach ID) und
+  fehlgeschlagenen Action; `run.trigger` ist noch offen – Backlog), `results` (alle bisher beendeten Actions nach ID),
+  `request` (Anfrage eines HTTP-Triggers, seit S38b1, [ADR 0018](0018-http-trigger.md)) und
   `result`. Ein Ergebnis hat `id`, `type`, `status` (`succeeded`, `failed`, `cancelled`, `skipped`), `success`,
   `output` (Ausgabedaten der Action), `error` und `durationMs`; `rows`, `files` und `exitCode` liefern die Actions, die
   sie haben, in `output`.
