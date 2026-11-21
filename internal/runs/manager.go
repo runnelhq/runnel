@@ -172,13 +172,21 @@ func limitsOf(p *model.Project, perFile int) limits {
 	return l
 }
 
+// newID returns the id of a new run, or ErrShutdown when no runs are started anymore.
+func (m *Manager) newID() (string, error) {
+	if m.stopping() {
+		return "", ErrShutdown
+	}
+	return workflow.NewRunID(time.Now()), nil
+}
+
 // Start prepares and starts a run in the background and returns its state. The
 // spec's Observer and RunID are set by the manager. Errors are those of Prepare.
 func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
-	if m.stopping() {
-		return Run{}, nil, ErrShutdown
+	id, err := m.newID()
+	if err != nil {
+		return Run{}, nil, err
 	}
-	id := workflow.NewRunID(time.Now())
 	spec.RunID = id
 	spec.Observer = func(e workflow.Event) { m.record(id, e) }
 	p, err := Prepare(spec)
@@ -198,10 +206,10 @@ func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
 // StartPipeline prepares and starts a pipeline run in the background, like Start (S25a3).
 // Its transforms are reported as actions, with their counts when they have finished.
 func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedPipeline, error) {
-	if m.stopping() {
-		return Run{}, nil, ErrShutdown
+	id, err := m.newID()
+	if err != nil {
+		return Run{}, nil, err
 	}
-	id := workflow.NewRunID(time.Now())
 	spec.RunID = id
 	spec.Observer = func(e pipeline.Event) { m.recordPipeline(id, e) }
 	p, err := PreparePipeline(spec)

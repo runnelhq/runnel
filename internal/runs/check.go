@@ -28,7 +28,7 @@ func CheckCalls(w *model.Workflow, projectDir, file string) model.Errors {
 			errs = append(errs, checkPipelineCall(w, i, a, projectDir, file)...)
 			continue
 		}
-		path, ok := staticText(a.With["workflow"])
+		path, ok := StaticText(a.With["workflow"])
 		if a.Type != ActionTypeRunWorkflow || !ok || path == "" {
 			continue
 		}
@@ -49,8 +49,8 @@ func CheckCalls(w *model.Workflow, projectDir, file string) model.Errors {
 	return errs
 }
 
-// staticText returns a value as text if it is fixed, i.e. contains no ${…} or {{ … }}.
-func staticText(v any) (string, bool) {
+// StaticText returns a value as text if it is fixed, i.e. contains no ${…} or {{ … }}.
+func StaticText(v any) (string, bool) {
 	var s string
 	switch v := v.(type) {
 	case string:
@@ -83,7 +83,7 @@ func readWorkflow(file, name string) (*model.Workflow, error) {
 // checkPipelineCall checks a call of a pipeline (core.run-pipeline) with a fixed path:
 // the file exists and is a pipeline, and the parameters fit (like workflow calls).
 func checkPipelineCall(w *model.Workflow, i int, a model.Action, projectDir, file string) model.Errors {
-	path, ok := staticText(a.With["pipeline"])
+	path, ok := StaticText(a.With["pipeline"])
 	if !ok || path == "" {
 		return nil
 	}
@@ -100,19 +100,19 @@ func checkPipelineCall(w *model.Workflow, i int, a model.Action, projectDir, fil
 		return model.Errors{w.ErrorAt(at+".pipeline", "action %q: pipeline file %s has errors; check it with \"runnel validate\"", a.ID, name)}
 	}
 	params, _ := a.With["params"].(map[string]any)
-	return checkGivenParams(w.ErrorAt, at, fmt.Sprintf("action %q: ", a.ID), pl.Parameters, "pipeline "+name, params)
+	return CheckGivenParams(w.ErrorAt, at, fmt.Sprintf("action %q: ", a.ID), pl.Parameters, "pipeline "+name, params)
 }
 
 func checkParamsOf(w *model.Workflow, at, id string, child *model.Workflow, name string, params map[string]any) model.Errors {
-	return checkGivenParams(w.ErrorAt, at, fmt.Sprintf("action %q: ", id), child.Parameters, "workflow "+name, params)
+	return CheckGivenParams(w.ErrorAt, at, fmt.Sprintf("action %q: ", id), child.Parameters, "workflow "+name, params)
 }
 
-// errorAt creates an error at a YAML path of a file (Workflow.ErrorAt, Trigger.ErrorAt …).
-type errorAt func(path, format string, args ...any) *model.Error
+// ErrorAt creates an error at a YAML path of a file (Workflow.ErrorAt, Trigger.ErrorAt …).
+type ErrorAt func(path, format string, args ...any) *model.Error
 
-// checkGivenParams checks the parameters given to a called workflow or pipeline (what);
+// CheckGivenParams checks the parameters given to a called workflow or pipeline (what);
 // at is the YAML path of the mapping that holds params, who starts the messages.
-func checkGivenParams(errAt errorAt, at, who string, parameters []model.Parameter, what string, params map[string]any) model.Errors {
+func CheckGivenParams(errAt ErrorAt, at, who string, parameters []model.Parameter, what string, params map[string]any) model.Errors {
 	var errs model.Errors
 	declaredParams := map[string]model.Parameter{}
 	for _, p := range parameters {
@@ -125,10 +125,10 @@ func checkGivenParams(errAt errorAt, at, who string, parameters []model.Paramete
 		p, ok := declaredParams[key]
 		if !ok {
 			errs = append(errs, errAt(at+".params."+key, "%sparameter %s is not declared by %s (declared: %s)",
-				who, key, what, declaredOf(parameters)))
+				who, key, what, DeclaredOf(parameters)))
 			continue
 		}
-		if text, fixed := staticText(params[key]); fixed {
+		if text, fixed := StaticText(params[key]); fixed {
 			if _, err := p.CheckValue(text); err != nil {
 				errs = append(errs, errAt(at+".params."+key, "%sparameter %s (%s): %v", who, key, p.Type.OrString(), err))
 			}
@@ -153,7 +153,7 @@ func callsBack(projectDir, root, rootName, file, name string, seen map[string]bo
 		return nil
 	}
 	for _, a := range w.Actions {
-		path, ok := staticText(a.With["workflow"])
+		path, ok := StaticText(a.With["workflow"])
 		if a.Type != ActionTypeRunWorkflow || !ok || path == "" {
 			continue
 		}

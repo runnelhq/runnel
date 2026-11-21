@@ -1,8 +1,6 @@
 package runs
 
 import (
-	"fmt"
-
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
@@ -63,15 +61,8 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 	}
 	p.Warnings = diags
 
-	if spec.ProjectDir != "" {
-		if p.Project, err = loadProject(spec.ProjectDir); err != nil {
-			return p, err
-		}
-		if p.Env, err = p.Project.SelectEnvironment(spec.Env); err != nil {
-			return p, err
-		}
-	} else if spec.Env != "" {
-		return p, fmt.Errorf("environment %s: no project (%s) found for %s", spec.Env, model.ProjectFile, spec.Name)
+	if p.Project, p.Env, err = scope(spec.ProjectDir, spec.Env, spec.Name); err != nil {
+		return p, err
 	}
 	if p.Undeclared, err = checkParams(pl.Parameters, spec.Params); err != nil {
 		return p, err

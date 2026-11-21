@@ -217,7 +217,7 @@ func LoadTrigger(path string) (*Trigger, error) {
 
 // ParseTrigger parses a trigger from YAML and checks its fields; name is used in
 // messages. References to other files (target, environment, parameters) are checked
-// with the project (runs.CheckTrigger).
+// with the project (triggers.CheckTrigger).
 func ParseTrigger(name string, data []byte) (*Trigger, error) {
 	src, err := parseSource(name, data)
 	if err != nil {

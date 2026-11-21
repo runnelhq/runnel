@@ -18,7 +18,6 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
-	"github.com/runnelhq/runnel/internal/runs"
 )
 
 // PollInterval is how often the scheduler looks for changed trigger files.
@@ -217,7 +216,7 @@ func Load(dir string) ([]*model.Trigger, model.Errors) {
 	collect(err)
 	var ok []*model.Trigger
 	for _, t := range triggers {
-		if errs := runs.CheckTrigger(t, p, dir); len(errs) > 0 {
+		if errs := CheckTrigger(t, p, dir); len(errs) > 0 {
 			problems = append(problems, errs...)
 			continue
 		}

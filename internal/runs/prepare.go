@@ -97,15 +97,8 @@ func Prepare(spec Spec) (*Prepared, error) {
 	}
 	p.Warnings = diags
 
-	if spec.ProjectDir != "" {
-		if p.Project, err = loadProject(spec.ProjectDir); err != nil {
-			return p, err
-		}
-		if p.Env, err = p.Project.SelectEnvironment(spec.Env); err != nil {
-			return p, err
-		}
-	} else if spec.Env != "" {
-		return p, fmt.Errorf("environment %s: no project (%s) found for %s", spec.Env, model.ProjectFile, spec.Name)
+	if p.Project, p.Env, err = scope(spec.ProjectDir, spec.Env, spec.Name); err != nil {
+		return p, err
 	}
 
 	if p.Undeclared, err = checkParams(w.Parameters, spec.Params); err != nil {
@@ -139,10 +132,10 @@ func Prepare(spec Spec) (*Prepared, error) {
 }
 
 // declared lists the parameter names of a workflow for messages.
-func declared(w *model.Workflow) string { return declaredOf(w.Parameters) }
+func declared(w *model.Workflow) string { return DeclaredOf(w.Parameters) }
 
-// declaredOf lists parameter names for messages; "none" without parameters.
-func declaredOf(params []model.Parameter) string {
+// DeclaredOf lists parameter names for messages; "none" without parameters.
+func DeclaredOf(params []model.Parameter) string {
 	if len(params) == 0 {
 		return "none"
 	}
@@ -156,14 +149,33 @@ func declaredOf(params []model.Parameter) string {
 // ErrMissingParameters is wrapped by the error of Prepare when required parameters are missing.
 var ErrMissingParameters = errors.New("missing required parameter(s)")
 
-// checkParams fails for missing required parameters and values that do not match
-// the declared type or allowed values. It returns the undeclared parameters, sorted.
-func checkParams(parameters []model.Parameter, params map[string]string) ([]string, error) {
-	declared := map[string]bool{}
-	var problems, missing []string
+// scope loads the project of a run and selects its environment; without a project
+// directory, giving an environment is an error. name names the file in messages.
+func scope(projectDir, env, name string) (*model.Project, *model.Environment, error) {
+	if projectDir == "" {
+		if env != "" {
+			return nil, nil, fmt.Errorf("environment %s: no project (%s) found for %s", env, model.ProjectFile, name)
+		}
+		return nil, nil, nil
+	}
+	p, err := loadProject(projectDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	e, err := p.SelectEnvironment(env)
+	return p, e, err
+}
+
+// CheckValues checks the values given at start against the declared parameters: problems
+// are values that do not match the type or allowed values ("parameter X (type): …"),
+// missing the required parameters without value and default. Parameters for which skip
+// reports true are not checked (e.g. fixed values of a trigger).
+func CheckValues(parameters []model.Parameter, values map[string]string, skip func(name string) bool) (problems, missing []string) {
 	for _, p := range parameters {
-		declared[p.Name] = true
-		value, given := params[p.Name]
+		if skip != nil && skip(p.Name) {
+			continue
+		}
+		value, given := values[p.Name]
 		if !given {
 			if p.Required && p.Default == "" {
 				missing = append(missing, p.Name)
@@ -174,6 +186,17 @@ func checkParams(parameters []model.Parameter, params map[string]string) ([]stri
 			problems = append(problems, fmt.Sprintf("parameter %s (%s): %v", p.Name, p.Type.OrString(), err))
 		}
 	}
+	return problems, missing
+}
+
+// checkParams fails for missing required parameters and values that do not match
+// the declared type or allowed values. It returns the undeclared parameters, sorted.
+func checkParams(parameters []model.Parameter, params map[string]string) ([]string, error) {
+	declared := map[string]bool{}
+	for _, p := range parameters {
+		declared[p.Name] = true
+	}
+	problems, missing := CheckValues(parameters, params, nil)
 	if len(missing) > 0 {
 		prefix := ""
 		if len(problems) > 0 {
