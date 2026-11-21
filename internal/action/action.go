@@ -45,8 +45,11 @@ type ExecContext struct {
 type Response struct {
 	Status  int
 	Headers map[string]string
-	// Body is sent as JSON, or as text if it is a string.
+	// Body is sent as JSON, or as text if it is a string; json.RawMessage is sent as it is.
 	Body any
+	// Fallback marks an answer that is sent only if the run ends without another one
+	// (http.response with whenEmpty, S38c); it does not take the place of a later answer.
+	Fallback bool
 }
 
 // Responder delivers the answer of a run to the waiting caller of an http trigger and

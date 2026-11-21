@@ -3,6 +3,7 @@ package runs
 import (
 	"fmt"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
@@ -27,8 +28,11 @@ type PipelineSpec struct {
 	Trigger string
 	// Client is the address of the caller of an http trigger.
 	Client string
-	// Rows are records for core.from-result (from core.run-pipeline).
+	// Rows are records for core.from-result (from core.run-pipeline, or the JSON list
+	// in the body of a request to an http trigger).
 	Rows []record.Record
+	// Respond answers the waiting caller of an http trigger (http.response, S38c).
+	Respond action.Responder
 }
 
 // PreparedPipeline is the result of PreparePipeline; it is also returned when it fails,
@@ -82,6 +86,7 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
 		Rows:        spec.Rows,
+		Respond:     spec.Respond,
 	})
 	if err == nil {
 		// Warnings of the schemas, e.g. fields that are not known (ADR 0007).

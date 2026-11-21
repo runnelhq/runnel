@@ -168,7 +168,7 @@ func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	inputs, bodyValue, status, err := requestValues(r, body)
+	inputs, bodyValue, status, err := requestValues(r, body, strings.HasSuffix(t.Target, ".pipeline.yaml"))
 	if err != nil {
 		fail(w, status, "%v", err)
 		return
@@ -192,6 +192,11 @@ func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		client = host
 	}
 	start := StartRequest{Params: params, Client: client, Request: requestOf(r, bodyValue, client)}
+	if list, ok := bodyValue.([]any); ok {
+		for _, item := range list {
+			start.Rows = append(start.Rows, item.(map[string]any))
+		}
+	}
 	if !t.WaitsForRun() {
 		if id, ok := s.startHTTP(w, e, start); ok {
 			w.Header().Set("Location", "/api/v1/runs/"+id)
@@ -273,8 +278,9 @@ func authorized(t *model.Trigger, r *http.Request) bool {
 
 // requestValues returns the values of the query and the body (a JSON object or a
 // form) as text, and the body as a value for request.body; the query wins over the
-// body. Non-text JSON values are given as JSON.
-func requestValues(r *http.Request, body []byte) (map[string]string, any, int, error) {
+// body. Non-text JSON values are given as JSON. With list (a pipeline is the target),
+// the body may also be a JSON list of objects: the records for core.from-result.
+func requestValues(r *http.Request, body []byte, list bool) (map[string]string, any, int, error) {
 	values := map[string]string{}
 	var bodyValue any
 	if len(bytes.TrimSpace(body)) > 0 {
@@ -293,11 +299,25 @@ func requestValues(r *http.Request, body []byte) (map[string]string, any, int, e
 		case media == "" || media == "application/json" || strings.HasSuffix(media, "+json"):
 			dec := json.NewDecoder(bytes.NewReader(body))
 			dec.UseNumber()
-			var obj map[string]any
-			if err := dec.Decode(&obj); err != nil || obj == nil {
+			var v any
+			err := dec.Decode(&v)
+			obj, isObject := v.(map[string]any)
+			items, isList := v.([]any)
+			switch {
+			case err == nil && isObject:
+				bodyValue = numbers(obj)
+			case err == nil && isList && list:
+				for i, item := range items {
+					if _, ok := item.(map[string]any); !ok {
+						return nil, nil, http.StatusBadRequest, fmt.Errorf("entry %d of the JSON list is not an object; the list holds the records for the pipeline", i+1)
+					}
+				}
+				return queryValues(r, values), numbers(items), 0, nil
+			case list:
+				return nil, nil, http.StatusBadRequest, errors.New("the body must be a JSON object (parameters) or a list of objects (records), e.g. [{\"id\": 4711}]")
+			default:
 				return nil, nil, http.StatusBadRequest, errors.New("the body must be a JSON object, e.g. {\"id\": 4711}")
 			}
-			bodyValue = numbers(obj)
 			for k, v := range obj {
 				switch v := v.(type) {
 				case nil:
@@ -316,10 +336,15 @@ func requestValues(r *http.Request, body []byte) (map[string]string, any, int, e
 			return nil, nil, http.StatusUnsupportedMediaType, fmt.Errorf("unsupported content type %q (expected application/json or application/x-www-form-urlencoded)", media)
 		}
 	}
+	return queryValues(r, values), bodyValue, 0, nil
+}
+
+// queryValues adds the query parameters to values; they win over the body.
+func queryValues(r *http.Request, values map[string]string) map[string]string {
 	for k, v := range r.URL.Query() {
 		values[k] = v[0]
 	}
-	return values, bodyValue, 0, nil
+	return values
 }
 
 type badRequest struct{ msg string }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/transforms"
 )
 
 const waitWorkflow = `kind: Workflow
@@ -412,5 +413,56 @@ actions:
 	d := waitRun(t, s, s.triggers.List()[0].Last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
 	if !strings.Contains(fmt.Sprint(d.Log), "answered: true") {
 		t.Errorf("log %v", d.Log)
+	}
+}
+
+// A pipeline gets a JSON list in the body as records and answers with http.response
+// (S38c).
+func TestHTTPTriggerPipeline(t *testing.T) {
+	dir, s := newRunProject(t)
+	s.transforms = transforms.Builtin()
+	writeFile(t, filepath.Join(dir, "pipelines", "big.pipeline.yaml"), `kind: Pipeline
+apiVersion: runnel/v1
+name: big
+parameters:
+  - { name: MIN, type: integer, default: "10" }
+transforms:
+  - { id: in, type: core.from-result }
+  - { id: big, type: core.filter, with: { condition: "{{ record.amount >= params.MIN }}" } }
+  - { id: answer, type: http.response, with: { status: "200", headers: { X-Kind: orders } } }
+  - { id: none, type: http.response, with: { status: "404", whenEmpty: true } }
+links:
+  - { from: in, to: big }
+  - { from: big, to: answer }
+  - { from: big, to: none }
+`)
+	writeFile(t, filepath.Join(dir, "triggers", "big.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: big\ntype: http\n"+
+		"target: pipelines/big.pipeline.yaml\nwith: { method: POST, path: /orders/big, auth: none, response: run, timeout: 5s }\n")
+	s.triggers.Reload()
+	if p := s.triggers.Problems(); len(p) != 0 {
+		t.Fatal(p)
+	}
+	post := func(path, body string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("POST", path, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Host, r.RemoteAddr = "127.0.0.1:7301", "127.0.0.1:50000"
+		w := httptest.NewRecorder()
+		s.triggers.ServeHTTP(w, r)
+		return w
+	}
+	w := post("/orders/big", `[{"id": 1, "amount": 5}, {"id": 2, "amount": 50}, {"id": 3, "amount": 12.5}]`)
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `[{"amount":50,"id":2},{"amount":12.5,"id":3}]` || w.Header().Get("X-Kind") != "orders" {
+		t.Errorf("records: %d %s %v", w.Code, w.Body, w.Header())
+	}
+	if w := post("/orders/big?MIN=100", `[{"id": 1, "amount": 5}]`); w.Code != 404 || strings.TrimSpace(w.Body.String()) != "[]" {
+		t.Errorf("none: %d %s", w.Code, w.Body)
+	}
+	last := s.triggers.List()[0].Last
+	if last == nil {
+		t.Fatal("no run")
+	}
+	d := waitRun(t, s, last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
+	if d.Kind != "pipeline" || d.Trigger != "http:big" {
+		t.Errorf("run %+v", d.Run)
 	}
 }

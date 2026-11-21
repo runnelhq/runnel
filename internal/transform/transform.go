@@ -32,14 +32,15 @@ type Transform interface {
 
 // Output passes the records of a transform on and writes to the run log.
 type Output struct {
-	id     string
-	emit   func(record.Record) error
-	log    func(slog.Level, string)
-	values map[string]any
-	fail   func(record.Record) error
-	emitTo func(string, record.Record) error
-	rows   []record.Record
-	result func(record.Record) error
+	id      string
+	emit    func(record.Record) error
+	log     func(slog.Level, string)
+	values  map[string]any
+	fail    func(record.Record) error
+	emitTo  func(string, record.Record) error
+	rows    []record.Record
+	result  func(record.Record) error
+	respond action.Responder
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
@@ -69,6 +70,25 @@ func (o *Output) EmitTo(target string, r record.Record) error {
 func (o *Output) WithResults(rows []record.Record, add func(record.Record) error) *Output {
 	o.rows, o.result = rows, add
 	return o
+}
+
+// WithRespond sets how Respond answers the waiting caller of an http trigger (S38c);
+// the engine sets it when the run has one.
+func (o *Output) WithRespond(respond action.Responder) *Output {
+	o.respond = respond
+	return o
+}
+
+// HasCaller reports whether a caller of an http trigger waits for the answer.
+func (o *Output) HasCaller() bool { return o.respond != nil }
+
+// Respond answers the waiting caller of an http trigger (http.response) and reports
+// whether it was the first answer; false without a caller.
+func (o *Output) Respond(r action.Response) bool {
+	if o.respond == nil {
+		return false
+	}
+	return o.respond(r)
 }
 
 // Rows returns the records passed to the run, e.g. by core.run-pipeline (rows); they

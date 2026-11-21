@@ -207,15 +207,19 @@ func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (string
 		params = map[string]string{}
 	}
 	maps.Copy(params, r.Params)
-	var run runs.Run
 	if fileKind(name) == "pipeline" {
-		run, _, err = s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
-			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger, Client: r.Client})
-	} else {
-		run, _, err = s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
-			ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger, Client: r.Client,
-			Request: r.Request, Respond: r.Respond})
+		rows, err := runs.Records(r.Rows)
+		if err != nil {
+			return "", err
+		}
+		run, _, err := s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
+			Env: t.Environment, Params: params, Registry: s.transforms, Trigger: trigger, Client: r.Client,
+			Rows: rows, Respond: r.Respond})
+		return run.ID, err
 	}
+	run, _, err := s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
+		ProjectDir: s.dir, Env: t.Environment, Params: params, Registry: s.registry, Transforms: s.transforms, Trigger: trigger, Client: r.Client,
+		Request: r.Request, Respond: r.Respond})
 	return run.ID, err
 }
 

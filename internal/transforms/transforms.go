@@ -7,11 +7,13 @@ import (
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/transforms/core"
 	"github.com/runnelhq/runnel/internal/transforms/csv"
+	"github.com/runnelhq/runnel/internal/transforms/http"
 )
 
 var namespaces = []func(*transform.Registry){
 	core.Register,
 	csv.Register,
+	http.Register,
 }
 
 // Builtin returns a new registry with all built-in transforms.

@@ -1,0 +1,14 @@
+# A small REST service (roadmap S38c): GET /api/customers/{KDNR} answers with the
+# customer from pipelines/customer-api.pipeline.yaml (200), or 404 if there is none.
+kind: Trigger
+apiVersion: runnel/v1
+name: customer
+description: Looks up a customer
+type: http
+target: pipelines/customer-api.pipeline.yaml
+with:
+  method: GET
+  path: /api/customers/{KDNR}
+  auth: none
+  response: run
+  timeout: 10s

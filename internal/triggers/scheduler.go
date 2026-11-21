@@ -80,6 +80,8 @@ type StartRequest struct {
 	Client string
 	// Request is the request of the caller (http; request in expressions).
 	Request map[string]any
+	// Rows are the records of a JSON list in the body (http, pipelines: core.from-result).
+	Rows []map[string]any
 	// Respond answers the waiting caller (http with response: run; http.respond).
 	Respond action.Responder
 }

@@ -1128,6 +1128,50 @@
         "additionalProperties": false
       },
       "recordErrors": true
+    },
+    {
+      "type": "http.response",
+      "kind": "transform",
+      "category": "output",
+      "label": "HTTP Response",
+      "description": "Answers the caller of an HTTP trigger with the records as JSON and passes them on",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "HTTP status code, e.g. 200 or 404",
+            "default": "200",
+            "examples": [
+              "200"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers of the answer",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "single": {
+            "type": "boolean",
+            "description": "Answer with the first record as an object instead of a list",
+            "default": false
+          },
+          "whenEmpty": {
+            "type": "boolean",
+            "description": "Fallback: answer also without records, but only if no other http.response answers (e.g. 404)",
+            "default": false
+          },
+          "maxRows": {
+            "type": "string",
+            "description": "Most records in the answer; more stop the pipeline, as they are held in memory",
+            "default": "10000"
+          }
+        },
+        "additionalProperties": false
+      }
     }
   ]
 }
