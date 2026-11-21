@@ -24,7 +24,7 @@ der Schutz erfolgt über Betriebssystem, Netzwerk und Dateirechte.
 - Jede Datei wird mit **ETag** (Hash des Inhalts) ausgeliefert; Speichern erfolgt mit `If-Match`.
 - Hat sich die Datei zwischenzeitlich geändert (anderer Browser, `git pull`, Editor außerhalb), antwortet der Server
   mit `412 Precondition Failed`. Der Editor bietet dann an: neu laden, eigene Version überschreiben oder als Kopie speichern.
-- Über WebSocket (`file.changed`) zeigen alle offenen Editoren sofort an, wenn eine geöffnete Datei anderswo geändert wurde.
+- Über Server-Sent Events ([ADR 0016](0016-live-events-sse.md), Ereignis `file.changed`, geplant) zeigen alle offenen Editoren sofort an, wenn eine geöffnete Datei anderswo geändert wurde.
 - **Hinweis „wird gerade bearbeitet“**: Öffnet ein Editor eine Datei mit ungespeicherten Änderungen, sehen andere
   Browser einen Hinweis (Rechnername/IP). Das ist eine Information, keine Sperre.
 

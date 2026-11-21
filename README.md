@@ -20,10 +20,18 @@ Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadma
 
 ## Verwendung
 
-Noch im Aufbau – Workflows lassen sich prüfen und mit den Basis-Actions (`core.start`, `core.log`, `core.wait`,
-`core.success`, `core.abort`, `core.dummy`), Sub-Workflows (`core.run-workflow`) und den Datei-Actions (`file.exists`, `file.wait`, `file.copy`,
-`file.move`, `file.delete`, `file.mkdir`, `file.list`) ausführen. Pipelines laufen bereits mit den Test-Transforms
-(`core.generate-rows`, `core.dummy`, `core.log`); CSV und weitere Transforms folgen laut [Roadmap](docs/ROADMAP.md).
+Noch vor Version 1.0 (Stand: Phase 0.5 abgeschlossen, siehe [Roadmap](docs/ROADMAP.md)):
+
+- **Workflows** mit den Basis-Actions (`core.start`, `core.log`, `core.wait`, `core.success`, `core.abort`,
+  `core.dummy`), Sub-Workflows und Pipelines als Schritt (`core.run-workflow`, `core.run-pipeline`), Datei-Actions
+  (`file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list`) und der Antwort an
+  HTTP-Aufrufer (`http.respond`); Ausdrücke `{{ … }}`, `forEach`, Retry und Timeouts.
+- **Pipelines** mit CSV (`csv.input`, `csv.output`), Filtern, Umwandeln, Verteilen, Sortieren und Gruppieren,
+  Datensätzen von und zu Workflows sowie der Antwort an HTTP-Aufrufer (`http.response`).
+- **Editor** im Browser für Workflows und Pipelines, **Trigger** (Zeitplan, Intervall, Ordner, HTTP) und der Betrieb
+  als **Windows-Dienst**.
+
+Die vollständige Liste der Bausteine zeigt `runnel catalog`.
 
 ```bash
 runnel run --env prod examples/hello/workflows/hello.workflow.yaml
@@ -35,7 +43,7 @@ runnel run --env prod examples/hello/workflows/hello.workflow.yaml
 23:28:02.494 INFO  workflow "hello" succeeded in 1s
 ```
 
-`runnel run <datei>` führt einen Workflow aus: `--env` wählt das Environment des Projekts, `--param KEY=VALUE` setzt
+`runnel run <datei>` führt einen Workflow oder eine Pipeline aus (bei Pipelines mit den Zählern je Transform): `--env` wählt das Environment des Projekts, `--param KEY=VALUE` setzt
 Parameter, `-v` zeigt zusätzlich Debug-Meldungen und jeden Action-Start. Exit-Code: `0` erfolgreich, `1` fehlgeschlagen,
 `2` nicht gestartet (ungültiger Workflow oder Aufruf), `130` abgebrochen – passend für die Windows-Aufgabenplanung.
 Strg+C bricht einen Lauf sauber ab (laufende Actions werden gestoppt); ein zweites Strg+C beendet sofort.
@@ -44,7 +52,8 @@ Strg+C bricht einen Lauf sauber ab (laufende Actions werden gestoppt); ein zweit
 runnel validate examples/hello
 ```
 
-`runnel validate [pfad...]` prüft Workflow-Dateien (`*.workflow.yaml`, Ordner werden rekursiv durchsucht) auf
+`runnel validate [pfad...]` prüft Workflows, Pipelines und Trigger (`*.workflow.yaml`, `*.pipeline.yaml`,
+`triggers/*.yaml`; Ordner werden rekursiv durchsucht) auf
 Syntax- und Feldfehler, Links auf unbekannte Actions, Zyklen ohne `loop: true`, unerreichbare Actions, nicht
 definierte Variablen sowie – wie vor einem Lauf – unbekannte Action-Typen und ungültige Konfigurationen (`with:`). Das zugehörige Projekt (`project.yaml` im Ordner oder darüber) und seine Environments werden
 mitgeprüft; Variablen gegen jedes Environment oder nur gegen eines (`--env prod`). Mit `--param KEY=VALUE` lassen
@@ -55,10 +64,11 @@ Exit-Code 1 (mit `--strict` auch bei Warnungen). Beispiele liegen unter [`exampl
 runnel serve examples/hello
 ```
 
-`runnel serve [projektordner]` startet den Server für ein Projekt; der Editor öffnet sich im Browser unter
-`http://127.0.0.1:7300` (anderer Port mit `--port`). Er ist nur vom eigenen Rechner aus erreichbar und bietet die API für den Editor: Projektbaum, Dateien lesen
-und speichern mit Konfliktschutz, Katalog der Actions, Prüfung von Workflows sowie Läufe starten, abbrechen und live
-verfolgen – beschrieben in [docs/dev/API.md](docs/dev/API.md). Der Editor selbst folgt mit den nächsten Schritten.
+`runnel serve [projektordner]` startet den Server für ein Projekt; der Editor ist im Browser unter
+`http://127.0.0.1:7300` erreichbar (anderer Port mit `--port`). Er ist nur vom eigenen Rechner aus erreichbar und bietet
+die API für den Editor: Projektbaum, Dateien lesen und speichern mit Konfliktschutz, Katalog der Actions und
+Transforms, Prüfung von Workflows und Pipelines sowie Läufe starten, abbrechen und live verfolgen – beschrieben in
+[docs/dev/API.md](docs/dev/API.md). Mit `--stop-timeout` bekommen laufende Runs beim Beenden Zeit, fertig zu werden.
 
 ```bash
 runnel triggers examples/hello
@@ -90,14 +100,14 @@ steht in `%ProgramData%\runnel\logs\<name>.log`, Start, Stopp, Warnungen und Feh
 runnel catalog core.wait
 ```
 
-`runnel catalog` listet die verfügbaren Actions nach Kategorien, `runnel catalog <typ>` beschreibt eine Action mit
+`runnel catalog` listet die verfügbaren Actions und Transforms nach Kategorien, `runnel catalog <typ>` beschreibt einen Baustein mit
 ihren Feldern (Typ, Pflichtfeld, erlaubte Werte, Standardwert, Beispiel). `--json` gibt die Descriptors mit
 JSON Schema aus – dieselben Daten, aus denen der Editor Palette und Eigenschaftsdialog erzeugt.
 
 ## Entwicklung
 
 Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`) und für den Editor [Node.js](https://nodejs.org/)
-22 LTS. Für `make lint` zusätzlich [golangci-lint](https://golangci-lint.run/) v2. Details zum Editor:
+22 LTS. Für `make lint` zusätzlich [golangci-lint](https://golangci-lint.run/) v2.15.0. Details zum Editor:
 [docs/dev/EDITOR.md](docs/dev/EDITOR.md).
 
 | Aufgabe | Mit `make` | Ohne `make` (z. B. Windows/PowerShell) |

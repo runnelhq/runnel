@@ -90,7 +90,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 
 ---
 
-## Phase 0.3 – Workflow-Ausbau
+## Phase 0.3 – Workflow-Ausbau ✅
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
@@ -105,7 +105,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 
 ---
 
-## Phase 0.4 – Pipelines (ETL)
+## Phase 0.4 – Pipelines (ETL) ✅
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
@@ -133,7 +133,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 
 ---
 
-## Phase 0.5 – Betrieb
+## Phase 0.5 – Betrieb ✅
 
 | Nr. | Schritt | Inhalt | Prüfen |
 |---|---|---|---|
@@ -185,7 +185,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | Nr. | Schritt | Inhalt | Hängt ab von / Hinweis |
 |---|---|---|---|
 | S10 | HTTP-Action | `http.request` (Methoden, Header, Body, Timeout, Statuscode → Ergebnis); Tests gegen lokalen Testserver | – |
-| S26 | Run-Historie | Ersetzt den Speicher aus E3 ohne API-Änderung; SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | bis dahin die letzten 100 Läufe im Speicher, nach einem Neustart weg |
+| S26 | Run-Historie | Ersetzt den Speicher aus E3 ohne API-Änderung; SQLite-Store mit Migrationen, Tabellen `runs`/`node_runs`/Link-Zustände; `runnel runs` listet Läufe | bis dahin die letzten 100 Läufe im Speicher (dazu 100 von HTTP-Triggern, seit S38b2), nach einem Neustart weg |
 | S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | S26 |
 | S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | – |
 | S16 (Teil) | `core.calculate` | Felder per Ausdruck berechnen | S08 |

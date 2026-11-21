@@ -31,7 +31,7 @@ nur vom Server zum Browser.
 | Abhängigkeit | keine | `coder/websocket` o. ä. |
 | Neuverbinden, verpasste Ereignisse | im Browser eingebaut (`EventSource`, `Last-Event-ID`) | selbst zu bauen |
 | Richtung | Server → Browser | beide Richtungen |
-| Proxys, Firewalls, Zugangsschlüssel (S39) | normales HTTP, gleicher Header wie die übrige API | Upgrade-Handshake, Schlüssel im Handshake |
+| Proxys, Firewalls, Zugangsschlüssel (S40b) | normales HTTP, gleicher Header wie die übrige API | Upgrade-Handshake, Schlüssel im Handshake |
 | Testen, Debuggen | `curl -N` | eigenes Werkzeug |
 
 Der einzige Vorteil eines WebSockets – Nachrichten vom Browser über dieselbe Verbindung – wird nicht gebraucht.

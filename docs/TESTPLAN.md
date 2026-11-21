@@ -1,6 +1,6 @@
 # Testplan und bekannte Einschränkungen
 
-Stand: nach S07 (Version `v0.1.0-alpha.2`). Dieses Dokument beschreibt, wie der aktuelle Stand geprüft wird – automatisch
+Stand: nach Phase 0.5 (S38c). Dieses Dokument beschreibt, wie der aktuelle Stand geprüft wird – automatisch
 und manuell unter Windows – und welche Einschränkungen bekannt sind.
 
 ## 1. Automatische Prüfungen
@@ -10,10 +10,12 @@ und manuell unter Windows – und welche Einschränkungen bekannt sind.
 | Lint (golangci-lint) | jeder PR, `main` | `make lint` |
 | Unit-, Golden- und CLI-Tests mit Race-Detector | jeder PR (Linux), ohne Race-Detector (Windows) | `make test` |
 | Schwachstellen (`govulncheck`) | jeder PR, wöchentlich | `make vulncheck` |
-| Fuzzing von YAML-Parser und Variablen | wöchentlich (5 min je Ziel), lokal bei Bedarf | `make fuzz FUZZTIME=2m` |
+| Editor: Typprüfung und Playwright-Tests (E2E) | jeder PR | `make e2e` |
+| Fuzzing von Workflow-YAML, Variablen und Ausdrücken | wöchentlich (5 min je Ziel), lokal bei Bedarf | `make fuzz FUZZTIME=2m` |
 | Build, Packen, SBOM | jeder PR | `make package` |
 
-Testabdeckung (Anweisungen): `vars` 98 %, `model` 93 %, `actions/core` 94 %, `cli` 92 %, `engine/workflow` 92 %.
+Testabdeckung (Anweisungen, Stand S38c): `engine/pipeline` 94 %, `triggers` 93 %, `model` 90 %, `engine/workflow` 90 %,
+`server` 90 %, `runs` 89 %, `vars` 87 %, `cli` 81 %, `actions/core` 70 %.
 
 Vom Fuzzing gefundene Eingaben werden unter `internal/model/testdata/fuzz/` gespeichert und laufen danach bei jedem
 `go test` als Regressionstest mit.
@@ -27,7 +29,7 @@ daneben legen.
 | # | Test | Erwartung |
 |---|---|---|
 | W1 | `.\runnel.exe version` | Version `v0.1.0-alpha.2`, `windows/amd64`; ggf. SmartScreen-Warnung beim ersten Start (exe noch nicht signiert) |
-| W2 | `.\runnel.exe validate examples\hello` | `3 workflow files checked: 0 errors, 0 warnings` |
+| W2 | `.\runnel.exe validate examples\hello` | `4 workflow files and 5 trigger files checked: 0 errors, 0 warnings` (Zahlen je nach Version; anfangs `3 workflow files checked`) |
 | W3 | `.\runnel.exe validate examples\broken` | 4 Fehler, 2 Warnungen; Exit-Code 1 (`$LASTEXITCODE`); ab S12 mit `cycle.pipeline.yaml`: 6 Fehler, 2 Warnungen („2 workflow files and 1 pipeline file checked“); ab S14 mit `fields.pipeline.yaml`: 7 Fehler, 2 Warnungen |
 | W4 | `.\runnel.exe run examples\hello\workflows\hello.workflow.yaml` | Gruß mit Rechnername und `%TEMP%`-Pfad, `output MESSAGE = …`, Exit-Code 0 |
 | W5 | wie W4 mit `--env prod --param GREETING=Moin` | „Moin, Production! … \\fileserver\exchange\runnel-hello“ |
@@ -93,13 +95,13 @@ Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe fe
 | # | Einschränkung | Umgehung / Plan |
 |---|---|---|
 | K1 | Keine Standardwerte in Variablen (`${env:X:-fallback}`); `examples/hello` braucht `COMPUTERNAME` und `TEMP` und schlägt daher unter Linux fehl | Variablen im Projekt setzen; Standardwert-Syntax als Kandidat für eine spätere Erweiterung |
-| K2 | Zeitangaben (`timeout`, `joinTimeout`, `retry.backoff`, `settings.timeout`) können keine Variablen enthalten | feste Werte; Variablen erst, wenn Felder zur Laufzeit ausgewertet werden (mit S08 prüfen) |
+| K2 | Zeitangaben (`timeout`, `joinTimeout`, `retry.backoff`, `settings.timeout`) können keine Variablen enthalten | feste Werte; Variablen in Zeitangaben sind ein Kandidat für später (Stand S38c weiterhin nicht möglich) |
 | K3 | `join: all` startet auch, wenn ein Zweig fehlgeschlagen ist (so in ADR 0003 festgelegt) | Fehlerpfade separat modellieren; ggf. später Modus „alle erfolgreich“ |
 | K4 | In Schleifen wirken Zwischenergebnisse bereits auf Joins außerhalb der Schleife | für Wiederholungen `retry` statt Schleife verwenden (ADR 0003, „Umsetzung“) |
 | K5 | Typfehler nennen das betroffene Feld nicht („expected an integer, got a string“) – die Zeile/Spalte zeigt es | Grenze der YAML-Bibliothek; eigene Meldungen in einem späteren Schritt |
 | K6 | ~~Keine Korrekturvorschläge bei unbekannten Feldern~~ – behoben: alle unbekannten Felder werden gemeldet, nach Position sortiert, mit Vorschlag (`unknown field "tpye" (did you mean "type"?)`) | – |
-| K7 | Ausdrücke `{{ … }}` werden noch nicht ausgewertet (in Bedingungen und Outputs vor dem Start abgelehnt, sonst als Text) | S08 |
+| K7 | ~~Ausdrücke `{{ … }}` werden noch nicht ausgewertet~~ – behoben mit S08b (Bedingungen, Outputs, Konfiguration) | – |
 | K8 | Die YAML-Bibliothek stürzt bei bestimmten fehlerhaften Eingaben ab; Runnel fängt das ab und meldet „the file could not be read“ | Fehlerbericht an `goccy/go-yaml` (Eingabe in `internal/model/testdata/fuzz/`) |
 | K9 | `runnel.exe` ist nicht signiert (SmartScreen-Warnung) | Code-Signing vor 1.0 (Roadmap) |
 | K10 | Läufe aufgerufener Workflows erscheinen nicht als eigene Läufe, nur im Log der Action (`params` lassen sich seit E7c im Panel bearbeiten) | eigene Läufe mit der Lauf-Historie (S26) |
-| K10 | Strg+C und Exit-Code 130 sind unter Windows nur über die CI (Build) abgedeckt, nicht automatisch getestet | manueller Test W9/W10 |
+| K12 | Strg+C und Exit-Code 130 sind unter Windows nur über die CI (Build) abgedeckt, nicht automatisch getestet | manueller Test W9/W10 |

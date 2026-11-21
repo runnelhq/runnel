@@ -38,7 +38,8 @@ ADR 0012 beschreibt einen Workflow dagegen über seine `parameters` und `outputs
 - Wer Werte weitergeben will, muss sie als Parameter deklarieren – mehr Schreibarbeit als bei Hop, dafür keine
   versteckten Abhängigkeiten.
 - Rekursion ist ausgeschlossen. Wird sie gebraucht (z. B. Ordnerbäume), folgt eine eigene Entscheidung.
-- `runConfig:` und `forEachRow` aus ADR 0008 folgen mit Phase 0.4 (S24).
+- Statt `forEachRow` aus ADR 0008 gibt es seit S24b `forEach` an jeder Action (siehe Nachtrag in ADR 0008); `runConfig:`
+  folgt mit S42 (Backlog).
 
 ## Nachtrag 2026-11-20 (S18): Pipelines
 
