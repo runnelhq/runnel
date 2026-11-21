@@ -4,39 +4,15 @@ Die Phasen aus dem [Konzept (Kap. 15)](KONZEPT.md#15-roadmap) sind hier in **kle
 
 Erledigte Schritte sind mit ✅ markiert.
 
-> **Umbau vom 2026-11-19:** Um schneller einen testbaren Editor zu haben, folgt auf die Runner-Basis direkt die
-> Editor-Grundlage (E1–E8). Sie ersetzt die bisherigen Schritte S27, S28 und S30–S34. Ausdrücke, weitere Actions,
-> Historie und Resume sowie Pipelines folgen danach. Bestehende Schrittnummern bleiben erhalten, weil ADRs und PRs
-> darauf verweisen; nur die Phasen sind neu nummeriert.
->
-> **Tiefe vor Breite (2026-11-19):** Damit der ganze Anwendungsfall früh bewertbar ist, werden die Phasen zuerst in der
-> Tiefe gebaut. Gute, aber nicht vorrangige Schritte stehen mit ihrer Nummer im [Backlog](#zurückgestellt-tiefe-vor-breite):
-> S10, S19, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48 sowie `core.calculate` (S16), `maxErrors` (S17), `core.dedupe` (S22) und die
-> Aufbewahrung der Historie (S43). E7c war ebenfalls zurückgestellt und ist seit 2026-11-20 wieder eingeplant (Phase 0.4).
->
-> **Betrieb verschlankt (2026-11-20):** Aus Phase 0.5 stehen jetzt S39 (Secret-Store), S40b (Netzwerkbetrieb des
-> Editors), S42 (Run-Konfigurationen) und S43 (Wartung & Monitoring) im Backlog. Der Webhook-Trigger wurde neu
-> besprochen und ist zum HTTP-Trigger geworden ([ADR 0018](adr/0018-http-trigger.md)): S38a–S38c, dazu S40a
-> (Listener und TLS) aus S40. Reihenfolge: zuerst die Trigger ohne HTTP und der Windows-Dienst (S37, S38, S41),
-> danach alles zum HTTP-Trigger (S38a, S40a, S38b, S38c).
-
 ## Regeln für jeden Schritt
 
-- **Ein Schritt = ein Pull Request.** Richtwert: höchstens ca. 1.000 geänderte Zeilen inklusive Tests
-  (ohne generierte Dateien und Lockfiles). Wird ein Schritt größer, wird er vor der Umsetzung geteilt.
-- **Lauffähig nach jedem Schritt:** `main` baut, alle Tests sind grün, nichts ist „halb fertig“ freigeschaltet.
-- **Tests sind Teil des Schritts:** Unit-Tests für neue Logik, Golden-File-Tests für Dateiformate und Datentransformationen,
-  `-race` für nebenläufigen Code.
-- **Manuell prüfbar:** Jeder Schritt nennt unter „Prüfen“, wie man das Ergebnis selbst ausprobiert.
-  Dazu gibt es bei Bedarf ein Beispiel unter `examples/`.
-- **Nur das Nötige:** Keine Vorab-Implementierung für spätere Schritte. Schnittstellen werden erweitert, wenn sie gebraucht werden.
-- **Doku im selben PR:** Betroffene Abschnitte in Konzept/ADRs werden mit angepasst.
-- **Oberflächen nach Corporate Design und freigegebenem Mockup:** Schritte mit sichtbarer Oberfläche (u. a. E4–E8,
-  S25a, S35, S44, S46, später E7c, E9 und S47) beginnen mit einem Mockup-PR unter `design/mockups/`; die Umsetzung folgt erst nach dessen
-  Freigabe ([design/README.md, Kap. 9](../design/README.md#9-mockups)).
-- **Anleitungen aktuell halten:** Ändert ein Schritt den Vertrag einer Action (oder später eines Transforms bzw.
-  Plugins), aktualisiert derselbe PR die Anleitung in [`docs/dev/`](dev/ACTIONS.md); ebenso [`AGENTS.md`](../AGENTS.md)
-  bei neuen Befehlen, Paketen oder Konventionen.
+Es gelten die Regeln aus [AGENTS.md](../AGENTS.md) (PR-Größe und Teilen, Tests, Doku im selben PR, Mockup vor
+Oberfläche, Sicherheit). Hier nur, was die Roadmap betrifft:
+
+- **Spalte „Prüfen“:** wie man das Ergebnis des Schritts selbst ausprobiert.
+- **Nummern bleiben:** ADRs und PRs verweisen auf sie. Geteilte Schritte bekommen Ziffern (`S38b1`, `S38b2`),
+  verschobene Teile behalten ihre Nummer mit „(Teil)“ im Backlog.
+- **Umbau-Hinweise** stehen während einer Phase am Kopf und danach im Abschnitt [Verlauf](#verlauf).
 
 Bausteine, die vorerst nicht benötigt werden (z. B. Mail, Shell/PowerShell, Excel), stehen im [Backlog](#backlog) und
 werden bei Bedarf als eigener kleiner Schritt eingeplant.
@@ -224,3 +200,25 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | KI ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Connections für Modell-Anbieter (Anthropic, OpenAI-kompatibel, Ollama); `ai.chat` (inkl. strukturierter Ausgabe per JSON Schema); `ai.agent` mit Werkzeugen (Workflows, Actions, MCP-Tools) und Positivliste; `mcp.call-tool` und MCP-Server als Plugin-Quelle; `core.approval` (Freigabe abwarten); Chat-Trigger mit Streaming und Gesprächsgedächtnis; Transforms `ai.chunk`, `ai.embed`, Vektor-Ausgabe (pgvector, Qdrant); MCP über HTTP (Token, später OAuth); Token-/Kosten-Erfassung und Rate-Limit je Connection; Link-Typ `tool` im Editor |
 | Plugin-SDKs | Python, C#/.NET, Node |
 | Später (Konzept) | Mappings, Remote-Runner (`RunConfig type: remote`), Git-Integration im Editor, Breakpoints, Import aus Apache Hop, Tray-Icon, `runnel update`, `winget`, Code-Signing |
+
+---
+
+## Verlauf
+
+Umbauten der Roadmap, nach Abschluss der jeweiligen Phase hierher verschoben.
+
+> **Umbau vom 2026-11-19:** Um schneller einen testbaren Editor zu haben, folgt auf die Runner-Basis direkt die
+> Editor-Grundlage (E1–E8). Sie ersetzt die bisherigen Schritte S27, S28 und S30–S34. Ausdrücke, weitere Actions,
+> Historie und Resume sowie Pipelines folgen danach. Bestehende Schrittnummern bleiben erhalten, weil ADRs und PRs
+> darauf verweisen; nur die Phasen sind neu nummeriert.
+>
+> **Tiefe vor Breite (2026-11-19):** Damit der ganze Anwendungsfall früh bewertbar ist, werden die Phasen zuerst in der
+> Tiefe gebaut. Gute, aber nicht vorrangige Schritte stehen mit ihrer Nummer im [Backlog](#zurückgestellt-tiefe-vor-breite):
+> S10, S19, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48 sowie `core.calculate` (S16), `maxErrors` (S17), `core.dedupe` (S22) und die
+> Aufbewahrung der Historie (S43). E7c war ebenfalls zurückgestellt und ist seit 2026-11-20 wieder eingeplant (Phase 0.4).
+>
+> **Betrieb verschlankt (2026-11-20):** Aus Phase 0.5 stehen jetzt S39 (Secret-Store), S40b (Netzwerkbetrieb des
+> Editors), S42 (Run-Konfigurationen) und S43 (Wartung & Monitoring) im Backlog. Der Webhook-Trigger wurde neu
+> besprochen und ist zum HTTP-Trigger geworden ([ADR 0018](adr/0018-http-trigger.md)): S38a–S38c, dazu S40a
+> (Listener und TLS) aus S40. Reihenfolge: zuerst die Trigger ohne HTTP und der Windows-Dienst (S37, S38, S41),
+> danach alles zum HTTP-Trigger (S38a, S40a, S38b, S38c).

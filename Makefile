@@ -20,7 +20,7 @@ GOVULNCHECK_VERSION     := v1.9.0
 CYCLONEDX_GOMOD := bin/tools/$(CYCLONEDX_GOMOD_VERSION)/cyclonedx-gomod
 GOVULNCHECK     := bin/tools/$(GOVULNCHECK_VERSION)/govulncheck
 
-.PHONY: all web web-deps build build-go build-windows build-linux dist notices sbom package test e2e fuzz vulncheck lint fmt tidy clean
+.PHONY: all web web-deps build build-go build-windows build-linux dist notices sbom package test e2e fuzz bench vulncheck lint fmt tidy clean
 
 all: lint test build
 
@@ -86,6 +86,10 @@ fuzz:
 	go test ./internal/model -run '^$$' -fuzz FuzzParseWorkflow -fuzztime $(FUZZTIME)
 	go test ./internal/expr -run '^$$' -fuzz FuzzCompile -fuzztime $(FUZZTIME)
 
+## bench: run the benchmarks (load probes, e.g. requests to an http trigger)
+bench:
+	go test ./... -run '^$$' -bench . -benchmem
+
 ## vulncheck: report known vulnerabilities in dependencies and the Go standard library
 vulncheck: $(GOVULNCHECK)
 	$(GOVULNCHECK) ./...
@@ -96,9 +100,10 @@ $(CYCLONEDX_GOMOD):
 $(GOVULNCHECK):
 	GOBIN=$(CURDIR)/$(dir $@) go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 
-## lint: run golangci-lint (includes go vet and formatting checks)
+## lint: run golangci-lint (includes go vet and formatting checks) for Linux and for Windows code
 lint:
 	golangci-lint run ./...
+	GOOS=windows golangci-lint run ./...
 
 ## fmt: format code
 fmt:
