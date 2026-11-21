@@ -5,6 +5,7 @@ import {
   deleteFile,
   deleteFolder,
   fetchReferences,
+  movedPath,
   newKinds,
   renamePath,
   suffixOf,
@@ -14,13 +15,15 @@ import {
   type Reference,
 } from "../files";
 import { Dialog } from "./Dialog";
-import { ChevronIcon, CopyIcon, FolderIcon, KindIcon, PipelineIcon, PlusIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ChevronIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
 
 /** Changes of the project files made in the explorer, for the tabs (E11). */
 export interface ExplorerChanges {
   onCreated: (path: string) => void;
   onRenamed: (from: string, to: string) => void;
   onDeleted: (path: string) => void;
+  /** Files changed on the server (references updated, E12): open tabs load them again. */
+  onChanged: (paths: string[]) => void;
   /** Whether a file has unsaved changes (it cannot be renamed then). */
   isDirty: (path: string) => boolean;
   /** Absolute path of the project, for "Copy path". */
@@ -32,9 +35,20 @@ type Editing = { create: NewKind; dir: string } | { rename: Entry };
 
 type Menu = { x: number; y: number; entry: Entry | null };
 
+/** A rename or move waiting for the answer to "Update the references?" (mockup E12). */
+type Moving = { from: string; to: string; refs: Reference[]; chosen: Set<number>; rename: boolean };
+
+/** A file or folder being dragged, and the folder it would be dropped into ("" = project). */
+type Drag = { entry: Entry; over: string | null; x: number; y: number };
+
+const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+const baseName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
+
 /**
  * Project explorer: the project tree, folders open by default (mockup E4). Files and
- * folders are created, renamed and deleted here (mockup design/mockups/e11-files.html).
+ * folders are created, renamed and deleted here (mockup design/mockups/e11-files.html)
+ * and moved by dragging or with "Move to…", with an offer to update the references of
+ * other files (mockup design/mockups/e12-organize.html).
  */
 export function Explorer(props: {
   tree: Entry | null;
@@ -48,6 +62,9 @@ export function Explorer(props: {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [deleting, setDeleting] = useState<{ entry: Entry; refs: Reference[] | null } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [moveTo, setMoveTo] = useState<Entry | null>(null);
+  const [moving, setMoving] = useState<Moving | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
   const { changes } = props;
 
   const all = flatten(props.tree);
@@ -81,24 +98,97 @@ export function Explorer(props: {
         return null;
       }
       if (exists(to) && to.toLowerCase() !== from.toLowerCase()) return `${to} already exists`;
-      await renamePath(from, to);
       setEditing(null);
-      props.onReload();
-      changes.onRenamed(from, to);
+      void startMove(from, to, true);
       return null;
     } catch (err) {
       return err instanceof Error ? err.message : String(err);
     }
   };
+  const hasUnsaved = (entry: Entry) => {
+    const dirty = entry.type === "file" ? changes?.isDirty(entry.path) : all.some((e) => e.path.startsWith(entry.path + "/") && changes?.isDirty(e.path));
+    if (dirty) setProblem(`Save or close ${entry.name} first: it has unsaved changes`);
+    return !!dirty;
+  };
   const startRename = (entry: Entry) => {
     setMenu(null);
-    const dirty = entry.type === "file" ? changes?.isDirty(entry.path) : all.some((e) => e.path.startsWith(entry.path + "/") && changes?.isDirty(e.path));
-    if (dirty) {
-      setProblem(`Save or close ${entry.name} first: it has unsaved changes`);
-      return;
-    }
-    setEditing({ rename: entry });
+    if (!hasUnsaved(entry)) setEditing({ rename: entry });
   };
+  const startMoveTo = (entry: Entry) => {
+    setMenu(null);
+    if (!hasUnsaved(entry)) setMoveTo(entry);
+  };
+  /**
+   * Renames or moves from to to. If other files refer to it, the dialog "Update the
+   * references?" asks first; files with unsaved changes are not changed (mockup E12).
+   */
+  const startMove = async (from: string, to: string, rename: boolean) => {
+    if (!changes) return;
+    let refs: Reference[] = [];
+    try {
+      refs = await fetchReferences(from);
+    } catch {
+      // Without the list the move goes ahead; the check reports missing files.
+    }
+    if (refs.length === 0) return move(from, to, []);
+    const chosen = new Set(refs.flatMap((r, i) => (changes.isDirty(r.file) ? [] : [i])));
+    setMoving({ from, to, refs, chosen, rename });
+  };
+  const move = async (from: string, to: string, refs: Reference[]) => {
+    if (!changes) return;
+    setMoving(null);
+    try {
+      const res = await renamePath(from, to, refs.map((r) => ({ file: r.file, line: r.line })));
+      props.onReload();
+      changes.onRenamed(from, to);
+      if (res.updated.length > 0) changes.onChanged(res.updated);
+      if (res.notUpdated.length > 0) {
+        const first = res.notUpdated[0];
+        setProblem(
+          `${res.notUpdated.length === 1 ? "1 reference was" : `${res.notUpdated.length} references were`} not updated: ${first.file} (line ${first.line}): ${first.reason}`,
+        );
+      }
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : String(err));
+    }
+  };
+  /** The folder a dragged entry can be dropped into, or null (its own folder, itself or a folder inside it). */
+  const dropTarget = (entry: Entry, dir: string): string | null =>
+    dir === parentOf(entry.path) || dir === entry.path || dir.startsWith(entry.path + "/") ? null : dir;
+  const drop = (entry: Entry, dir: string) => {
+    setDrag(null);
+    const to = (dir ? dir + "/" : "") + entry.name;
+    if (dropTarget(entry, dir) === null || hasUnsaved(entry)) return;
+    if (exists(to)) return setProblem(`${to} already exists`);
+    void startMove(entry.path, to, false);
+  };
+  const dragHandlers = changes
+    ? {
+        onStart: (entry: Entry, e: React.DragEvent) => {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", entry.path);
+          // The hint next to the pointer replaces the picture of the row.
+          const img = new Image();
+          img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+          e.dataTransfer.setDragImage(img, 0, 0);
+          setDrag({ entry, over: null, x: e.clientX, y: e.clientY });
+        },
+        onOver: (dir: string, e: React.DragEvent) => {
+          if (!drag) return;
+          e.stopPropagation();
+          const target = dropTarget(drag.entry, dir);
+          if (target !== null) e.preventDefault();
+          e.dataTransfer.dropEffect = target === null ? "none" : "move";
+          if (drag.over !== target || Math.abs(drag.x - e.clientX) + Math.abs(drag.y - e.clientY) > 2) setDrag({ ...drag, over: target, x: e.clientX, y: e.clientY });
+        },
+        onDrop: (dir: string, e: React.DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (drag) drop(drag.entry, dir);
+        },
+        onEnd: () => setDrag(null),
+      }
+    : undefined;
   const startDelete = (entry: Entry) => {
     setMenu(null);
     setDeleting({ entry, refs: entry.type === "file" && (entry.kind === "workflow" || entry.kind === "pipeline") ? null : [] });
@@ -186,7 +276,13 @@ export function Explorer(props: {
           </button>
         </p>
       )}
-      <ul role="tree" aria-label="Project files" className="m-0 list-none overflow-auto px-2 pb-2">
+      <ul
+        role="tree"
+        aria-label="Project files"
+        className={"m-0 min-h-10 list-none overflow-auto rounded-sm px-2 pb-2 " + (drag?.over === "" ? "outline-1 outline-ring outline-dashed -outline-offset-1" : "")}
+        onDragOver={(e) => dragHandlers?.onOver("", e)}
+        onDrop={(e) => dragHandlers?.onDrop("", e)}
+      >
         {(creatingAt === "" || (creatingAt !== null && !dirExists)) && nameRow}
         {props.tree?.children?.map((e) => (
           <Node
@@ -198,6 +294,9 @@ export function Explorer(props: {
             menuOpen={menu?.entry?.path}
             onMenu={openMenu}
             onRename={changes ? startRename : undefined}
+            drag={dragHandlers}
+            dropOver={drag?.over ?? null}
+            dragging={drag?.entry.path ?? null}
             editing={editing}
             nameRow={dirExists ? nameRow : null}
             onSubmit={submit}
@@ -212,7 +311,42 @@ export function Explorer(props: {
           onClose={() => setMenu(null)}
           onCreate={startCreate}
           onRename={startRename}
+          onMove={startMoveTo}
           onDelete={startDelete}
+        />
+      )}
+      {drag?.over != null && (
+        <div
+          aria-hidden="true"
+          style={{ left: drag.x + 14, top: drag.y + 10 }}
+          className="pointer-events-none fixed z-50 inline-flex items-center gap-1.5 rounded-md border border-border bg-popover px-2.5 py-1 text-xs text-popover-foreground shadow-md"
+        >
+          {drag.entry.type === "dir" ? <FolderIcon width={14} height={14} /> : <KindIcon kind={drag.entry.kind} width={14} height={14} />}
+          {drag.entry.name}
+          <small className="text-muted-foreground">→ {drag.over === "" ? "project" : drag.over + "/"}</small>
+        </div>
+      )}
+      {moveTo && (
+        <MoveDialog
+          entry={moveTo}
+          folders={all.filter((e) => e.type === "dir").map((e) => e.path)}
+          exists={exists}
+          onCancel={() => setMoveTo(null)}
+          onReload={props.onReload}
+          onMove={(dir) => {
+            const entry = moveTo;
+            setMoveTo(null);
+            void startMove(entry.path, (dir ? dir + "/" : "") + entry.name, false);
+          }}
+        />
+      )}
+      {moving && (
+        <ReferencesDialog
+          moving={moving}
+          isDirty={(f) => !!changes?.isDirty(f)}
+          onChoose={(chosen) => setMoving({ ...moving, chosen })}
+          onCancel={() => setMoving(null)}
+          onMove={(all) => void move(moving.from, moving.to, all ? moving.refs.filter((_, i) => moving.chosen.has(i)) : [])}
         />
       )}
       {deleting && (
@@ -263,6 +397,16 @@ function Node(props: {
   onMenu: (e: ReactMouseEvent, entry: Entry) => void;
   /** F2 on a row renames it. */
   onRename?: (entry: Entry) => void;
+  /** Dragging rows onto folders moves them (E12); none: rows cannot be dragged. */
+  drag?: {
+    onStart: (entry: Entry, e: React.DragEvent) => void;
+    onOver: (dir: string, e: React.DragEvent) => void;
+    onDrop: (dir: string, e: React.DragEvent) => void;
+    onEnd: () => void;
+  };
+  /** The folder a dragged row would be dropped into, and the path of the dragged row. */
+  dropOver: string | null;
+  dragging: string | null;
   editing: Editing | null;
   nameRow: React.ReactNode;
   onSubmit: (name: string) => Promise<string | null>;
@@ -275,6 +419,8 @@ function Node(props: {
   const activate = () => (isDir ? setOpen(!open) : props.onOpen(entry.path));
   const renaming = editing && "rename" in editing && editing.rename.path === entry.path;
   const creatingHere = editing && "create" in editing && editing.dir === entry.path;
+  // A row dropped on a file goes into the folder of that file.
+  const dropDir = isDir ? entry.path : parentOf(entry.path);
 
   if (renaming) {
     const suffix = isDir ? "" : suffixOf(entry.path);
@@ -284,7 +430,7 @@ function Node(props: {
         entry={entry}
         initial={entry.name.slice(0, entry.name.length - suffix.length)}
         suffix={suffix}
-        hint={() => "Enter renames · Esc cancels · references in other files are not changed"}
+        hint={() => "Enter renames · Esc cancels"}
         depth={depth}
         onSubmit={props.onSubmit}
         onCancel={props.onCancel}
@@ -296,6 +442,12 @@ function Node(props: {
       <div
         tabIndex={0}
         title={entry.path}
+        draggable={!!props.drag}
+        onDragStart={(e) => props.drag?.onStart(entry, e)}
+        onDragEnd={() => props.drag?.onEnd()}
+        onDragOver={(e) => props.drag?.onOver(dropDir, e)}
+        onDrop={(e) => props.drag?.onDrop(dropDir, e)}
+        data-drop={isDir && props.dropOver === entry.path ? "" : undefined}
         onClick={activate}
         onContextMenu={(e) => props.onMenu(e, entry)}
         onKeyDown={(e) => {
@@ -311,7 +463,9 @@ function Node(props: {
         style={{ paddingLeft: 8 + depth * 18 }}
         className={
           "group flex h-[26px] cursor-default items-center gap-1.5 rounded-sm pr-1 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring " +
-          (selected ? "bg-accent font-medium text-accent-foreground" : props.menuOpen === entry.path ? "bg-sidebar-accent" : "hover:bg-sidebar-accent")
+          (selected ? "bg-accent font-medium text-accent-foreground" : props.menuOpen === entry.path ? "bg-sidebar-accent" : "hover:bg-sidebar-accent") +
+          (isDir && props.dropOver === entry.path ? " bg-accent outline-1 outline-ring outline-dashed -outline-offset-1" : "") +
+          (props.dragging === entry.path ? " opacity-55" : "")
         }
       >
         {isDir ? <ChevronIcon open={open} width={12} height={12} className="text-muted-foreground" /> : <span className="w-3" />}
@@ -425,6 +579,7 @@ function ContextMenu(props: {
   onClose: () => void;
   onCreate: (kind: NewKind, dir?: string) => void;
   onRename: (e: Entry) => void;
+  onMove: (e: Entry) => void;
   onDelete: (e: Entry) => void;
 }) {
   const { menu } = props;
@@ -487,6 +642,7 @@ function ContextMenu(props: {
       item("New folder…", <FolderIcon />, () => props.onCreate("folder", entry.path)),
       sep("s1"),
       item("Rename", <span className="text-xs">✎</span>, () => props.onRename(entry), { hint: "F2" }),
+      item("Move to…", <MoveIcon />, () => props.onMove(entry)),
       item("Delete folder", <TrashIcon />, () => props.onDelete(entry), { danger: true, disabled: !empty, hint: empty ? undefined : "not empty" }),
       sep("s2"),
       item("Copy path", <CopyIcon />, () => copy(entry.path)),
@@ -494,6 +650,7 @@ function ContextMenu(props: {
   } else {
     content = [
       item("Rename", <span className="text-xs">✎</span>, () => props.onRename(entry), { hint: "F2" }),
+      item("Move to…", <MoveIcon />, () => props.onMove(entry)),
       item("Delete", <TrashIcon />, () => props.onDelete(entry), { danger: true }),
       sep("s1"),
       item("Copy path", <CopyIcon />, () => copy(entry.path)),
@@ -509,5 +666,195 @@ function ContextMenu(props: {
     >
       {content}
     </div>
+  );
+}
+
+const segments = (a: string, b: string) => {
+  const x = a.split("/");
+  const y = b.split("/");
+  for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+  return x.length - y.length;
+};
+
+/** "Move to…": choose the folder, a new one can be created there (mockup E12, state "moveto"). */
+function MoveDialog(props: {
+  entry: Entry;
+  folders: string[];
+  exists: (path: string) => boolean;
+  onCancel: () => void;
+  onReload: () => void;
+  onMove: (dir: string) => void;
+}) {
+  const { entry } = props;
+  const current = parentOf(entry.path);
+  const [created, setCreated] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [naming, setNaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inside = (dir: string) => entry.type === "dir" && (dir === entry.path || dir.startsWith(entry.path + "/"));
+  const folders = ["", ...[...new Set([...props.folders, ...created])].filter((d) => !inside(d)).sort(segments)];
+  // The current folder can be chosen to create a folder in it, not to move there.
+  const to = selected === null || selected === current ? null : (selected ? selected + "/" : "") + entry.name;
+  const taken = to !== null && props.exists(to);
+  const createFolderIn = async (name: string) => {
+    const path = (selected ? selected + "/" : "") + name.trim();
+    if (!name.trim() || name.includes("/") || name.includes("\\")) return setError("The name must not be empty or contain / or \\");
+    if (props.exists(path) || created.includes(path)) return setError(`${path} already exists`);
+    try {
+      await createFolder(path);
+      setCreated((c) => [...c, path]);
+      setSelected(path);
+      setNaming(false);
+      setError(null);
+      props.onReload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+  return (
+    <Dialog
+      title={`Move ${entry.name}`}
+      form
+      icon={<MoveIcon width={15} height={15} />}
+      iconClass="bg-accent text-accent-foreground"
+      onCancel={props.onCancel}
+      actions={[
+        { label: "Cancel", onClick: props.onCancel },
+        { label: "Move", tone: "primary", disabled: to === null || taken, onClick: () => to !== null && selected !== null && props.onMove(selected) },
+      ]}
+    >
+      <p>Choose the folder; a new one can be created there.</p>
+      <div role="listbox" aria-label="Folders" className="mb-2.5 max-h-[260px] overflow-auto rounded-md border border-border p-1">
+        {folders.map((dir) => {
+          const isCurrent = dir === current;
+          const depth = dir === "" ? 0 : dir.split("/").length;
+          return (
+            <button
+              key={dir || "."}
+              type="button"
+              role="option"
+              aria-selected={selected === dir}
+              aria-label={dir === "" ? "(project)" : dir}
+              onClick={() => setSelected(dir)}
+              style={{ paddingLeft: 8 + depth * 18 }}
+              className={
+                "flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent pr-2 text-left text-sm hover:bg-muted " +
+                (selected === dir ? "bg-accent text-accent-foreground hover:bg-accent" : isCurrent ? "text-muted-foreground" : "text-foreground")
+              }
+            >
+              {dir === "" ? <ProjectIcon width={15} height={15} /> : <FolderIcon width={15} height={15} />}
+              {dir === "" ? "(project)" : baseName(dir)}
+              {isCurrent && <small className="ml-auto text-2xs text-muted-foreground">current folder</small>}
+            </button>
+          );
+        })}
+      </div>
+      {naming && (
+        <input
+          autoFocus
+          aria-label="Name of the new folder"
+          placeholder={`New folder in ${selected ? selected + "/" : "the project"}`}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void createFolderIn(e.currentTarget.value);
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setNaming(false);
+            }
+          }}
+          className="mb-2 h-7 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+        />
+      )}
+      {error && <p className="text-xs text-destructive">✖ {error}</p>}
+      <p className="flex items-center gap-2 text-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setNaming(true);
+            setError(null);
+          }}
+          className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium text-foreground hover:bg-muted"
+        >
+          <PlusIcon width={14} height={14} />
+          New folder
+        </button>
+        {to !== null &&
+          (taken ? (
+            <span className="text-destructive">✖ {to} already exists</span>
+          ) : (
+            <span>
+              New path: <code className="font-mono text-foreground">{to}</code>
+            </span>
+          ))}
+      </p>
+    </Dialog>
+  );
+}
+
+/** "Update the references?" before a rename or move (mockup E12, state "refs"). */
+function ReferencesDialog(props: {
+  moving: Moving;
+  isDirty: (file: string) => boolean;
+  onChoose: (chosen: Set<number>) => void;
+  onCancel: () => void;
+  onMove: (update: boolean) => void;
+}) {
+  const { from, to, refs, chosen, rename } = props.moving;
+  const files = new Set(refs.map((r) => r.file)).size;
+  const verb = rename ? "Rename" : "Move";
+  const toggle = (i: number) => {
+    const next = new Set(chosen);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
+    props.onChoose(next);
+  };
+  return (
+    <Dialog
+      title="Update the references?"
+      wide
+      form
+      icon={<MoveIcon width={15} height={15} />}
+      iconClass="bg-accent text-accent-foreground"
+      onCancel={props.onCancel}
+      actions={[
+        { label: "Cancel", onClick: props.onCancel },
+        { label: `${verb} only`, onClick: () => props.onMove(false) },
+        {
+          label: `${verb} and update ${chosen.size} ${chosen.size === 1 ? "reference" : "references"}`,
+          tone: "primary",
+          disabled: chosen.size === 0,
+          onClick: () => props.onMove(true),
+        },
+      ]}
+    >
+      <p>
+        {baseName(from)} {rename ? "is renamed to" : "moves to"} <code className="font-mono text-foreground">{to}</code>.{" "}
+        {files === 1 ? "1 file refers" : `${files} files refer`} to it by its old path:
+      </p>
+      <ul data-testid="references" className="mb-2.5! list-none! rounded-md bg-muted px-3! py-2">
+        {refs.map((r, i) => {
+          const dirty = props.isDirty(r.file);
+          return (
+            <li key={i} className="grid grid-cols-[20px_1fr] gap-2 py-1 text-xs text-foreground">
+              <input
+                type="checkbox"
+                aria-label={`Update ${r.file}, ${r.what}`}
+                checked={chosen.has(i)}
+                disabled={dirty}
+                onChange={() => toggle(i)}
+                className="mt-0.5 size-3.5 accent-primary"
+              />
+              <span>
+                <code className="font-mono text-2xs">{r.file}</code> – {r.what}
+                {dirty && <span className="text-warning"> · unsaved changes – not changed</span>}
+                <span className="block font-mono text-2xs text-muted-foreground">
+                  {r.field}: <del className="text-destructive">{r.value}</del> <ins className="text-success no-underline">{movedPath(r.target, from, to)}</ins>
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mb-0!">Only these lines change; the files are saved. Unchecked files keep the old path and report it as missing.</p>
+    </Dialog>
   );
 }

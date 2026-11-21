@@ -119,7 +119,7 @@ func fileKind(p string) string {
 		return "project"
 	case path.Dir(p) == model.EnvironmentsDir && strings.HasSuffix(p, ".yaml"):
 		return "environment"
-	case path.Dir(p) == model.TriggersDir && strings.HasSuffix(p, ".yaml"):
+	case model.IsTriggerFile(p):
 		return "trigger"
 	}
 	return "other"

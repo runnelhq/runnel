@@ -395,8 +395,7 @@ func (s *Scheduler) currentSig() string {
 // project.yaml and the environments.
 func (s *Scheduler) signature() string {
 	var b strings.Builder
-	add := func(pattern string) {
-		files, _ := filepath.Glob(filepath.Join(s.opts.Dir, pattern))
+	add := func(files []string) {
 		slices.Sort(files)
 		for _, f := range files {
 			if info, err := os.Stat(f); err == nil {
@@ -404,9 +403,14 @@ func (s *Scheduler) signature() string {
 			}
 		}
 	}
-	add(model.ProjectFile)
-	add(filepath.Join(model.EnvironmentsDir, "*.yaml"))
-	add(filepath.Join(model.TriggersDir, "*.yaml"))
+	glob := func(pattern string) []string {
+		files, _ := filepath.Glob(filepath.Join(s.opts.Dir, pattern))
+		return files
+	}
+	add(glob(model.ProjectFile))
+	add(glob(filepath.Join(model.EnvironmentsDir, "*.yaml")))
+	triggerFiles, _ := model.TriggerFiles(s.opts.Dir)
+	add(triggerFiles)
 	return b.String()
 }
 

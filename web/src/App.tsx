@@ -9,7 +9,7 @@ import { Palette, type PaletteTarget } from "./components/Palette";
 import { Splitter, useExplorerHeight } from "./components/Splitter";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
-import { fetchTree, type Entry } from "./files";
+import { fetchTree, movedPath, type Entry } from "./files";
 import type { RunView } from "./run";
 import { useTheme } from "./theme";
 
@@ -29,6 +29,8 @@ export function App() {
   const [run, setRun] = useState<RunView | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [closing, setClosing] = useState<string | null>(null);
+  // Files changed outside their tab (references updated when moving, E12) load again.
+  const [reloads, setReloads] = useState<Record<string, number>>({});
   const handles = useRef(new Map<string, FileHandle>());
   // The height of the explorer can be changed; the palette takes the rest.
   const [explorerHeight, setExplorerHeight] = useExplorerHeight();
@@ -112,10 +114,11 @@ export function App() {
                 onCreated: open,
                 // Tabs of a renamed file or of the files of a renamed folder follow (E11).
                 onRenamed: (from, to) => {
-                  const moved = (p: string) => (p === from ? to : p.startsWith(from + "/") ? to + p.slice(from.length) : p);
+                  const moved = (p: string) => movedPath(p, from, to);
                   setTabs((t) => t.map(moved));
                   setActive((a) => (a ? moved(a) : a));
                 },
+                onChanged: (paths) => setReloads((r) => Object.fromEntries([...Object.entries(r), ...paths.map((p) => [p, (r[p] ?? 0) + 1])])),
                 onDeleted: (path) => {
                   const gone = tabs.filter((p) => p === path || p.startsWith(path + "/"));
                   const rest = tabs.filter((p) => !gone.includes(p));
@@ -146,7 +149,7 @@ export function App() {
               <Tabs paths={tabs} active={active} dirty={dirty} onSelect={setActive} onClose={close} />
               {tabs.map((path) => (
                 <FileView
-                  key={path}
+                  key={`${path}#${reloads[path] ?? 0}`}
                   path={path}
                   active={path === active}
                   projectDir={project?.dir ?? null}

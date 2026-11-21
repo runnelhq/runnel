@@ -30,7 +30,7 @@ func newServeCommand() *cobra.Command {
 		Long: "Starts the server for the project in project-dir (or the current directory), found by its\n" +
 			"project.yaml in that directory or above. The server listens on 127.0.0.1 only and serves the\n" +
 			"API under " + server.APIPrefix + " (files, catalog, validation, runs, live events).\n" +
-			"It starts the runs of the project's triggers (" + model.TriggersDir + "/*.yaml) at their times; changed\n" +
+			"It starts the runs of the project's triggers (" + model.TriggersDir + "/, also in subfolders) at their times; changed\n" +
 			"trigger files are picked up while it runs. HTTP triggers get their own listener (--triggers),\n" +
 			"opened once an http trigger is enabled. On the network it needs HTTPS: --triggers-tls auto creates\n" +
 			"a certificate once (in " + userTLSDir() + "), --triggers-cert and --triggers-key use an own one.\n" +

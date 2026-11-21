@@ -27,6 +27,9 @@ func TestValidateText(t *testing.T) {
 		{"triggers/nightly.yaml", "kind: Trigger\napiVersion: runnel/v1\nname: nightly\ntype: cron\ntarget: workflows/import.workflow.yaml\nwith: { schedule: \"0 3 * * *\" }\n", nil},
 		{"triggers/new.yaml", "kind: Trigger\napiVersion: runnel/v1\nname: nightly\ntype: cron\ntarget: workflows/none.workflow.yaml\nwith: { schedule: \"0 3 * * *\" }\n",
 			[]string{`trigger name "nightly" is already used by nightly.yaml`, "none.workflow.yaml"}},
+		// In a subfolder of triggers/ (E12): checked as a trigger, the name against all.
+		{"triggers/nightly/new.yaml", "kind: Trigger\napiVersion: runnel/v1\nname: nightly\ntype: cron\ntarget: workflows/import.workflow.yaml\nwith: { schedule: \"0 3 * * *\" }\n",
+			[]string{`trigger name "nightly" is already used by nightly.yaml`}},
 		{"triggers/new.yaml", "kind: Trigger\napiVersion: runnel/v1\nname: x\ntype: cron\ntarget: workflows/import.workflow.yaml\nwith: { schedule: \"soon\" }\n", []string{"schedule"}},
 	} {
 		rec := do(t, s, "POST", "/api/v1/validate", mustJSON(t, map[string]string{"path": tt.path, "content": tt.content}))

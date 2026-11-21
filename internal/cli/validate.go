@@ -37,7 +37,7 @@ func newValidateCommand() *cobra.Command {
 			"unknown action types and invalid action configurations (with:).\n" +
 			"Pipeline files (*" + pipelineSuffix + ") are checked for syntax errors, invalid fields,\n" +
 			"links to unknown transforms, cycles, unknown transform types and invalid configurations.\n" +
-			"Trigger files (" + model.TriggersDir + "/*.yaml of a project) are checked for invalid fields and schedules,\n" +
+			"Trigger files (" + model.TriggersDir + "/ of a project, also in subfolders) are checked for invalid fields and schedules,\n" +
 			"missing targets and environments, and parameters the target does not declare.\n\n" +
 			"Paths can be files or directories; directories are searched recursively.\n" +
 			"Without a path, the current directory is checked.\n\n" +
@@ -58,7 +58,7 @@ func newValidateCommand() *cobra.Command {
 				return err
 			}
 			if len(files) == 0 {
-				return fmt.Errorf("no workflow, pipeline or trigger files (*%s, *%s, %s/*.yaml) found in %s", workflowSuffix, pipelineSuffix, model.TriggersDir, strings.Join(args, ", "))
+				return fmt.Errorf("no workflow, pipeline or trigger files (*%s, *%s, %s/**/*.yaml) found in %s", workflowSuffix, pipelineSuffix, model.TriggersDir, strings.Join(args, ", "))
 			}
 			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
 				registry: actions.Builtin(), transforms: transforms.Builtin()}
@@ -195,7 +195,7 @@ func (v *validator) trigger(file string) error {
 		v.report(diags)
 		return nil
 	}
-	root := filepath.Dir(filepath.Dir(file))
+	root, _ := model.TriggerProjectDir(file)
 	p, _, err := v.project(root)
 	if err != nil {
 		return err
@@ -210,7 +210,7 @@ func (v *validator) trigger(file string) error {
 		v.triggerNames[root] = names
 	}
 	if first, dup := names[t.Name]; dup {
-		diags = append(diags, t.ErrorAt("$.name", "trigger name %q is already used by %s", t.Name, filepath.Base(first)))
+		diags = append(diags, t.ErrorAt("$.name", "trigger name %q is already used by %s", t.Name, model.TriggerFileName(root, first)))
 	} else {
 		names[t.Name] = file
 	}
@@ -219,14 +219,11 @@ func (v *validator) trigger(file string) error {
 	return nil
 }
 
-// isTriggerFile reports whether a file is in the triggers folder of a project.
+// isTriggerFile reports whether a file is in the triggers folder of a project (also in
+// a subfolder of it).
 func isTriggerFile(file string) bool {
-	dir := filepath.Dir(file)
-	if filepath.Base(dir) != model.TriggersDir || !strings.HasSuffix(file, ".yaml") {
-		return false
-	}
-	_, err := os.Stat(filepath.Join(filepath.Dir(dir), model.ProjectFile))
-	return err == nil
+	_, ok := model.TriggerProjectDir(file)
+	return ok
 }
 
 // project returns the project of a directory, loading and reporting it on first use.

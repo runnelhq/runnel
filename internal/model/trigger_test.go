@@ -85,10 +85,11 @@ func TestParseTriggerErrors(t *testing.T) {
 func TestLoadTriggers(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, content string) {
-		if err := os.MkdirAll(filepath.Join(dir, TriggersDir), 0o755); err != nil {
+		file := filepath.Join(dir, TriggersDir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, TriggersDir, name), []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -96,15 +97,40 @@ func TestLoadTriggers(t *testing.T) {
 	write("b.yaml", triggerSource) // same name
 	write("c.yaml", strings.Replace(triggerSource, "name: nightly", "name: weekly", 1))
 	write("d.yaml", "kind: [\n")
+	// Subfolders are read (E12); a name used in a subfolder clashes, hidden folders are left out.
+	write("nightly/e.yaml", strings.Replace(triggerSource, "name: nightly", "name: hourly", 1))
+	write("nightly/f.yaml", strings.Replace(triggerSource, "name: nightly", "name: weekly", 1))
+	write(".old/g.yaml", strings.Replace(triggerSource, "name: nightly", "name: old", 1))
 	list, err := LoadTriggers(dir)
-	if len(list) != 2 || list[0].Name != "nightly" || list[1].Name != "weekly" {
-		t.Errorf("triggers %v", list)
+	var names []string
+	for _, tr := range list {
+		names = append(names, tr.Name+"="+TriggerFileName(dir, tr.File()))
 	}
-	if err == nil || !strings.Contains(err.Error(), `trigger name "nightly" is already used by a.yaml`) || !strings.Contains(err.Error(), "d.yaml") {
-		t.Errorf("problems %v", err)
+	if got := strings.Join(names, " "); got != "nightly=a.yaml weekly=c.yaml hourly=nightly/e.yaml" {
+		t.Errorf("triggers %s", got)
 	}
-	if !IsTriggerFile("triggers/a.yaml") || IsTriggerFile("triggers/sub/a.yaml") || IsTriggerFile("workflows/a.yaml") {
-		t.Error("IsTriggerFile")
+	for _, want := range []string{`trigger name "nightly" is already used by a.yaml`, "d.yaml", `trigger name "weekly" is already used by c.yaml`} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("problems %v, want %s", err, want)
+		}
+	}
+	for rel, want := range map[string]bool{"triggers/a.yaml": true, "triggers/sub/a.yaml": true, "workflows/a.yaml": false,
+		"triggers/.old/a.yaml": false, "triggers/a.txt": false, "triggers.yaml": false} {
+		if IsTriggerFile(rel) != want {
+			t.Errorf("IsTriggerFile(%s) = %v", rel, !want)
+		}
+	}
+	if project, ok := TriggerProjectDir(filepath.Join(dir, TriggersDir, "nightly", "e.yaml")); ok {
+		t.Errorf("without project.yaml: %s", project)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ProjectFile), []byte("kind: Project\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if project, ok := TriggerProjectDir(filepath.Join(dir, TriggersDir, "nightly", "e.yaml")); !ok || project != dir {
+		t.Errorf("TriggerProjectDir = %s, %v", project, ok)
+	}
+	if empty, err := TriggerFiles(t.TempDir()); err != nil || len(empty) != 0 {
+		t.Errorf("no triggers folder: %v, %v", empty, err)
 	}
 }
 

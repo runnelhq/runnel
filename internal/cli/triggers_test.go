@@ -59,6 +59,8 @@ func TestValidateTriggers(t *testing.T) {
 		"ok.yaml":      cliTrigger,
 		"same.yaml":    cliTrigger,
 		"missing.yaml": strings.Replace(strings.Replace(cliTrigger, "name: nightly", "name: missing", 1), "job.workflow.yaml", "gone.workflow.yaml", 1),
+		// Subfolders of triggers/ are checked too (E12).
+		"nightly/again.yaml": cliTrigger,
 	})
 	code, out, _ := run(t, "validate", dir)
 	if code != 1 {
@@ -66,8 +68,10 @@ func TestValidateTriggers(t *testing.T) {
 	}
 	for _, want := range []string{
 		"missing.yaml:5:9: error: target workflows/gone.workflow.yaml not found in the project",
-		`same.yaml:3:7: error: trigger name "nightly" is already used by ok.yaml`,
-		"1 workflow file and 3 trigger files checked: 2 errors, 0 warnings",
+		// The first by path keeps the name: nightly/again.yaml sorts before ok.yaml.
+		`ok.yaml:3:7: error: trigger name "nightly" is already used by nightly/again.yaml`,
+		`same.yaml:3:7: error: trigger name "nightly" is already used by nightly/again.yaml`,
+		"1 workflow file and 4 trigger files checked: 3 errors, 0 warnings",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)

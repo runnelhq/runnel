@@ -228,6 +228,13 @@ export const DetectIcon = (p: P) => (
   </Icon>
 );
 
+export const MoveIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <path d="M10 13h6M13.5 10.5L16 13l-2.5 2.5" />
+  </Icon>
+);
+
 export const TrashIcon = (p: P) => (
   <Icon {...p}>
     <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
