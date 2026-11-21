@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const httpSource = `kind: Trigger
@@ -40,6 +41,13 @@ func TestParseHTTPTrigger(t *testing.T) {
 	if err != nil || !tr.AuthNone() {
 		t.Errorf("auth none: %v", err)
 	}
+	if tr.WaitsForRun() || tr.ResponseTimeout() != DefaultResponseTimeout {
+		t.Error("accepted by default")
+	}
+	tr, err = ParseTrigger("x.yaml", []byte(httpSource+"  response: run\n  timeout: 5s\n"))
+	if err != nil || !tr.WaitsForRun() || tr.ResponseTimeout() != 5*time.Second {
+		t.Errorf("response: run: %v", err)
+	}
 
 	for _, c := range []struct{ old, new, want string }{
 		{"method: post", "method: HEAD", `invalid method "HEAD" (expected GET, POST, PUT, PATCH or DELETE)`},
@@ -53,8 +61,10 @@ func TestParseHTTPTrigger(t *testing.T) {
 		{`{ token: "${env:RUNNEL_TEST_TOKEN}" }`, `{ token: "abc123" }`, "the token must not be written into the file"},
 		{`{ token: "${env:RUNNEL_TEST_TOKEN}" }`, "open", `invalid auth "open"`},
 		{`  auth: { token: "${env:RUNNEL_TEST_TOKEN}" }` + "\n", "", `missing required field "auth"`},
-		{"maxConcurrent: 3", "maxConcurrent: 3\n  response: run", "response: run is not supported yet (roadmap S38b)"},
-		{"maxConcurrent: 3", "maxConcurrent: 3\n  timeout: 30s", "timeout belongs to response: run and is not supported yet"},
+		{"maxConcurrent: 3", "maxConcurrent: 3\n  response: wait", `invalid response "wait" (expected accepted or run)`},
+		{"maxConcurrent: 3", "maxConcurrent: 3\n  timeout: 30s", "timeout belongs to response: run"},
+		{"maxConcurrent: 3", "maxConcurrent: 3\n  response: run\n  timeout: 0s", "timeout must be at least 1s"},
+		{"maxConcurrent: 3", "maxConcurrent: 3\n  history: errors", "history is not supported yet (roadmap S38b2)"},
 		{"maxConcurrent: 3", "maxConcurrent: -1", "maxConcurrent must not be negative"},
 		{"maxConcurrent: 3", "maxConcurrent: 3\n  overlap: allow", "overlap is not used by http triggers"},
 	} {

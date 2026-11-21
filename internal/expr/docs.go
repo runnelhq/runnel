@@ -46,6 +46,14 @@ var Roots = []Doc{
 	{Name: "result", Type: "map", Description: "Result of the action the link starts from (in link conditions)", Fields: resultFields, Example: "{{ result.success }}"},
 	{Name: "results", Type: "map", Description: "Results of the actions that have run, by action id", Fields: resultFields, Example: "{{ results.load.status }}"},
 	{Name: "row", Type: "any", Description: "The current entry of forEach; only in actions with forEach", Example: "{{ row.path }}"},
+	{Name: "request", Type: "map", Description: "The request of the caller of an http trigger; nil if the run was not started by one", Fields: []Doc{
+		{Name: "method", Type: "string", Description: "HTTP method, e.g. POST"},
+		{Name: "path", Type: "string", Description: "Path of the request, e.g. /api/customers/4711"},
+		{Name: "headers", Type: "map", Description: "Headers by name, e.g. request.headers['Content-Type']"},
+		{Name: "query", Type: "map", Description: "Query parameters by name (the first value of each)"},
+		{Name: "body", Type: "any", Description: "The body: the JSON value, the fields of a form, or the text"},
+		{Name: "client", Type: "string", Description: "Address of the caller"},
+	}, Example: "{{ request?.body?.customer?.id }}"},
 }
 
 // Functions describes the functions of expressions: the library of Runnel (ADR 0006)

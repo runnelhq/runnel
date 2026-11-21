@@ -2,7 +2,7 @@
 
 | Ordner | Inhalt |
 |---|---|
-| [`hello/`](hello/) | Kleines Projekt mit zwei Environments (`dev`, `prod`); Workflows: `hello` (Variablen, Outputs), `parallel` (parallele Zweige, Join, Fehlerpfad), `collector` (`core.dummy` als Sammelpunkt); Trigger `morning` (Cron, S37), `hourly` (Intervall, S38), `greet` und `greet-default` (HTTP, S38a: `curl -X POST http://127.0.0.1:7301/greet/Moin`) |
+| [`hello/`](hello/) | Kleines Projekt mit zwei Environments (`dev`, `prod`); Workflows: `hello` (Variablen, Outputs), `parallel` (parallele Zweige, Join, Fehlerpfad), `collector` (`core.dummy` als Sammelpunkt); Trigger `morning` (Cron, S37), `hourly` (Intervall, S38), `greet` und `greet-default` (HTTP, S38a: `curl -X POST http://127.0.0.1:7301/greet/Moin`), `answer` mit dem Workflow `answer` (HTTP mit Antwort aus dem Workflow, S38b1: `curl -i http://127.0.0.1:7301/answer/Anna`) |
 | [`expressions/`](expressions/) | Ausdrücke `{{ … }}` (ADR 0006): Bedingungs-Links abhängig von einem Parameter und einer Projektvariable, Standardwert per Ausdruck (gestriges Datum), Outputs aus den Ergebnissen der Actions |
 | [`files/`](files/) | Datei-Actions (S09): Bestellungen aus `inbox/` (nur `*.csv`) in einen Archivordner je Tag kopieren, Dateiliste mit Größen auswerten, leeren Eingang über einen Fehler-Link melden; Trigger `orders` (S38) startet mit `runnel serve examples/files` den Workflow `arrived` für jede neue Datei `orders-*.csv` in `inbox/` |
 | [`sub-workflows/`](sub-workflows/) | Sub-Workflows (S11): `nightly` ruft `import-region` je Region mit eigenen Parametern auf und summiert dessen Outputs; zu viele Bestellungen lassen das Kind abbrechen, der Fehler-Link meldet es |

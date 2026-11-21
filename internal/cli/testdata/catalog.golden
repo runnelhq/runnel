@@ -16,6 +16,8 @@ actions / files
   file.mkdir   Create Folder  Creates a folder with its parent folders; output: the path
   file.move    Move Files     Moves files or folders; output: the new paths
   file.wait    Wait for File  Waits until files exist; output: the matching paths
+actions / network
+  http.respond  HTTP Response  Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
   csv.input           CSV Input      Reads the rows of a CSV file as records

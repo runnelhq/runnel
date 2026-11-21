@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/runnelhq/runnel/internal/vars"
 )
@@ -17,9 +18,27 @@ var httpMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 const (
 	// ResponseAccepted answers 202 with the run id at once (S38a).
 	ResponseAccepted = "accepted"
-	// ResponseRun waits for the answer of the run (S38b).
+	// ResponseRun waits for the answer of the run (S38b1).
 	ResponseRun = "run"
 )
+
+// DefaultResponseTimeout is how long a caller waits for the answer of a run unless
+// timeout is given (response: run).
+const DefaultResponseTimeout = 30 * time.Second
+
+// WaitsForRun reports whether the caller of an http trigger waits for the answer of
+// the run (response: run).
+func (t *Trigger) WaitsForRun() bool {
+	return t.With.Response == ResponseRun
+}
+
+// ResponseTimeout returns how long the caller waits for the answer (response: run).
+func (t *Trigger) ResponseTimeout() time.Duration {
+	if d, err := t.With.Timeout.Value(); err == nil && d > 0 {
+		return d
+	}
+	return DefaultResponseTimeout
+}
 
 var (
 	segmentPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]+$`)
@@ -108,18 +127,19 @@ func (t *Trigger) checkHTTP() Errors {
 	errs = append(errs, t.checkAuth()...)
 	switch w.Response {
 	case "", ResponseAccepted:
+		if w.Timeout != "" {
+			errs = append(errs, s.errorf("$.with.timeout", "timeout belongs to response: run (with accepted the caller does not wait)"))
+		}
 	case ResponseRun:
-		errs = append(errs, s.errorf("$.with.response", "response: run is not supported yet (roadmap S38b); use accepted"))
+		errs = append(errs, t.checkDuration("timeout", w.Timeout, false)...)
 	default:
-		errs = append(errs, s.errorf("$.with.response", "invalid response %q (expected accepted)", w.Response))
+		errs = append(errs, s.errorf("$.with.response", "invalid response %q (expected accepted or run)", w.Response))
 	}
 	if w.MaxConcurrent < 0 {
 		errs = append(errs, s.errorf("$.with.maxConcurrent", "maxConcurrent must not be negative (0: no own limit)"))
 	}
-	for field, set := range map[string]bool{"timeout": w.Timeout != "", "history": w.History != ""} {
-		if set {
-			errs = append(errs, s.errorf("$.with."+field, "%s belongs to response: run and is not supported yet (roadmap S38b)", field))
-		}
+	if w.History != "" {
+		errs = append(errs, s.errorf("$.with.history", "history is not supported yet (roadmap S38b2)"))
 	}
 	return errs
 }

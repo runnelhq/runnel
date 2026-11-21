@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -248,7 +249,7 @@ func TestTriggers(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "triggers", "often.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: often\ntype: cron\n"+
 		"target: workflows/wait.workflow.yaml\nenvironment: dev\nparams: { DELAY: 1ms }\nwith: { schedule: \"* * * * *\" }\n")
 	writeFile(t, filepath.Join(dir, "triggers", "bad.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: bad\ntype: http\ntarget: workflows/wait.workflow.yaml\n"+
-		"with: { method: GET, path: /bad, auth: none, response: run }\n")
+		"with: { method: GET, path: /bad, auth: none, history: errors }\n")
 	s.triggers.Reload()
 	rec := do(t, s, "GET", "/api/v1/triggers", "")
 	var res triggersResponse
@@ -320,5 +321,96 @@ func TestHTTPTrigger(t *testing.T) {
 	d := waitRun(t, s, res.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
 	if d.Status != "succeeded" || d.Trigger != "http:hook" || d.Client != "127.0.0.1" || d.Params["DELAY"] != "1ms" {
 		t.Errorf("run %+v", d.Run)
+	}
+}
+
+// With response: run the workflow answers the caller with http.respond, also from a
+// called workflow; without it the outputs are the answer (S38b1).
+func TestHTTPTriggerResponse(t *testing.T) {
+	dir, s := newRunProject(t)
+	files := map[string]string{
+		"workflows/item.workflow.yaml": `kind: Workflow
+apiVersion: runnel/v1
+name: item
+parameters:
+  - { name: ID, type: integer, required: true }
+actions:
+  - { id: start, type: core.start }
+  - id: reply
+    type: http.respond
+    with:
+      status: "{{ params.ID > 100 ? 404 : 200 }}"
+      headers: { X-Method: "{{ request.method }}" }
+      body: { id: "{{ params.ID }}", name: "{{ request?.body?.name ?? 'none' }}" }
+  - { id: after, type: core.log, with: { message: "answered: {{ results.reply.output.sent }}" } }
+links:
+  - { from: start, to: reply }
+  - { from: reply, to: after }
+`,
+		"workflows/outer.workflow.yaml": `kind: Workflow
+apiVersion: runnel/v1
+name: outer
+parameters:
+  - { name: ID, type: integer, required: true }
+actions:
+  - { id: start, type: core.start }
+  - { id: call, type: core.run-workflow, with: { workflow: workflows/item.workflow.yaml, params: { ID: "${ID}" } } }
+links:
+  - { from: start, to: call }
+`,
+		"workflows/sum.workflow.yaml": `kind: Workflow
+apiVersion: runnel/v1
+name: sum
+parameters:
+  - { name: A, type: integer, required: true }
+outputs:
+  - { name: TWICE, type: integer, value: "{{ params.A * 2 }}" }
+actions:
+  - { id: start, type: core.start }
+`,
+	}
+	for name, content := range files {
+		writeFile(t, filepath.Join(dir, filepath.FromSlash(name)), content)
+	}
+	for _, tr := range []struct{ name, target, path string }{
+		{"item", "item", "/items/{ID}"}, {"outer", "outer", "/outer/{ID}"}, {"sum", "sum", "/sum"},
+	} {
+		writeFile(t, filepath.Join(dir, "triggers", tr.name+".yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: "+tr.name+"\ntype: http\n"+
+			"target: workflows/"+tr.target+".workflow.yaml\nwith: { method: POST, path: \""+tr.path+"\", auth: none, response: run, timeout: 5s }\n")
+	}
+	s.triggers.Reload()
+	if p := s.triggers.Problems(); len(p) != 0 {
+		t.Fatal(p)
+	}
+	post := func(path, body string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("POST", path, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Host, r.RemoteAddr = "127.0.0.1:7301", "127.0.0.1:50000"
+		w := httptest.NewRecorder()
+		s.triggers.ServeHTTP(w, r)
+		return w
+	}
+	for _, c := range []struct {
+		path, body string
+		status     int
+		want       string
+	}{
+		{"/items/7", `{"name": "Anna"}`, 200, `{"id":7,"name":"Anna"}`},
+		{"/items/700", "", 404, `{"id":700,"name":"none"}`},
+		{"/outer/8", `{"name": "Ben"}`, 200, `{"id":8,"name":"Ben"}`},
+		{"/sum?A=21", "", 200, `{"TWICE":42}`},
+	} {
+		w := post(c.path, c.body)
+		if w.Code != c.status || strings.TrimSpace(w.Body.String()) != c.want {
+			t.Errorf("%s: %d %s", c.path, w.Code, w.Body)
+		}
+		if c.path == "/items/7" && w.Header().Get("X-Method") != "POST" {
+			t.Errorf("headers %v", w.Header())
+		}
+	}
+	// The workflow goes on after the answer.
+	d := waitRun(t, s, s.triggers.List()[0].Last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
+	if !strings.Contains(fmt.Sprint(d.Log), "answered: true") {
+		t.Errorf("log %v", d.Log)
 	}
 }

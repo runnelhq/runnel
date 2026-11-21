@@ -82,6 +82,7 @@ func (spec Spec) workflows(envName string) action.WorkflowRunner {
 		child := Spec{
 			Name: name, Data: data, ProjectDir: spec.ProjectDir, Env: envName, Params: call.Params,
 			Registry: spec.Registry, Transforms: spec.Transforms, Observer: forward(call.Log), File: file, chain: chain, strict: true,
+			Request: spec.Request, Respond: spec.Respond,
 		}
 		p, err := Prepare(child)
 		if err != nil {

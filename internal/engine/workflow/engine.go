@@ -46,6 +46,11 @@ type Options struct {
 	Workflows action.WorkflowRunner
 	// Pipelines runs pipelines called by actions (core.run-pipeline); nil if not supported.
 	Pipelines action.PipelineRunner
+	// Request is the request of the caller of an http trigger (request in expressions,
+	// S38b1); nil otherwise.
+	Request map[string]any
+	// Respond answers the waiting caller of an http trigger (http.respond); nil if none.
+	Respond action.Responder
 }
 
 // Status is the final state of a run.
@@ -307,6 +312,7 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 		RunID:    runID,
 		ActionID: a.ID,
 		Log:      func(level slog.Level, msg string) { r.log(runID, a, level, prefix+msg) },
+		Respond:  r.opts.Respond,
 	}
 	if r.opts.Workflows != nil {
 		ec.RunWorkflow = func(ctx context.Context, path string, params map[string]string) (map[string]any, error) {
