@@ -1,5 +1,7 @@
 # Beispiele
 
+Relative Pfade in den Beispielen beziehen sich auf den jeweiligen Projektordner ([ADR 0020](../docs/adr/0020-relative-pfade.md)); Ausgaben landen unter `out/` im Projekt (in Git ignoriert). Die Befehle unten funktionieren deshalb aus jedem Ordner, sofern der Pfad zur Datei stimmt.
+
 | Ordner | Inhalt |
 |---|---|
 | [`hello/`](hello/) | Kleines Projekt mit zwei Environments (`dev`, `prod`); Workflows: `hello` (Variablen, Outputs), `parallel` (parallele Zweige, Join, Fehlerpfad), `collector` (`core.dummy` als Sammelpunkt); Trigger `morning` (Cron, S37), `hourly` (Intervall, S38), `greet` und `greet-default` (HTTP, S38a: `curl -X POST http://127.0.0.1:7301/greet/Moin`), `answer` mit dem Workflow `answer` (HTTP mit Antwort aus dem Workflow, S38b1: `curl -i http://127.0.0.1:7301/answer/Anna`) |

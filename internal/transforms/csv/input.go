@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -29,7 +30,7 @@ var inputDefinition = transform.Definition{
 }
 
 type input struct {
-	Path      string `json:"path" doc:"CSV file to read; relative paths refer to the working directory of runnel" schema:"required,example=C:\\in\\orders.csv"`
+	Path      string `json:"path" doc:"CSV file to read, relative to the project folder or absolute" schema:"required,example=C:\\in\\orders.csv"`
 	Delimiter string `json:"delimiter" doc:"Character between the values, e.g. ; or \\t for tab; empty: comma" schema:"example=;"`
 	Header    *bool  `json:"header" doc:"Whether the first row holds the names of the columns" schema:"default=true"`
 	Encoding  string `json:"encoding" doc:"Encoding of the file; auto recognizes UTF-8 and UTF-16 by their byte order mark and reads UTF-8 otherwise" schema:"enum=auto|utf-8|windows-1252|utf-16,default=auto"`
@@ -118,7 +119,7 @@ func (t *input) Process(ctx context.Context, _ <-chan transform.Batch, out *tran
 	if err != nil {
 		return err
 	}
-	f, err := os.Open(t.Path)
+	f, err := os.Open(paths.Resolve(ctx, t.Path))
 	if err != nil {
 		return fmt.Errorf("cannot read %q: %w", t.Path, plain(err))
 	}

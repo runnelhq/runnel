@@ -432,7 +432,7 @@ export interface Detection {
 export class DetectError extends Error {
   constructor(
     message: string,
-    readonly workingDir?: string,
+    readonly baseDir?: string,
   ) {
     super(message);
   }
@@ -445,8 +445,8 @@ export async function detectFields(path: string, content: string, transform: str
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path, content, transform }),
   });
-  const body = (await res.json()) as Detection & { error?: string; workingDir?: string };
-  if (!res.ok) throw new DetectError(body.error ?? `${res.status} ${res.statusText}`, body.workingDir);
+  const body = (await res.json()) as Detection & { error?: string; baseDir?: string };
+  if (!res.ok) throw new DetectError(body.error ?? `${res.status} ${res.statusText}`, body.baseDir);
   return body;
 }
 

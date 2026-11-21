@@ -131,6 +131,7 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
 ### 2.5 Environment & Variablen
 
 - Variablen werden über Ebenen aufgelöst (spätere Ebene überschreibt):
+  0. Eingebaut: `PROJECT_DIR` – absoluter Pfad des Projektordners ([ADR 0020](adr/0020-relative-pfade.md))
   1. Standardwerte der Workflow-Parameter (`parameters[].default`)
   2. Project (`project.yaml`, Abschnitt `variables`)
   3. Environment (`environments/<name>.yaml`; Auswahl per `--env`, sonst `defaultEnvironment` des Projekts)
@@ -144,6 +145,9 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
   - `$${` – ein wörtliches `${`
   - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
 - Das Projekt wird über `project.yaml` im Ordner des Workflows oder einem übergeordneten Ordner gefunden (wie `.git`).
+- **Relative Pfade** in allen Actions, Transforms und Triggern beziehen sich auf den Projektordner, ohne Projekt auf den
+  Ordner der Workflow- bzw. Pipeline-Datei – nie auf das Arbeitsverzeichnis von Runnel
+  ([ADR 0020](adr/0020-relative-pfade.md)).
 - `runnel validate` meldet nicht definierte Variablen als Warnung – je Environment des Projekts, damit z. B. eine nur in
   `dev` gesetzte Variable für `prod` auffällt.
 
@@ -1036,7 +1040,8 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 
 - **Pfade:** Platzhalter `*`, `?` und `[abc]` sind im letzten Teil des Pfads erlaubt (`C:\in\*.csv`); unter Windows
   ohne Unterscheidung von Groß- und Kleinschreibung wie im Explorer. UNC-Pfade (`\\server\share\…`) funktionieren wie
-  lokale; relative Pfade beziehen sich auf das Arbeitsverzeichnis von Runnel.
+  lokale; relative Pfade beziehen sich auf den Projektordner ([ADR 0020](adr/0020-relative-pfade.md)); Ergebnisse nennen den
+  absoluten Pfad.
 - **Ziel bei Kopieren/Verschieben:** Bei Platzhaltern, einem Ziel mit `\` am Ende oder einem vorhandenen Ordner landen
   die Dateien im Ordner; eine einzelne Datei kann auch unter neuem Namen abgelegt werden. Fehlende Ordner werden
   angelegt.

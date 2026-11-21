@@ -194,14 +194,14 @@
         "properties": {
           "source": {
             "type": "string",
-            "description": "File or folder; wildcards are allowed in the name, e.g. *.csv",
+            "description": "File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv",
             "examples": [
               "C:\\in\\*.csv"
             ]
           },
           "target": {
             "type": "string",
-            "description": "Target folder; for a single file also a new file name",
+            "description": "Target folder, relative to the project folder or absolute; for a single file also a new file name",
             "examples": [
               "D:\\archive"
             ]
@@ -231,7 +231,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "File or folder; wildcards are allowed in the name, e.g. *.tmp",
+            "description": "File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.tmp",
             "examples": [
               "C:\\work\\*.tmp"
             ]
@@ -265,7 +265,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "File or folder; wildcards are allowed in the name, e.g. *.csv",
+            "description": "File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv",
             "examples": [
               "C:\\in\\*.csv"
             ]
@@ -299,7 +299,7 @@
         "properties": {
           "folder": {
             "type": "string",
-            "description": "Folder to list",
+            "description": "Folder to list, relative to the project folder or absolute",
             "examples": [
               "C:\\in"
             ]
@@ -343,7 +343,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "Folder to create",
+            "description": "Folder to create, relative to the project folder or absolute",
             "examples": [
               "D:\\archive\\2026"
             ]
@@ -367,14 +367,14 @@
         "properties": {
           "source": {
             "type": "string",
-            "description": "File or folder; wildcards are allowed in the name, e.g. *.csv",
+            "description": "File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv",
             "examples": [
               "C:\\in\\*.csv"
             ]
           },
           "target": {
             "type": "string",
-            "description": "Target folder; for a single file also a new file name",
+            "description": "Target folder, relative to the project folder or absolute; for a single file also a new file name",
             "examples": [
               "D:\\archive"
             ]
@@ -404,7 +404,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "File to wait for; wildcards are allowed in the name, e.g. *.csv",
+            "description": "File to wait for, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv",
             "examples": [
               "C:\\in\\*.csv"
             ]
@@ -968,7 +968,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "CSV file to read; relative paths refer to the working directory of runnel",
+            "description": "CSV file to read, relative to the project folder or absolute",
             "examples": [
               "C:\\in\\orders.csv"
             ]
@@ -1058,7 +1058,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "CSV file to write; relative paths refer to the working directory of runnel",
+            "description": "CSV file to write, relative to the project folder or absolute",
             "examples": [
               "C:\\out\\orders.csv"
             ]

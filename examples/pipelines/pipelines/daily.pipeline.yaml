@@ -1,5 +1,4 @@
-# Revenue per day from the orders (roadmap S22). Run it from the folder that contains
-# "examples":
+# Revenue per day from the orders (roadmap S22). Relative paths refer to the project folder (output in out/); for example:
 #   runnel run examples/pipelines/pipelines/daily.pipeline.yaml
 # - "days" groups the orders by date: number of orders, total, average and largest order,
 #   and the customers as one text. Groups are formed in memory, in the order in which
@@ -11,12 +10,12 @@ name: daily
 parameters:
   - name: OUTPUT
     description: CSV file to write
-    default: orders-per-day.csv
+    default: out/orders-per-day.csv
 transforms:
   - id: read
     type: csv.input
     with:
-      path: examples/pipelines/data/orders.csv
+      path: data/orders.csv
       delimiter: ";"
       fields:
         - { name: Kunde }

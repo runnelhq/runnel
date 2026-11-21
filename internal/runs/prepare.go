@@ -7,6 +7,7 @@ package runs
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -56,6 +57,15 @@ type Spec struct {
 	chain []caller
 	// strict rejects parameters the workflow does not declare (called workflows).
 	strict bool
+}
+
+// BaseDir is the folder relative paths of a run refer to (ADR 0020): the project folder,
+// or without a project the folder of the workflow or pipeline file.
+func BaseDir(projectDir, file string) string {
+	if projectDir != "" {
+		return projectDir
+	}
+	return filepath.Dir(file)
 }
 
 // file returns the path of the workflow file on disk.
@@ -127,6 +137,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 		Pipelines:   spec.pipelines(envName),
 		Request:     spec.Request,
 		Respond:     spec.Respond,
+		BaseDir:     BaseDir(spec.ProjectDir, spec.file()),
 	})
 	return p, err
 }

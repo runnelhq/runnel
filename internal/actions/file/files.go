@@ -3,7 +3,7 @@
 //
 // Paths may contain wildcards (*, ?, [abc]) in their last element, e.g. C:\in\*.csv;
 // on Windows they match regardless of upper and lower case, like in Explorer. Relative
-// paths refer to the working directory of runnel. Each action lives in a file of its
+// paths refer to the project folder (ADR 0020, package paths). Each action lives in a file of its
 // own (<name>.go) with its tests next to it; Register lists all of them (ADR 0013).
 package file
 
@@ -18,6 +18,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // hasWildcard reports whether the last element of a path contains wildcards.
@@ -109,30 +111,31 @@ func endsWithSeparator(path string) bool {
 
 // transfer copies or moves files and folders (file.copy, file.move).
 type transfer struct {
-	Source    string `json:"source" doc:"File or folder; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
-	Target    string `json:"target" doc:"Target folder; for a single file also a new file name" schema:"required,example=D:\\archive"`
+	Source    string `json:"source" doc:"File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
+	Target    string `json:"target" doc:"Target folder, relative to the project folder or absolute; for a single file also a new file name" schema:"required,example=D:\\archive"`
 	Overwrite bool   `json:"overwrite" doc:"Replace existing files in the target" schema:"default=false"`
 }
 
 // targets pairs each source with its destination. Several sources (wildcards) and paths
 // ending with \ go into the target folder; a single file or folder becomes the target.
-func (t *transfer) targets() ([][2]string, error) {
+func (t *transfer) targets(ctx context.Context) ([][2]string, error) {
 	if t.Target == "" {
 		return nil, errors.New("no target given")
 	}
-	sources, err := match(t.Source)
+	target := paths.Resolve(ctx, t.Target)
+	sources, err := match(paths.Resolve(ctx, t.Source))
 	if err != nil {
 		return nil, err
 	}
 	if len(sources) == 0 {
 		return nil, fmt.Errorf("no file or folder matches %q", t.Source)
 	}
-	intoFolder := hasWildcard(t.Source) || endsWithSeparator(t.Target) || isFolder(t.Target) && !isFolder(sources[0])
+	intoFolder := hasWildcard(t.Source) || endsWithSeparator(t.Target) || isFolder(target) && !isFolder(sources[0])
 	pairs := make([][2]string, len(sources))
 	for i, s := range sources {
-		dst := t.Target
+		dst := target
 		if intoFolder {
-			dst = filepath.Join(t.Target, filepath.Base(s))
+			dst = filepath.Join(target, filepath.Base(s))
 		}
 		if sameFile(s, dst) {
 			return nil, fmt.Errorf("%q and %q are the same", s, dst)

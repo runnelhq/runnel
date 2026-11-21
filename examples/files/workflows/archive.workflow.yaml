@@ -1,4 +1,4 @@
-# File actions. Run it from the folder that contains "examples":
+# File actions. Relative paths refer to the project folder (output in out/); for example:
 #   runnel run -v examples/files/workflows/archive.workflow.yaml
 #   runnel run -v --param ARCHIVE=D:\archive examples/files/workflows/archive.workflow.yaml
 # - "check" fails if the inbox has no *.csv files; the failure link reports that.
@@ -12,10 +12,10 @@ name: archive
 parameters:
   - name: INBOX
     description: Folder with the incoming order files
-    default: examples/files/inbox
+    default: inbox
   - name: ARCHIVE
     description: Archive folder; a subfolder per day is created in it
-    default: runnel-archive
+    default: out/archive
 outputs:
   - name: FOLDER
     value: "{{ results.folder?.output ?? '' }}"

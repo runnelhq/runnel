@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // file.delete deletes files and, with recursive, folders with their content.
@@ -21,7 +22,7 @@ var deleteDefinition = action.Definition{
 }
 
 type deleteAction struct {
-	Path      string `json:"path" doc:"File or folder; wildcards are allowed in the name, e.g. *.tmp" schema:"required,example=C:\\work\\*.tmp"`
+	Path      string `json:"path" doc:"File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.tmp" schema:"required,example=C:\\work\\*.tmp"`
 	Recursive bool   `json:"recursive" doc:"Also delete folders with everything in them" schema:"default=false"`
 	MustExist bool   `json:"mustExist" doc:"Fail if nothing matches the path" schema:"default=false"`
 }
@@ -38,7 +39,7 @@ func (a *deleteAction) Execute(ctx context.Context, ec *action.ExecContext) (act
 	if err := ctx.Err(); err != nil {
 		return action.Result{}, err
 	}
-	found, err := match(a.Path)
+	found, err := match(paths.Resolve(ctx, a.Path))
 	if err != nil {
 		return action.Result{}, err
 	}

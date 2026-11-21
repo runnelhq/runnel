@@ -21,17 +21,27 @@ func TestPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The pipeline reads data/customers.csv relative to the project folder (ADR 0020).
 	dir := t.TempDir()
-	csv := filepath.Join(dir, "customers.csv")
+	if err := os.MkdirAll(filepath.Join(dir, "data"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	csv := filepath.Join(dir, "data", "customers.csv")
 	if err := os.WriteFile(csv, []byte("kdnr;name;umsatz\n4711;A;1.000,50\n4712;B;k. A.\n4713;C;2,00\n4714;D;0,00\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	text := strings.Replace(string(data), "path: examples/pipelines/data/customers.csv", "path: "+filepath.ToSlash(csv), 1)
+	if err := os.WriteFile(filepath.Join(dir, "project.yaml"), []byte("kind: Project\napiVersion: runnel/v1\nname: preview\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "path: data/customers.csv") {
+		t.Fatal("the example no longer reads data/customers.csv")
+	}
 	// Outputs write into the folder; nothing may be written.
 	text = strings.ReplaceAll(text, "${OUTPUT}", filepath.ToSlash(filepath.Join(dir, "out.csv")))
 	text = strings.ReplaceAll(text, "${REJECTED}", filepath.ToSlash(filepath.Join(dir, "rejected.csv")))
 
-	p, err := PreparePipeline(PipelineSpec{Name: "customers.pipeline.yaml", Data: []byte(text), Registry: transforms.Builtin(),
+	p, err := PreparePipeline(PipelineSpec{Name: "customers.pipeline.yaml", Data: []byte(text), ProjectDir: dir, Registry: transforms.Builtin(),
 		Preview: &PreviewSpec{UpTo: "types", Limit: 3}})
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +72,8 @@ func TestPreview(t *testing.T) {
 	if _, ok := res.Counts["map"]; ok {
 		t.Error("map runs, but is after types")
 	}
-	if files, _ := filepath.Glob(filepath.Join(dir, "*.csv")); len(files) != 1 {
+	// Only the input is there; out.csv and rejected.csv were not written.
+	if files, _ := filepath.Glob(filepath.Join(dir, "*.csv")); len(files) != 0 {
 		t.Errorf("files written: %v", files)
 	}
 	if v, _ := res.Samples[p.Preview.Output][0].Get("kdnr"); v != int64(4711) {

@@ -261,12 +261,28 @@ func (p *Project) EnvironmentNames() []string {
 	return slices.Sorted(maps.Keys(p.Environments))
 }
 
+// ProjectDirVariable is the built-in variable with the absolute path of the project
+// folder (ADR 0020), e.g. for paths put together in expressions. A variable of the same
+// name in the project, an environment or the parameters takes precedence.
+const ProjectDirVariable = "PROJECT_DIR"
+
+// BuiltinLayer is the name of the variable layer of the built-in variables (the lowest).
+const BuiltinLayer = "runnel"
+
+// absDir returns dir as an absolute path, or as it is if that fails.
+func absDir(dir string) string {
+	if abs, err := filepath.Abs(dir); err == nil {
+		return abs
+	}
+	return dir
+}
+
 // ParameterDefaultsLayer is the name of the variable layer with the default values of
-// the workflow parameters (the lowest layer of Scope).
+// the workflow parameters (lowest but for the built-in variables).
 const ParameterDefaultsLayer = "workflow parameters"
 
 // Scope returns the variables available to a workflow, from lowest to highest priority:
-// defaults of the workflow parameters, project variables, environment variables and
+// the built-in PROJECT_DIR (with a project), defaults of the workflow parameters, project variables, environment variables and
 // parameter values passed at start (see docs/KONZEPT.md, chapter 2.5).
 // p, env and params may be nil.
 func Scope(w *Workflow, p *Project, env *Environment, params map[string]string) *vars.Scope {
@@ -283,7 +299,11 @@ func scopeFor(parameters []Parameter, p *Project, env *Environment, params map[s
 	for _, param := range parameters {
 		defaults[param.Name] = param.Default
 	}
-	layers := []vars.Layer{{Name: ParameterDefaultsLayer, Values: defaults}}
+	var layers []vars.Layer
+	if p != nil && p.Dir != "" {
+		layers = append(layers, vars.Layer{Name: BuiltinLayer, Values: map[string]string{ProjectDirVariable: absDir(p.Dir)}})
+	}
+	layers = append(layers, vars.Layer{Name: ParameterDefaultsLayer, Values: defaults})
 	if p != nil {
 		layers = append(layers, vars.Layer{Name: "project", Values: p.Variables})
 	}

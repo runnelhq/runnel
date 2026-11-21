@@ -1,6 +1,7 @@
 package csv
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,7 +36,7 @@ func summary(d *transform.Detection) string {
 func TestDetectFields(t *testing.T) {
 	path := writeCSV(t, "kdnr;name;umsatz;ort;telefon\r\n4711;Müller GmbH;12.500,00;Köln;0221 123456\r\n"+
 		"4712;Schmidt & Söhne;0,00;Bonn;\r\n4713;\"Weber, Anna\";980,50;Aachen;0241 98765\r\n4714;Klein KG;k. A.;Essen;\r\n")
-	d, err := detectFields(map[string]any{"path": path, "delimiter": ";"}, transform.DetectLimit)
+	d, err := detectFields(context.Background(), map[string]any{"path": path, "delimiter": ";"}, transform.DetectLimit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ telefon string "" "" true | 0221 123456,,0241 98765, | Leading zero: kept as tex
 // new columns are not selected, listed ones missing in the file are marked.
 func TestDetectFieldsListed(t *testing.T) {
 	path := writeCSV(t, "\xEF\xBB\xBFNr;Kunde;Betrag;Datum;Bezahlt\n1001;Müller GmbH;1.234,50;19.11.2026;ja\n1002;Weber;89,90;20.11.2026;nein\n")
-	d, err := detectFields(map[string]any{"path": path, "delimiter": ";", "fields": []any{
+	d, err := detectFields(context.Background(), map[string]any{"path": path, "delimiter": ";", "fields": []any{
 		map[string]any{"name": "Nr", "type": "int"},
 		map[string]any{"name": "Kunde"},
 		map[string]any{"name": "Betrag", "type": "decimal", "format": "#.##0,00"},
@@ -87,7 +88,7 @@ Bezahlt string "" "new" false | ja,nein | ja/nein is not a bool (true/false, 1/0
 
 func TestDetectFieldsNoHeader(t *testing.T) {
 	path := writeCSV(t, "1,a\n2,b\n3,c\n")
-	d, err := detectFields(map[string]any{"path": path, "header": false, "fields": []any{map[string]any{"name": "id", "type": "int"}}}, 2)
+	d, err := detectFields(context.Background(), map[string]any{"path": path, "header": false, "fields": []any{map[string]any{"name": "id", "type": "int"}}}, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +113,7 @@ func TestDetectFieldsErrors(t *testing.T) {
 		{map[string]any{"path": writeCSV(t, "a;a\n1;2\n"), "delimiter": ";"}, `the column "a" appears twice`},
 		{map[string]any{"path": writeCSV(t, "a\n\"x\n")}, "extraneous or missing"},
 	} {
-		if _, err := detectFields(tt.with, 10); err == nil || !strings.Contains(err.Error(), tt.want) {
+		if _, err := detectFields(context.Background(), tt.with, 10); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("detectFields(%v) = %v; want %q", tt.with, err, tt.want)
 		}
 	}

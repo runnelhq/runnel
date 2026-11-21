@@ -302,7 +302,7 @@ meldet `/catalog` mit `"detectFields": true` (zuerst `csv.input`). Der Server sc
 POST /api/v1/pipelines/fields
 { "path": "pipelines/customers.pipeline.yaml", "content": "kind: Pipeline\n…", "transform": "read" }
 
-→ 200 { "source": [{ "name": "File", "value": "examples/pipelines/data/customers.csv" },
+→ 200 { "source": [{ "name": "File", "value": "data/customers.csv" },
                    { "name": "Delimiter", "value": ";" }, { "name": "Header", "value": "first row" },
                    { "name": "Encoding", "value": "UTF-8" }],
         "rows": 4, "complete": true, "environment": "dev", "variables": false,
@@ -324,8 +324,8 @@ POST /api/v1/pipelines/fields
 Ein Typ wird nur vorgeschlagen, wenn **jeder** gelesene Wert passt (`int`, `decimal` auch mit `#.##0,00` oder
 `#,##0.00`, `date` und `datetime` ISO oder `dd.MM.yyyy`, `bool`); sonst `string` mit Begründung. Zahlen mit führender
 Null bleiben Text. Antworten: `404` für einen unbekannten Transform, `400` für Typen ohne Erkennung, `422`, wenn die
-Pipeline oder das Projekt nicht lesbar ist, oder – mit `{"error", "workingDir"}` – wenn die Eingabe nicht lesbar ist
-(relative Pfade beziehen sich auf `workingDir`, den Ordner, in dem `runnel` gestartet wurde).
+Pipeline oder das Projekt nicht lesbar ist, oder – mit `{"error", "baseDir"}` – wenn die Eingabe nicht lesbar ist
+(relative Pfade beziehen sich auf `baseDir`, den Projektordner, ADR 0020).
 
 ## Datenvorschau (`/preview`)
 

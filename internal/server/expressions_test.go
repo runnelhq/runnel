@@ -19,8 +19,10 @@ func TestExpressions(t *testing.T) {
 		t.Errorf("roots %d, functions %v", len(res.Roots), res.Functions)
 	}
 	// The default environment overrides the project.
-	want := []variableDoc{{"LIMIT", "10", "project.yaml"}, {"TARGET", "dev", "environments/dev.yaml"}}
-	if len(res.Variables) != 2 || res.Variables[0] != want[0] || res.Variables[1] != want[1] {
+	// PROJECT_DIR is built in (ADR 0020).
+	abs, _ := filepath.Abs(dir)
+	want := []variableDoc{{"LIMIT", "10", "project.yaml"}, {"PROJECT_DIR", abs, "built-in"}, {"TARGET", "dev", "environments/dev.yaml"}}
+	if len(res.Variables) != 3 || res.Variables[0] != want[0] || res.Variables[1] != want[1] || res.Variables[2] != want[2] {
 		t.Errorf("variables %+v, want %+v", res.Variables, want)
 	}
 

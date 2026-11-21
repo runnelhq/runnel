@@ -1,6 +1,8 @@
 package runs
 
 import (
+	"cmp"
+
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
@@ -12,6 +14,9 @@ import (
 type PipelineSpec struct {
 	// Name identifies the pipeline file in messages.
 	Name string
+	// File is the path of the pipeline file on disk, if Name is not; without a project,
+	// relative paths of the transforms refer to its folder (ADR 0020).
+	File string
 	Data []byte
 	// ProjectDir is the directory of the project; "" without a project.
 	ProjectDir string
@@ -93,6 +98,7 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		RunID:       spec.RunID,
 		Rows:        spec.Rows,
 		Respond:     spec.Respond,
+		BaseDir:     BaseDir(spec.ProjectDir, cmp.Or(spec.File, spec.Name)),
 	})
 	if err == nil {
 		// Warnings of the schemas, e.g. fields that are not known (ADR 0007).

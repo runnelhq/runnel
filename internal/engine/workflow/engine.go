@@ -17,6 +17,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -51,6 +52,9 @@ type Options struct {
 	Request map[string]any
 	// Respond answers the waiting caller of an http trigger (http.respond); nil if none.
 	Respond action.Responder
+	// BaseDir is the folder relative paths of actions refer to (ADR 0020): the project
+	// folder, or the folder of the workflow file; empty: the working directory.
+	BaseDir string
 }
 
 // Status is the final state of a run.
@@ -192,6 +196,7 @@ func Check(w *model.Workflow, opts Options) model.Errors {
 
 // Run executes the workflow and returns when it has finished.
 func (r *Runner) Run(ctx context.Context) Result {
+	ctx = paths.WithBase(ctx, r.opts.BaseDir)
 	now := r.opts.Now
 	started := now()
 	runID := r.opts.RunID

@@ -49,7 +49,7 @@ func TestDetectFieldsRejected(t *testing.T) {
 		status int
 		want   string
 	}{
-		{fieldsBody(t, missing, "read"), http.StatusUnprocessableEntity, `"workingDir"`},
+		{fieldsBody(t, missing, "read"), http.StatusUnprocessableEntity, `"baseDir"`},
 		{fieldsBody(t, pipelineYAML, "active"), http.StatusBadRequest, "core.filter cannot detect its fields"},
 		{fieldsBody(t, pipelineYAML, "nope"), http.StatusNotFound, "no transform nope"},
 		{fieldsBody(t, "kind: [", "read"), http.StatusUnprocessableEntity, "cannot be read"},

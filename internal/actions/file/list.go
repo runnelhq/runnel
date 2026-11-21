@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // file.list lists the files (and optionally folders) of a folder. Output: a list
@@ -24,7 +25,7 @@ var listDefinition = action.Definition{
 }
 
 type listAction struct {
-	Folder    string `json:"folder" doc:"Folder to list" schema:"required,example=C:\\in"`
+	Folder    string `json:"folder" doc:"Folder to list, relative to the project folder or absolute" schema:"required,example=C:\\in"`
 	Pattern   string `json:"pattern" doc:"Names to include, with wildcards, e.g. *.csv" schema:"default=*"`
 	Recursive bool   `json:"recursive" doc:"Also list the subfolders" schema:"default=false"`
 	Include   string `json:"include" doc:"What to list" schema:"enum=files|folders|all,default=files"`
@@ -60,19 +61,20 @@ func (a *listAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 	default:
 		return action.Result{}, fmt.Errorf("invalid include %q (expected files, folders or all)", include)
 	}
-	if !isFolder(a.Folder) {
+	folder := paths.Resolve(ctx, a.Folder)
+	if !isFolder(folder) {
 		return action.Result{}, fmt.Errorf("folder %q does not exist", a.Folder)
 	}
 
 	entries := []any{}
-	err := filepath.WalkDir(a.Folder, func(p string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(folder, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("cannot read %q: %w", p, plain(err))
 		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if p == a.Folder {
+		if p == folder {
 			return nil
 		}
 		wanted := include == "all" || include == "folders" && d.IsDir() || include == "files" && !d.IsDir()

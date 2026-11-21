@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // file.exists succeeds if a file or folder exists and fails otherwise, so that the
@@ -21,7 +22,7 @@ var existsDefinition = action.Definition{
 }
 
 type exists struct {
-	Path string `json:"path" doc:"File or folder; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
+	Path string `json:"path" doc:"File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
 	Kind string `json:"kind" doc:"What has to exist" schema:"enum=any|file|folder,default=any"`
 }
 
@@ -37,7 +38,7 @@ func (a *exists) Execute(ctx context.Context, ec *action.ExecContext) (action.Re
 	if err := ctx.Err(); err != nil {
 		return action.Result{}, err
 	}
-	found, err := matchKind(a.Path, a.Kind)
+	found, err := matchKind(paths.Resolve(ctx, a.Path), a.Kind)
 	if err != nil {
 		return action.Result{}, err
 	}

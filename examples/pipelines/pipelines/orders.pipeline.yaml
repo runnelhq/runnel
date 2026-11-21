@@ -1,5 +1,4 @@
-# Converts a CSV file in German format into one for other systems. Run it from the
-# folder that contains "examples":
+# Converts a CSV file in German format into one for other systems. Relative paths refer to the project folder (output in out/); for example:
 #   runnel run examples/pipelines/pipelines/orders.pipeline.yaml
 #   runnel run --param OUTPUT=C:\out\orders.csv examples/pipelines/pipelines/orders.pipeline.yaml
 # - "read" reads the columns it needs with type and format: 1.234,50 is a decimal number,
@@ -15,10 +14,10 @@ name: orders
 parameters:
   - name: INPUT
     description: CSV file with orders in German format
-    default: examples/pipelines/data/orders.csv
+    default: data/orders.csv
   - name: OUTPUT
     description: CSV file to write
-    default: orders-export.csv
+    default: out/orders-export.csv
   - name: MIN_AMOUNT
     description: Smallest amount of an order to export
     type: number

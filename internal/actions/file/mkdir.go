@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // file.mkdir creates a folder with all missing parent folders; an existing folder is
@@ -22,7 +23,7 @@ var mkdirDefinition = action.Definition{
 }
 
 type mkdir struct {
-	Path string `json:"path" doc:"Folder to create" schema:"required,example=D:\\archive\\2026"`
+	Path string `json:"path" doc:"Folder to create, relative to the project folder or absolute" schema:"required,example=D:\\archive\\2026"`
 }
 
 func newMkdir(with map[string]any) (action.Action, error) {
@@ -40,16 +41,19 @@ func (a *mkdir) Execute(ctx context.Context, ec *action.ExecContext) (action.Res
 	if a.Path == "" {
 		return action.Result{}, errors.New("no path given")
 	}
-	if info, err := os.Stat(a.Path); err == nil {
+	// The output is the folder with the project folder in front of a relative path, so
+	// that later actions find it wherever they look (ADR 0020).
+	folder := paths.Resolve(ctx, a.Path)
+	if info, err := os.Stat(folder); err == nil {
 		if !info.IsDir() {
 			return action.Result{}, fmt.Errorf("cannot create folder %q: a file with this name exists", a.Path)
 		}
 		ec.Logf(slog.LevelDebug, "folder %s exists already", a.Path)
-		return action.Result{Output: a.Path}, nil
+		return action.Result{Output: folder}, nil
 	}
-	if err := os.MkdirAll(a.Path, 0o755); err != nil {
+	if err := os.MkdirAll(folder, 0o755); err != nil {
 		return action.Result{}, fmt.Errorf("cannot create folder %q: %w", a.Path, plain(err))
 	}
 	ec.Logf(slog.LevelDebug, "created folder %s", a.Path)
-	return action.Result{Output: a.Path}, nil
+	return action.Result{Output: folder}, nil
 }

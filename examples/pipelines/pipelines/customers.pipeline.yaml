@@ -1,4 +1,4 @@
-# Prepares customers for a CRM import. Run it from the folder that contains "examples":
+# Prepares customers for a CRM import. Relative paths refer to the project folder (output in out/); for example:
 #   runnel run examples/pipelines/pipelines/customers.pipeline.yaml
 # - "read" reads all columns as text (no field definition).
 # - "types" converts kdnr and umsatz (German format) into numbers. A customer whose
@@ -17,15 +17,15 @@ parameters:
     default: "1"
   - name: OUTPUT
     description: CSV file to write
-    default: customers-crm.csv
+    default: out/customers-crm.csv
   - name: REJECTED
     description: CSV file for customers with invalid values
-    default: customers-rejected.csv
+    default: out/customers-rejected.csv
 transforms:
   - id: read
     type: csv.input
     with:
-      path: examples/pipelines/data/customers.csv
+      path: data/customers.csv
       delimiter: ";"
   - id: types
     type: core.convert

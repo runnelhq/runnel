@@ -34,7 +34,7 @@ func (a *copyAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 	if err := ctx.Err(); err != nil {
 		return action.Result{}, err
 	}
-	pairs, err := a.targets()
+	pairs, err := a.targets(ctx)
 	if err == nil {
 		err = a.check(pairs, "copy")
 	}

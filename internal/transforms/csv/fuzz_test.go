@@ -50,7 +50,7 @@ func FuzzDetectFields(f *testing.F) {
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		d, err := detectFields(map[string]any{"path": path, "delimiter": ";", "header": !noHeader}, 50)
+		d, err := detectFields(context.Background(), map[string]any{"path": path, "delimiter": ";", "header": !noHeader}, 50)
 		if err != nil {
 			return
 		}
