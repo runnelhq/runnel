@@ -180,7 +180,7 @@ HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem 
 | Status, Header und Body von `http.respond` | `response: run` (seit S38b1): die erste Antwort des Laufs |
 | `200` + `outputs` / `500` + `{"error", "runId"}` | `response: run` ohne `http.respond`: Lauf erfolgreich bzw. gescheitert |
 | `504` + `{"error", "runId"}` | `response: run`: keine Antwort innerhalb von `timeout`; der Lauf läuft weiter |
-| `400` | Pflichtparameter fehlt, Wert passt nicht zum Typ, Body ist kein JSON-Objekt |
+| `400` | Pflichtparameter fehlt, Wert passt nicht zum Typ, Body ist kein JSON-Objekt (bei Pipelines auch: keine Liste von Objekten) |
 | `401` | Token fehlt oder falsch (`Authorization: Bearer <token>`) |
 | `403` | Anfrage aus einer Webseite (`Origin`) oder – bei einem lokalen Listener – an einen fremden Host-Namen |
 | `404` / `405` | kein Trigger für den Pfad bzw. deaktiviert / andere Methode (Header `Allow`) |

@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/runid"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
@@ -50,6 +51,8 @@ type Options struct {
 	Now func() time.Time
 	// Rows are records passed to the run, read by core.from-result (S24a).
 	Rows []record.Record
+	// Respond answers the waiting caller of an http trigger (http.response, S38c); nil if none.
+	Respond action.Responder
 }
 
 // Status is the final state of a run or a transform.
@@ -632,7 +635,7 @@ func (r *Runner) Run(parent context.Context) Result {
 						return add(p, rec)
 					}
 					return add(all, rec)
-				}, log).WithValues(values).WithResults(r.opts.Rows, addResult)
+				}, log).WithValues(values).WithResults(r.opts.Rows, addResult).WithRespond(r.opts.Respond)
 				if len(errLinks) > 0 {
 					out.WithErrorLinks(func(rec record.Record) error {
 						counts[i].errors.Add(1)

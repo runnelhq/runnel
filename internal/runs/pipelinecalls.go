@@ -70,6 +70,10 @@ func (spec Spec) pipelines(envName string) action.PipelineRunner {
 	}
 }
 
+// Records turns rows (e.g. the JSON list in the body of a request to an http trigger)
+// into records for core.from-result; the fields are ordered by name.
+func Records(rows []map[string]any) ([]record.Record, error) { return toRecords(rows) }
+
 // toRecords turns the rows of core.run-pipeline into records; the fields of an object
 // are ordered by name, as objects have no order.
 func toRecords(rows []map[string]any) ([]record.Record, error) {

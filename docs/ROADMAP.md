@@ -144,7 +144,7 @@ neue Actions erscheinen dank E1 später automatisch in Palette und Eigenschaftsd
 | S40a ✅ | Listener und TLS | Adresse des Trigger-Listeners frei wählbar (`--triggers`), im Netz nur mit TLS: selbst erzeugtes Zertifikat (`--triggers-tls auto`, neben den Logs, Fingerabdruck im Log) oder eigenes (`--triggers-cert`/`--triggers-key`, Erneuerung ohne Neustart); reines HTTP nur mit `--triggers-insecure`; Warnung bei `auth: none` im Netz; auch für den Dienst (später auch für den Editor, S40b) | Tests mit TLS-Client; Aufruf von einem zweiten Rechner (TESTPLAN W50) |
 | S38b1 ✅ | HTTP-Trigger: Antwort aus dem Workflow | `response: run` mit `timeout` (`504`), Standardantwort aus `outputs` (`200`/`500`), Action `http.respond` (Status, Header, Body; erste Antwort gilt, auch aus Sub-Workflows, ohne Aufrufer wirkungslos), `request` im Ausdruckskontext | Tests; `curl` mit verschiedenen Statuscodes |
 | S38b2 | HTTP-Trigger: Last | `history` (`all`/`errors`/`none`), eigenes Limit für HTTP-Läufe im Lauf-Speicher, Zwischenspeicher vorbereiteter Workflows | Tests; Lastprobe mit vielen Anfragen |
-| S38c | HTTP-Trigger: Antwort aus der Pipeline | Transform `http.response` (Datensätze als JSON, `single`, `whenEmpty`, Status und Header), JSON-Array im Body als Datensätze | Tests; REST-artiges Beispiel |
+| S38c ✅ | HTTP-Trigger: Antwort aus der Pipeline | Transform `http.response` (Datensätze als JSON, `single`, `whenEmpty` als Rückfallantwort, Status und Header, `maxRows`), JSON-Array im Body als Datensätze | Tests; REST-artiges Beispiel `customer-api` |
 
 **Ergebnis 0.5:** Dauerbetrieb als Windows-Dienst – zeit- und dateigesteuert und per HTTP von anderen Systemen
 ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der Editor bleibt lokal.

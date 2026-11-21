@@ -1,0 +1,60 @@
+# Answers GET /api/customers/{KDNR} with one customer as JSON (roadmap S38c); started
+# by triggers/customer.yaml while "runnel serve examples/pipelines" runs (from the
+# folder that contains "examples"):
+#   curl -i http://127.0.0.1:7301/api/customers/4711
+#   curl -i http://127.0.0.1:7301/api/customers/1
+# - "types" converts kdnr and umsatz; customers with invalid values go to "skip".
+# - "match" keeps the customer that was asked for.
+# - "found" answers with it as an object (single). "missing" is the fallback
+#   (whenEmpty): it answers 404 only if "found" has not answered.
+kind: Pipeline
+apiVersion: runnel/v1
+name: customer-api
+parameters:
+  - name: KDNR
+    description: Customer number
+    type: integer
+    required: true
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: examples/pipelines/data/customers.csv
+      delimiter: ";"
+  - id: types
+    type: core.convert
+    with:
+      fields:
+        - { name: kdnr, type: int }
+        - { name: umsatz, type: decimal, format: "#.##0,00" }
+  - id: skip
+    type: core.dummy
+  - id: match
+    type: core.filter
+    with:
+      condition: "{{ record.kdnr == params.KDNR }}"
+  - id: fields
+    type: core.select-fields
+    with:
+      fields:
+        - { name: kdnr, rename: id }
+        - { name: name }
+        - { name: ort, rename: city }
+        - { name: umsatz, rename: revenue }
+  - id: found
+    type: http.response
+    with:
+      single: true
+  - id: missing
+    type: http.response
+    with:
+      status: "404"
+      single: true
+      whenEmpty: true
+links:
+  - { from: read, to: types }
+  - { from: types, to: skip, type: error }
+  - { from: types, to: match }
+  - { from: match, to: fields }
+  - { from: fields, to: found }
+  - { from: fields, to: missing }

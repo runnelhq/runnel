@@ -137,6 +137,16 @@ Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
   behalten in `request.body` ihren Typ.
 - Jede Antwort bei `response: run` trägt den Header `Runnel-Run-Id`.
 
+## Ergänzungen bei der Umsetzung (S38c)
+
+- **`whenEmpty` ist immer Rückfallantwort:** Ein `http.response` mit `whenEmpty: true` antwortet – mit oder ohne
+  Datensätze – erst am Ende des Laufs und nur, wenn kein anderer geantwortet hat. Damit genügen für „gefunden → `200`,
+  sonst `404`“ zwei `http.response` hinter demselben Transform, ohne `core.switch`.
+- **JSON der Datensätze:** Felder in ihrer Reihenfolge, Dezimalzahlen als Zahl, Datum als `yyyy-mm-dd`, Zeitpunkte nach
+  RFC 3339; höchstens `maxRows` (Standard 10.000) Datensätze im Speicher.
+- **JSON-Liste im Body** nur für Pipelines; die Felder eines Objekts werden nach Namen sortiert (wie `rows` bei
+  `core.run-pipeline`). `request` steht in Pipelines (noch) nicht zur Verfügung; Pfad und Query kommen als Parameter.
+
 ## Konsequenzen
 
 - Ein Begriff „Trigger“ für alles, was Läufe automatisch startet: `cron`, `file`, `interval`, `http`. Der Typ `webhook`

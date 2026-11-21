@@ -18,7 +18,17 @@ import (
 func (s *Scheduler) answer(w http.ResponseWriter, r *http.Request, e *entry, start StartRequest) {
 	answers := make(chan action.Response, 1)
 	var once sync.Once
+	var mu sync.Mutex
+	var fallback *action.Response // http.response with whenEmpty: only if no other answer comes
 	start.Respond = func(resp action.Response) bool {
+		if resp.Fallback {
+			mu.Lock()
+			defer mu.Unlock()
+			if fallback == nil {
+				fallback = &resp
+			}
+			return true
+		}
 		first := false
 		once.Do(func() {
 			first = true
@@ -61,6 +71,13 @@ func (s *Scheduler) answer(w http.ResponseWriter, r *http.Request, e *entry, sta
 			writeResponse(w, resp)
 			return
 		}
+		mu.Lock()
+		fb := fallback
+		mu.Unlock()
+		if fb != nil {
+			writeResponse(w, *fb)
+			return
+		}
 		if out.Status == "succeeded" {
 			body := out.Body
 			if body == nil {
@@ -91,6 +108,8 @@ func writeResponse(w http.ResponseWriter, resp action.Response) {
 	contentType := ""
 	switch b := resp.Body.(type) {
 	case nil:
+	case json.RawMessage:
+		body, contentType = append(b, '\n'), "application/json; charset=utf-8"
 	case string:
 		body, contentType = []byte(b), "text/plain; charset=utf-8"
 	default:

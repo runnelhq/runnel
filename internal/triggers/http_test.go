@@ -354,3 +354,68 @@ func TestHTTPResponseRun(t *testing.T) {
 		t.Errorf("timeout: %d %s", w.Code, w.Body)
 	}
 }
+
+// For a pipeline the body may be a JSON list of objects: the records for
+// core.from-result (S38c). An answer with whenEmpty is sent only if no other comes.
+func TestHTTPPipeline(t *testing.T) {
+	dir, f, s, _ := setup(t, map[string]string{
+		"load.yaml": "kind: Trigger\napiVersion: runnel/v1\nname: load\ntype: http\ntarget: pipelines/load.pipeline.yaml\n" +
+			"with:\n  method: POST\n  path: /load\n  auth: none\n  response: run\n  timeout: 1s\n",
+	})
+	write(t, dir, "pipelines/load.pipeline.yaml", "kind: Pipeline\napiVersion: runnel/v1\nname: load\nparameters:\n  - { name: MODE }\n"+
+		"transforms:\n  - { id: in, type: core.from-result }\n  - { id: out, type: core.dummy }\nlinks:\n  - { from: in, to: out }\n")
+	s.Reload()
+	if p := s.Problems(); len(p) != 0 {
+		t.Fatal(p)
+	}
+	var behave func(r StartRequest)
+	s.opts.Start = func(tr *model.Trigger, r StartRequest) (string, error) {
+		id, err := f.start(tr, r)
+		behave(r)
+		return id, err
+	}
+	s.opts.Wait = func(context.Context, string) (Outcome, bool) {
+		return Outcome{Status: "succeeded", Body: map[string]any{"transforms": map[string]any{}}}, true
+	}
+	post := func(body string) *httptest.ResponseRecorder {
+		return call{method: "POST", path: "/load?MODE=full", contentType: "application/json", body: body}.do(s)
+	}
+
+	// The fallback is the answer when no other comes; another answer wins over it.
+	behave = func(r StartRequest) {
+		r.Respond(action.Response{Status: 404, Body: json.RawMessage("null"), Fallback: true})
+	}
+	if w := post(`[{"id": 1, "name": "a"}, {"id": 2.5}]`); w.Code != 404 || strings.TrimSpace(w.Body.String()) != "null" {
+		t.Errorf("fallback: %d %s", w.Code, w.Body)
+	}
+	if rows := f.requests[0].Rows; len(rows) != 2 || rows[0]["id"] != int64(1) || rows[1]["id"] != 2.5 || f.params[0]["MODE"] != "full" {
+		t.Errorf("rows %v, params %v", rows, f.params[0])
+	}
+	behave = func(r StartRequest) {
+		r.Respond(action.Response{Status: 404, Fallback: true})
+		r.Respond(action.Response{Status: 200, Body: json.RawMessage(`[{"id":1}]`)})
+	}
+	if w := post(`[]`); w.Code != 200 || strings.TrimSpace(w.Body.String()) != `[{"id":1}]` || !strings.HasPrefix(w.Header().Get("Content-Type"), "application/json") {
+		t.Errorf("answer over fallback: %d %s", w.Code, w.Body)
+	}
+	behave = func(StartRequest) {}
+	if w := post(`[1, 2]`); w.Code != 400 || !strings.Contains(w.Body.String(), "entry 1 of the JSON list is not an object") {
+		t.Errorf("list of numbers: %d %s", w.Code, w.Body)
+	}
+	if w := post(`"text"`); w.Code != 400 || !strings.Contains(w.Body.String(), "a JSON object (parameters) or a list of objects (records)") {
+		t.Errorf("text: %d %s", w.Code, w.Body)
+	}
+	// Without an answer, the counts of the transforms (default answer).
+	if w := post(`{"MODE": "delta"}`); w.Code != 200 || !strings.Contains(w.Body.String(), `"transforms"`) || f.params[len(f.params)-1]["MODE"] != "full" {
+		t.Errorf("default: %d %s %v", w.Code, w.Body, f.params)
+	}
+}
+
+// For a workflow a JSON list is not accepted.
+func TestHTTPWorkflowList(t *testing.T) {
+	_, s := httpSetup(t)
+	if w := (call{method: "GET", path: "/open?ID=1", contentType: "application/json", body: `[{"a": 1}]`}).do(s); w.Code != 400 ||
+		!strings.Contains(w.Body.String(), "the body must be a JSON object") {
+		t.Errorf("%d %s", w.Code, w.Body)
+	}
+}

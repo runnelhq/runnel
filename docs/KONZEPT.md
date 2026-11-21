@@ -634,6 +634,17 @@ with:
     Aufrufer (Editor, `runnel run`, andere Trigger) tut sie nichts.
   - Ohne `http.respond`: Endet der Lauf erfolgreich, sind die `outputs` als JSON-Objekt die Antwort (`200`; bei einer
     Pipeline die Zähler der Transforms); scheitert er, `500` mit der Lauf-ID, ohne Details (die stehen im Log).
+  - **Pipelines (seit S38c):** Der Transform **`http.response`** antwortet mit den Datensätzen, die er erhält, als
+    JSON – eine Liste, mit `single: true` der erste Datensatz als Objekt (ohne Datensätze `null`). Felder in ihrer
+    Reihenfolge, Dezimalzahlen als Zahl, Datum als `yyyy-mm-dd`; höchstens `maxRows` (Standard 10.000) im Speicher.
+    Er antwortet, wenn seine Eingabe endet und er Datensätze erhalten hat; der erste gilt. Mit **`whenEmpty: true`**
+    ist er die Rückfallantwort: Sie geht – mit oder ohne Datensätze – erst am Ende des Laufs hinaus und nur, wenn kein
+    anderer `http.response` geantwortet hat. So entsteht z. B. „Kunde gefunden → `200`, sonst `404`“ mit zwei
+    `http.response` hinter demselben Filter (`examples/pipelines/pipelines/customer-api.pipeline.yaml`). Die Datensätze
+    gehen weiter; ohne wartenden Aufrufer tut er nichts.
+  - **Datensätze aus dem Body (seit S38c):** Ist das Ziel eine Pipeline, darf der Body eine JSON-Liste von Objekten
+    sein; sie kommt wie `rows` bei `core.run-pipeline` als Datensätze an (`core.from-result`, Felder nach Namen
+    sortiert). Parameter kommen dann aus Pfad und Query.
   - Kommt bis `timeout` keine Antwort: `504`; der Lauf läuft weiter.
   - Jede Antwort trägt den Header `Runnel-Run-Id`.
 - **`request` in Ausdrücken (seit S38b1):** `request.method`, `.path`, `.headers`, `.query`, `.body` (JSON-Wert oder
@@ -1085,7 +1096,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Pipeline Executor, Workflow Executor, In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
-| Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, Log |
+| Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
 Umgesetzt (Stand S22): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
 `core.constant`, `core.convert`, `core.switch`, `core.sort`, `core.group-by` sowie `csv.input` und `csv.output`:
