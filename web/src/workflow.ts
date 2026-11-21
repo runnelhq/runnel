@@ -235,6 +235,19 @@ export function place(wf: Workflow): Placement {
 }
 
 /** Changes made on the canvas (see model.WorkflowEdit). */
+export interface KeyValue {
+  key: string;
+  value: string;
+}
+
+export interface SetField {
+  id: string;
+  field: string;
+  value: string | number | boolean | null;
+  map?: KeyValue[];
+  list?: KeyValue[][];
+}
+
 export interface WorkflowEdit {
   move?: Record<string, { x: number; y: number }>;
   delete?: string[];
@@ -244,8 +257,11 @@ export interface WorkflowEdit {
   deleteLinks?: number[];
   /** when: success, failure, always or an expression "{{ … }}"; type (pipelines): data or error. */
   updateLinks?: { index: number; when?: string; loop?: boolean; disabled?: boolean; type?: string }[];
-  /** Changes one field of an action (properties panel); null removes the field. map sets a mapping of texts (with.params). */
-  set?: { id: string; field: string; value: string | number | boolean | null; map?: { key: string; value: string }[] }[];
+  /**
+   * Changes one field of an action (properties panel); null removes the field. map sets a mapping of texts (with.params),
+   * list a list of mappings, one per line (with.fields of an input transform, S46).
+   */
+  set?: SetField[];
   /** Changes one field of the workflow itself (name, description, settings.*). */
   setWorkflow?: { field: string; value: string | number | boolean | null }[];
   /** Changes a parameter or an output (E7c); at most one. */
@@ -355,7 +371,7 @@ export interface PipelineEdit {
   deleteLinks?: number[];
   updateLinks?: { index: number; type: string }[];
   /** copies, distribution or with.<name>; null removes the field. */
-  set?: { id: string; field: string; value: string | number | boolean | null }[];
+  set?: SetField[];
   /** name, description or settings.*. */
   setPipeline?: { field: string; value: string | number | boolean | null }[];
   /** Changes a parameter (E7c). */
@@ -387,4 +403,58 @@ export async function editWorkflow(path: string, content: string, edit: Workflow
   const body = (await res.json()) as { content?: string; error?: string };
   if (!res.ok) throw new APIError(body.error ?? `${res.status} ${res.statusText}`, res.status);
   return body.content ?? content;
+}
+
+/** A field proposed by "Detect fields" (POST /pipelines/fields, S46). */
+export interface DetectedField {
+  name: string;
+  type: string;
+  format?: string;
+  /** The first values read, as text ("" for an empty value). */
+  values: string[];
+  note?: string;
+  warning?: boolean;
+  /** With fields in the configuration: listed, new or missing. */
+  state?: "listed" | "new" | "missing";
+  selected: boolean;
+}
+
+export interface Detection {
+  source: { name: string; value: string }[];
+  rows: number;
+  complete: boolean;
+  environment?: string;
+  variables?: boolean;
+  fields: DetectedField[];
+}
+
+/** The input could not be read: the message and the folder relative paths refer to. */
+export class DetectError extends Error {
+  constructor(
+    message: string,
+    readonly workingDir?: string,
+  ) {
+    super(message);
+  }
+}
+
+/** Proposes the fields of an input transform from the text shown in the editor (saved or not). */
+export async function detectFields(path: string, content: string, transform: string): Promise<Detection> {
+  const res = await fetch(`${apiBase}/pipelines/fields`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, content, transform }),
+  });
+  const body = (await res.json()) as Detection & { error?: string; workingDir?: string };
+  if (!res.ok) throw new DetectError(body.error ?? `${res.status} ${res.statusText}`, body.workingDir);
+  return body;
+}
+
+/** The entries of "fields:" for the selected fields: text needs no type, other types no empty format. */
+export function fieldsList(fields: { name: string; type: string; format?: string }[]): KeyValue[][] {
+  return fields.map((f) => [
+    { key: "name", value: f.name },
+    ...(f.type && f.type !== "string" ? [{ key: "type", value: f.type }] : []),
+    ...(f.format ? [{ key: "format", value: f.format }] : []),
+  ]);
 }

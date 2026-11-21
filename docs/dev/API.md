@@ -36,6 +36,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | POST | `/validate` | Workflow oder Pipeline prüfen, siehe unten |
 | POST | `/workflows/edit` | Änderung vom Canvas auf den Text anwenden (nicht speichern), siehe unten |
 | POST | `/pipelines/edit` | dasselbe für Pipelines (S25a), siehe unten |
+| POST | `/pipelines/fields` | Felder eines Eingabe-Transforms ermitteln (S46), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
 | GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst |
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
@@ -274,7 +275,45 @@ POST /api/v1/pipelines/edit
 | `move`, `delete`, `add`, `rename`, `deleteLinks` | wie dort, für Transforms (`transforms:`) |
 | `addLinks` | `from`, `to`, optional `type: error` (`data` ist der Standard und wird nicht geschrieben) |
 | `updateLinks` | ändert den Typ: `[{"index": 1, "type": "error"}]`; `data` entfernt `type:` |
-| `set` | `copies`, `distribution` und `with.<name>` eines Transforms |
+| `set` | `copies`, `distribution` und `with.<name>` eines Transforms; zusätzlich setzt `list` ein Feld der Konfiguration auf eine Liste von Zuordnungen, je eine Zeile im Flow-Stil (S46): `{"id": "read", "field": "with.fields", "value": null, "list": [[{"key": "name", "value": "kdnr"}, {"key": "type", "value": "int"}]]}` → `- { name: kdnr, type: int }`; Texte mit `,` `[` `]` `{` `}` in Anführungszeichen. Eine vorhandene Liste wird ersetzt, ohne `list` und `value` entfernt |
 | `setPipeline` | `name`, `description`, `settings.batchSize`, `settings.bufferSize`, `settings.strict` |
 | `entries` | nur `parameters` (Pipelines haben keine Outputs) |
 
+
+## Felder ermitteln (`/pipelines/fields`)
+
+„Detect fields“ im Editor (S46, [ADR 0007](../adr/0007-typsystem-pipelines.md)): Ein Eingabe-Transform liest die ersten
+Zeilen seiner Eingabe (höchstens 1.000) und schlägt Felder mit Typ und Format vor. Gelesen wird mit der Konfiguration
+aus `content` (dem Text im Editor, gespeichert oder nicht); `${…}` werden mit den Standardwerten der Parameter, den
+Variablen des Projekts und des Standard-Environments aufgelöst (wie ein Lauf ohne Werte). Welche Typen das können,
+meldet `/catalog` mit `"detectFields": true` (zuerst `csv.input`). Der Server schreibt nichts; geschrieben wird mit
+`/pipelines/edit` (`set` mit `list`).
+
+```json
+POST /api/v1/pipelines/fields
+{ "path": "pipelines/customers.pipeline.yaml", "content": "kind: Pipeline\n…", "transform": "read" }
+
+→ 200 { "source": [{ "name": "File", "value": "examples/pipelines/data/customers.csv" },
+                   { "name": "Delimiter", "value": ";" }, { "name": "Header", "value": "first row" },
+                   { "name": "Encoding", "value": "UTF-8" }],
+        "rows": 4, "complete": true, "environment": "dev", "variables": false,
+        "fields": [
+          { "name": "kdnr", "type": "int", "values": ["4711", "4712", "4713", "4714"], "selected": true },
+          { "name": "umsatz", "type": "string", "values": ["12.500,00", "0,00", "980,50", "k. A."], "selected": true,
+            "warning": true, "note": "3 of 4 values are decimal (#.##0,00); “k. A.” in line 5 is not. Kept as text." } ] }
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `source` | was gelesen wurde (Datei, Trennzeichen, Kopfzeile, Kodierung), zur Anzeige in dieser Reihenfolge |
+| `rows`, `complete` | gelesene Zeilen; `complete`, wenn das alle Zeilen der Eingabe sind |
+| `environment`, `variables` | Environment, dessen Variablen galten; `variables`, wenn die Konfiguration `${…}` enthält |
+| `fields[]` | `name`, `type`, `format` (falls nötig), `values` (die ersten 5 Werte als Text, `""` für leer), `note` und `warning` (Begründung, z. B. warum eine Spalte Text bleibt) |
+| `fields[].state` | nur wenn die Konfiguration schon `fields:` hat: `listed` (Typ und Format aus der Datei), `new` (nur in der Eingabe), `missing` (nur in der Datei); die Reihenfolge ist die der aufgeführten Felder, neue folgen |
+| `fields[].selected` | Vorschlag zum Schreiben: ohne `fields:` alle, sonst die aufgeführten (die Liste wählt bei `csv.input` auch die gelesenen Spalten) |
+
+Ein Typ wird nur vorgeschlagen, wenn **jeder** gelesene Wert passt (`int`, `decimal` auch mit `#.##0,00` oder
+`#,##0.00`, `date` und `datetime` ISO oder `dd.MM.yyyy`, `bool`); sonst `string` mit Begründung. Zahlen mit führender
+Null bleiben Text. Antworten: `404` für einen unbekannten Transform, `400` für Typen ohne Erkennung, `422`, wenn die
+Pipeline oder das Projekt nicht lesbar ist, oder – mit `{"error", "workingDir"}` – wenn die Eingabe nicht lesbar ist
+(relative Pfade beziehen sich auf `workingDir`, den Ordner, in dem `runnel` gestartet wurde).

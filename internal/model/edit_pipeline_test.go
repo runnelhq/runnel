@@ -120,3 +120,34 @@ func TestPipelineLayout(t *testing.T) {
 		t.Errorf("diags %v", d)
 	}
 }
+
+// TestEditPipelineSetList checks writing "fields:" from "Detect fields" (S46): one
+// mapping per line, texts with , quoted, an existing list replaced, an empty one removed.
+func TestEditPipelineSetList(t *testing.T) {
+	fields := [][]KeyValue{
+		{{Key: "name", Value: "kdnr"}, {Key: "type", Value: "int"}},
+		{{Key: "name", Value: "Weber, Anna"}},
+		{{Key: "name", Value: "umsatz"}, {Key: "type", Value: "decimal"}, {Key: "format", Value: "#.##0,00"}},
+	}
+	got := editPipeline(t, pipelineSource, PipelineEdit{Set: []SetField{{ID: "read", Field: "with.fields", List: fields}}})
+	want := strings.Replace(pipelineSource, "      path: in.csv   # input\n", `      path: in.csv   # input
+      fields:
+        - { name: kdnr, type: int }
+        - { name: "Weber, Anna" }
+        - { name: umsatz, type: decimal, format: "#.##0,00" }
+`, 1)
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+	again := editPipeline(t, got, PipelineEdit{Set: []SetField{{ID: "read", Field: "with.fields", List: fields[:1]}}})
+	if !strings.Contains(again, "      fields:\n        - { name: kdnr, type: int }\n  - id: types") || strings.Count(again, "- { name") != 1 {
+		t.Errorf("replaced:\n%s", again)
+	}
+	if removed := editPipeline(t, got, PipelineEdit{Set: []SetField{{ID: "read", Field: "with.fields"}}}); removed != pipelineSource {
+		t.Errorf("removed:\n%s", removed)
+	}
+	if _, err := EditPipeline("x.pipeline.yaml", []byte(pipelineSource), PipelineEdit{Set: []SetField{{ID: "read", Field: "with.fields",
+		List: [][]KeyValue{{{Key: "name", Value: "a"}, {Key: "name", Value: "b"}}}}}}); err == nil {
+		t.Error("duplicate key: no error")
+	}
+}

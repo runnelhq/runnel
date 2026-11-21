@@ -19,7 +19,7 @@ import {
   type Workflow,
 } from "../workflow";
 import type { Selection } from "./Canvas";
-import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, DetectIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
@@ -54,6 +54,8 @@ export interface PropertiesProps {
   /** The current or last run, to show the result of the selected action (mockup E8). */
   run?: RunView | null;
   onShowInLog?: (actionId: string) => void;
+  /** Input transforms that can propose their fields: opens "Detect fields" (S46). */
+  onDetectFields?: (id: string) => void;
 }
 
 /** A change of a link in the panel. */
@@ -165,7 +167,9 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
   const ids = new Set((workflow.actions ?? []).map((a) => a.id));
   const incoming = (workflow.links ?? []).filter((l) => l.to === action.id && !l.disabled).length;
   const schema = d?.schema;
-  const config = Object.entries(schema?.properties ?? {});
+  // The fields of an input transform that can detect them have their own section (S46).
+  const detect = pipeline && !!d?.detectFields;
+  const config = Object.entries(schema?.properties ?? {}).filter(([name]) => !(detect && name === "fields"));
 
   const declared = useDeclaredParameters(action);
   const configFields = config.map(([name, s]) => (
@@ -275,6 +279,9 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
             <p className="mx-4 mt-0 mb-3 text-xs text-muted-foreground">This {pipeline ? "transform" : "action"} has no configuration.</p>
           )}
         </Section>
+      )}
+      {detect && (
+        <FieldsSection value={action.with?.fields} problems={at("with.fields", "fields")} onDetect={props.onDetectFields && (() => props.onDetectFields!(action.id))} />
       )}
       {!pipeline && <ForEachSection action={action} at={at} set={set} ctx={props.ctx} />}
       <Section title="Execution" summary={summary || "defaults"}>
@@ -1259,6 +1266,58 @@ function LinkFields(props: { kind: "data" | "error"; schemas?: TransformSchemas;
           <code className="font-mono">_errorField</code> and the id of the transform in <code className="font-mono">_errorTransform</code>.
         </p>
       )}
+    </Section>
+  );
+}
+
+/**
+ * The fields of an input transform (mockup S46): the list of "fields:" (name, type,
+ * format) or a note that all columns are read as text, and "Detect fields…".
+ */
+function FieldsSection(props: { value: unknown; problems: Problem[]; onDetect?: () => void }) {
+  const list = Array.isArray(props.value) ? props.value : [];
+  const fields = list.map((f) => {
+    const o = f !== null && typeof f === "object" ? (f as Record<string, unknown>) : {};
+    const text = (v: unknown) => (typeof v === "string" ? v : "");
+    return { name: text(o.name), type: text(o.type) || "string", format: text(o.format) };
+  });
+  return (
+    <Section title="Fields" summary={fields.length > 0 ? String(fields.length) : "none"}>
+      <div data-field="with.fields">
+        {fields.length > 0 ? (
+          <ul data-testid="configured-fields" className="mx-4 mt-0 mb-3 list-none rounded-md border border-border p-0 text-xs">
+            {fields.map((f, i) => (
+              <li key={i} className="grid h-[26px] grid-cols-[1fr_64px_88px] items-center gap-2 border-b border-border px-2.5 last:border-b-0">
+                <span className="truncate font-mono">{f.name}</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{f.type}</span>
+                <span className="truncate text-right font-mono text-[10px] text-muted-foreground">{f.format}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
+            Without fields, all columns are read as text, and the fields are only known when the pipeline runs.
+          </p>
+        )}
+        <ProblemList problems={props.problems} />
+        {props.onDetect && (
+          <div className="mx-4 mb-3">
+            <button
+              type="button"
+              onClick={props.onDetect}
+              className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted"
+            >
+              <DetectIcon width={14} height={14} />
+              Detect fields…
+            </button>
+            <p className="mt-1 mb-0 text-2xs text-muted-foreground">
+              {fields.length > 0
+                ? "Only the listed columns are read. Change single fields in your text editor for now."
+                : "Reads the first rows of the file and proposes names and types."}
+            </p>
+          </div>
+        )}
+      </div>
     </Section>
   );
 }

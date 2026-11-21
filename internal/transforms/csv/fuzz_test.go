@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/runnelhq/runnel/internal/format"
+	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transforms/transformtest"
 )
 
@@ -30,5 +32,32 @@ func FuzzInput(f *testing.F) {
 			"path": path, "delimiter": ";", "encoding": encodings[int(enc)%len(encodings)],
 		})
 		_, _, _ = transformtest.Run(context.Background(), tr)
+	})
+}
+
+// FuzzDetectFields checks that "Detect fields" (S46) never panics on arbitrary files and
+// always proposes a valid type and format for every column.
+func FuzzDetectFields(f *testing.F) {
+	files, _ := filepath.Glob(filepath.Join("..", "..", "..", "examples", "*", "data", "*.csv"))
+	for _, file := range files {
+		if data, err := os.ReadFile(file); err == nil {
+			f.Add(data, false)
+		}
+	}
+	f.Add([]byte("a;b\n0221;1.234,5\n;19.11.2026\n"), true)
+	f.Fuzz(func(t *testing.T, data []byte, noHeader bool) {
+		path := filepath.Join(t.TempDir(), "in.csv")
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		d, err := detectFields(map[string]any{"path": path, "delimiter": ";", "header": !noHeader}, 50)
+		if err != nil {
+			return
+		}
+		for _, fd := range d.Fields {
+			if _, err := format.New(record.Type(fd.Type), fd.Format); err != nil {
+				t.Errorf("field %q: invalid proposal %s %q: %v", fd.Name, fd.Type, fd.Format, err)
+			}
+		}
 	})
 }

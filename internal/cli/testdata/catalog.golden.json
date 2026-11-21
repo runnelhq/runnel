@@ -1043,7 +1043,8 @@
         ],
         "additionalProperties": false
       },
-      "recordErrors": true
+      "recordErrors": true,
+      "detectFields": true
     },
     {
       "type": "csv.output",

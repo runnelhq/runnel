@@ -51,6 +51,10 @@ type SetField struct {
 	// Map sets a field of the configuration to a mapping of texts instead (e.g.
 	// with.params), in this order; Value must then be nil.
 	Map []KeyValue `json:"map,omitempty"`
+	// List sets a field of the configuration to a list of mappings instead, each written
+	// on one line, e.g. with.fields as "- { name: kdnr, type: int }" (S46); Value and
+	// Map must then be nil.
+	List [][]KeyValue `json:"list,omitempty"`
 }
 
 var (
@@ -374,6 +378,21 @@ func checkSetField(f SetField, fields map[string]bool) error {
 	if (!ok || !configKeyPattern.MatchString(name)) && !fields[f.Field] {
 		return fmt.Errorf("field %q cannot be changed here", f.Field)
 	}
+	if len(f.List) > 0 {
+		if !ok || f.Value != nil || len(f.Map) > 0 {
+			return fmt.Errorf("%s: a list can only be set for a field of the configuration", f.Field)
+		}
+		for _, item := range f.List {
+			seen := map[string]bool{}
+			for _, kv := range item {
+				if !configKeyPattern.MatchString(kv.Key) || seen[kv.Key] {
+					return fmt.Errorf("%s: invalid or duplicate key %q", f.Field, kv.Key)
+				}
+				seen[kv.Key] = true
+			}
+		}
+		return nil
+	}
 	if len(f.Map) > 0 {
 		if !ok || f.Value != nil {
 			return fmt.Errorf("%s: a mapping can only be set for a field of the configuration", f.Field)
@@ -502,6 +521,9 @@ func (e *editor) set(f SetField) error {
 	}
 	indent := strings.Repeat(" ", itemEntries[0].Key.GetToken().Position.Column-1)
 	value := f.Value
+	if len(f.List) > 0 {
+		value = mappingList(f.List)
+	}
 	if len(f.Map) > 0 {
 		value = inFileOrder(f.Map, entries(valueOf(entries(valueOf(itemEntries, "with")), strings.TrimPrefix(f.Field, "with."))))
 	}
@@ -694,6 +716,16 @@ func entryLines(indent, key string, value any) ([]string, error) {
 		return []string{indent + key + ": " + yamlScalar(v)}, nil
 	case rawValue:
 		return []string{indent + key + ": " + string(v)}, nil
+	case mappingList:
+		lines := []string{indent + key + ":"}
+		for _, item := range v {
+			parts := make([]string, len(item))
+			for i, kv := range item {
+				parts[i] = kv.Key + ": " + flowScalar(kv.Value)
+			}
+			lines = append(lines, indent+"  - { "+strings.Join(parts, ", ")+" }")
+		}
+		return lines, nil
 	case []KeyValue:
 		lines := []string{indent + key + ":"}
 		for _, kv := range v {
@@ -707,6 +739,9 @@ func entryLines(indent, key string, value any) ([]string, error) {
 	}
 	return nil, fmt.Errorf("unsupported value %T", value)
 }
+
+// mappingList is a list of mappings, written one per line in flow style.
+type mappingList [][]KeyValue
 
 // yamlScalar writes a text as plain YAML scalar if it reads back unchanged, otherwise double-quoted.
 func yamlScalar(s string) string {
