@@ -188,6 +188,8 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S37 (Teil) | Verpasste Läufe nachholen | `catchUp` für Cron-Trigger: verpasste Zeitpunkte beim Start des Servers nachholen | S26 (letzter Lauf je Trigger) |
 | S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster; vorher Mockup | – |
 | S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | bis dahin ZIP |
+| E14 | Listen im Panel bearbeiten | Konfigurationen mit Listen (z. B. `fields` von `core.constant`, `core.convert`, `core.select-fields`, `core.sort`; `aggregates` und `groupBy` von `core.group-by`; `cases` von `core.switch`) im Eigenschaften-Panel statt nur in der YAML-Ansicht: ein Editor aus dem Schema (eine Zeile je Eintrag, eine Spalte je Eigenschaft mit Hilfetext; Hinzufügen, Entfernen, Verschieben; Auswahllisten für feste Werte, Ausdruckseditor für `{{ … }}`, Listen von Feldnamen als Chips). Wo ein Feldname gefragt ist, bietet das Panel die Felder am eingehenden Link an. Dazu je Transform eine Kurzhilfe mit kleinem YAML-Beispiel. Bis dahin zeigt das Panel bei Listen nur „Lists and nested values are changed in the YAML view.“ | Mockup vorab |
+| E15 | Referenz der Bausteine | Beschreibung aller Actions und Transforms für Anwender, erzeugt aus den Descriptoren (Felder, Typen, Standardwerte, Beispiele): im Editor (z. B. Hilfe zum ausgewählten Baustein) und als Dokument unter `docs/`. Bis dahin `runnel catalog <typ>` und die Beispiele unter `examples/` | Beispiele im Descriptor (ADR 0014) |
 
 ### Fehlerbehebungen
 
