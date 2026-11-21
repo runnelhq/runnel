@@ -19,6 +19,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e11-files.html`](e11-files.html) | E11 – Dateien anlegen und löschen | `new`, `name`, `rename`, `delete`, `folder` | freigegeben mit PR #96, umgesetzt mit E11 |
 | [`e12-organize.html`](e12-organize.html) | E12 – Projekt organisieren | `drag`, `moveto`, `refs`, `triggers` | freigegeben mit PR #99, umgesetzt mit E12 |
 | [`e13-icons.html`](e13-icons.html) | E13 – Icons aller Bausteine | `overview`, `sizes`, `canvas` | freigegeben vom Maintainer, umgesetzt mit E13 (im selben PR) |
+| [`e14-lists.html`](e14-lists.html) | E14 – Listen im Panel bearbeiten | `constant`, `convert`, `group`, `switch`, `help` | zur Freigabe |
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 
@@ -84,6 +85,13 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | S44 | Die Tabelle bleibt ohne neue Abhängigkeit (höchstens 1.000 Zeilen, keine Virtualisierung nötig); das Konzept nannte `@tanstack/react-table` – erst bei Bedarf |
 | S44 | „Refresh“ führt die Vorschau nach Änderungen erneut aus; ein Fehler zeigt, an welchem Transform die Vorschau stehen blieb, mit der Meldung |
 | S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
+| E14 | Listen in Konfigurationen werden im Panel bearbeitet; der Editor ergibt sich aus dem Schema (ADR 0014), ohne eigenen Code je Transform. Statt „Lists and nested values are changed in the YAML view.“ |
+| E14 | Darstellung: Listen mit bis zu drei kurzen, einfachen Eigenschaften als **Tabelle** (eine Zeile je Eintrag, Spaltenköpfe mit `*` für Pflicht, z. B. `core.constant`, `core.convert`, `core.select-fields`, `core.sort`); längere oder mehr Eigenschaften als **Karten** (z. B. `aggregates` von `core.group-by`, `cases` von `core.switch`): zugeklappt mit einer Zusammenfassung (`total = sum(Betrag)`, Bedingung → Ziel), aufgeklappt die Felder. Listen von Texten (Feldnamen wie `groupBy`, `remove`) als **Chips** |
+| E14 | Jede Zeile/Karte: Griff zum Verschieben (Reihenfolge zählt, z. B. bei `cases`), × zum Entfernen; „Add field“, „Add aggregate“, „Add case“ am Ende. Neue Einträge sind leer, der Fokus steht im ersten Feld. Jede Änderung ist ein Schritt für Rückgängig wie andere Panel-Änderungen |
+| E14 | Feste Werte (`enum`) als Auswahl, `bool` als Kästchen, Ausdrücke `{{ … }}` mit dem Ausdruckseditor (S35, Knopf `{ }`); Eigenschaften, die nur in einem Fall gelten (z. B. `separator` nur bei `concat`), erscheinen nur dann |
+| E14 | **Feldnamen zur Auswahl:** Wo ein vorhandenes Feld gemeint ist (z. B. `name` bei `core.convert`, `core.select-fields`, `core.sort`, `field` bei Aggregaten, `groupBy`), bietet eine Auswahl die Felder der eingehenden Datensätze mit Typ an; bereits verwendete sind markiert, ein anderer Name lässt sich tippen. Neue Namen (`name` bei `core.constant`, Aggregaten) sind freie Eingaben. Welche Eigenschaft ein Feld meint, sagt der Descriptor (`format: runnel-field` im Schema), ebenso Ziele von Links (`to` bei `core.switch`: `format: runnel-target`, Auswahl der Ziele der Daten-Links) |
+| E14 | Meldungen an der Zeile: ein unbekanntes Feld wird als Warnung unter der Zeile gezeigt, mit Vorschlag („did you mean umsatz?“), wie in Problems |
+| E14 | Abschnitt **Help** je Transform (zugeklappt): kleines YAML-Beispiel aus dem Descriptor, „Show in YAML“ (springt zum Transform) und „Copy example“, Hinweis auf `runnel catalog <typ>` |
 | E13 | Jeder eingebaute Baustein hat ein eigenes Icon; das allgemeine Symbol (Quadrat mit Strich) bleibt nur für Typen ohne eigenes Icon (z. B. aus Plugins, bis der Descriptor `icon` liefert) |
 | E13 | Linien-Icons wie bisher (24 × 24, Strich 1,6, `currentColor`, weiß auf der Kachel in der Kategoriefarbe); lesbar ab 13 px (Palette) |
 | E13 | `core.run-workflow` und `core.run-pipeline` zeigen die Symbole der Workflow- und Pipeline-Dateien aus dem Explorer – derselbe Begriff, dasselbe Zeichen |
@@ -122,6 +130,7 @@ node design/mockups/screenshots.cjs s44-preview preview,json,link,error
 node design/mockups/screenshots.cjs e11-files new,name,rename,delete,folder
 node design/mockups/screenshots.cjs e12-organize drag,moveto,refs,triggers
 node design/mockups/screenshots.cjs e13-icons overview,sizes,canvas
+node design/mockups/screenshots.cjs e14-lists constant,convert,group,switch,help
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
