@@ -602,12 +602,15 @@
 
   // A larger project: workflows in folders, a shared pipeline, triggers in a subfolder.
   const moved = state === "refs";
+  // Folders by topic: import/ holds workflows and the pipeline only they use;
+  // pipelines/count is used by several workflows and moves to shared/.
   const rows = [
     ["folder", "environments", 0, "1"], ["env", "dev.yaml", 1],
-    ["folder", "pipelines", 0, moved ? "1" : "2"], ...(moved ? [] : [["pl", "count.pipeline.yaml", 1]]), ["pl", "orders.pipeline.yaml", 1],
+    ["folder", "import", 0, "3"], ["wf", "a.workflow.yaml", 1], ["wf", "b.workflow.yaml", 1], ["pl", "orders.pipeline.yaml", 1],
+    ["folder", "pipelines", 0, moved ? "0" : "1"], ...(moved ? [] : [["pl", "count.pipeline.yaml", 1]]),
     ["folder", "shared", 0, moved ? "1" : "0"], ...(moved ? [["pl", "count.pipeline.yaml", 1]] : []),
     ["folder", "triggers", 0, "2"], ["folder", "nightly", 1, "2"], ["trigger", "import-a.yaml", 2], ["trigger", "import-b.yaml", 2], ["trigger", "hourly.yaml", 1],
-    ["folder", "workflows", 0, "1"], ["folder", "import", 1, "2"], ["wf", "a.workflow.yaml", 2], ["wf", "b.workflow.yaml", 2],
+    ["folder", "workflows", 0, "1"], ["wf", "main.workflow.yaml", 1],
     ["proj", "project.yaml", 0]];
   const selected = state === "triggers" ? "import-a.yaml" : "count.pipeline.yaml";
   document.getElementById("tree").innerHTML = rows.map(([k, n, d, c]) => {
@@ -635,7 +638,7 @@
 
   const lines = state === "triggers"
     ? ["# Imports file A every night (in triggers/nightly/)", "kind: Trigger", "apiVersion: runnel/v1", "name: import-a", "type: cron",
-       "target: workflows/import/a.workflow.yaml", "with:", '  schedule: "0 2 * * *"']
+       "target: import/a.workflow.yaml", "with:", '  schedule: "0 2 * * *"']
     : ["kind: Pipeline", "apiVersion: runnel/v1", "name: count", "parameters:", "  - name: ROWS", "    type: integer", '    default: "3"',
        "transforms:", '  - { id: gen, type: core.generate-rows, with: { rows: "${ROWS}" } }'];
   const vars = v => esc(v).replace(/(\$\{[^}]*\})/g, `<span class="v">$1</span>`);
@@ -658,8 +661,8 @@
     host.insertAdjacentHTML("beforeend", `<div class="dragghost" style="left:120px;top:${top0 + 300}px">${icon(kind.pl, 14)}count.pipeline.yaml<small>→ shared/</small></div>`);
   }
   if (state === "moveto") {
-    const folders = [["", "(project)", 0], ["environments", "environments", 1], ["pipelines", "pipelines", 1, true], ["shared", "shared", 1, false, true],
-                     ["triggers", "triggers", 1], ["triggers/nightly", "nightly", 2], ["workflows", "workflows", 1], ["workflows/import", "import", 2]];
+    const folders = [["", "(project)", 0], ["environments", "environments", 1], ["import", "import", 1], ["pipelines", "pipelines", 1, true],
+                     ["shared", "shared", 1, false, true], ["triggers", "triggers", 1], ["triggers/nightly", "nightly", 2], ["workflows", "workflows", 1]];
     host.insertAdjacentHTML("beforeend", `<div class="overlay"><div class="dialog" role="dialog">
       <h2><span class="sym" style="background:var(--accent);color:var(--accent-foreground)">${icon(kind.move, 15)}</span>Move count.pipeline.yaml</h2>
       <p>Choose the folder; a new one can be created there.</p>
@@ -673,8 +676,8 @@
       <h2><span class="sym" style="background:var(--accent);color:var(--accent-foreground)">${icon(kind.move, 15)}</span>Update the references?</h2>
       <p>count.pipeline.yaml moves to <code class="mono">shared/count.pipeline.yaml</code>. 3 files refer to it by its old path:</p>
       <div class="refs update"><ul class="reflist">
-        ${[["workflows/import/a.workflow.yaml", "action count (core.run-pipeline)"], ["workflows/import/b.workflow.yaml", "action count (core.run-pipeline)"],
-           ["workflows/import/b.workflow.yaml", "action totals (core.run-pipeline)"]].map(([f, w]) =>
+        ${[["import/a.workflow.yaml", "action count (core.run-pipeline)"], ["import/b.workflow.yaml", "action count (core.run-pipeline)"],
+           ["workflows/main.workflow.yaml", "action totals (core.run-pipeline)"]].map(([f, w]) =>
           `<li><label class="check"><span class="box on">✔</span></label><span><code class="mono">${f}</code> – ${w}
             <span class="diff">pipeline: <del>pipelines/count.pipeline.yaml</del> <ins>shared/count.pipeline.yaml</ins></span></span></li>`).join("")}
       </ul></div>
