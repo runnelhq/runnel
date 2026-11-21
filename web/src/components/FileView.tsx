@@ -20,6 +20,7 @@ import { DetectFieldsDialog } from "./DetectFieldsDialog";
 import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
+import { YamlEditor } from "./YamlEditor";
 import { Dialog } from "./Dialog";
 import { PropertiesPanel, type FieldValue, type LinkChange } from "./PropertiesPanel";
 import type { SettableKind } from "./LinkEdge";
@@ -113,6 +114,14 @@ export function FileView(props: {
   const [panel, setPanel] = useState(true);
   // The transform whose fields are being detected (S46).
   const [detecting, setDetecting] = useState<string | null>(null);
+  // Editing in the YAML view (E9): typed text waiting for the typing pause, a check on its way,
+  // the line to show in the editor, and the function that hands over typed text at once.
+  const [typing, setTyping] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [yamlFocus, setYamlFocus] = useState<{ line: number; seq: number } | null>(null);
+  const flushTyping = useRef<(() => void) | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  useEffect(() => setCursor(null), [view]);
 
   const doc = state.status === "loaded" ? state.doc : null;
   const dirty = doc !== null && doc.text !== doc.saved;
@@ -156,10 +165,13 @@ export function FileView(props: {
   useEffect(() => {
     if (!isGraph || text === undefined) return;
     let cancelled = false;
-    validate(path, text).then(
-      (v) => !cancelled && setValidation(v),
-      () => !cancelled && setValidation(null),
-    );
+    setChecking(true);
+    validate(path, text)
+      .then(
+        (v) => !cancelled && setValidation(v),
+        () => !cancelled && setValidation(null),
+      )
+      .finally(() => !cancelled && setChecking(false));
     return () => {
       cancelled = true;
     };
@@ -173,9 +185,9 @@ export function FileView(props: {
     onSummary(
       view === "canvas" && graph
         ? `${graph.kind === "pipeline" ? "Pipeline" : "Workflow"} · ${graph.actions?.length ?? 0} ${steps} · ${graph.links?.length ?? 0} links`
-        : fileSummary(path, doc.text, doc.encoding),
+        : fileSummary(path, doc.text, doc.encoding) + (view === "yaml" && isGraph && cursor ? ` · ${cursor}` : ""),
     );
-  }, [active, doc, path, view, graph, steps, onSummary]);
+  }, [active, doc, path, view, graph, steps, onSummary, isGraph, cursor]);
 
   const docRef = useRef<Doc | null>(null);
   docRef.current = doc;
@@ -326,6 +338,7 @@ export function FileView(props: {
   // Saving: with the ETag of the loaded text; a 412 means the file was changed elsewhere.
   const save = useCallback(
     async (overwrite = false): Promise<boolean> => {
+      flushTyping.current?.();
       await pending.current?.catch(() => undefined);
       const current = docRef.current;
       if (!current) return false;
@@ -391,6 +404,7 @@ export function FileView(props: {
   const requestRun = useCallback(
     (dialog: boolean) => {
       if (running) return;
+      flushTyping.current?.();
       if (docRef.current && docRef.current.text !== docRef.current.saved) setUnsavedAsk({ dialog });
       else proceedRun(dialog);
     },
@@ -447,11 +461,17 @@ export function FileView(props: {
   const showInYAML = useCallback((line: number) => {
     setView("yaml");
     setFocusLine(line);
+    setYamlFocus((f) => ({ line, seq: (f?.seq ?? 0) + 1 }));
   }, []);
 
   // A click on a problem selects what it belongs to and shows the field in the properties panel.
   const openProblem = useCallback(
     (p: Problem) => {
+      // In the YAML view a problem shows its line (E9).
+      if (view === "yaml") {
+        if (p.line) showInYAML(p.line);
+        return;
+      }
       const target = graph ? problemTarget(graph, p) : null;
       if (!target) {
         if (p.line) showInYAML(p.line);
@@ -461,7 +481,7 @@ export function FileView(props: {
       setPanel(true);
       if (target.field) setFocusField((f) => ({ key: target.field!, seq: (f?.seq ?? 0) + 1 }));
     },
-    [graph, showInYAML],
+    [graph, view, showInYAML],
   );
 
   if (!active) return null;
@@ -497,12 +517,7 @@ export function FileView(props: {
   // name with the path in its tooltip, "Copy path" as a symbol next to it, no kind badge.
   const compact = isGraph;
   // The badges open the list of problems below the canvas, also from the YAML view.
-  const openProblems = editable
-    ? () => {
-        setView("canvas");
-        setBottomTab("problems");
-      }
-    : undefined;
+  const openProblems = isGraph ? () => setBottomTab("problems") : undefined;
   return (
     <>
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-4">
@@ -542,11 +557,11 @@ export function FileView(props: {
           </Badge>
         )}
         {/* After the problem badges, so that they stay in place when switching views. */}
-        {isGraph && view === "yaml" && (
-          <Badge testId="yaml-read-only" title="The YAML view is read-only: change the file on the canvas or in your text editor">
-            <LockIcon width={12} height={12} />
-            Read-only
-          </Badge>
+        {isGraph && view === "yaml" && (typing || checking) && (
+          <span data-testid="checking" className="inline-flex items-center gap-1.5 text-2xs whitespace-nowrap text-muted-foreground">
+            <span className="size-[9px] animate-spin rounded-full border-2 border-current border-r-transparent motion-reduce:animate-none" />
+            Checking…
+          </span>
         )}
         <span className="flex-1" />
         {isGraph &&
@@ -604,7 +619,7 @@ export function FileView(props: {
               <SaveIcon width={14} height={14} />
               Save
             </button>
-            <ViewSwitch view={view} onView={setView} pipeline={graphKind === "pipeline"} />
+            <ViewSwitch view={view} onView={setView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
             {/* Always there, so that nothing moves: pressed while the panel is shown. */}
             <IconButton
               title={
@@ -637,6 +652,18 @@ export function FileView(props: {
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {!doc ? (
           <div className="flex-1" aria-busy="true" />
+        ) : view === "yaml" && isGraph ? (
+          <YamlEditor
+            text={doc.text}
+            problems={validation?.problems ?? []}
+            focus={yamlFocus}
+            onChange={(next) => setText(next, "push")}
+            onPending={setTyping}
+            onUndo={doUndo}
+            onRedo={doRedo}
+            registerFlush={(f) => (flushTyping.current = f)}
+            onCursor={(line, column) => setCursor(`Ln ${line}, Col ${column}`)}
+          />
         ) : view === "yaml" ? (
           <CodeView text={doc.text} yaml={isYAML(path)} focusLine={focusLine} />
         ) : graph ? (
@@ -658,13 +685,14 @@ export function FileView(props: {
             run={shownRun}
           />
         ) : validation ? (
-          <NotAGraph path={path} kind={graphKind ?? "workflow"} validation={validation} onShowYAML={() => showInYAML(validation.problems[0]?.line ?? 1)} />
+          <NotAGraph path={path} kind={graphKind ?? "workflow"} validation={validation} onShowYAML={showInYAML} />
         ) : (
           <div className="runnel-canvas flex-1" aria-busy="true" />
         )}
-        {editable && view === "canvas" && graph && (
+        {isGraph && doc && (graph || validation) && (
           <BottomPanel
-            workflow={graph}
+            workflow={graph ?? null}
+            pipeline={graphKind === "pipeline"}
             problems={validation?.problems ?? []}
             tab={bottomTab}
             onTab={setBottomTab}
@@ -826,7 +854,7 @@ const problemList = (v: Validation, severity: "error" | "warning") =>
     .map((p) => (p.line ? `${p.line}:${p.column ?? 1} ${p.message}` : p.message))
     .join("\n");
 
-function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean }) {
+function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean; notAGraph?: boolean }) {
   const views: [View, string, typeof CodeIcon][] = [
     ["canvas", "Canvas", props.pipeline ? PipelineIcon : WorkflowIcon],
     ["yaml", "YAML", CodeIcon],
@@ -838,11 +866,13 @@ function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: b
           key={v}
           type="button"
           aria-pressed={props.view === v}
+          title={v === "canvas" && props.notAGraph ? "The file has errors: the canvas shows where they are" : undefined}
           onClick={() => props.onView(v)}
           className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-[3px] text-xs text-muted-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm"
         >
           <Icon width={14} height={14} />
           {label}
+          {v === "canvas" && props.notAGraph && <span data-testid="not-a-graph" className="size-1.5 rounded-full bg-destructive" />}
         </button>
       ))}
     </div>
@@ -850,8 +880,9 @@ function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: b
 }
 
 /** Shown instead of the canvas when the file cannot be read as a workflow. */
-function NotAGraph(props: { path: string; kind: GraphKind; validation: Validation; onShowYAML: () => void }) {
+function NotAGraph(props: { path: string; kind: GraphKind; validation: Validation; onShowYAML: (line: number) => void }) {
   const first = props.validation.problems.find((p) => p.severity === "error");
+  const line = first?.line ?? 1;
   return (
     <div className="runnel-canvas grid flex-1 place-items-center p-8" role="alert">
       <div className="max-w-[440px] rounded-xl border border-border bg-card px-7 py-6 text-center shadow-md">
@@ -859,7 +890,7 @@ function NotAGraph(props: { path: string; kind: GraphKind; validation: Validatio
           ✖
         </span>
         <h2 className="mt-3 mb-1 text-md font-semibold">This {props.kind} can’t be shown as a graph</h2>
-        <p className="mt-0 mb-3 text-muted-foreground">The file has errors. Fix them in your text editor; the YAML view shows the lines.</p>
+        <p className="mt-0 mb-3 text-muted-foreground">The file has errors. Fix them in the YAML view; your changes are kept.</p>
         {first && (
           <pre className="mt-0 mb-4 rounded-md bg-muted px-2.5 py-2 text-left text-xs whitespace-pre-wrap">
             {props.path}
@@ -868,9 +899,9 @@ function NotAGraph(props: { path: string; kind: GraphKind; validation: Validatio
             {first.message}
           </pre>
         )}
-        <SmallButton onClick={props.onShowYAML}>
+        <SmallButton onClick={() => props.onShowYAML(line)}>
           <CodeIcon width={14} height={14} />
-          Show YAML
+          Show YAML at line {line}
         </SmallButton>
       </div>
     </div>

@@ -312,3 +312,128 @@
   border-right: 1px solid var(--border);
   border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md);
 }
+
+/* YAML editor (mockup design/mockups/e9-yaml.html): colours as in the read-only view (E4). */
+.runnel-yaml .cm-editor {
+  height: 100%;
+  font-size: var(--rn-text-sm);
+  background: var(--background);
+}
+.runnel-yaml .cm-editor.cm-focused {
+  outline: none;
+  box-shadow: inset 2px 0 0 var(--ring);
+}
+.runnel-yaml .cm-scroller {
+  font-family: var(--rn-font-mono);
+  line-height: 20px;
+  padding: 8px 0 24px;
+}
+.runnel-yaml .cm-content {
+  caret-color: var(--foreground);
+}
+.runnel-yaml .cm-cursor {
+  border-left: 2px solid var(--foreground);
+}
+.runnel-yaml .cm-selectionBackground,
+.runnel-yaml .cm-focused .cm-selectionBackground {
+  background: var(--accent) !important;
+}
+.runnel-yaml .cm-gutters {
+  background: var(--background);
+  border-right: 0;
+  color: var(--code-gutter);
+}
+.runnel-yaml .cm-lineNumbers .cm-gutterElement {
+  min-width: 32px;
+  padding: 0 16px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.runnel-yaml .cm-activeLine,
+.runnel-yaml .cm-activeLineGutter {
+  background: var(--muted);
+}
+.runnel-yaml .cm-activeLineGutter {
+  color: var(--foreground);
+}
+.runnel-yaml .ry-problems .cm-gutterElement {
+  width: 20px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ry-comment {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.ry-key {
+  color: var(--foreground);
+  font-weight: 500;
+}
+.ry-punct {
+  color: var(--muted-foreground);
+}
+.ry-value {
+  color: var(--code-string);
+}
+.ry-var {
+  color: var(--expression);
+  background: var(--expression-soft);
+  border-radius: 3px;
+}
+.ry-warning {
+  text-decoration: underline wavy var(--warning);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+.ry-mark-error {
+  color: var(--destructive);
+  font-weight: 700;
+}
+.ry-mark-warning {
+  color: var(--warning);
+  font-weight: 700;
+}
+.runnel-yaml .cm-tooltip.ry-tooltip {
+  max-width: 420px;
+  padding: 8px 10px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--rn-radius-md);
+  box-shadow: var(--rn-shadow-md);
+  font-family: var(--rn-font-sans);
+  font-size: var(--rn-text-xs);
+  line-height: 1.45;
+}
+.ry-where {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--rn-font-mono);
+  font-size: var(--rn-text-2xs);
+  color: var(--muted-foreground);
+}
+/* Search panel (@codemirror/search) in the colours of the editor. */
+.runnel-yaml .cm-panels {
+  background: var(--muted);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.runnel-yaml .cm-panel.cm-search {
+  font-family: var(--rn-font-sans);
+  font-size: var(--rn-text-xs);
+  padding: 6px 12px;
+}
+.runnel-yaml .cm-panel.cm-search input,
+.runnel-yaml .cm-panel.cm-search button {
+  font: inherit;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--input);
+  border-radius: var(--rn-radius-sm);
+}
+.runnel-yaml .cm-searchMatch {
+  background: var(--warning-soft);
+}
+.runnel-yaml .cm-searchMatch-selected {
+  background: var(--accent);
+}

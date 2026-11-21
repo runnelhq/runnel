@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { editorText } from "./editor";
 import { expect, test, type Page } from "@playwright/test";
 
 // "Detect fields" (mockup design/mockups/s46-fields.html): csv.input proposes its fields
@@ -29,9 +30,9 @@ async function open(page: Page) {
 /** The text of the YAML view. */
 async function yaml(page: Page) {
   await page.getByRole("button", { name: "YAML", exact: true }).click();
-  const lines = await page.getByTestId("code").locator(":scope > div > span:nth-child(2)").allTextContents();
+  const text = await editorText(page);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  return lines.join("\n") + "\n";
+  return text;
 }
 
 const panel = (page: Page) => page.getByRole("region", { name: "Properties" });
@@ -58,7 +59,7 @@ test("detects the fields of a CSV file and writes them", async ({ page }) => {
   await expect(dialog(page)).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: "Wrote 4 fields to read" })).toBeVisible();
   await expect(panel(page).getByTestId("configured-fields").locator("li")).toHaveCount(4);
-  await expect(fields).toContainText("Change single fields in your text editor for now.");
+  await expect(fields).toContainText("Change single fields in the YAML view.");
   expect(await yaml(page)).toContain(
     "      delimiter: \";\"\n      fields:\n        - { name: kdnr, type: int }\n        - { name: name }\n        - { name: umsatz }\n        - { name: ort }\n  - id: types\n",
   );

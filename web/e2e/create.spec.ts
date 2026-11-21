@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { editorText } from "./editor";
 import { expect, test, type Page } from "@playwright/test";
 
 // Creating on the canvas (mockup design/mockups/e6b-create.html): palette, new actions,
@@ -25,8 +26,7 @@ async function open(page: Page) {
 async function yaml(page: Page) {
   await page.getByRole("button", { name: "YAML", exact: true }).click();
   // The text of each line without its number.
-  const lines = await page.getByTestId("code").locator(":scope > div > span:nth-child(2)").allTextContents();
-  const text = lines.join("\n") + "\n";
+  const text = await editorText(page);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
   return text;
 }

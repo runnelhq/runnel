@@ -78,7 +78,9 @@ function useDebug(): [boolean, (on: boolean) => void] {
  * the current or last run, following it while it runs.
  */
 export function BottomPanel(props: {
-  workflow: Workflow;
+  /** null while the file cannot be read as a graph (problems are still listed, E9). */
+  workflow: Workflow | null;
+  pipeline: boolean;
   problems: Problem[];
   tab: BottomTab | null;
   onTab: (tab: BottomTab | null) => void;
@@ -126,12 +128,12 @@ export function BottomPanel(props: {
         {tabButton("log", "Log")}
       </div>
       {tab === "problems" && <ProblemsTable {...props} />}
-      {tab === "log" && <LogView run={props.run} pipeline={props.workflow.kind === "pipeline"} focus={props.logFocus} onSelectAction={props.onSelectAction} />}
+      {tab === "log" && <LogView run={props.run} pipeline={props.pipeline} focus={props.logFocus} onSelectAction={props.onSelectAction} />}
     </section>
   );
 }
 
-function ProblemsTable(props: { workflow: Workflow; problems: Problem[]; onOpen: (p: Problem) => void }) {
+function ProblemsTable(props: { workflow: Workflow | null; problems: Problem[]; onOpen: (p: Problem) => void }) {
   const { problems } = props;
   return (
     <div role="table" aria-label="Problems" className="h-[168px] overflow-auto border-t border-border text-xs">
@@ -156,7 +158,7 @@ function ProblemsTable(props: { workflow: Workflow; problems: Problem[]; onOpen:
           </span>
           <span role="cell">{p.message}</span>
           <span role="cell" className="truncate font-mono text-2xs text-muted-foreground">
-            {where(props.workflow, p)}
+            {props.workflow ? where(props.workflow, p) : ""}
           </span>
           <span role="cell" className="font-mono text-2xs text-muted-foreground">
             {p.line ? `line ${p.line}${p.column ? `:${p.column}` : ""}` : ""}

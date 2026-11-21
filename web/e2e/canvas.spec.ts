@@ -41,7 +41,7 @@ test("shows a workflow as a graph", async ({ page }) => {
 
   // Switching to YAML and back.
   await page.getByRole("button", { name: "YAML", exact: true }).click();
-  await expect(page.getByTestId("code")).toContainText("name: parallel");
+  await expect(page.getByTestId("yaml-editor")).toContainText("name: parallel");
   await expect(page.getByTestId("file-summary")).toHaveText(/^YAML · UTF-8 · \d+ lines$/);
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
   await expect(canvas.getByTestId("node-start")).toBeVisible();
@@ -78,7 +78,8 @@ test("shows problems at the actions and jumps to the YAML line", async ({ page }
   await expect(dialog).toContainText('unknown action type "core.wiat"');
   await dialog.getByRole("button", { name: "Show in YAML ›" }).click();
 
-  const focused = page.getByTestId("code").locator("[data-focus]");
+  // The YAML view (E9) puts the cursor on the line.
+  const focused = page.getByTestId("yaml-editor").locator(".cm-activeLine");
   await expect(focused).toBeVisible();
   await expect(focused).toContainText("type: core.wiat");
   await expect(page.getByRole("button", { name: "YAML", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -92,8 +93,10 @@ test("explains when a workflow cannot be shown as a graph", async ({ page }) => 
   await expect(alert).toContainText("This workflow can’t be shown as a graph");
   await expect(alert).toContainText("workflows/parallel.workflow.yaml:");
   await expect(page.getByTestId("error-count")).toHaveText("✖ 1");
-  await alert.getByRole("button", { name: "Show YAML" }).click();
-  await expect(page.getByTestId("code")).toContainText("name: broken");
+  await expect(alert).toContainText("Fix them in the YAML view; your changes are kept.");
+  await expect(page.getByTestId("not-a-graph")).toBeVisible();
+  await alert.getByRole("button", { name: /^Show YAML at line \d+$/ }).click();
+  await expect(page.getByTestId("yaml-editor")).toContainText("name: broken");
 });
 
 test("arranges a workflow without layout automatically", async ({ page }) => {

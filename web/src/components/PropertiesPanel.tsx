@@ -251,7 +251,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
         </div>
       </div>
       <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
-        {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in your text editor."}
+        {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in the YAML view."}
       </p>
       <LastRun {...props} id={action.id} />
       {rest.length > 0 && (
@@ -543,7 +543,7 @@ function SchemaField(props: {
   if (!scalar || s.type === "array" || s.type === "object") {
     return (
       <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={props.problems}>
-        {() => <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-2xs text-muted-foreground">Lists and nested values are changed in your text editor for now.</p>}
+        {() => <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-2xs text-muted-foreground">Lists and nested values are changed in the YAML view.</p>}
       </Field>
     );
   }
@@ -1312,7 +1312,7 @@ function FieldsSection(props: { value: unknown; problems: Problem[]; onDetect?: 
             </button>
             <p className="mt-1 mb-0 text-2xs text-muted-foreground">
               {fields.length > 0
-                ? "Only the listed columns are read. Change single fields in your text editor for now."
+                ? "Only the listed columns are read. Change single fields in the YAML view."
                 : "Reads the first rows of the file and proposes names and types."}
             </p>
           </div>
