@@ -93,7 +93,7 @@ func (s *Scheduler) checkFolder(e *entry, now time.Time) {
 			w.problem = msg
 			e.last = &Fired{Time: now, Error: msg}
 			s.mu.Unlock()
-			s.opts.Log(fmt.Sprintf("trigger %q: %s; trying again every %s", t.Name, msg, t.PollInterval()))
+			s.opts.Warn(fmt.Sprintf("trigger %q: %s; trying again every %s", t.Name, msg, t.PollInterval()))
 			return
 		}
 		s.mu.Unlock()

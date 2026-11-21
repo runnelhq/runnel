@@ -69,6 +69,17 @@ Zeitpunkt. Solange `runnel serve` läuft, starten sie ihre Workflows bzw. Pipeli
 Zeitzone), in einem festen Abstand (`interval`) oder für neue Dateien in einem Ordner (`file`, z. B.
 `runnel serve examples/files`); das Server-Log zeigt jeden Start.
 
+```powershell
+runnel service install D:\flows
+runnel service start
+```
+
+`runnel service install [projektordner]` richtet unter Windows einen Dienst ein, der das Projekt wie `runnel serve`
+bedient und seine Trigger auch ohne angemeldeten Benutzer ausführt (Konsole „als Administrator“). Standard: Konto
+LocalService, verzögerter Autostart, Neustart nach Fehlern, laufende Runs bekommen beim Stoppen 30 s
+(`--stop-timeout`). `runnel service status|stop|uninstall` steuern ihn, `--name` unterscheidet mehrere Dienste. Das Log
+steht in `%ProgramData%\runnel\logs\<name>.log`, Start, Stopp, Warnungen und Fehler zusätzlich in der Ereignisanzeige.
+
 ```bash
 runnel catalog core.wait
 ```

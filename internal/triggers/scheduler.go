@@ -32,6 +32,9 @@ type Options struct {
 	Running func(runID string) bool
 	// Log receives messages for the server log, e.g. started and skipped runs.
 	Log func(msg string)
+	// Warn receives problems for the server log: problems of trigger files, runs that
+	// were not started, folders that cannot be read; defaults to Log.
+	Warn func(msg string)
 	// Now returns the current time; defaults to time.Now (tests use a simulated clock).
 	Now func() time.Time
 }
@@ -89,6 +92,9 @@ func New(opts Options) *Scheduler {
 	if opts.Log == nil {
 		opts.Log = func(string) {}
 	}
+	if opts.Warn == nil {
+		opts.Warn = opts.Log
+	}
 	return &Scheduler{opts: opts}
 }
 
@@ -131,7 +137,7 @@ func (s *Scheduler) Reload() {
 	}
 	s.problems, s.sig = problems, sig
 	for _, p := range problems {
-		s.opts.Log(p.Error())
+		s.opts.Warn(p.Error())
 	}
 	active := 0
 	for _, e := range s.entries {
@@ -272,7 +278,11 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 		e.active = append(e.active, f.RunID)
 	}
 	s.mu.Unlock()
-	if !quiet {
+	switch {
+	case quiet:
+	case f.Error != "":
+		s.opts.Warn(msg)
+	default:
 		s.opts.Log(msg)
 	}
 	return f.RunID != ""

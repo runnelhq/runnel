@@ -708,7 +708,9 @@ type Transform interface {
   (`settings.maxConcurrentRuns`). Seit S37 wird ein Start über dem Limit abgelehnt (Editor/API: `429`, Trigger: Meldung
   im Server-Log); eine Warteschlange, die ihn später startet, steht im Backlog.
 - Prioritäten (manuell > HTTP-Trigger > zeitgesteuerte Trigger).
-- Graceful Shutdown: Dienst-Stopp wartet konfigurierbar auf laufende Runs, danach Abbruch + Status `Cancelled` (resumebar).
+- Graceful Shutdown: Dienst-Stopp wartet konfigurierbar auf laufende Runs (`--stop-timeout`, beim Dienst Standard 30 s,
+  bei `runnel serve` 0), startet in der Zeit keine neuen und bricht danach ab – Status `cancelled` (seit S41; Fortsetzen
+  abgebrochener Runs folgt mit der Run-Historie).
 
 ---
 
@@ -812,7 +814,8 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Run-Historie, Status, Metriken, Samples | `data\runnel.db` | SQLite (WAL-Modus) |
 | Secrets | `data\runnel.db` (Tabelle `secrets`) | verschlüsselt |
 | Run-Logs | `data\logs\<jahr>\<run-id>.log` | JSON-Lines (slog) |
-| Dienst-Ereignisse | Windows-Ereignisanzeige | EventLog-Quelle „Runnel“ |
+| Dienst-Ereignisse | Windows-Ereignisanzeige (Anwendung) | Quelle = Dienstname (Standard `runnel`): Start, Stopp, Warnungen, Fehler (seit S41) |
+| Server-Log des Dienstes | `%ProgramData%\runnel\logs\<dienst>.log` | Text, Rotation bei 10 MB nach `<dienst>.log.1` (seit S41) |
 
 Standardpfade: `%ProgramData%\runnel\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\` (Desktop) bzw. neben der exe (portabel).
 
@@ -1083,7 +1086,22 @@ Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dat
 ## 13. Windows-Betrieb im Detail
 
 - **Installation**: (a) ZIP entpacken und starten (portabel), (b) MSI (WiX v4) mit Dienst-Registrierung und Startmenü-Eintrag, (c) `winget install runnel`.
-- **Dienst**: `runnel service install --project D:\flows --account "DOMAIN\svc-runnel"` registriert über den Service Control Manager; automatischer Neustart bei Absturz (Recovery-Optionen), verzögerter Autostart.
+- **Dienst** (seit S41): `runnel service install D:\flows` registriert über den Service Control Manager einen Dienst,
+  der das Projekt wie `runnel serve` bedient und seine Trigger ausführt. `runnel service start|stop|status|uninstall`
+  steuern ihn; Installieren, Entfernen, Starten und Stoppen brauchen eine Konsole „als Administrator“.
+  - **Name:** `--name` (Standard `runnel`) unterscheidet mehrere Dienste, z. B. einen je Projekt mit eigenem `--port`.
+  - **Konto:** standardmäßig `NT AUTHORITY\LocalService` (wenige Rechte, kein Passwort; Netzfreigaben nur, wenn sie
+    für jeden lesbar sind). `--account` wählt `NetworkService`, `LocalSystem`, ein Benutzerkonto `DOMAIN\user` (das
+    Passwort wird ohne Anzeige abgefragt; das Konto braucht das Recht „Als Dienst anmelden“) oder ein gMSA
+    `DOMAIN\name$`. Das Konto muss den Projektordner lesen können.
+  - **Start:** `--start delayed` (Standard: automatisch, kurz nach dem Hochfahren), `auto` oder `manual`.
+  - **Wiederherstellung:** Neustart 10 s, 1 min und 5 min nach einem Fehler, auch wenn der Server mit Fehler endet (z. B.
+    Port belegt); der Zähler beginnt nach einem Tag ohne Fehler neu.
+  - **Stopp:** keine neuen Läufe mehr (Trigger und API: `503`), laufende Runs bekommen `--stop-timeout` (Standard 30 s),
+    danach werden sie abgebrochen. Beim Herunterfahren von Windows kann die Zeit kürzer sein.
+  - **Log:** vollständig in `%ProgramData%\runnel\logs\<name>.log` (der Ordner wird beim Installieren für das Konto
+    beschreibbar gemacht), Start, Stopp, Warnungen und Fehler zusätzlich in der Ereignisanzeige.
+  - Der Dienst startet die `runnel.exe`, mit der er installiert wurde; nach dem Verschieben neu installieren.
 - **Code-Signing** der exe (Authenticode) – wichtig, damit SmartScreen/Virenscanner nicht anschlagen.
 - **Pfade**: UNC-Pfade (`\\server\share`) und lange Pfade (`\\?\`) werden unterstützt; Encoding-Unterstützung für `windows-1252`/`UTF-16` bei Dateien.
 - **Updates**: `runnel update` lädt neue Version, prüft Signatur, ersetzt exe über Rename-Trick und startet Dienst neu.

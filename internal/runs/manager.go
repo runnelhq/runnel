@@ -118,6 +118,8 @@ type Manager struct {
 	events  []Event  // the last MaxEvents events
 	seq     int64
 	waiters map[chan struct{}]struct{}
+	// draining is set by Drain: no new runs are started.
+	draining bool
 }
 
 type entry struct {
@@ -135,7 +137,7 @@ func NewManager() *Manager {
 	return &Manager{ctx: ctx, cancel: cancel, runs: map[string]*entry{}, waiters: map[chan struct{}]struct{}{}}
 }
 
-// ErrShutdown is returned by Start after Shutdown.
+// ErrShutdown is returned by Start after Drain or Shutdown.
 var ErrShutdown = errors.New("the server is shutting down")
 
 // LimitError is returned by Start when a limit of runs at the same time is reached
@@ -162,7 +164,7 @@ func limitsOf(p *model.Project, perFile int) limits {
 // Start prepares and starts a run in the background and returns its state. The
 // spec's Observer and RunID are set by the manager. Errors are those of Prepare.
 func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
-	if m.ctx.Err() != nil {
+	if m.stopping() {
 		return Run{}, nil, ErrShutdown
 	}
 	id := workflow.NewRunID(time.Now())
@@ -185,7 +187,7 @@ func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
 // StartPipeline prepares and starts a pipeline run in the background, like Start (S25a3).
 // Its transforms are reported as actions, with their counts when they have finished.
 func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedPipeline, error) {
-	if m.ctx.Err() != nil {
+	if m.stopping() {
 		return Run{}, nil, ErrShutdown
 	}
 	id := workflow.NewRunID(time.Now())
@@ -220,6 +222,11 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 		e.byID[st[0]] = s
 	}
 	m.mu.Lock()
+	if m.draining || m.ctx.Err() != nil {
+		m.mu.Unlock()
+		cancel()
+		return Run{}, ErrShutdown
+	}
 	if err := m.checkLimits(run.Path, lim); err != nil {
 		m.mu.Unlock()
 		cancel()
@@ -463,9 +470,35 @@ func (m *Manager) Cancel(id string) (found, running bool) {
 	return true, true
 }
 
-// Shutdown cancels all runs and waits until they have ended or ctx is done.
-func (m *Manager) Shutdown(ctx context.Context) error {
-	m.cancel()
+func (m *Manager) stopping() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.draining || m.ctx.Err() != nil
+}
+
+// Running returns the number of runs that are running.
+func (m *Manager) Running() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, e := range m.runs {
+		if e.run.Status == StatusRunning {
+			n++
+		}
+	}
+	return n
+}
+
+// Drain stops starting runs (Start returns ErrShutdown) and waits until the running
+// runs have ended or ctx is done; it does not cancel them. Shutdown cancels the rest.
+func (m *Manager) Drain(ctx context.Context) error {
+	m.mu.Lock()
+	m.draining = true
+	m.mu.Unlock()
+	return m.wait(ctx)
+}
+
+func (m *Manager) wait(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		m.wg.Wait()
@@ -477,6 +510,12 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// Shutdown cancels all runs and waits until they have ended or ctx is done.
+func (m *Manager) Shutdown(ctx context.Context) error {
+	m.cancel()
+	return m.wait(ctx)
 }
 
 func levelName(l slog.Level) string {
