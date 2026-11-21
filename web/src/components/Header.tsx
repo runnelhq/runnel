@@ -20,8 +20,8 @@ export function Header(props: {
     <header className="flex items-center gap-4 border-b border-border bg-background px-4">
       <div className="flex items-center gap-2">
         <img src={icon} alt="" width={20} height={20} />
-        <img src={wordmark} alt="runnel" className="h-[15px] [[data-theme=dark]_&]:hidden" />
-        <img src={wordmarkInverse} alt="runnel" className="hidden h-[15px] [[data-theme=dark]_&]:inline" />
+        <img src={wordmark} alt="Runnel" className="h-[15px] [[data-theme=dark]_&]:hidden" />
+        <img src={wordmarkInverse} alt="Runnel" className="hidden h-[15px] [[data-theme=dark]_&]:inline" />
       </div>
       <div className="h-6 w-px bg-border" />
       <div className="flex min-w-0 items-baseline gap-2" data-testid="project">
