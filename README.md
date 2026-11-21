@@ -119,7 +119,7 @@ Voraussetzung: [Go](https://go.dev/dl/) (Version laut `go.mod`) und für den Edi
 | Tests | `make test` (mit Race-Detector) | `go test ./...` |
 | Lint (Linux- und Windows-Code) | `make lint` | `golangci-lint run ./...` und `$env:GOOS="windows"; golangci-lint run ./...` |
 | Formatieren | `make fmt` | `golangci-lint fmt ./...` |
-| Fuzz-Tests (Parser, Variablen, Ausdrücke) | `make fuzz` | – |
+| Fuzz-Tests (Dateien, Variablen, Ausdrücke, Formate, CSV, HTTP-Anfragen) | `make fuzz` | – |
 | Benchmarks | `make bench` | `go test ./... -run '^$' -bench . -benchmem` |
 | Bekannte Sicherheitslücken prüfen | `make vulncheck` | `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` |
 | SBOMs erzeugen | `make sbom` | – |

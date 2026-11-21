@@ -71,6 +71,19 @@ type serveConfig struct {
 	TLSDir   string
 }
 
+// findProject returns the project directory of dir: dir or the first directory above
+// it with a project.yaml.
+func findProject(dir string) (string, error) {
+	root, found, err := model.FindProjectDir(dir)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf("no project (%s) found in %s or above", model.ProjectFile, dir)
+	}
+	return root, nil
+}
+
 // runServer serves the project until ctx is done.
 func runServer(ctx context.Context, c serveConfig) error {
 	if c.Port < 0 || c.Port > 65535 {
@@ -82,12 +95,9 @@ func runServer(ctx context.Context, c serveConfig) error {
 	if c.StopTimeout < 0 {
 		return fmt.Errorf("invalid --stop-timeout %s (expected 0 or more, e.g. 30s)", c.StopTimeout)
 	}
-	root, found, err := model.FindProjectDir(c.Dir)
+	root, err := findProject(c.Dir)
 	if err != nil {
 		return err
-	}
-	if !found {
-		return fmt.Errorf("no project (%s) found in %s or above", model.ProjectFile, c.Dir)
 	}
 	tlsConfig, err := c.Triggers.tlsConfig(c.TLSDir, c.Log, c.Warn)
 	if err != nil {

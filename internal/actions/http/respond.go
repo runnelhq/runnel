@@ -2,11 +2,7 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	nethttp "net/http"
-	"strconv"
-	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
 )
@@ -40,13 +36,9 @@ func newRespond(with map[string]any) (action.Action, error) {
 }
 
 func (a *respondAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
-	status := nethttp.StatusOK
-	if s := strings.TrimSpace(a.Status); s != "" {
-		n, err := strconv.Atoi(s)
-		if err != nil || n < 200 || n > 599 {
-			return action.Result{}, fmt.Errorf("invalid status %q (expected a number from 200 to 599)", a.Status)
-		}
-		status = n
+	status, err := action.ParseStatus(a.Status)
+	if err != nil {
+		return action.Result{}, err
 	}
 	if err := ctx.Err(); err != nil {
 		return action.Result{}, err

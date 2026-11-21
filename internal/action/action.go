@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/model"
@@ -50,6 +51,20 @@ type Response struct {
 	// Fallback marks an answer that is sent only if the run ends without another one
 	// (http.response with whenEmpty, S38c); it does not take the place of a later answer.
 	Fallback bool
+}
+
+// ParseStatus reads the HTTP status of an answer (http.respond, http.response): a
+// number from 200 to 599; empty is 200.
+func ParseStatus(s string) (int, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 200, nil
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 200 || n > 599 {
+		return 0, fmt.Errorf("invalid status %q (expected a number from 200 to 599)", s)
+	}
+	return n, nil
 }
 
 // Responder delivers the answer of a run to the waiting caller of an http trigger and

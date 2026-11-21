@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -391,20 +392,11 @@ func missing(t reflect.Type, value any, path string) string {
 		}
 	case reflect.Map:
 		entries, _ := value.(map[string]any)
-		for _, key := range sortedKeys(entries) {
+		for _, key := range slices.Sorted(maps.Keys(entries)) {
 			if m := missing(t.Elem(), entries[key], join(path, key)); m != "" {
 				return m
 			}
 		}
 	}
 	return ""
-}
-
-func sortedKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
 }

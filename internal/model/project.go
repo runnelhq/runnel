@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -199,22 +200,13 @@ func (p *Project) validate() Errors {
 
 func checkVariables(s *source, values map[string]string) Errors {
 	var errs Errors
-	for _, name := range sortedKeys(values) {
+	for _, name := range slices.Sorted(maps.Keys(values)) {
 		if !vars.ValidName(name) {
 			errs = append(errs, s.errorf(keyPath("$.variables", name),
 				"invalid variable name %q (letters, digits and _, not starting with a digit)", name))
 		}
 	}
 	return errs
-}
-
-func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 // SelectEnvironment returns the environment with the given name, or the default
@@ -235,7 +227,7 @@ func (p *Project) SelectEnvironment(name string) (*Environment, error) {
 
 // EnvironmentNames returns the names of all environments, sorted.
 func (p *Project) EnvironmentNames() []string {
-	return sortedKeys(p.Environments)
+	return slices.Sorted(maps.Keys(p.Environments))
 }
 
 // ParameterDefaultsLayer is the name of the variable layer with the default values of

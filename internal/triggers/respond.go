@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/httpx"
 )
 
 // answer starts the run of a request with response: run and answers the caller with
@@ -115,7 +116,7 @@ func writeResponse(w http.ResponseWriter, resp action.Response) {
 	default:
 		data, err := json.Marshal(b)
 		if err != nil {
-			reply(w, http.StatusInternalServerError, errorBody{"the body of http.respond cannot be written as JSON: " + err.Error()})
+			reply(w, http.StatusInternalServerError, httpx.ErrorBody{Error: "the body of http.respond cannot be written as JSON: " + err.Error()})
 			return
 		}
 		body, contentType = append(data, '\n'), "application/json; charset=utf-8"

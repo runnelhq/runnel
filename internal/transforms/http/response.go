@@ -53,7 +53,7 @@ func newResponse(with map[string]any) (transform.Transform, error) {
 }
 
 func (t *response) Process(ctx context.Context, in <-chan transform.Batch, out *transform.Output) error {
-	status, err := parseStatus(t.Status)
+	status, err := action.ParseStatus(t.Status)
 	if err != nil {
 		return err
 	}
@@ -119,18 +119,6 @@ func (t *response) Process(ctx context.Context, in <-chan transform.Batch, out *
 
 // Init passes the schema on: the records stay as they are.
 func (t *response) Init(ic *transform.InitContext) (record.Schema, error) { return ic.In, nil }
-
-func parseStatus(s string) (int, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 200, nil
-	}
-	n, err := strconv.Atoi(s)
-	if err != nil || n < 200 || n > 599 {
-		return 0, fmt.Errorf("invalid status %q (expected a number from 200 to 599)", s)
-	}
-	return n, nil
-}
 
 // encode writes records as JSON objects with their fields in order: a list, or the
 // first record (null without records) with single. Decimals are written as numbers,

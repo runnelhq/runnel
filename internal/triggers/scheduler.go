@@ -1,6 +1,7 @@
 // Package triggers starts the runs of the triggers of a project: at the times of a
-// cron schedule (roadmap S37), at a fixed interval and for new files in a folder (S38).
-// It reads the trigger files, works out when each is due and starts the target.
+// cron schedule, at a fixed interval, for new files in a folder (files.go) and for
+// requests to its own HTTP listener (http.go, respond.go). It reads the trigger files,
+// works out when each is due and starts the target.
 package triggers
 
 import (
@@ -278,14 +279,35 @@ func (s *Scheduler) fire(e *entry, now time.Time) {
 	s.start(e, now, nil, nil)
 }
 
+// dropEnded removes the runs that have ended from e.active. Running is asked without
+// holding s.mu, so that the scheduler never waits for the run store while holding its
+// own lock (lock order: the scheduler does not call out while holding s.mu).
+func (s *Scheduler) dropEnded(e *entry) {
+	s.mu.Lock()
+	ids := slices.Clone(e.active)
+	s.mu.Unlock()
+	ended := map[string]bool{}
+	for _, id := range ids {
+		if !s.opts.Running(id) {
+			ended[id] = true
+		}
+	}
+	if len(ended) == 0 {
+		return
+	}
+	s.mu.Lock()
+	e.active = slices.DeleteFunc(e.active, func(id string) bool { return ended[id] })
+	s.mu.Unlock()
+}
+
 // start starts a run of the trigger unless overlap: skip prevents it and reports
 // whether it was started. params are set in addition to those of the trigger; files
 // are the files the run is for (file triggers). A file trigger logs a skip or an
 // error only once while it repeats at each check.
 func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, files []string) bool {
 	t := e.t
+	s.dropEnded(e)
 	s.mu.Lock()
-	e.active = slices.DeleteFunc(e.active, func(id string) bool { return !s.opts.Running(id) })
 	busy := len(e.active) > 0 && t.OverlapMode() == model.OverlapSkip
 	var running string
 	if busy {

@@ -2,8 +2,8 @@
 // executes each action and decides on the next one by the action's outcome.
 //
 // Actions whose incoming links fire run in parallel; where branches meet, the join
-// mode of the action decides when it starts (ADR 0003). Expression conditions,
-// retries and timeouts follow in later steps of the roadmap.
+// mode of the action decides when it starts (ADR 0003). Links can have conditions
+// (expressions), actions retries, timeouts and forEach.
 package workflow
 
 import (

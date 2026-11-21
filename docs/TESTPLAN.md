@@ -11,7 +11,7 @@ und manuell unter Windows – und welche Einschränkungen bekannt sind.
 | Unit-, Golden- und CLI-Tests mit Race-Detector | jeder PR (Linux), ohne Race-Detector (Windows) | `make test` |
 | Schwachstellen (`govulncheck`) | jeder PR, wöchentlich | `make vulncheck` |
 | Editor: Typprüfung und Playwright-Tests (E2E) | jeder PR | `make e2e` |
-| Fuzzing von Workflow-YAML, Variablen und Ausdrücken | wöchentlich (5 min je Ziel), lokal bei Bedarf | `make fuzz FUZZTIME=2m` |
+| Fuzzing von Workflow-, Pipeline- und Trigger-Dateien, Variablen, Ausdrücken, Zahlen-/Datumsformaten, CSV-Eingabe und HTTP-Anfragen an Trigger | wöchentlich (5 min je Ziel), lokal bei Bedarf | `make fuzz FUZZTIME=2m` |
 | Build, Packen, SBOM | jeder PR | `make package` |
 | Benchmarks (Lastproben, z. B. HTTP-Trigger) | lokal bei Änderungen an Pfaden unter Last, Werte im PR | `make bench` |
 

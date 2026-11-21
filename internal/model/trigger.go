@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -70,7 +71,7 @@ type Trigger struct {
 	APIVersion  string `yaml:"apiVersion" json:"apiVersion"`
 	Name        string `yaml:"name" json:"name"`
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
-	// Type is cron (S37); file, interval and http follow.
+	// Type is cron, interval, file or http.
 	Type string `yaml:"type" json:"type"`
 	// Target is the workflow or pipeline to start, relative to the project directory.
 	Target string `yaml:"target" json:"target"`
@@ -256,7 +257,7 @@ func (t *Trigger) validate() error {
 	case filepath.IsAbs(t.Target) || slices.Contains(strings.Split(filepath.ToSlash(t.Target), "/"), ".."):
 		errs = append(errs, s.errorf("$.target", "target %q must be a path inside the project, relative to its directory", t.Target))
 	}
-	for _, key := range sortedKeys(t.Params) {
+	for _, key := range slices.Sorted(maps.Keys(t.Params)) {
 		if v, ok := t.Params[key].(string); ok && expr.Contains(v) {
 			errs = append(errs, s.errorf(keyPath("$.params", key), "parameter %s: expressions {{ … }} are not supported in triggers; use a fixed value or ${…}", key))
 		}
@@ -299,7 +300,7 @@ func (t *Trigger) unusedFields() Errors {
 		"timeout": t.With.Timeout != "", "history": t.With.History != "",
 	}
 	var errs Errors
-	for _, f := range sortedKeys(set) {
+	for _, f := range slices.Sorted(maps.Keys(set)) {
 		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
 			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))
 		}

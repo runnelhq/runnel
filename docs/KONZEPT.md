@@ -1229,6 +1229,7 @@ runnel/
 │  ├─ triggers/             # Scheduler (cron, interval), Ordner-Überwachung, HTTP-Trigger mit eigenem Listener
 │  ├─ server/               # API für den Editor, Server-Sent Events, Zugangsschutz
 │  ├─ webui/                # eingebetteter Editor-Build (go:embed)
+│  ├─ httpx/                # gemeinsame HTTP-Helfer (Server, Trigger-Listener)
 │  ├─ tlscert/              # Zertifikate des Trigger-Listeners (selbst erzeugt oder eigene)
 │  ├─ logfile/              # Log-Datei mit Rotation (Dienst)
 │  ├─ winsvc/               # Windows-Dienst, Ereignisanzeige (build tag windows)
