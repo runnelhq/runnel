@@ -1897,10 +1897,23 @@ function ChipsField(props: {
   onChange: (values: string[]) => void;
 }) {
   const [text, setText] = useState("");
+  // Changes go to the server, which answers with the new file; until then props.values is
+  // the old list. The field keeps its own list until the server has confirmed it, so that
+  // a value added before the answer does not overwrite the previous one.
+  const [pending, setPending] = useState<string[] | null>(null);
+  const confirmed = props.values.join("\u0000");
+  useEffect(() => {
+    setPending((p) => (p !== null && p.join("\u0000") === confirmed ? null : p));
+  }, [confirmed]);
+  const values = pending ?? props.values;
+  const change = (next: string[]) => {
+    setPending(next);
+    props.onChange(next);
+  };
   const add = () => {
     const v = text.trim();
     setText("");
-    if (v !== "" && !props.values.includes(v)) props.onChange([...props.values, v]);
+    if (v !== "" && !values.includes(v)) change([...values, v]);
   };
   return (
     <Field label={props.label} fieldKey={props.fieldKey} keyLabel={props.keyLabel} help={props.help} problems={props.problems}>
@@ -1911,13 +1924,13 @@ function ChipsField(props: {
             (p.invalid ? "border-destructive" : "border-input")
           }
         >
-          {props.values.map((v) => (
+          {values.map((v) => (
             <span key={v} className="inline-flex h-[22px] items-center gap-1 rounded-sm bg-secondary pr-0.5 pl-2 font-mono text-2xs text-secondary-foreground">
               {v}
               <button
                 type="button"
                 aria-label={`Remove ${v}`}
-                onClick={() => props.onChange(props.values.filter((x) => x !== v))}
+                onClick={() => change(values.filter((x) => x !== v))}
                 className="grid size-4 cursor-pointer place-items-center rounded-sm border-0 bg-transparent text-muted-foreground hover:text-foreground"
               >
                 ×
