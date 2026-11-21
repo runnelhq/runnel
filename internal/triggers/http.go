@@ -191,7 +191,7 @@ func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if host, _, err := net.SplitHostPort(client); err == nil {
 		client = host
 	}
-	start := StartRequest{Params: params, Client: client, Request: requestOf(r, bodyValue, client)}
+	start := StartRequest{Params: params, Client: client, Request: requestOf(r, bodyValue, client), History: t.HistoryMode()}
 	if list, ok := bodyValue.([]any); ok {
 		for _, item := range list {
 			start.Rows = append(start.Rows, item.(map[string]any))

@@ -33,6 +33,8 @@ type PipelineSpec struct {
 	Rows []record.Record
 	// Respond answers the waiting caller of an http trigger (http.response, S38c).
 	Respond action.Responder
+	// History: see Spec.History.
+	History string
 }
 
 // PreparedPipeline is the result of PreparePipeline; it is also returned when it fails,
@@ -51,19 +53,18 @@ type PreparedPipeline struct {
 // the files are returned as model.Errors, other problems as plain errors.
 func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 	p := &PreparedPipeline{}
-	pl, err := model.ParsePipeline(spec.Name, spec.Data)
+	pl, diags, err := parsePipeline(spec.Name, spec.Data)
 	if err != nil {
 		return p, err
 	}
 	p.Pipeline = pl
-	diags := pl.Validate()
 	if diags.HasErrors() {
 		return p, diags
 	}
 	p.Warnings = diags
 
 	if spec.ProjectDir != "" {
-		if p.Project, err = model.LoadProject(spec.ProjectDir); err != nil {
+		if p.Project, err = loadProject(spec.ProjectDir); err != nil {
 			return p, err
 		}
 		if p.Env, err = p.Project.SelectEnvironment(spec.Env); err != nil {

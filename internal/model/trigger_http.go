@@ -26,6 +26,25 @@ const (
 // timeout is given (response: run).
 const DefaultResponseTimeout = 30 * time.Second
 
+// Values of history: which runs of an http trigger are kept when they have ended.
+const (
+	HistoryAll    = "all"
+	HistoryErrors = "errors"
+	HistoryNone   = "none"
+)
+
+// HistoryMode returns which runs of an http trigger are kept: history, or all with
+// response: accepted and errors with response: run.
+func (t *Trigger) HistoryMode() string {
+	switch {
+	case t.With.History != "":
+		return t.With.History
+	case t.WaitsForRun():
+		return HistoryErrors
+	}
+	return HistoryAll
+}
+
 // WaitsForRun reports whether the caller of an http trigger waits for the answer of
 // the run (response: run).
 func (t *Trigger) WaitsForRun() bool {
@@ -138,8 +157,10 @@ func (t *Trigger) checkHTTP() Errors {
 	if w.MaxConcurrent < 0 {
 		errs = append(errs, s.errorf("$.with.maxConcurrent", "maxConcurrent must not be negative (0: no own limit)"))
 	}
-	if w.History != "" {
-		errs = append(errs, s.errorf("$.with.history", "history is not supported yet (roadmap S38b2)"))
+	switch w.History {
+	case "", HistoryAll, HistoryErrors, HistoryNone:
+	default:
+		errs = append(errs, s.errorf("$.with.history", "invalid history %q (expected all, errors or none)", w.History))
 	}
 	return errs
 }

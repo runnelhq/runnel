@@ -250,7 +250,7 @@ func TestTriggers(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "triggers", "often.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: often\ntype: cron\n"+
 		"target: workflows/wait.workflow.yaml\nenvironment: dev\nparams: { DELAY: 1ms }\nwith: { schedule: \"* * * * *\" }\n")
 	writeFile(t, filepath.Join(dir, "triggers", "bad.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: bad\ntype: http\ntarget: workflows/wait.workflow.yaml\n"+
-		"with: { method: GET, path: /bad, auth: none, history: errors }\n")
+		"with: { method: GET, path: /bad, auth: none, history: some }\n")
 	s.triggers.Reload()
 	rec := do(t, s, "GET", "/api/v1/triggers", "")
 	var res triggersResponse
@@ -260,7 +260,7 @@ func TestTriggers(t *testing.T) {
 	if len(res.Triggers) != 1 || res.Triggers[0].Name != "often" || res.Triggers[0].File != "triggers/often.yaml" || res.Triggers[0].Next.IsZero() {
 		t.Errorf("triggers %+v", res.Triggers)
 	}
-	if len(res.Problems) != 1 || res.Problems[0].File != "triggers/bad.yaml" || !strings.Contains(res.Problems[0].Message, "not supported yet") {
+	if len(res.Problems) != 1 || res.Problems[0].File != "triggers/bad.yaml" || !strings.Contains(res.Problems[0].Message, "invalid history") {
 		t.Errorf("problems %+v", res.Problems)
 	}
 
@@ -377,7 +377,7 @@ actions:
 		{"item", "item", "/items/{ID}"}, {"outer", "outer", "/outer/{ID}"}, {"sum", "sum", "/sum"},
 	} {
 		writeFile(t, filepath.Join(dir, "triggers", tr.name+".yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: "+tr.name+"\ntype: http\n"+
-			"target: workflows/"+tr.target+".workflow.yaml\nwith: { method: POST, path: \""+tr.path+"\", auth: none, response: run, timeout: 5s }\n")
+			"target: workflows/"+tr.target+".workflow.yaml\nwith: { method: POST, path: \""+tr.path+"\", auth: none, response: run, timeout: 5s, history: all }\n")
 	}
 	s.triggers.Reload()
 	if p := s.triggers.Problems(); len(p) != 0 {
@@ -457,12 +457,17 @@ links:
 	if w := post("/orders/big?MIN=100", `[{"id": 1, "amount": 5}]`); w.Code != 404 || strings.TrimSpace(w.Body.String()) != "[]" {
 		t.Errorf("none: %d %s", w.Code, w.Body)
 	}
+	// history: errors (the default with response: run) drops runs that succeeded.
 	last := s.triggers.List()[0].Last
 	if last == nil {
 		t.Fatal("no run")
 	}
-	d := waitRun(t, s, last.RunID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
-	if d.Kind != "pipeline" || d.Trigger != "http:big" {
-		t.Errorf("run %+v", d.Run)
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		if _, ok := s.runs.Get(last.RunID); !ok {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the run that succeeded is kept (history: errors)")
+		}
 	}
 }

@@ -147,6 +147,18 @@ Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
 - **JSON-Liste im Body** nur für Pipelines; die Felder eines Objekts werden nach Namen sortiert (wie `rows` bei
   `core.run-pipeline`). `request` steht in Pipelines (noch) nicht zur Verfügung; Pfad und Query kommen als Parameter.
 
+## Ergänzungen bei der Umsetzung (S38b2)
+
+- **`history: none`** behält den Lauf nicht und veröffentlicht auch keine Ereignisse (Editor, `/events`); `errors`
+  behält nur gescheiterte. Die Standardantwort aus `outputs` funktioniert trotzdem, weil der wartende Aufrufer den
+  Lauf bis zu seinem Ende festhält.
+- **Eigenes Limit:** die letzten 100 Läufe von HTTP-Triggern, zusätzlich zu den letzten 100 übrigen.
+- **Zwischenspeicher** nicht je Trigger, sondern für alle Starts: geprüfte Dateien nach dem Hash ihres Inhalts, das
+  Projekt nach Größe und Zeit seiner Dateien, übersetzte Ausdrücke nach ihrem Text. Nur fehlerfreie Ergebnisse werden
+  behalten; eine geänderte Datei hat einen anderen Hash und wird neu geprüft. Aufrufe anderer Workflows
+  (`CheckCalls`) werden bei jedem Start geprüft, da sie von anderen Dateien abhängen. Gemessen: ein kleiner Workflow
+  mit `http.respond` von 1,1 ms auf 0,23 ms je Anfrage (ein Kern), 5.550 auf 675 Allokationen.
+
 ## Konsequenzen
 
 - Ein Begriff „Trigger“ für alles, was Läufe automatisch startet: `cron`, `file`, `interval`, `http`. Der Typ `webhook`

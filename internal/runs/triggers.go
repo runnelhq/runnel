@@ -64,13 +64,13 @@ func TargetParams(t *model.Trigger, projectDir string) ([]model.Parameter, strin
 	what := "workflow " + t.Target
 	if strings.HasSuffix(t.Target, ".pipeline.yaml") {
 		what = "pipeline " + t.Target
-		pl, err := model.ParsePipeline(t.Target, data)
+		pl, _, err := parsePipeline(t.Target, data)
 		if err != nil {
 			return nil, what, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what)
 		}
 		return pl.Parameters, what, nil
 	}
-	w, err := model.ParseWorkflow(t.Target, data)
+	w, _, err := parseWorkflow(t.Target, data)
 	if err != nil {
 		return nil, what, t.ErrorAt("$.target", "%s has errors; check it with \"runnel validate\"", what)
 	}
