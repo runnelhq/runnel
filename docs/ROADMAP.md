@@ -135,6 +135,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 | S46 ✅ | Felder ermitteln | „Felder ermitteln“ für CSV schreibt `fields:` in die Datei; Mockup [`s46-fields.html`](../design/mockups/s46-fields.html). Die Erkennung ist eine optionale Schnittstelle der Eingabe-Transforms: neue Eingabe-Formate (JSON mit S19, später XML, Excel, Datenbank) setzen sie gleich mit um | Playwright-Test |
 | E9 ✅ | YAML bearbeiten | Workflows und Pipelines in der YAML-Ansicht bearbeiten (Editor mit Hervorhebung, Prüfung beim Tippen über `/validate`, Rückgängig gemeinsam mit dem Canvas, Umgang mit Fehlern, die keinen Graph mehr erlauben); Mockup [`e9-yaml.html`](../design/mockups/e9-yaml.html). Bis dahin ist die YAML-Ansicht als „Read-only“ gekennzeichnet | Playwright |
 | E10 ✅ | Weitere Dateien bearbeiten | `project.yaml`, Environments und Trigger in der YAML-Ansicht bearbeiten wie Workflows und Pipelines in E9 (Prüfung beim Tippen, Rückgängig, Speichern); bis dahin schreibgeschützt | Playwright |
+| E11 | Dateien anlegen und löschen | Im Explorer: neue Workflows, Pipelines, Trigger und Environments aus einer kleinen gültigen Vorlage, neue Dateien und Ordner, Umbenennen, Löschen mit Rückfrage (mit Hinweis auf Verweise anderer Dateien), Ordner nur leer löschen – damit ein Projekt komplett im Editor entsteht; Mockup [`e11-files.html`](../design/mockups/e11-files.html) | Playwright |
 
 ---
 
