@@ -201,6 +201,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S40b | Netzwerkbetrieb des Editors | `--listen` für Editor und API, gemeinsamer Zugangsschlüssel, Client-Infos im Protokoll ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)) | S40a (TLS); bis dahin Editor nur auf `127.0.0.1` |
 | S38 (Teil) | HMAC für HTTP-Trigger | Signaturprüfung als weitere `auth`-Variante (z. B. GitHub, Shop-Systeme) | S38a |
 | S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | – |
+| S41 (Teil) | Dienstverwaltung im Editor | Dienste (`runnel service`) im Editor anzeigen und steuern: Zustand, Konto, Starttyp, Port; Starten, Stoppen, Neustarten; Server-Log und Einträge der Ereignisanzeige ansehen; Dienst für das geöffnete Projekt einrichten. Offen: Rechte (Steuern und Einrichten brauchen Administratorrechte, der Dienst selbst läuft als LocalService) und ob es nur im Desktop-Modus angeboten wird | S41; Mockup vorab; bei Zugriff über das Netz S40b |
 | S43 | Wartung & Monitoring | Error-Workflow, `/health`, optional `/metrics`, Aufbewahrung der Historie (Retention) | Retention: S26 |
 | S37 (Teil) | Run-Queue | Starts über dem Limit warten (Status `queued`) statt abgelehnt zu werden, Prioritäten (manuell > HTTP > zeitgesteuert), `overlap: queue` | S37 |
 | S37 (Teil) | Verpasste Läufe nachholen | `catchUp` für Cron-Trigger: verpasste Zeitpunkte beim Start des Servers nachholen | S26 (letzter Lauf je Trigger) |
