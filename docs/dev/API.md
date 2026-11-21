@@ -172,14 +172,14 @@ werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26 (zurü
 ## HTTP-Trigger (eigener Listener)
 
 HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem eigenen Listener (`--triggers`, Standard
-`127.0.0.1:7301`) unter den Pfaden ihrer Trigger-Dateien; Format und Regeln in KONZEPT 5.3.
+`127.0.0.1:7301`; im Netz per HTTPS, seit S40a) unter den Pfaden ihrer Trigger-Dateien; Format und Regeln in KONZEPT 5.3.
 
 | Antwort | Bedeutung |
 |---|---|
 | `202` + `{"runId", "status"}`, Header `Location` | Lauf gestartet; `status` ist der Pfad des Laufs in dieser API |
 | `400` | Pflichtparameter fehlt, Wert passt nicht zum Typ, Body ist kein JSON-Objekt |
 | `401` | Token fehlt oder falsch (`Authorization: Bearer <token>`) |
-| `403` | Anfrage aus einer Webseite (`Origin`) oder an einen fremden Host-Namen |
+| `403` | Anfrage aus einer Webseite (`Origin`) oder – bei einem lokalen Listener – an einen fremden Host-Namen |
 | `404` / `405` | kein Trigger für den Pfad bzw. deaktiviert / andere Methode (Header `Allow`) |
 | `413` / `415` | Body über 1 MiB / weder JSON noch Formular |
 | `429` | `maxConcurrent` des Triggers oder `settings.maxConcurrentRuns` erreicht |

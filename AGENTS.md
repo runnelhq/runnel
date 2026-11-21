@@ -39,6 +39,7 @@ Windows-Code (`*_windows.go`) zusätzlich `GOOS=windows go vet ./...` und `GOOS=
 | `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, HTTP-Trigger mit eigenem Listener in `http.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt |
 | `internal/winsvc/` | Windows-Dienst: Installieren, Steuern, Ausführen, Ereignisanzeige (`*_windows.go`; sonst `ErrNotSupported`) |
 | `internal/logfile/` | Log-Datei mit Rotation nach Größe (Dienst) |
+| `internal/tlscert/` | Zertifikate des Trigger-Listeners: selbst erzeugt und wiederverwendet, eigene PEM-Dateien mit Neuladen |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Läufe und Ereignisse im Speicher |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |

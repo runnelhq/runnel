@@ -115,6 +115,17 @@ Mit dem Maintainer abgestimmt bzw. beim Umsetzen festgelegt:
   belegen keinen Port. Solange er nur lokal lauscht (bis S40a), lehnt er Anfragen aus Webseiten (`Origin`) und an
   fremde Host-Namen (DNS-Rebinding) mit `403` ab.
 
+## Ergänzungen bei der Umsetzung (S40a)
+
+- **Optionen am Server, nicht im Projekt:** `--triggers`, `--triggers-tls auto`, `--triggers-cert`/`--triggers-key`
+  und `--triggers-insecure` bei `runnel serve` und `runnel service install` – Adresse und Zertifikat hängen am
+  Rechner, nicht am Projekt.
+- **Im Netz nur mit TLS**, außer ausdrücklich `--triggers-insecure` (Warnung bei jedem Start).
+- **Selbst erzeugtes Zertifikat** neben den Logs (`%ProgramData%\runnel\tls\` bzw. `%LOCALAPPDATA%\runnel\tls\`),
+  nie im Projekt; ein eigenes Zertifikat wird nach dem Erneuern ohne Neustart übernommen.
+- Die Prüfung des `Host`-Headers gilt nur für einen lokalen Listener; Anfragen aus Webseiten (`Origin`) bleiben
+  überall abgelehnt.
+
 ## Konsequenzen
 
 - Ein Begriff „Trigger“ für alles, was Läufe automatisch startet: `cron`, `file`, `interval`, `http`. Der Typ `webhook`

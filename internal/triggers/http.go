@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net"
 	"net/http"
@@ -61,9 +63,27 @@ func (s *Scheduler) listen() {
 	}
 	l.problem = ""
 	l.addr = ln.Addr().String()
-	l.srv = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: time.Minute}
+	scheme := "http"
+	if s.opts.TLS != nil {
+		ln, scheme = tls.NewListener(ln, s.opts.TLS), "https"
+	}
+	l.srv = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: time.Minute, TLSConfig: s.opts.TLS,
+		ErrorLog: log.New(io.Discard, "", 0)} // failed TLS handshakes of scanners are no news
 	go func(srv *http.Server) { _ = srv.Serve(ln) }(l.srv)
-	s.opts.Log(fmt.Sprintf("http triggers: listening on http://%s", l.addr))
+	s.opts.Log(fmt.Sprintf("http triggers: listening on %s://%s", scheme, l.addr))
+	if !s.local() && s.opts.TLS == nil {
+		s.opts.Warn("http triggers: listening on the network without TLS (--triggers-insecure); tokens and data are sent as plain text")
+	}
+}
+
+// local reports whether the listener of http triggers is reachable from this computer
+// only (a loopback address).
+func (s *Scheduler) local() bool {
+	host, _, err := net.SplitHostPort(s.opts.Listen)
+	if err != nil {
+		return true
+	}
+	return isLoopbackHost(host)
 }
 
 func (l *listener) close() {
@@ -110,10 +130,9 @@ func fail(w http.ResponseWriter, status int, format string, args ...any) {
 // trigger by method and path, checks the token, turns the path, the query and the body
 // into parameters of the target and starts a run (202 with its id).
 func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Until the listener can be reached from the network (S40a), only programs on this
-	// computer are callers: web pages in a browser must not start runs (cross-site
-	// requests send an Origin header; DNS rebinding a foreign Host).
-	if !isLoopbackHost(r.Host) {
+	// Web pages in a browser must not start runs: cross-site requests send an Origin
+	// header; on a local listener, DNS rebinding sends a foreign Host.
+	if s.local() && !isLoopbackHost(r.Host) {
 		fail(w, http.StatusForbidden, "requests must be addressed to localhost or 127.0.0.1")
 		return
 	}

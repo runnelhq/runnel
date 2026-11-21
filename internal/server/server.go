@@ -9,6 +9,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,6 +46,8 @@ type Options struct {
 	Warn func(msg string)
 	// TriggerListen is the address of the listener of http triggers (S38a); empty: none.
 	TriggerListen string
+	// TriggerTLS makes it serve HTTPS (S40a); nil: plain HTTP.
+	TriggerTLS *tls.Config
 }
 
 // Server serves the API for one project.
@@ -78,7 +81,7 @@ func New(opts Options) (*Server, error) {
 	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
 		stop: make(chan struct{})}
 	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Running: s.running, Log: opts.Log, Warn: opts.Warn,
-		Listen: opts.TriggerListen})
+		Listen: opts.TriggerListen, TLS: opts.TriggerTLS})
 	return s, nil
 }
 

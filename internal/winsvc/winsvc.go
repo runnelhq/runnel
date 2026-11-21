@@ -48,6 +48,9 @@ type Config struct {
 	Start string
 	// LogDir is created and made writable for the account.
 	LogDir string
+	// TLSDir is the folder of the self-signed certificate (--triggers-tls auto); it is
+	// created for the account, Administrators and SYSTEM only. Empty: not needed.
+	TLSDir string
 }
 
 // Info describes an installed service.

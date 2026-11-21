@@ -2,16 +2,22 @@ package triggers
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/tlscert"
 )
 
 const apiTarget = `kind: Workflow
@@ -197,5 +203,71 @@ func TestHTTPListener(t *testing.T) {
 	<-done
 	if s.HTTPAddress() != "" {
 		t.Error("still listening")
+	}
+}
+
+// With TLS the listener serves HTTPS; a caller that trusts the certificate reaches it
+// (S40a).
+func TestHTTPListenerTLS(t *testing.T) {
+	_, s := httpSetup(t)
+	dir := t.TempDir()
+	c, _, err := tlscert.SelfSigned(dir, []string{"localhost"}, []net.IP{net.IPv4(127, 0, 0, 1)}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.opts.Listen, s.opts.TLS = "127.0.0.1:0", tlscert.Static(c)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	var addr string
+	for deadline := time.Now().Add(5 * time.Second); addr == ""; time.Sleep(10 * time.Millisecond) {
+		if addr = s.HTTPAddress(); addr == "" && time.Now().After(deadline) {
+			t.Fatal("not listening")
+		}
+	}
+	pool := x509.NewCertPool()
+	pem, _ := os.ReadFile(filepath.Join(dir, tlscert.CertFile))
+	pool.AppendCertsFromPEM(pem)
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}}
+	resp, err := client.Get("https://" + addr + "/open?ID=3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != 202 {
+		t.Errorf("https: %d", resp.StatusCode)
+	}
+	// Plain HTTP and callers that do not trust the certificate get no answer.
+	if resp, err := http.Get("http://" + addr + "/open?ID=3"); err == nil {
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("plain HTTP: %d", resp.StatusCode)
+		}
+	}
+	if _, err := http.Get("https://" + addr + "/open?ID=3"); err == nil {
+		t.Error("untrusted certificate accepted")
+	}
+}
+
+// On the network, the Host header is the name callers use; requests from web pages
+// are still refused, and auth: none and plain HTTP are warned about.
+func TestHTTPOnNetwork(t *testing.T) {
+	f, s := httpSetup(t)
+	s.opts.Listen = "0.0.0.0:0"
+	s.Reload()
+	if w := (call{method: "GET", path: "/open?ID=1", host: "srv01.example:7301"}).do(s); w.Code != 202 {
+		t.Errorf("host on the network: %d %s", w.Code, w.Body)
+	}
+	if w := (call{method: "GET", path: "/open?ID=1", origin: "https://evil.example"}).do(s); w.Code != 403 {
+		t.Errorf("origin: %d", w.Code)
+	}
+	s.listen()
+	defer s.listener.close()
+	logs := strings.Join(f.logs, "\n")
+	if !strings.Contains(logs, `trigger "open": auth: none on the network; anyone who reaches 0.0.0.0:0 can start runs`) ||
+		strings.Contains(logs, `trigger "items": auth: none`) ||
+		!strings.Contains(logs, "http triggers: listening on the network without TLS (--triggers-insecure)") {
+		t.Errorf("logs %v", f.logs)
 	}
 }

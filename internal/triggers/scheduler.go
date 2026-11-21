@@ -5,6 +5,7 @@ package triggers
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -41,6 +42,8 @@ type Options struct {
 	// Listen is the address of the listener of http triggers (S38a), e.g.
 	// 127.0.0.1:7301; it is opened once an http trigger is enabled. Empty: none.
 	Listen string
+	// TLS makes the listener serve HTTPS (S40a); nil: plain HTTP.
+	TLS *tls.Config
 }
 
 // Scheduler starts the runs of the triggers of a project. Missed times (while the
@@ -151,6 +154,13 @@ func (s *Scheduler) Reload() {
 	for _, e := range s.entries {
 		if e.t.IsEnabled() {
 			active++
+		}
+	}
+	if s.opts.Listen != "" && !s.local() {
+		for _, e := range s.entries {
+			if e.t.Type == model.TriggerHTTP && e.t.IsEnabled() && e.t.AuthNone() {
+				s.opts.Warn(fmt.Sprintf("trigger %q: auth: none on the network; anyone who reaches %s can start runs", e.t.Name, s.opts.Listen))
+			}
 		}
 	}
 	if len(triggers) > 0 || len(problems) > 0 {

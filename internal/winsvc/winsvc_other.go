@@ -33,3 +33,6 @@ func ReadPassword(io.Writer, io.Reader, string) (string, error) { return "", Err
 
 // LogDir returns the folder of the log files of services.
 func LogDir() string { return "" }
+
+// TLSDir returns the folder of the self-signed certificate of services.
+func TLSDir() string { return "" }

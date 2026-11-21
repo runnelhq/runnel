@@ -116,6 +116,59 @@ func Install(c Config) error {
 		_ = eventlog.Remove(c.Name)
 		return undo(err)
 	}
+	if c.TLSDir != "" {
+		if err := prepareTLSDir(c.TLSDir, account); err != nil {
+			_ = eventlog.Remove(c.Name)
+			return undo(err)
+		}
+	}
+	return nil
+}
+
+// prepareTLSDir creates the folder of the self-signed certificate and protects it: it
+// holds the private key, so only the account, Administrators and SYSTEM may use it;
+// inherited permissions (e.g. read for all users of %ProgramData%) are removed.
+func prepareTLSDir(dir, account string) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("cannot create the folder %s: %w", dir, err)
+	}
+	trustees := []string{"S-1-5-32-544", "S-1-5-18"} // Administrators, SYSTEM
+	var sids []*windows.SID
+	for _, s := range trustees {
+		sid, err := windows.StringToSid(s)
+		if err != nil {
+			return err
+		}
+		sids = append(sids, sid)
+	}
+	if account != AccountLocalSystem {
+		sid, _, _, err := windows.LookupSID("", account)
+		if err != nil {
+			return fmt.Errorf("account %q not found: %w", account, err)
+		}
+		sids = append(sids, sid)
+	}
+	entries := make([]windows.EXPLICIT_ACCESS, len(sids))
+	for i, sid := range sids {
+		entries[i] = windows.EXPLICIT_ACCESS{
+			AccessPermissions: windows.GENERIC_ALL,
+			AccessMode:        windows.SET_ACCESS,
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+			Trustee: windows.TRUSTEE{
+				TrusteeForm:  windows.TRUSTEE_IS_SID,
+				TrusteeType:  windows.TRUSTEE_IS_UNKNOWN,
+				TrusteeValue: windows.TrusteeValueFromSID(sid),
+			},
+		}
+	}
+	acl, err := windows.ACLFromEntries(entries, nil)
+	if err != nil {
+		return fmt.Errorf("cannot set the permissions of %s: %w", dir, err)
+	}
+	info := windows.SECURITY_INFORMATION(windows.DACL_SECURITY_INFORMATION | windows.PROTECTED_DACL_SECURITY_INFORMATION)
+	if err := windows.SetNamedSecurityInfo(dir, windows.SE_FILE_OBJECT, info, nil, nil, acl, nil); err != nil {
+		return fmt.Errorf("cannot set the permissions of %s: %w", dir, err)
+	}
 	return nil
 }
 
@@ -304,11 +357,20 @@ func IsService() (bool, error) {
 
 // LogDir returns the folder of the log files of services: %ProgramData%\runnel\logs.
 func LogDir() string {
-	base := os.Getenv("ProgramData")
-	if base == "" {
-		base = `C:\ProgramData`
+	return filepath.Join(programData(), "runnel", "logs")
+}
+
+// TLSDir returns the folder of the self-signed certificate of services:
+// %ProgramData%\runnel\tls.
+func TLSDir() string {
+	return filepath.Join(programData(), "runnel", "tls")
+}
+
+func programData() string {
+	if base := os.Getenv("ProgramData"); base != "" {
+		return base
 	}
-	return filepath.Join(base, "runnel", "logs")
+	return `C:\ProgramData`
 }
 
 // events writes to the Event Viewer; if the source cannot be opened, nothing is written.
