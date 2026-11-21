@@ -163,10 +163,22 @@ func readSource(path string) (*source, error) {
 }
 
 func loadEnvironment(path string) (*Environment, error) {
-	src, err := readSource(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
+	return ReadEnvironment(filepath.ToSlash(path), data)
+}
+
+// ReadEnvironment parses and checks an environment file; name is the file (its base name
+// must match the name of the environment) and is used in messages, e.g. the text shown
+// in the editor (E10).
+func ReadEnvironment(name string, data []byte) (*Environment, error) {
+	src, err := parseSource(name, data)
+	if err != nil {
+		return nil, err
+	}
+	path := name
 	env := &Environment{src: src}
 	if err := src.decode(env); err != nil {
 		return nil, err
@@ -181,6 +193,25 @@ func loadEnvironment(path string) (*Environment, error) {
 		return nil, err
 	}
 	return env, nil
+}
+
+// ReadProject parses and checks project.yaml from data, e.g. the text shown in the editor
+// (E10); name is used in messages. envExists reports whether an environment exists, for
+// defaultEnvironment (nil: not checked).
+func ReadProject(name string, data []byte, envExists func(env string) bool) (*Project, error) {
+	src, err := parseSource(name, data)
+	if err != nil {
+		return nil, err
+	}
+	p := &Project{src: src}
+	if err := src.decode(p); err != nil {
+		return nil, err
+	}
+	errs := p.validate()
+	if d := p.DefaultEnvironment; d != "" && envExists != nil && !envExists(d) {
+		errs = append(errs, src.errorf("$.defaultEnvironment", "default environment %q not found (expected %s/%s.yaml)", d, EnvironmentsDir, d))
+	}
+	return p, errs.errOrNil()
 }
 
 func (p *Project) validate() Errors {

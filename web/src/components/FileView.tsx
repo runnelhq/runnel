@@ -97,6 +97,8 @@ export function FileView(props: {
   // Workflows and pipelines are graphs: shown on the canvas and edited there.
   const graphKind: GraphKind | null = fileKind === "workflow" || fileKind === "pipeline" ? fileKind : null;
   const isGraph = graphKind !== null;
+  // Files edited as text in the YAML view (E9, E10): graphs and the other files of a project.
+  const editsText = isGraph || fileKind === "project" || fileKind === "environment" || fileKind === "trigger";
   const [view, setView] = useState<View>(isGraph ? "canvas" : "yaml");
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
@@ -163,7 +165,7 @@ export function FileView(props: {
   // The server checks the text shown and returns the parsed workflow or pipeline for the canvas.
   const text = doc?.text;
   useEffect(() => {
-    if (!isGraph || text === undefined) return;
+    if (!editsText || text === undefined) return;
     let cancelled = false;
     setChecking(true);
     validate(path, text)
@@ -175,7 +177,7 @@ export function FileView(props: {
     return () => {
       cancelled = true;
     };
-  }, [isGraph, path, text]);
+  }, [editsText, path, text]);
   const graph = useMemo(() => graphOf(validation), [validation]);
   const steps = graphKind === "pipeline" ? "transforms" : "actions";
 
@@ -185,9 +187,9 @@ export function FileView(props: {
     onSummary(
       view === "canvas" && graph
         ? `${graph.kind === "pipeline" ? "Pipeline" : "Workflow"} · ${graph.actions?.length ?? 0} ${steps} · ${graph.links?.length ?? 0} links`
-        : fileSummary(path, doc.text, doc.encoding) + (view === "yaml" && isGraph && cursor ? ` · ${cursor}` : ""),
+        : fileSummary(path, doc.text, doc.encoding) + (view === "yaml" && editsText && cursor ? ` · ${cursor}` : ""),
     );
-  }, [active, doc, path, view, graph, steps, onSummary, isGraph, cursor]);
+  }, [active, doc, path, view, graph, steps, onSummary, editsText, cursor]);
 
   const docRef = useRef<Doc | null>(null);
   docRef.current = doc;
@@ -413,15 +415,15 @@ export function FileView(props: {
 
   // Keyboard shortcuts of the active tab: Ctrl+S, Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z, F5 (run), Ctrl+. (cancel).
   useEffect(() => {
-    if (!active || !isGraph) return;
+    if (!active || !editsText) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "F5" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (isGraph && e.key === "F5" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault(); // instead of reloading the page
         requestRun(e.shiftKey);
         return;
       }
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      if (e.key === ".") {
+      if (isGraph && e.key === ".") {
         e.preventDefault();
         void cancelRun();
         return;
@@ -443,7 +445,7 @@ export function FileView(props: {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, isGraph, save, doUndo, doRedo, requestRun, cancelRun]);
+  }, [active, isGraph, editsText, save, doUndo, doRedo, requestRun, cancelRun]);
 
   useEffect(() => {
     if (!toast) return;
@@ -517,7 +519,7 @@ export function FileView(props: {
   // name with the path in its tooltip, "Copy path" as a symbol next to it, no kind badge.
   const compact = isGraph;
   // The badges open the list of problems below the canvas, also from the YAML view.
-  const openProblems = isGraph ? () => setBottomTab("problems") : undefined;
+  const openProblems = editsText ? () => setBottomTab("problems") : undefined;
   return (
     <>
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-4">
@@ -530,8 +532,8 @@ export function FileView(props: {
         ) : (
           <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
         )}
-        {!isGraph && (
-          <Badge title="Only workflows and pipelines can be edited in this version">
+        {!editsText && (
+          <Badge title="This file can be changed in your text editor">
             <LockIcon width={12} height={12} />
             Read-only
           </Badge>
@@ -557,7 +559,7 @@ export function FileView(props: {
           </Badge>
         )}
         {/* After the problem badges, so that they stay in place when switching views. */}
-        {isGraph && view === "yaml" && (typing || checking) && (
+        {editsText && view === "yaml" && (typing || checking) && (
           <span data-testid="checking" className="inline-flex items-center gap-1.5 text-2xs whitespace-nowrap text-muted-foreground">
             <span className="size-[9px] animate-spin rounded-full border-2 border-current border-r-transparent motion-reduce:animate-none" />
             Checking…
@@ -599,7 +601,7 @@ export function FileView(props: {
               </button>
             </span>
           ))}
-        {isGraph && (
+        {editsText && (
           <>
             <div className="inline-flex gap-1">
               <IconButton title="Undo (Ctrl+Z)" disabled={undo.length === 0} onClick={doUndo}>
@@ -619,6 +621,10 @@ export function FileView(props: {
               <SaveIcon width={14} height={14} />
               Save
             </button>
+          </>
+        )}
+        {isGraph && (
+          <>
             <ViewSwitch view={view} onView={setView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
             {/* Always there, so that nothing moves: pressed while the panel is shown. */}
             <IconButton
@@ -652,7 +658,7 @@ export function FileView(props: {
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {!doc ? (
           <div className="flex-1" aria-busy="true" />
-        ) : view === "yaml" && isGraph ? (
+        ) : view === "yaml" && editsText ? (
           <YamlEditor
             text={doc.text}
             problems={validation?.problems ?? []}
@@ -689,10 +695,11 @@ export function FileView(props: {
         ) : (
           <div className="runnel-canvas flex-1" aria-busy="true" />
         )}
-        {isGraph && doc && (graph || validation) && (
+        {editsText && doc && (graph || validation) && (
           <BottomPanel
             workflow={graph ?? null}
             pipeline={graphKind === "pipeline"}
+            log={isGraph}
             problems={validation?.problems ?? []}
             tab={bottomTab}
             onTab={setBottomTab}

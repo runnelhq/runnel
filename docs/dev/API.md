@@ -27,7 +27,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 |---|---|---|
 | GET | `/version` | `{"version", "commit", "date", "goVersion", "os", "arch"}` wie `runnel version --json` |
 | GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello", "environments": ["dev", "prod"], "defaultEnvironment": "dev"}` |
-| GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `other`; versteckte Einträge und symbolische Links fehlen |
+| GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `trigger` (seit E10), `other`; versteckte Einträge und symbolische Links fehlen |
 | GET | `/files/{path}` | Inhalt der Datei, Header `ETag` |
 | PUT | `/files/{path}` | Datei speichern (Body = Inhalt, max. 10 MiB); Antwort `{path, etag}` und Header `ETag` |
 | DELETE | `/files/{path}` | Datei löschen, `204` |
@@ -70,7 +70,11 @@ POST /api/v1/validate
 Geprüft wird genau wie bei `runnel validate`: Felder, Links, Zyklen, Erreichbarkeit, Variablen gegen alle
 Environments, Projektdateien und – wie vor einem Lauf – unbekannte Action-Typen und Konfiguration `with:`. Für
 Pipeline-Dateien (`*.pipeline.yaml`, seit S25a1a): Felder, Links, Zyklen, `layout` und – wie vor einem Lauf – Typen,
-Konfiguration und verwendete Felder der Transforms (ADR 0007); die Pfade lauten `$.transforms[i]…`.
+Konfiguration und verwendete Felder der Transforms (ADR 0007); die Pfade lauten `$.transforms[i]…`. Seit E10 auch
+`project.yaml` (Felder, Variablennamen, `defaultEnvironment` gegen die Dateien unter `environments/`),
+Environments (`environments/*.yaml`, Name gleich Dateiname) und Trigger (`triggers/*.yaml`: Felder und Zeitplan, gegen
+das Projekt Ziel, Environment und Parameter, Name gegen die anderen gespeicherten Trigger-Dateien); die Antwort hat
+dann nur `problems`, `errors` und `warnings`. Andere Dateien: `400`.
 
 ```json
 {

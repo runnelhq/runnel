@@ -49,7 +49,7 @@ test("shows a workflow as a graph", async ({ page }) => {
 
 test("other files have no canvas", async ({ page }) => {
   await openFile(page, "dev.yaml");
-  await expect(page.getByTestId("code")).toBeVisible();
+  await expect(page.getByTestId("yaml-editor")).toBeVisible();
   await expect(page.getByRole("group", { name: "View" })).toHaveCount(0);
 });
 

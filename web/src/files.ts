@@ -10,7 +10,7 @@ export interface Entry {
   children?: Entry[];
 }
 
-export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "other";
+export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "other";
 
 /** Error of the file API with its HTTP status (404: file not found). */
 export class APIError extends Error {
@@ -81,6 +81,7 @@ export function kindOf(path: string): FileKind {
   if (path.endsWith(".pipeline.yaml")) return "pipeline";
   if (path === "project.yaml") return "project";
   if (/^environments\/[^/]+\.yaml$/.test(path)) return "environment";
+  if (/^triggers\/[^/]+\.yaml$/.test(path)) return "trigger";
   return "other";
 }
 
@@ -89,6 +90,7 @@ export const kindLabel: Record<FileKind, string> = {
   pipeline: "Pipeline",
   project: "Project",
   environment: "Environment",
+  trigger: "Trigger",
   other: "File",
 };
 

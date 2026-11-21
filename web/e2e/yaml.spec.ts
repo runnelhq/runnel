@@ -109,3 +109,58 @@ test("finds text with Ctrl+F", async ({ page }) => {
   await find.press("Enter"); // the panel searches on Enter and while typing
   await expect(editor(page).locator(".cm-searchMatch").first()).toContainText("GREETING");
 });
+
+// E10: project.yaml, environments and triggers are edited the same way, without canvas and log.
+test.describe("other files of the project", () => {
+  const envURL = "/api/v1/files/environments/prod.yaml";
+  const triggerURL = "/api/v1/files/triggers/hourly.yaml";
+  const env = readFileSync(new URL("../../examples/hello/environments/prod.yaml", import.meta.url), "utf8");
+  const trigger = readFileSync(new URL("../../examples/hello/triggers/hourly.yaml", import.meta.url), "utf8");
+
+  test.afterEach(async ({ request }) => {
+    await request.put(envURL, { headers: { "If-Match": "*" }, data: env });
+    await request.put(triggerURL, { headers: { "If-Match": "*" }, data: trigger });
+  });
+
+  test("edits an environment and checks it while typing", async ({ page, request }) => {
+    await page.goto("/");
+    await page.getByRole("tree").getByText("prod.yaml", { exact: true }).click();
+    await expect(editor(page)).toContainText("name: prod");
+    await expect(page.getByText("Read-only")).toHaveCount(0);
+    await expect(page.getByRole("group", { name: "View" })).toHaveCount(0);
+
+    await retype(page, "name: prod", 4, "live");
+    await expect(page.getByTestId("error-count")).toHaveText("✖ 1");
+    await expect(page.locator(".ry-tooltip")).toContainText('environment name "live" must match the file name');
+    await page.getByTestId("error-count").click();
+    const bar = page.getByRole("region", { name: "Problems and log" });
+    await expect(bar.getByRole("table", { name: "Problems" })).toContainText("must match the file name");
+    await expect(bar.getByRole("button", { name: "Log" })).toHaveCount(0);
+
+    await page.keyboard.press("Control+z");
+    await expect(page.getByTestId("error-count")).toHaveCount(0);
+    await retype(page, "STAGE: production", 10, "live");
+    await expect(page.getByTestId("checking")).toHaveCount(0);
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByRole("tab", { name: /prod\.yaml/ })).not.toContainText("●");
+    expect(await (await request.get(envURL)).text()).toBe(env.replace("STAGE: production", "STAGE: live"));
+  });
+
+  test("checks the target of a trigger", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("tree").getByText("hourly.yaml", { exact: true }).click();
+    await expect(page.getByTestId("kind")).toHaveText("Trigger");
+    await retype(page, "target: workflows/hello.workflow.yaml", "hello.workflow.yaml".length, "nope.workflow.yaml");
+    await expect(page.getByTestId("error-count")).toHaveText("✖ 1");
+    await expect(page.locator(".ry-tooltip")).toContainText("nope.workflow.yaml");
+  });
+
+  test("other files stay read-only", async ({ page, request }) => {
+    await request.put("/api/v1/files/notes.txt", { headers: { "If-Match": "*" }, data: "notes\n" });
+    await page.goto("/");
+    await page.getByRole("tree").getByText("notes.txt", { exact: true }).click();
+    await expect(page.getByText("Read-only")).toBeVisible();
+    await expect(page.getByTestId("code")).toContainText("notes");
+    await request.delete("/api/v1/files/notes.txt");
+  });
+});
