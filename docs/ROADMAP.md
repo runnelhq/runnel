@@ -186,6 +186,14 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster; vorher Mockup | – |
 | S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | bis dahin ZIP |
 
+### Fehlerbehebungen
+
+Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-einschränkungen)), je ein Fix-PR.
+
+| Thema | Inhalt | Hinweis |
+|---|---|---|
+| Kodierung beim Speichern erhalten (K13) | Der Editor speichert eine Datei in der Kodierung, in der sie geöffnet wurde (UTF-8 mit/ohne BOM, UTF-16 LE/BE, Windows-1252); Zeichen, die in Windows-1252 nicht darstellbar sind, werden vor dem Speichern gemeldet statt still ersetzt | betrifft seit E9/E10 alle bearbeitbaren Dateien |
+
 ### Weitere Bausteine
 
 | Bereich | Bausteine |
