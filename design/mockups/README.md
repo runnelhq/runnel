@@ -15,6 +15,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s35-expressions.html`](s35-expressions.html) | S35 – Ausdruckseditor | `complete`, `functions`, `error`, `condition`, `expanded` | freigegeben mit PR #43, umgesetzt mit S35a (Editor im Panel, Link-Bedingung) und S35b (`expanded`) |
 | [`s25a-pipeline.html`](s25a-pipeline.html) | S25a – Pipeline-Canvas (dazu K10/K11 im Workflow-Panel) | `canvas`, `link`, `run`, `problems`, `foreach` | freigegeben mit PR #62; Umsetzung in S25a1a (Server), S25a1b, S25a2, S25a3; `foreach` mit E7c ✅ |
 | [`e7c-parameters.html`](e7c-parameters.html) | E7c – Parameter und Outputs im Editor | `parameters`, `add`, `outputs`, `problems` | freigegeben mit PR #69, umgesetzt mit E7c (zusammen mit `foreach` aus S25a) |
+| [`e9-yaml.html`](e9-yaml.html) | E9 – YAML bearbeiten | `edit`, `problem`, `syntax`, `canvas` | zur Freigabe |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 
 ## Entscheidungen
@@ -63,6 +64,11 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E7c | Felder eines Parameters: Name, Type, Required, Default (Ausdruckseditor aus S35; bei Required ohne Wirkung), Allowed values (`enum`, als Chips), Description. Outputs: Name, Type, Value (Ausdruckseditor), Description |
 | E7c | Umbenennen eines Parameters ändert keine Verweise (`${NAME}`, `params.NAME`) – der Hinweis am Feld sagt das; Meldungen zu fehlenden Namen erscheinen danach über `/validate` |
 | E7c | Pipelines haben denselben Abschnitt „Parameters“, ohne Outputs. `forEach`/`parallel`/`stopOnError` und das Schlüssel/Wert-Feld für `params` folgen dem freigegebenen Mockup S25a (Zustand `foreach`) |
+| E9 | Bearbeitet wird in der YAML-Ansicht von Workflows und Pipelines mit CodeMirror 6 (schon mit S35 im Editor); Hervorhebung, Zeilennummern und Farben wie bisher (E4), über den vorhandenen Tokenizer, ohne neues Sprachpaket. Neu: `@codemirror/search` (MIT, freigegeben) für Suchen und Ersetzen (Strg+F, Strg+H). Tab rückt um zwei Leerzeichen ein, Enter behält die Einrückung; keine Vorschläge in E9 |
+| E9 | Geprüft wird nach einer Tipp-Pause (0,5 s wie in E7) über `/validate` mit dem Text im Editor; „Checking…“ in der Dateileiste, solange die Prüfung läuft. Meldungen: Wellenlinie an der Stelle, Zeichen in der Randspalte, Text beim Darüberfahren oder wenn der Cursor dort steht, und wie bisher unter „Problems“ (ein Klick springt an die Stelle) |
+| E9 | Ein Rückgängig für alles: Jede Tipp-Pause ist ein Schritt im selben Verlauf wie Änderungen auf dem Canvas und im Panel; Strg+Z und Strg+Y wirken in beiden Ansichten (der eigene Verlauf von CodeMirror ist aus). Speichern wie bisher mit Save, kein automatisches Speichern |
+| E9 | Ist der Text kein lesbarer Workflow (Syntaxfehler), bleibt der Wechsel zum Canvas möglich; er zeigt den Hinweis aus E5 („can’t be shown as a graph“) mit „Show YAML at line n“, die Änderungen bleiben erhalten. Der Knopf „Canvas“ trägt dann einen roten Punkt. Fehler in Feldern verhindern den Canvas wie bisher nicht |
+| E9 | Der Hinweis „Read-only“ entfällt bei Workflows und Pipelines; andere Dateien (`project.yaml`, Environments, Trigger) bleiben in E9 schreibgeschützt und kommen mit einem eigenen Schritt (E10). Die Hinweise im Panel „in your text editor for now“ verweisen danach auf die YAML-Ansicht |
 | S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
 | S46 | Vorschlag in einem Dialog (das Panel ist für eine Tabelle zu schmal): je Spalte Auswahl, Name, Type, Format, gelesene Werte und eine Begründung; geschrieben wird erst mit „Write n fields“ |
 | S46 | Gelesen wird mit der aktuellen (auch ungespeicherten) Konfiguration des Transforms; Variablen im Pfad mit den Standardwerten der Parameter und dem Standard-Environment (wie Run ohne Dialog); höchstens die ersten 1.000 Zeilen |
@@ -86,6 +92,7 @@ node design/mockups/screenshots.cjs s35-expressions complete,functions,error,con
 node design/mockups/screenshots.cjs s25a-pipeline canvas,link,run,problems,foreach
 node design/mockups/screenshots.cjs e7c-parameters parameters,add,outputs,problems
 node design/mockups/screenshots.cjs s46-fields fields,detect,written,update,error
+node design/mockups/screenshots.cjs e9-yaml edit,problem,syntax,canvas
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
