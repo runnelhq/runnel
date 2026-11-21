@@ -11,14 +11,14 @@ import (
 )
 
 func TestServiceConfig(t *testing.T) {
-	o := installOptions{name: "runnel-import", account: "localservice", start: "delayed", port: 7301, stopTimeout: 45 * time.Second, triggers: "127.0.0.1:7302"}
+	o := installOptions{name: "runnel-import", account: "localservice", start: "delayed", port: 7301, stopTimeout: 45 * time.Second, listener: listenerOptions{Address: "0.0.0.0:7302", TLS: "auto"}}
 	c, err := serviceConfig(o, `D:\flows`, `C:\Tools\runnel.exe`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"service", "run", "--name", "runnel-import", "--port", "7301", "--stop-timeout", "45s", "--triggers", "127.0.0.1:7302", `D:\flows`}
+	want := []string{"service", "run", "--name", "runnel-import", "--port", "7301", "--stop-timeout", "45s", "--triggers", "0.0.0.0:7302", "--triggers-tls", "auto", `D:\flows`}
 	if !slices.Equal(c.Args, want) || c.Exe != `C:\Tools\runnel.exe` || c.Account != winsvc.AccountLocalService ||
-		c.DisplayName != "Runnel (runnel-import)" || c.Description != `Runnel server for the project D:\flows (http://127.0.0.1:7301)` {
+		c.TLSDir != winsvc.TLSDir() || c.DisplayName != "Runnel (runnel-import)" || c.Description != `Runnel server for the project D:\flows (http://127.0.0.1:7301)` {
 		t.Errorf("config %+v", c)
 	}
 	for _, c := range []struct {
@@ -29,7 +29,7 @@ func TestServiceConfig(t *testing.T) {
 		{func(o *installOptions) { o.start = "boot" }, `invalid start type "boot" (expected auto, delayed or manual)`},
 		{func(o *installOptions) { o.port = 0 }, "invalid --port 0 (expected 1–65535)"},
 		{func(o *installOptions) { o.stopTimeout = -time.Second }, "invalid --stop-timeout -1s"},
-		{func(o *installOptions) { o.triggers = "0.0.0.0:7301" }, "listening on the network follows with TLS (roadmap S40a)"},
+		{func(o *installOptions) { o.listener = listenerOptions{Address: "0.0.0.0:7301"} }, "listens on the network: use HTTPS"},
 	} {
 		bad := o
 		c.change(&bad)

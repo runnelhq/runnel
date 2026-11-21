@@ -15,7 +15,6 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/server"
 	"github.com/runnelhq/runnel/internal/transforms"
-	"github.com/runnelhq/runnel/internal/triggers"
 )
 
 // DefaultPort is the port of "runnel serve" unless --port is given.
@@ -24,7 +23,7 @@ const DefaultPort = 7300
 func newServeCommand() *cobra.Command {
 	var port int
 	var stopTimeout time.Duration
-	var listen string
+	var listen listenerOptions
 	cmd := &cobra.Command{
 		Use:   "serve [project-dir]",
 		Short: "Start the server for a project (API for the editor)",
@@ -33,7 +32,8 @@ func newServeCommand() *cobra.Command {
 			"API under " + server.APIPrefix + " (files, catalog, validation, runs, live events).\n" +
 			"It starts the runs of the project's triggers (" + model.TriggersDir + "/*.yaml) at their times; changed\n" +
 			"trigger files are picked up while it runs. HTTP triggers get their own listener (--triggers),\n" +
-			"opened once an http trigger is enabled; for now on this computer only (127.0.0.1).\n" +
+			"opened once an http trigger is enabled. On the network it needs HTTPS: --triggers-tls auto creates\n" +
+			"a certificate once (in " + userTLSDir() + "), --triggers-cert and --triggers-key use an own one.\n" +
 			"Stop it with Ctrl+C; running workflows are cancelled, after --stop-timeout if given.\n" +
 			"To run it as a Windows service, see \"runnel service install\".",
 		Args: cobra.MaximumNArgs(1),
@@ -43,12 +43,12 @@ func newServeCommand() *cobra.Command {
 				dir = args[0]
 			}
 			logf := func(msg string) { cmd.Printf("%s %s\n", time.Now().Format("15:04:05"), msg) }
-			return runServer(cmd.Context(), serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen,
+			return runServer(cmd.Context(), serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen, TLSDir: userTLSDir(),
 				Log: logf, Warn: logf, Print: func(msg string) { cmd.Println(msg) }, StopHint: "; press Ctrl+C to stop"})
 		},
 	}
 	cmd.Flags().IntVar(&port, "port", DefaultPort, "TCP port on 127.0.0.1 (0 picks a free port)")
-	triggersFlag(cmd, &listen)
+	listenerFlags(cmd, &listen)
 	cmd.Flags().DurationVar(&stopTimeout, "stop-timeout", 0, "time running runs get to end when stopping, before they are cancelled (e.g. 30s; 0: cancel at once)")
 	return cmd
 }
@@ -65,31 +65,10 @@ type serveConfig struct {
 	Log, Warn, Print func(msg string)
 	// StopHint follows the line with the address, e.g. "; press Ctrl+C to stop".
 	StopHint string
-	// Triggers is the address of the listener of http triggers; empty: none.
-	Triggers string
-}
-
-func triggersFlag(cmd *cobra.Command, listen *string) {
-	cmd.Flags().StringVar(listen, "triggers", triggers.DefaultListen, "address of the listener of http triggers (127.0.0.1 or ::1 with a port; \"\": none)")
-}
-
-// checkTriggersAddress checks the address of the listener of http triggers: until
-// roadmap S40a only addresses of this computer.
-func checkTriggersAddress(addr string) error {
-	if addr == "" {
-		return nil
-	}
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return fmt.Errorf("invalid --triggers %q (expected an address with a port, e.g. %s)", addr, triggers.DefaultListen)
-	}
-	if n, err := strconv.Atoi(port); err != nil || n < 0 || n > 65535 {
-		return fmt.Errorf("invalid --triggers %q (port 0–65535)", addr)
-	}
-	if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
-		return fmt.Errorf("--triggers %s: listening on the network follows with TLS (roadmap S40a); for now use 127.0.0.1 or ::1", addr)
-	}
-	return nil
+	// Triggers configures the listener of http triggers; TLSDir is the folder of its
+	// self-signed certificate.
+	Triggers listenerOptions
+	TLSDir   string
 }
 
 // runServer serves the project until ctx is done.
@@ -97,7 +76,7 @@ func runServer(ctx context.Context, c serveConfig) error {
 	if c.Port < 0 || c.Port > 65535 {
 		return fmt.Errorf("invalid --port %d (expected 0–65535; 0 picks a free port)", c.Port)
 	}
-	if err := checkTriggersAddress(c.Triggers); err != nil {
+	if err := c.Triggers.check(); err != nil {
 		return err
 	}
 	if c.StopTimeout < 0 {
@@ -110,8 +89,12 @@ func runServer(ctx context.Context, c serveConfig) error {
 	if !found {
 		return fmt.Errorf("no project (%s) found in %s or above", model.ProjectFile, c.Dir)
 	}
+	tlsConfig, err := c.Triggers.tlsConfig(c.TLSDir, c.Log, c.Warn)
+	if err != nil {
+		return err
+	}
 	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin(), Log: c.Log, Warn: c.Warn,
-		TriggerListen: c.Triggers})
+		TriggerListen: c.Triggers.Address, TriggerTLS: tlsConfig})
 	if err != nil {
 		return err
 	}

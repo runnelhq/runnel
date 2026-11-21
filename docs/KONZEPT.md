@@ -600,9 +600,19 @@ with:
 ```
 
 - **Listener:** HTTP-Trigger laufen auf einem eigenen Listener, getrennt vom Editor: `--triggers` bei `runnel serve`
-  und `runnel service install`, Standard `127.0.0.1:7301`. Er öffnet sich erst, wenn ein HTTP-Trigger aktiv ist. Bis
-  S40a (TLS) nur auf diesem Rechner (`127.0.0.1`, `::1`); Anfragen aus Webseiten (`Origin`-Header) und an fremde
-  Host-Namen werden mit `403` abgelehnt.
+  und `runnel service install`, Standard `127.0.0.1:7301`. Er öffnet sich erst, wenn ein HTTP-Trigger aktiv ist.
+  Anfragen aus Webseiten (`Origin`-Header) werden mit `403` abgelehnt, bei einem lokalen Listener auch Anfragen an
+  fremde Host-Namen (DNS-Rebinding).
+- **Im Netz (seit S40a):** z. B. `--triggers 0.0.0.0:7301` – dann nur mit HTTPS:
+  - `--triggers-tls auto`: selbst erzeugtes Zertifikat (ECDSA P-256, 2 Jahre, für `localhost`, den Rechnernamen und
+    die IP-Adressen des Rechners). Es wird einmal erzeugt und wiederverwendet, 30 Tage vor Ablauf oder nach einer
+    Umbenennung des Rechners neu erzeugt. Ablage: beim Dienst `%ProgramData%\runnel\tls\` (nur für Dienstkonto,
+    Administratoren und SYSTEM lesbar), sonst `%LOCALAPPDATA%\runnel\tls\`, nie im Projekt. Das Log nennt Namen,
+    Ablauf und SHA-256-Fingerabdruck; Aufrufer vertrauen ihm, indem sie `triggers.crt` importieren.
+  - `--triggers-cert` und `--triggers-key`: eigenes Zertifikat als PEM-Dateien (z. B. von der Firmen-CA); ein
+    erneuertes Zertifikat wird ohne Neustart übernommen (Prüfung höchstens jede Minute).
+  - Reines HTTP im Netz nur mit `--triggers-insecure` (Warnung im Log bei jedem Start), denn Tokens und Daten gingen
+    im Klartext. Für Trigger mit `auth: none` warnt das Log ebenfalls, wenn der Listener im Netz lauscht.
 - **Routing:** Methode und Pfad sind im Projekt eindeutig; feste Teile ohne Rücksicht auf Groß-/Kleinschreibung.
   Überschneidungen (`/a/{x}` und `/a/b`) meldet `runnel validate`, der spätere Trigger bleibt inaktiv. Unbekannter
   Pfad oder deaktivierter Trigger: `404`, falsche Methode: `405`.
@@ -827,7 +837,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
 | Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `RUNNEL_MASTER_KEY` |
 | Secrets im Log | Automatische Maskierung aller bekannten Secret-Werte in Logs und Vorschauen |
-| HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal, im Netz mit TLS – S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrent` ([ADR 0018](adr/0018-http-trigger.md)) |
+| HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal; im Netz nur mit TLS – eigenes oder selbst erzeugtes Zertifikat – oder ausdrücklich `--triggers-insecure`, seit S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrent` ([ADR 0018](adr/0018-http-trigger.md)) |
 | Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
 | Dienstkonto | Empfehlung: dedizierter Dienstbenutzer mit minimalen Rechten (bzw. gMSA in Domänen) |
 | Audit | Dateiänderungen über den Editor, manuelle Starts und Abbrüche werden mit Client-Informationen (IP, Rechnername, User-Agent) protokolliert |
@@ -846,6 +856,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Run-Logs | `data\logs\<jahr>\<run-id>.log` | JSON-Lines (slog) |
 | Dienst-Ereignisse | Windows-Ereignisanzeige (Anwendung) | Quelle = Dienstname (Standard `runnel`): Start, Stopp, Warnungen, Fehler (seit S41) |
 | Server-Log des Dienstes | `%ProgramData%\runnel\logs\<dienst>.log` | Text, Rotation bei 10 MB nach `<dienst>.log.1` (seit S41) |
+| Selbst erzeugtes Zertifikat der HTTP-Trigger | `%ProgramData%\runnel\tls\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\tls\` | `triggers.crt`, `triggers.key` (PEM, seit S40a) |
 
 Standardpfade: `%ProgramData%\runnel\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\` (Desktop) bzw. neben der exe (portabel).
 
