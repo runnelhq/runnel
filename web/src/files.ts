@@ -81,7 +81,8 @@ export function kindOf(path: string): FileKind {
   if (path.endsWith(".pipeline.yaml")) return "pipeline";
   if (path === "project.yaml") return "project";
   if (/^environments\/[^/]+\.yaml$/.test(path)) return "environment";
-  if (/^triggers\/[^/]+\.yaml$/.test(path)) return "trigger";
+  // Triggers also in subfolders of triggers/ (E12), not in hidden ones.
+  if (/^triggers\/([^./][^/]*\/)*[^./][^/]*\.yaml$/.test(path)) return "trigger";
   return "other";
 }
 
@@ -136,15 +137,41 @@ export async function deleteFolder(path: string): Promise<void> {
   await check(await fetch(`${apiBase}/folders/${encodePath(path)}`, { method: "DELETE" }));
 }
 
-/** Renames or moves a file or folder within the project. */
-export async function renamePath(from: string, to: string): Promise<void> {
-  await check(await postJSON(`${apiBase}/rename`, { from, to }));
+/** A reference to change when renaming: its file and line. */
+export interface ReferenceKey {
+  file: string;
+  line: number;
+}
+
+export interface RenameResult {
+  path: string;
+  /** Files whose references were changed, at their new place. */
+  updated: string[];
+  notUpdated: (ReferenceKey & { reason: string })[];
+}
+
+/** Renames or moves a file or folder within the project; the given references are changed to the new path (E12). */
+export async function renamePath(from: string, to: string, references: ReferenceKey[] = []): Promise<RenameResult> {
+  const res = await check(await postJSON(`${apiBase}/rename`, { from, to, references }));
+  return (await res.json()) as RenameResult;
 }
 
 /** A saved file that refers to another one, e.g. a trigger with it as target. */
 export interface Reference {
   file: string;
   what: string;
+  /** The field with the path: "target", "workflow" or "pipeline". */
+  field: string;
+  /** The file referred to; for a folder one of its files. */
+  target: string;
+  /** The path as written in the file. */
+  value: string;
+  line: number;
+}
+
+/** Where a path is after from was renamed or moved to to. */
+export function movedPath(p: string, from: string, to: string): string {
+  return p === from ? to : p.startsWith(from + "/") ? to + p.slice(from.length) : p;
 }
 
 export async function fetchReferences(path: string): Promise<Reference[]> {
@@ -189,6 +216,6 @@ export function template(kind: NewKind, name: string, firstWorkflow?: string): s
 /** The kind and name ending of a file for renaming: the ending stays as it is. */
 export function suffixOf(path: string): string {
   for (const s of [".workflow.yaml", ".pipeline.yaml"]) if (path.endsWith(s)) return s;
-  if (/^(environments|triggers)\/[^/]+\.yaml$/.test(path)) return ".yaml";
+  if (/^environments\/[^/]+\.yaml$/.test(path) || kindOf(path) === "trigger") return ".yaml";
   return "";
 }

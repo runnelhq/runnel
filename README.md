@@ -53,7 +53,7 @@ runnel validate examples/hello
 ```
 
 `runnel validate [pfad...]` prüft Workflows, Pipelines und Trigger (`*.workflow.yaml`, `*.pipeline.yaml`,
-`triggers/*.yaml`; Ordner werden rekursiv durchsucht) auf
+`triggers/**/*.yaml`; Ordner werden rekursiv durchsucht) auf
 Syntax- und Feldfehler, Links auf unbekannte Actions, Zyklen ohne `loop: true`, unerreichbare Actions, nicht
 definierte Variablen sowie – wie vor einem Lauf – unbekannte Action-Typen und ungültige Konfigurationen (`with:`). Das zugehörige Projekt (`project.yaml` im Ordner oder darüber) und seine Environments werden
 mitgeprüft; Variablen gegen jedes Environment oder nur gegen eines (`--env prod`). Mit `--param KEY=VALUE` lassen
@@ -74,7 +74,7 @@ Transforms, Prüfung von Workflows und Pipelines sowie Läufe starten, abbrechen
 runnel triggers examples/hello
 ```
 
-`runnel triggers [projektordner]` listet die Trigger des Projekts (`triggers/*.yaml`) mit Zeitplan, Ziel und nächstem
+`runnel triggers [projektordner]` listet die Trigger des Projekts (`triggers/`, auch in Unterordnern) mit Zeitplan, Ziel und nächstem
 Zeitpunkt. Solange `runnel serve` läuft, starten sie ihre Workflows bzw. Pipelines: zu festen Zeiten (Cron-Ausdruck mit
 Zeitzone), in einem festen Abstand (`interval`), für neue Dateien in einem Ordner (`file`, z. B.
 `runnel serve examples/files`) oder auf Anfrage per HTTP (`http`, eigener Listener auf `127.0.0.1:7301`, z. B.

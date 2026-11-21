@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -407,15 +408,14 @@ func cronError(err error) string {
 	return msg
 }
 
-// LoadTriggers reads the trigger files of a project (triggers/*.yaml), sorted by file
-// name. Files with problems are left out; their problems are returned as Errors, as are
-// trigger names used more than once.
+// LoadTriggers reads the trigger files of a project (triggers/**/*.yaml, also in
+// subfolders), sorted by path. Files with problems are left out; their problems are
+// returned as Errors, as are trigger names used more than once.
 func LoadTriggers(projectDir string) ([]*Trigger, error) {
-	files, err := filepath.Glob(filepath.Join(projectDir, TriggersDir, "*.yaml"))
+	files, err := TriggerFiles(projectDir)
 	if err != nil {
 		return nil, err
 	}
-	slices.Sort(files)
 	var out []*Trigger
 	var errs Errors
 	names := map[string]string{}
@@ -430,7 +430,7 @@ func LoadTriggers(projectDir string) ([]*Trigger, error) {
 			return nil, err
 		}
 		if first, dup := names[t.Name]; dup {
-			errs = append(errs, t.ErrorAt("$.name", "trigger name %q is already used by %s", t.Name, filepath.Base(first)))
+			errs = append(errs, t.ErrorAt("$.name", "trigger name %q is already used by %s", t.Name, TriggerFileName(projectDir, first)))
 			continue
 		}
 		names[t.Name] = file
@@ -441,10 +441,79 @@ func LoadTriggers(projectDir string) ([]*Trigger, error) {
 	return out, errs.errOrNil()
 }
 
-// IsTriggerFile reports whether a path relative to the project is a trigger file.
+// TriggerFiles returns the trigger files of a project: the *.yaml files in triggers/ and
+// its subfolders, sorted by path. Hidden files and folders (".…") are left out; a
+// project without triggers/ has none.
+func TriggerFiles(projectDir string) ([]string, error) {
+	root := filepath.Join(projectDir, TriggersDir)
+	var files []string
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			if p == root && errors.Is(err, fs.ErrNotExist) {
+				return fs.SkipDir
+			}
+			return err
+		case p != root && strings.HasPrefix(d.Name(), "."):
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		case !d.IsDir() && strings.HasSuffix(d.Name(), ".yaml"):
+			files = append(files, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	slices.Sort(files)
+	return files, nil
+}
+
+// TriggerFileName is the path of a trigger file relative to triggers/ for messages,
+// e.g. "nightly/import.yaml".
+func TriggerFileName(projectDir, file string) string {
+	if rel, err := filepath.Rel(filepath.Join(projectDir, TriggersDir), file); err == nil && !strings.HasPrefix(rel, "..") {
+		return filepath.ToSlash(rel)
+	}
+	return filepath.Base(file)
+}
+
+// TriggerProjectDir returns the project folder of a trigger file: the folder above the
+// triggers/ folder the file is in (also in a subfolder of it) that has a project.yaml.
+// ok is false for other files.
+func TriggerProjectDir(file string) (dir string, ok bool) {
+	if !strings.HasSuffix(file, ".yaml") {
+		return "", false
+	}
+	for d := filepath.Dir(file); ; {
+		parent := filepath.Dir(d)
+		if parent == d {
+			return "", false
+		}
+		if filepath.Base(d) == TriggersDir {
+			if _, err := os.Stat(filepath.Join(parent, ProjectFile)); err == nil {
+				return parent, true
+			}
+		}
+		d = parent
+	}
+}
+
+// IsTriggerFile reports whether a path relative to the project is a trigger file
+// (triggers/**/*.yaml, not hidden).
 func IsTriggerFile(rel string) bool {
 	rel = filepath.ToSlash(rel)
-	return strings.HasPrefix(rel, TriggersDir+"/") && strings.HasSuffix(rel, ".yaml") && !strings.Contains(rel[len(TriggersDir)+1:], "/")
+	if !strings.HasPrefix(rel, TriggersDir+"/") || !strings.HasSuffix(rel, ".yaml") {
+		return false
+	}
+	for _, part := range strings.Split(rel[len(TriggersDir)+1:], "/") {
+		if part == "" || strings.HasPrefix(part, ".") {
+			return false
+		}
+	}
+	return true
 }
 
 // Describe tells when a trigger starts runs, e.g. "0 2 * * 1-5 (Europe/Berlin)",

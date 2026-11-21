@@ -48,7 +48,7 @@ func (s *Server) checkTrigger(t *model.Trigger, name string) model.Errors {
 			continue
 		}
 		if rel, err := filepath.Rel(s.dir, o.File()); err == nil && filepath.ToSlash(rel) != name {
-			diags = append(diags, t.ErrorAt("$.name", "trigger name %q is already used by %s", t.Name, filepath.Base(o.File())))
+			diags = append(diags, t.ErrorAt("$.name", "trigger name %q is already used by %s", t.Name, model.TriggerFileName(s.dir, o.File())))
 			break
 		}
 	}

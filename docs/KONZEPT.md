@@ -539,7 +539,7 @@ with:
   overlap: skip            # skip (Standard) | allow
 ```
 
-Trigger-Dateien liegen unter `triggers/*.yaml`. Gestartet wird nur, solange `runnel serve` läuft; geänderte Dateien
+Trigger-Dateien liegen unter `triggers/` (`*.yaml`, auch in Unterordnern wie `triggers/nightly/`; versteckte Ordner `.…` zählen nicht); ihre Namen sind im ganzen Projekt eindeutig. Gestartet wird nur, solange `runnel serve` läuft; geänderte Dateien
 übernimmt der Server ohne Neustart. Verpasste Zeitpunkte (Server lief nicht) werden nicht nachgeholt. `runnel triggers`
 listet die Trigger mit ihrem nächsten Zeitpunkt, `runnel validate` prüft sie (Zeitplan, Ziel, Environment, Parameter).
 `overlap: skip` startet keinen Lauf, solange der vorige dieses Triggers läuft. Felder unter `with:`, die der Typ nicht

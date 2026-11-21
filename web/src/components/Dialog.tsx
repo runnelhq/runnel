@@ -20,6 +20,8 @@ export function Dialog(props: {
   icon?: ReactNode;
   iconClass?: string;
   form?: boolean;
+  /** Wider, e.g. for lists of paths. */
+  wide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const cancel = useRef(props.onCancel);
@@ -50,7 +52,7 @@ export function Dialog(props: {
         role={props.form ? "dialog" : "alertdialog"}
         aria-modal="true"
         aria-label={props.title}
-        className="w-[480px] rounded-xl border border-border bg-popover px-6 py-5 text-popover-foreground shadow-lg"
+        className={`${props.wide ? "w-[600px]" : "w-[480px]"} max-w-[calc(100vw-32px)] rounded-xl border border-border bg-popover px-6 py-5 text-popover-foreground shadow-lg`}
       >
         <h2 className="m-0 mb-2 flex items-center gap-2.5 text-md font-semibold">
           <span className={`inline-grid size-7 place-items-center rounded-full text-sm ${props.iconClass ?? "bg-warning-soft text-warning"}`}>

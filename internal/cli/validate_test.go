@@ -99,7 +99,7 @@ links:
 
 func TestValidateNoFiles(t *testing.T) {
 	code, _, errOut := run(t, "validate", t.TempDir())
-	if code != 1 || !strings.Contains(errOut, "no workflow, pipeline or trigger files (*.workflow.yaml, *.pipeline.yaml, triggers/*.yaml)") {
+	if code != 1 || !strings.Contains(errOut, "no workflow, pipeline or trigger files (*.workflow.yaml, *.pipeline.yaml, triggers/**/*.yaml)") {
 		t.Errorf("exit code %d, stderr %q", code, errOut)
 	}
 
