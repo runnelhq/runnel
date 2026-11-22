@@ -1,6 +1,6 @@
 # ADR 0022: Connections und Secrets
 
-- **Status:** Entwurf (zur Abstimmung mit dem Maintainer)
+- **Status:** Angenommen
 - **Datum:** 2026-11-22
 - **Bezug:** KONZEPT Kap. 2.5, 2.6, 4.2, 8, 12; [ADR 0004 – MIT-Lizenz](0004-lizenz-mit.md),
   [ADR 0005 – Mehrbenutzerbetrieb](0005-mehrbenutzerbetrieb.md), [ADR 0007 – Typsystem](0007-typsystem-pipelines.md),
@@ -86,27 +86,95 @@ der Datei. So gibt es genau eine Stelle für Unterschiede, und `validate` prüft
 - Der Baustein erhält die aufgelöste Connection: Variablen und Secrets sind ersetzt. Die Werte erscheinen nie im Log
   oder im Ergebnis.
 
-### 4. Secrets: Kern des Secret-Stores vor S20
+### 4. Secrets und Secret-Quellen
 
-Damit Passwörter nicht als Umgebungsvariablen des Dienstkontos enden, kommt ein **Kern des Secret-Stores (S39) vor
-S20**:
+**Schreibweise.** Workflows und Connections schreiben `${secret:NAME}` oder, mit ausdrücklicher Quelle,
+`${secret:QUELLE/NAME}`. Woher der Wert kommt, entscheidet die Konfiguration, nicht der Workflow.
 
-- **Speicher:** eine Datei außerhalb des Projekts, verschlüsselt mit AES-256-GCM.
-  - Für Benutzer: `%LOCALAPPDATA%\runnel\secrets.db` bzw. `<Konfigurationsordner>/runnel/secrets.db`.
-  - Für den Dienst: `%ProgramData%\runnel\secrets\`, geschützt wie der Ordner des Zertifikats.
-- **Schlüssel:** unter Windows mit **DPAPI** gebunden an Benutzer bzw. Dienstkonto. Unter Linux und im portablen Modus
-  über `RUNNEL_MASTER_KEY`. Das Master-Passwort folgt später.
-- **Bedienung:** `runnel secret set <name>` (liest den Wert verdeckt von der Konsole oder von stdin, nie als Argument),
-  `runnel secret list` (nur Namen und Änderungszeit), `runnel secret delete <name>`, je mit `--service` für den Dienst
-  (Administratorrechte). Der Editor bekommt später ein Formular (Mockup); Werte zeigt er nie wieder an.
-- **Verwendung:** `${secret:NAME}` ist **nur in Connection-Dateien und in Headern bzw. Feldern mit `secret`-Format**
-  erlaubt, nicht in beliebigen Texten wie `core.log`. So landet ein Secret nicht versehentlich in Log, Datei oder
-  Ergebnis.
-- **Fehlendes Secret:** Ein Lauf, der es braucht, startet nicht. Die Meldung nennt den Namen, nie einen Wert.
-- **Je Environment:** Secret-Namen dürfen Variablen enthalten (`${secret:erp-${ENV}-password}`); einen eigenen Speicher
-  je Environment gibt es nicht.
-- **Maskierung:** Alle Werte, die aus Secrets aufgelöst wurden, ersetzt Runnel in Log, Fehlermeldungen, Vorschau und
-  Ereignissen durch `***`. Das gilt ebenso für Werte aus `${env:…}`, die in Connections stehen (Übergangslösung).
+**Secret-Quellen** sind Metadaten-Dateien im Projekt, wie Connections:
+
+```yaml
+# secret-stores/company-vault.yaml
+kind: SecretStore
+apiVersion: runnel/v1
+name: company-vault               # muss dem Dateinamen entsprechen
+type: azure-keyvault
+with:
+  url: https://contoso-runnel.vault.azure.net
+  auth: managed-identity
+  cache: 5m
+```
+
+```yaml
+# environments/prod.yaml
+kind: Environment
+apiVersion: runnel/v1
+name: prod
+secretStore: company-vault        # Standardquelle für ${secret:NAME} in diesem Environment
+variables: { … }
+```
+
+- **Standardquelle:** `secretStore` im Environment, sonst in `project.yaml`, sonst `local`. So nutzt z. B. dev den lokalen
+  Store und prod einen Tresor, ohne dass sich Workflows oder Connections ändern.
+- **Eingebaut immer vorhanden** (ohne Datei): `local` (lokaler Store des Projekts), `shared` (lokaler Store, für alle
+  Projekte des Kontos gemeinsam) und `env` (Umgebungsvariablen; `${env:NAME}` bleibt als Schreibweise für nicht
+  geheime Werte). Diese Namen sind für eigene Quellen reserviert.
+- **Typen:**
+
+  | Typ | Was | Wann |
+  |---|---|---|
+  | `local` | eigener Store (unten) | S39a |
+  | `env` | Umgebungsvariablen des Prozesses | S39a |
+  | `windows-credentials` | Windows-Anmeldeinformationsverwaltung | bei Bedarf |
+  | `azure-keyvault` | Azure Key Vault über die REST-API, ohne SDK; Anmeldung per Managed Identity, Client-Secret oder Zertifikat | bei Bedarf |
+  | `vault` | HashiCorp Vault / OpenBao über die HTTP-API, ohne Client-Bibliothek (MPL); Token oder AppRole | bei Bedarf |
+  | `aws-secrets`, `gcp-secrets` | Cloud-Tresore | später |
+  | Plugin | ein Plugin bietet eine Quelle an (neue Methode `secrets.get`, Nachtrag zu ADR 0019) | später |
+
+- **Kein `exec`:** Eine Quelle, die ein Programm startet (z. B. `op read`), gibt es nicht. Sie würde ein fremdes Projekt
+  Code ausführen lassen; Fälle wie 1Password oder KeePass laufen über ein freigegebenes Plugin (ADR 0019, Nachtrag).
+- **Anmeldung am Tresor:** über die Identität des Rechners (Managed Identity, gMSA/Kerberos) oder ein Secret aus einer
+  anderen Quelle, z. B. `clientSecret: ${secret:local/vault-client}`. Ketten enden immer bei `local`, `env` oder der
+  Identität des Rechners; Zyklen sind ein Fehler.
+- **Lesen und Schreiben:** Runnel liest aus allen Quellen, schreibt aber nur in `local` (später ggf.
+  `windows-credentials`). Tresore pflegt man mit deren Werkzeugen.
+- **Verfügbarkeit:** Ist eine Quelle nicht erreichbar oder fehlt ein Secret, startet ein Lauf nicht; die Meldung nennt
+  Quelle und Namen, nie einen Wert. Werte werden je Quelle im Speicher zwischengespeichert (`cache`, Standard 5 min),
+  nie auf der Platte. `validate` prüft die Konfiguration der Quellen, ruft aber keine Werte ab.
+
+**Der lokale Store (`local`, Schritt S39a vor S20):**
+
+- **Ablage außerhalb des Projekts:** für Benutzer `%LOCALAPPDATA%\runnel\secrets.db` bzw.
+  `<Konfigurationsordner>/runnel/secrets.db`, für den Dienst `%ProgramData%\runnel\secrets\` (geschützt wie der Ordner
+  des Zertifikats). Verschlüsselt mit AES-256-GCM; der Schlüssel ist unter Windows per **DPAPI** an Benutzer bzw.
+  Dienstkonto gebunden, sonst kommt er aus `RUNNEL_MASTER_KEY` oder einem Master-Passwort beim Start.
+- **Je Projekt:** Werte gehören zum Projekt (über seinen Ordner); zwei Projekte mit `erp-password` teilen sich den Wert
+  nicht. Gemeinsame Werte nur ausdrücklich über die Quelle `shared` (`${secret:shared/NAME}`).
+- **Inhalt:** Text, mehrzeiliger Text (z. B. private SSH-Schlüssel, PEM) und Dateien (z. B. PFX, als Base64) über
+  `--from-file`. Je Secret Änderungszeit und optional ein **Ablaufdatum** (`--expires`), vor dem `runnel secret list`
+  und der Editor warnen.
+- **Bedienung:**
+  - `runnel secret set <name>` liest den Wert verdeckt von der Konsole, von stdin oder mit `--from-file`, nie als Argument.
+  - `runnel secret list` zeigt Namen, Änderungszeit und Ablauf, keine Werte.
+  - `runnel secret delete <name>`.
+  - **`runnel secret missing`** zeigt, welche Secrets das Projekt braucht (aus Connections und Feldern mit
+    `secret`-Format) und welche in der jeweiligen Quelle fehlen; bei Tresoren nur, wenn das Recht zum Auflisten besteht,
+    sonst „nicht prüfbar“.
+  - `runnel secret export` / `import`: verschlüsselte Datei mit eigenem Passwort, für Umzug und Sicherung.
+  - Alles mit `--service` für den Store des Dienstes (Administratorrechte).
+- **Editor:** Secrets setzen und löschen, **nie anzeigen**; Hinweis auf fehlende und bald ablaufende Secrets (Mockup).
+  Im Netzbetrieb (S40b) ist das Setzen im Editor standardmäßig aus und nur per Schalter am Server erlaubt.
+
+**Wo Secrets hinfließen dürfen:**
+
+- `${secret:…}` ist **nur in Connection- und SecretStore-Dateien und in Feldern mit `secret`-Format** erlaubt, nicht
+  in beliebigen Texten wie `core.log`. So landet ein Secret nicht versehentlich in Log, Datei oder Ergebnis.
+- **Plugins** erhalten ein Secret nur über ein Feld mit `secret`-Format in ihrer Konfiguration; ihr Log wird ebenso
+  maskiert.
+- **Maskierung:** Alle aufgelösten Secret-Werte ersetzt Runnel in Log, Fehlermeldungen, Vorschau, Ereignissen und
+  Ergebnissen durch `***`, ebenso Werte aus `${env:…}`, die in Connections stehen. Werte unter 4 Zeichen werden nicht
+  maskiert, damit nicht jedes einzelne Zeichen ersetzt wird. Die Maskierung erkennt nur den exakten Wert; kodiert
+  (Base64, URL-kodiert) oder in Teilen bleibt er erkennbar. Die Doku sagt das deutlich.
 
 ### 5. Datenbanken: Werte nur als Parameter
 
@@ -187,7 +255,7 @@ Der Editor bietet „Test connection“ über `POST /api/v1/connections/{name}/t
 
 ### 9. Einheitliche Regeln für Metadaten-Dateien
 
-Für `Project`, `Environment`, `Trigger`, `Connection`, `Plugin` und später `RunConfig` gilt:
+Für `Project`, `Environment`, `Trigger`, `Connection`, `SecretStore`, `Plugin` und später `RunConfig` gilt:
 
 - `kind` und `apiVersion` sind Pflicht.
 - Wo es einen Ordner je Art gibt, gilt **Name gleich Dateiname**.
@@ -203,7 +271,10 @@ Abweichungen bestehender Dateiarten gleicht der Schritt an, der sie zuerst betri
 - **Secrets** liegen nie im Projekt und nie im Klartext auf der Platte; der Schlüssel ist an Benutzer bzw. Dienstkonto
   gebunden (DPAPI). Werte erscheinen weder in Logs, Fehlermeldungen, Vorschau, Ereignissen noch Ergebnissen
   (Maskierung).
-- **`${secret:…}`** ist nur in Connections und Feldern mit `secret`-Format erlaubt.
+- **`${secret:…}`** ist nur in Connections, Secret-Quellen und Feldern mit `secret`-Format erlaubt.
+- **Secret-Quellen** im Projekt enthalten nur Adresse und Art der Anmeldung, keine Werte; eine Quelle, die Programme
+  startet, gibt es nicht. Tresore werden nur gelesen; Werte liegen nur im Speicher und nur für die Dauer von `cache`.
+- **Export** des lokalen Stores nur verschlüsselt mit eigenem Passwort; der Editor zeigt Werte nie an.
 - **SQL:** Werte nur als Parameter, Bezeichner nur über geprüfte Felder. Das schützt vor SQL-Injection auch bei Werten
   aus HTTP-Triggern.
 - **Transport:**
@@ -214,6 +285,8 @@ Abweichungen bestehender Dateiarten gleicht der Schritt an, der sie zuerst betri
 - **Grenzen:** Timeouts je Abfrage bzw. Übertragung und Obergrenzen für offene Verbindungen.
 - **Tests für Ablehnungen** gehören zu den jeweiligen Schritten:
   - `${secret:…}` an verbotener Stelle
+  - fehlendes Secret und nicht erreichbare Quelle (Lauf startet nicht, Meldung ohne Wert)
+  - Zyklus in der Anmeldung von Quellen
   - Ausdruck im SQL-Text
   - fremder Host bei HTTP-Connection
   - unbekannter Hostschlüssel
@@ -229,8 +302,21 @@ Abweichungen bestehender Dateiarten gleicht der Schritt an, der sie zuerst betri
 - **MySQL mit `go-sql-driver/mysql`:** vorerst verworfen wegen MPL-2.0 (vom Maintainer entschieden).
 - **Passwörter bis S39 nur über Umgebungsvariablen:** verworfen. Für den Windows-Dienst ist das umständlich und
   fehleranfällig; ein kleiner Kern des Secret-Stores ist überschaubar.
+- **Ein fest eingebauter Speicher ohne Quellen:** verworfen. Teams mit Tresor müssten Werte doppelt pflegen; mit
+  Quellen bleibt `${secret:NAME}` gleich und nur die Konfiguration je Environment ändert sich.
+- **Quelle `exec`** (ein Programm liefert den Wert): verworfen (vom Maintainer entschieden). Sie würde Code aus dem
+  Projekt ausführen; dafür gibt es Plugins mit Freigabe.
+- **Secret-Quellen nur in der Rechner-Konfiguration:** verworfen (vom Maintainer entschieden). Im Projekt sieht jeder,
+  woher die Secrets kommen, und `runnel secret missing` kann gezielt helfen; Werte und Zugangsdaten liegen dort nicht.
 - **Secrets in einer Datei im Projekt (verschlüsselt):** verworfen. Ein Schlüssel müsste mitgegeben werden, und Git
   würde alte Stände behalten.
+
+## Abstimmung
+
+Mit dem Maintainer am 2026-11-22 abgestimmt: Werte je Environment über Variablen, ein Namensraum `transfer`, MySQL
+vorerst nicht; Ort der Secrets, `${secret:…}` nur an bestimmten Stellen, Platzhalter `@name`, Standardwerte wie
+vorgeschlagen; Secret-Quellen im Projekt ohne `exec`, lokaler Store je Projekt mit Export, Ablaufdatum und Editor nur
+zum Setzen.
 
 ## Konsequenzen
 
@@ -239,11 +325,12 @@ Abweichungen bestehender Dateiarten gleicht der Schritt an, der sie zuerst betri
   - Der Editor erzeugt Formulare und Auswahl aus den Schemas.
   - Ein Muster für alle Arten von Verbindungen.
 - **Negativ:**
-  - Mehr Arbeit vor S20: Secret-Kern, Connection-Format und Prüfung.
+  - Mehr Arbeit vor S20: Secret-Quellen mit lokalem Store, Connection-Format und Prüfung.
   - MySQL fehlt vorerst.
   - Die strengen Regeln (nur Parameter im SQL, Hostschlüssel Pflicht) verlangen mehr Angaben.
 - **Folgen für Dokumente:**
   - ADR 0013 erhält einen Nachtrag: `transfer` statt `ftp`/`sftp`.
   - KONZEPT 2.6, 4.2 (Treiber) und 8 werden angepasst.
-  - Die Roadmap bekommt S39a (Secret-Kern) vor S20, ein Mockup für Connections und Secrets im Editor und die
+  - Die Roadmap bekommt S39a (Secret-Quellen mit `local` und `env`, lokaler Store) vor S20, weitere Quellen als
+    eigene Schritte bei Bedarf, ein Mockup für Connections und Secrets im Editor und die
     `transfer`-Actions als eigenen Schritt.
