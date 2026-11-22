@@ -27,7 +27,7 @@ export interface Descriptor {
   recordErrors?: boolean;
   /** Transforms: can run in several copies. */
   parallel?: boolean;
-  /** Transforms: a short configuration ("with:" in YAML) for the help in the panel (E14b). */
+  /** A short configuration ("with:" in YAML) for the help in the panel (E14b); missing without configuration. */
   example?: string;
   /** Input transforms: can propose their fields ("Detect fields", S46). */
   detectFields?: boolean;

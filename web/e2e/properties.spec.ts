@@ -272,3 +272,15 @@ test("lists the problems below the canvas and jumps to the field", async ({ page
   await bar.getByRole("button", { name: /^Problems/ }).click();
   await expect(bar.getByRole("table")).toHaveCount(0);
 });
+
+test("help with an example for every action, also without configuration", async ({ page }) => {
+  await open(page);
+  await select(page, "fetch-b");
+  await page.getByRole("button", { name: "Help" }).click();
+  await expect(page.getByTestId("help-example")).toContainText("- id: fetch-b\n  type: core.wait\n  with:\n    duration: 30s");
+  await expect(page.getByText("runnel catalog core.wait")).toBeVisible();
+  // The start action has no configuration: the example is the entry alone.
+  await select(page, "start");
+  await page.getByRole("button", { name: "Help" }).click();
+  await expect(page.getByTestId("help-example")).toHaveText("- id: start\n  type: core.start\n");
+});

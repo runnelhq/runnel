@@ -16,7 +16,8 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "example": "message: \"No orders found in ${INBOX}\"\n"
     },
     {
       "type": "core.dummy",
@@ -64,7 +65,8 @@
           "message"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "message: \"Imported {{ results.import.output.write.written }} records\"\nlevel: info\n"
     },
     {
       "type": "core.run-pipeline",
@@ -96,7 +98,8 @@
           "pipeline"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "pipeline: pipelines/customers.pipeline.yaml\nparams:\n  BATCH: \"42\"\n"
     },
     {
       "type": "core.run-workflow",
@@ -125,7 +128,8 @@
           "workflow"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "workflow: workflows/import-region.workflow.yaml\nparams:\n  REGION: north\n"
     },
     {
       "type": "core.start",
@@ -155,7 +159,8 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "example": "message: Nothing to import today\n"
     },
     {
       "type": "core.wait",
@@ -180,7 +185,8 @@
           "duration"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "duration: 30s\n"
     },
     {
       "type": "file.copy",
@@ -217,7 +223,8 @@
           "target"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "source: inbox/*.csv\ntarget: archive/\noverwrite: true\n"
     },
     {
       "type": "file.delete",
@@ -251,7 +258,8 @@
           "path"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "path: out/*.tmp\n"
     },
     {
       "type": "file.exists",
@@ -285,7 +293,8 @@
           "path"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "path: inbox/orders-*.csv\nkind: file\n"
     },
     {
       "type": "file.list",
@@ -329,7 +338,8 @@
           "folder"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "folder: inbox\npattern: \"*.csv\"\n"
     },
     {
       "type": "file.mkdir",
@@ -353,7 +363,8 @@
           "path"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "path: \"archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n"
     },
     {
       "type": "file.move",
@@ -390,7 +401,8 @@
           "target"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "source: inbox/orders.csv\ntarget: done/\n"
     },
     {
       "type": "file.wait",
@@ -436,7 +448,8 @@
           "path"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "path: inbox/*.csv\nmaxWait: 30m\nstableFor: 10s\n"
     },
     {
       "type": "http.respond",
@@ -468,7 +481,8 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "example": "status: \"404\"\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n"
     }
   ],
   "transforms": [
@@ -613,6 +627,7 @@
         ],
         "additionalProperties": false
       },
+      "example": "condition: \"{{ record.umsatz \u003e 0 \u0026\u0026 record.ort != '' }}\"\n",
       "recordErrors": true,
       "parallel": true
     },
@@ -977,7 +992,8 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "example": "maxRows: 1000\n"
     },
     {
       "type": "csv.input",
@@ -1198,7 +1214,8 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "example": "status: 200\nsingle: true\n"
     }
   ]
 }

@@ -16,6 +16,7 @@ var copyDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "Copy Files",
 	Description: "Copies files or folders; output: the copied files",
+	Example:     "source: inbox/*.csv\ntarget: archive/\noverwrite: true\n",
 	Config:      transfer{},
 	New:         newCopy,
 }

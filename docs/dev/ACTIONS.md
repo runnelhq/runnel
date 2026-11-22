@@ -191,6 +191,7 @@ Pflicht:
 - [ ] Typname im passenden, reservierten Namensraum; bei neuem Namensraum: `namespaces.go`, `register.go`, `actions.go`
 - [ ] Eine Datei je Action, Tests daneben, Eintrag in `register.go`
 - [ ] `Category`, `Label`, `Description`, `Config` gesetzt; jedes Feld mit `doc`, Pflichtfelder mit `required` und `example`
+- [ ] `Example` (die `with:`-Werte in YAML) für den Abschnitt „Help“ im Editor; der Vertragstest prüft es
 - [ ] Konfiguration über `DecodeConfig`; `New` prüft nur Struktur, Werte werden in `Execute` geprüft
 - [ ] `ctx` wird beachtet (Abbruch, Timeout); keine Panics; keine Secrets im Log
 - [ ] Verständliche englische Fehlermeldungen

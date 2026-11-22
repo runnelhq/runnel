@@ -16,6 +16,7 @@ var waitDefinition = action.Definition{
 	Category:    action.CategoryGeneral,
 	Label:       "Wait",
 	Description: "Waits for a given time",
+	Example:     "duration: 30s\n",
 	Config:      wait{},
 	New:         newWait,
 }

@@ -147,6 +147,10 @@ type Definition struct {
 	Label string
 	// Description is one short English sentence without a final period.
 	Description string
+	// Example is a short configuration ("with:", in YAML) shown in the help of the editor;
+	// empty only for actions without configuration. The contract test checks that New
+	// accepts it.
+	Example string
 	// Config is the configuration struct that New decodes "with" into, e.g. logAction{};
 	// nil for actions without configuration. The JSON Schema of the action is derived
 	// from it (package schema).
@@ -167,6 +171,8 @@ type Descriptor struct {
 	Label       string         `json:"label"`
 	Description string         `json:"description"`
 	Schema      *schema.Schema `json:"schema"` // schema of the "with" configuration
+	// Example: see Definition.Example.
+	Example string `json:"example,omitempty"`
 }
 
 // Registry holds the available action types. Transforms have a registry of their own,
@@ -202,6 +208,7 @@ func (r *Registry) Register(d Definition) {
 		Label:       d.Label,
 		Description: d.Description,
 		Schema:      s,
+		Example:     d.Example,
 	}
 }
 

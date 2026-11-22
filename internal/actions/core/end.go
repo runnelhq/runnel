@@ -16,6 +16,7 @@ var (
 		Category:    action.CategoryGeneral,
 		Label:       "Success",
 		Description: "Ends the workflow successfully",
+		Example:     "message: Nothing to import today\n",
 		Config:      successConfig{},
 		New: func(with map[string]any) (action.Action, error) {
 			var c successConfig
@@ -30,6 +31,7 @@ var (
 		Category:    action.CategoryGeneral,
 		Label:       "Abort",
 		Description: "Ends the workflow as failed",
+		Example:     "message: \"No orders found in ${INBOX}\"\n",
 		Config:      abortConfig{},
 		New: func(with map[string]any) (action.Action, error) {
 			var c abortConfig

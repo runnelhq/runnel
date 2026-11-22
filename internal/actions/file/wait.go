@@ -20,6 +20,7 @@ var waitDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "Wait for File",
 	Description: "Waits until files exist; output: the matching paths",
+	Example:     "path: inbox/*.csv\nmaxWait: 30m\nstableFor: 10s\n",
 	Config:      wait{},
 	New:         newWait,
 }

@@ -19,6 +19,7 @@ var toResultDefinition = transform.Definition{
 	Category:    transform.CategoryExecution,
 	Label:       "Records to Workflow",
 	Description: "Returns the records to the calling workflow (output.rows) and passes them on",
+	Example:     "maxRows: 1000\n",
 	Config:      toResult{},
 	New:         newToResult,
 }

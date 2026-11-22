@@ -22,6 +22,7 @@ var runPipelineDefinition = action.Definition{
 	Category:    action.CategoryExecution,
 	Label:       "Run Pipeline",
 	Description: "Runs a pipeline with parameters; output: the counts of its transforms",
+	Example:     "pipeline: pipelines/customers.pipeline.yaml\nparams:\n  BATCH: \"42\"\n",
 	Config:      runPipeline{},
 	New:         newRunPipeline,
 }

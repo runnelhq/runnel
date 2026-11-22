@@ -17,6 +17,7 @@ var respondDefinition = action.Definition{
 	Category:    action.CategoryNetwork,
 	Label:       "HTTP Response",
 	Description: "Answers the caller of an HTTP trigger with status, headers and body; output: sent and status",
+	Example:     "status: \"404\"\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n",
 	Config:      respondAction{},
 	New:         newRespond,
 }
