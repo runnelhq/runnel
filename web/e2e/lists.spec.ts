@@ -110,7 +110,7 @@ test("chips for texts, cards with fields that apply only sometimes", async ({ pa
   await page.getByRole("button", { name: "Add field" }).click();
   await page.getByRole("combobox", { name: "New field" }).fill("source");
   await page.getByRole("combobox", { name: "New field" }).press("Enter");
-  await expect(page.getByRole("listitem").filter({ hasText: "source" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Group by" }).getByRole("listitem").filter({ hasText: "source" })).toBeVisible();
 
   // aggregates: cards; separator only for concat.
   const cards = page.getByTestId("list-aggregates");
