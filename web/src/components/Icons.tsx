@@ -319,6 +319,13 @@ const actionIcons: Record<string, ReactNode> = {
   // Transforms (design/mockups/s25a-pipeline.html); core.log and core.dummy as above.
   "csv.input": <path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6" />,
   "csv.output": <path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v7M9 15l3 3 3-3" />,
+  // JSON files (S19, variant A chosen by the maintainer): a page with braces; writing with an arrow down, as csv.output.
+  "json.input": (
+    <path d="M6 3h8l4 4v14H6zM14 3v4h4M11 10.5c-1.2 0-1.7.5-1.7 1.6v.6c0 .7-.4 1.1-1.1 1.1.7 0 1.1.4 1.1 1.1v.6c0 1.1.5 1.6 1.7 1.6M13 10.5c1.2 0 1.7.5 1.7 1.6v.6c0 .7.4 1.1 1.1 1.1-.7 0-1.1.4-1.1 1.1v.6c0 1.1-.5 1.6-1.7 1.6" />
+  ),
+  "json.output": (
+    <path d="M14 3H6v18h6M14 3v4h4v4M9.5 9.5c-1 0-1.4.4-1.4 1.3v.5c0 .6-.3.9-.9.9.6 0 .9.3.9.9v.5c0 .9.4 1.3 1.4 1.3M18 14v7M15 18l3 3 3-3" />
+  ),
   "core.generate-rows": <path d="M4 6h16M4 12h16M4 18h16M19 3v6M16 6h6" />,
   "core.from-result": <path d="M4 12h11M11 8l4 4-4 4M15 4h5v16h-5" />,
   "core.to-result": <path d="M9 12h11M16 8l4 4-4 4M9 4H4v16h5" />,

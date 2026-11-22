@@ -242,6 +242,30 @@ func TestRunMapSplitExample(t *testing.T) {
 	}
 }
 
+// TestRunJSONExample: json.input and json.output (S19) in
+// examples/pipelines/pipelines/api-orders.pipeline.yaml.
+func TestRunJSONExample(t *testing.T) {
+	chdirRepoRoot(t)
+	target := filepath.Join(t.TempDir(), "orders.ndjson")
+	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "examples/pipelines/pipelines/api-orders.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	if !strings.Contains(out, "[read] read 3 records from api/orders.json") {
+		t.Errorf("missing the count in:\n%s", out)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the paid orders; Weber, Anna has no address.
+	want := `{"id":1001,"customer":"Müller GmbH","city":"Köln","amount":1234.5,"day":"19.11.2026"}` + "\n" +
+		`{"id":1003,"customer":"Weber, Anna","city":null,"amount":12500,"day":"20.11.2026"}` + "\n"
+	if string(b) != want {
+		t.Errorf("written file %q, want %q", b, want)
+	}
+}
+
 func TestRunBasicTransformsExample(t *testing.T) {
 	chdirRepoRoot(t)
 	target := filepath.Join(t.TempDir(), "crm.csv")

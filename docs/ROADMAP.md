@@ -153,6 +153,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 | S16d ✅ | Sequenz | `core.sequence`: fortlaufende Nummer in der Reihenfolge der Datensätze, `start`, `step`, mit `groupBy` je Gruppe; Icons von `core.calculate`, `core.dedupe` und `core.sequence` nach Mockup [`s16d-icons.html`](../design/mockups/s16d-icons.html); Beispiel `contacts.pipeline.yaml` | Unit-Tests, Benchmark; CLI-Test mit dem Beispiel |
 | S16e ✅ | Funktion `concat()` | `concat(trenner, a, b, …)` in der Ausdruckssprache: verbindet Werte als Text und lässt leere weg ([ADR 0006](adr/0006-ausdruckssprache.md), Nachtrag); statt eines eigenen Concat-Transforms | Unit-Tests; Beispiel in `contacts.pipeline.yaml` |
 | S16f ✅ | Wertzuordnung & Feld teilen | `core.map-values` (Tabelle `from`/`to`, `target`, `default`, `ignoreCase`) und `core.split-field` (in Felder mit `into` oder in Datensätze mit `rows`, `indexField`, `keepEmpty`, `trim`); Icons nach Vorschlag (Variante A, vom Maintainer ohne eigenes Mockup gewählt); Beispiel `people.pipeline.yaml` | Unit-Tests, Benchmarks; CLI-Test mit dem Beispiel |
+| S19 ✅ | JSON | `json.input` (JSON als Strom mit `records` für ein Array im Dokument, NDJSON je Zeile mit Fehler-Link, `fields` mit `from` und Typ, Kodierung wie CSV, „Detect fields“) und `json.output` (Array oder NDJSON, exakte Zahlen, ISO-Daten, `format`); Icons: Seite mit `{ }` (Variante A, vom Maintainer gewählt); Kodierung gemeinsam mit CSV in `internal/textenc`; Beispiel `api-orders.pipeline.yaml` | Unit-Tests, Fuzzing, Benchmarks; CLI-Test mit dem Beispiel |
 | S49 | Plugin-Protokoll | JSON-RPC über stdin/stdout ([ADR 0019](adr/0019-plugin-protokoll.md)): `kind: Plugin` unter `plugins/<name>/`, Handshake, Prozess je Lauf, `describe`, `action.execute` | Beispiel-Plugin in Go |
 | S50 | Plugin-Transforms | `transform.open/batch/end`, `emit`/`closed`, Kredite (Streaming, ADR 0019) | Beispiel-Plugin; Benchmark mit Echo-Plugin (Ziel ≥ 300.000 Records/s) |
 | S51 | Go-SDK | `pkg/sdk` mit Beispielen | Beispiel-Plugin baut nur mit SDK |
@@ -178,7 +179,6 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | – |
 | S24 (Teil) | Ergebnis-Datensätze auslagern | `resultSpillRows`: große Ergebnisse in eine temporäre Datei statt in den Speicher | S24a |
 | S17 (Teil) | `maxErrors` | Schwelle für Fehler-Links: mehr als n fehlerhafte Datensätze brechen die Pipeline ab | S17a |
-| S19 | JSON | `json.input`, `json.output` (JSON und NDJSON), mit „Felder ermitteln“ (S46) | – |
 | S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | – |
 | S21 | DB-Ausgabe | `db.table-output` (Insert, `commitSize`), `db.upsert` | S20 |
 | S23 | Lookups & Join | Info-Link, `core.stream-lookup`, `db.lookup`, `core.merge-join` | `db.lookup`: S20; danach Info-Links im Pipeline-Canvas |

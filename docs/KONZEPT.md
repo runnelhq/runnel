@@ -1133,7 +1133,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 
 Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
 `core.constant`, `core.convert`, `core.calculate`, `core.sequence`, `core.map-values`, `core.split-field`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
-`core.from-result`, `core.to-result`, `csv.input`, `csv.output` und `http.response`:
+`core.from-result`, `core.to-result`, `csv.input`, `csv.output`, `json.input`, `json.output` und `http.response`:
 
 - **`core.sort`** sortiert stabil nach `fields: [{ name, descending, ignoreCase }]`; leere Werte zuletzt (auch absteigend),
   Zahlen exakt über `int`, `decimal` und `float` hinweg, Text nach Unicode-Codepunkten (Großbuchstaben zuerst) oder mit
@@ -1176,6 +1176,17 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   (Standard 1) im Abstand `step` (Standard 1, auch negativ; beide dürfen `${…}` sein). Mit `groupBy` zählt jede
   Kombination von Werten für sich ab `start`, ohne dass die Datensätze sortiert sein müssen (Positionen je Bestellung);
   dafür bleibt je Gruppe ein Zähler im Speicher. Für eine Rangliste davor `core.sort`.
+- **`json.input`** liest JSON und NDJSON (S19): bei `format: json` die Einträge von Arrays und einzelne Objekte, auch
+  mehrere Dokumente hintereinander, mit `records: data.items` das Array innerhalb des Dokuments (z. B. die Antwort einer
+  API); bei `ndjson` (Standard für `.ndjson` und `.jsonl`) ein Objekt je Zeile, eine kaputte Zeile geht mit ihrem Text
+  auf den Fehler-Link. Schlüssel behalten ihre Reihenfolge, ganze Zahlen werden `int`, andere exakt `decimal`,
+  verschachtelte Objekte und Listen bleiben (`json`). `fields` wählt Felder aus, auch aus verschachtelten Objekten
+  (`from: address.city`), und wandelt sie mit `type`/`format` um wie `core.convert`. Gelesen wird als Strom (große
+  Dateien passen nicht in den Speicher); Kodierung wie bei CSV (UTF-16 von PowerShell 5 wird erkannt). „Detect fields“
+  schlägt Typen aus den Werten vor.
+- **`json.output`** schreibt ein Array mit einem Datensatz je Zeile oder NDJSON (Standard für `.ndjson`/`.jsonl`), UTF-8
+  ohne BOM, Schlüssel in der Reihenfolge der Felder; Dezimalzahlen exakt, Daten in ISO 8601, mit `format` als Text.
+  Wie `csv.output` über eine temporäre Datei, die die alte erst am Ende ersetzt (`ifExists: replace|fail`).
 - **`core.map-values`** ersetzt die Werte eines Feldes über eine Tabelle `values: [{ from, to }]` (z. B. Codes durch
   Namen), wahlweise in ein anderes Feld (`target`). Verglichen wird als Text (`1` = `"1"`), mit `ignoreCase` ohne Groß-
   und Kleinschreibung; ein leeres `from` trifft leere Werte, ein fehlendes `to` leert. Werte, die nicht in der Tabelle
@@ -1304,7 +1315,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S10, S19–S21, S23, S25, S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S10, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

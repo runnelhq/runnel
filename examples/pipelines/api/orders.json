@@ -1,0 +1,10 @@
+{
+  "meta": { "source": "shop", "page": 1 },
+  "data": {
+    "items": [
+      { "id": 1001, "customer": { "name": "Müller GmbH", "address": { "city": "Köln" } }, "amount": 1234.50, "day": "2026-11-19", "paid": true },
+      { "id": 1002, "customer": { "name": "Schmidt & Söhne", "address": { "city": "Bonn" } }, "amount": 89.90, "day": "2026-11-19", "paid": false },
+      { "id": 1003, "customer": { "name": "Weber, Anna" }, "amount": 12500, "day": "2026-11-20", "paid": true }
+    ]
+  }
+}
