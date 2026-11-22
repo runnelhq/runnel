@@ -150,7 +150,7 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 		if !ok {
 			errs = append(errs, w.ErrorAt(path+".type", "action %q: unknown action type %q (available: %v)",
 				a.ID, a.Type, opts.Registry.Types()))
-		} else if _, err := def.New(a.With); err != nil {
+		} else if _, err := def.New(asText(a.With, opts.Registry, a.Type)); err != nil {
 			errs = append(errs, w.ErrorAt(path+".with", "action %q (%s): %v", a.ID, a.Type, err))
 		}
 	}

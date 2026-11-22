@@ -96,7 +96,9 @@ Regeln:
   Backslashes in Tags verdoppeln (`example=C:\\in`), sonst ist das ganze Tag ungültig.
 - **Typen:** `string`, `bool`, Ganz- und Kommazahlen, Slices, `map[string]T`, verschachtelte Structs, `any`. Felder,
   die `${…}` oder `{{ … }}` enthalten dürfen, als `string` anlegen – auch Zahlen und Zeitangaben. Ergibt ein Ausdruck
-  für ein Textfeld eine Zahl oder ein Datum, erhält die Action den Wert als Text.
+  für ein Textfeld eine Zahl oder ein Datum, erhält die Action den Wert als Text. Ebenso wird eine Zahl oder
+  `true`/`false` in der Datei (`status: 404`) für ein Textfeld als Text übergeben – vor dem Lauf wie bei der
+  Ausführung, wie in Pipelines.
 - **`DecodeConfig`** verwenden – es lehnt unbekannte Felder ab (Tippfehler im Workflow werden gemeldet; Vertragstest
   prüft das) und prüft Pflichtfelder.
 - **`New` prüft nur die Struktur:** Pflichtfelder, Typen, unbekannte Felder. `New` wird zweimal aufgerufen: vor dem Lauf

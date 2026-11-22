@@ -482,7 +482,7 @@
         },
         "additionalProperties": false
       },
-      "example": "status: \"404\"\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n"
+      "example": "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n"
     }
   ],
   "transforms": [
