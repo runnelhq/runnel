@@ -358,3 +358,19 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   Ereignissen (Log, Fehler, Ausgaben), im Ergebnis eines Workflows und in der Datenvorschau. Die Datensätze einer Pipeline
   bleiben unverändert: Sie sind Daten für den nächsten Schritt.
 
+## Nachtrag 2026-11-22 (S39a2): Quelle `inline` für Klartext
+
+Abgestimmt mit dem Maintainer. Abweichung von „Secrets liegen nie im Projekt“, bewusst und sichtbar:
+
+- **Zweck:** Entwicklungssysteme und einfache APIs mit geringer Auswirkung, für die ein Store auf jedem Rechner zu viel
+  Aufwand wäre.
+- **Form:** Eingebaute Quelle `inline`. Die Werte stehen unter `secrets:` im Environment bzw. in `project.yaml`
+  (Environment vor Projekt), Namen wie bei `${secret:NAME}`. Workflows schreiben weiter `${secret:NAME}`; für die
+  Produktion stellt man nur `secretStore:` des Environments um, z. B. auf `local`.
+- **Behandlung wie jedes Secret:** nur in Secret-Feldern und als Token, Maskierung im Lauf. Die Werte gehen nicht über die
+  JSON-API des Projekts hinaus (die Datei selbst liest der Editor wie jede Datei des Projekts).
+- **Warnung statt Verbot:** `runnel validate` und der Editor warnen bei jedem `secrets:` mit Werten („secrets in plain
+  text …“). Ein Schalter, der `inline` im Betrieb verbietet, ist vorerst nicht vorgesehen (vom Maintainer entschieden).
+- **Portabler Betrieb** bleibt davon getrennt: Dort liegt der lokale Store neben der exe, mit Schlüsseldatei statt DPAPI
+  (mit S39d bzw. dem portablen Modus).
+

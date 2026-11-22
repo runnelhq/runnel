@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -12,15 +13,17 @@ import (
 // Secret stores (ADR 0022): ${secret:NAME} reads from the default store of the
 // environment (secretStore: in the environment, else in project.yaml, else local);
 // ${secret:STORE/NAME} names the store. Built in are local and shared (the local secret
-// store of the computer, roadmap S39d/S39e) and env (environment variables).
+// store of the computer, roadmap S39d/S39e), env (environment variables) and inline
+// (secrets: in the environment or project.yaml, plain text; Nachtrag S39a2).
 const (
 	SecretStoreLocal  = "local"
 	SecretStoreShared = "shared"
 	SecretStoreEnv    = "env"
+	SecretStoreInline = "inline"
 )
 
 // SecretStores are the names of the built-in secret stores.
-var SecretStores = []string{SecretStoreLocal, SecretStoreShared, SecretStoreEnv}
+var SecretStores = []string{SecretStoreLocal, SecretStoreShared, SecretStoreEnv, SecretStoreInline}
 
 // DefaultSecretStore returns the store ${secret:NAME} reads from in an environment:
 // secretStore of the environment, else of the project, else local. p and env may be nil.
@@ -45,7 +48,10 @@ func SecretLookup(p *Project, env *Environment) func(store, name string) (string
 		if err := secretStoreAvailable(store); err != nil {
 			return "", fmt.Errorf("secret %q: %w", name, err)
 		}
-		v, ok := os.LookupEnv(name) // env is the only store so far
+		if store == SecretStoreInline {
+			return inlineSecret(p, env, name)
+		}
+		v, ok := os.LookupEnv(name)
 		if !ok || v == "" {
 			return "", fmt.Errorf("secret %q: environment variable %s is not set (secret store env)", name, name)
 		}
@@ -53,10 +59,63 @@ func SecretLookup(p *Project, env *Environment) func(store, name string) (string
 	}
 }
 
-// secretStoreAvailable reports why a store cannot be read; nil for env.
+// inlineSecret reads a secret from secrets: of the environment, else of project.yaml.
+func inlineSecret(p *Project, env *Environment, name string) (string, error) {
+	if env != nil {
+		if v, ok := env.Secrets[name]; ok {
+			return v, nil
+		}
+	}
+	if p != nil {
+		if v, ok := p.Secrets[name]; ok {
+			return v, nil
+		}
+	}
+	where := ProjectFile
+	if env != nil {
+		where = EnvironmentsDir + "/" + env.Name + ".yaml or " + ProjectFile
+	}
+	return "", fmt.Errorf("secret %q is not set under secrets: in %s (secret store inline)", name, where)
+}
+
+func checkSecretNames(s *source, secrets map[string]string) Errors {
+	var errs Errors
+	for _, name := range slices.Sorted(maps.Keys(secrets)) {
+		if !vars.ValidSecretName(name) {
+			errs = append(errs, s.errorf(keyPath("$.secrets", name), "invalid secret name %q (letters, digits, ., - and _)", name))
+		}
+	}
+	return errs
+}
+
+// inlineWarning is the warning for secrets in plain text (secretStore: inline).
+const inlineWarning = "secrets in plain text (secretStore: inline): meant for development and simple APIs; keep this file out of shared repositories and use another secret store for production"
+
+// InlineSecretWarnings warns about secrets in plain text in project.yaml and its
+// environments (for runnel validate; loading a project does not warn).
+func (p *Project) InlineSecretWarnings() Errors {
+	var errs Errors
+	if p.src != nil && len(p.Secrets) > 0 {
+		errs = append(errs, p.src.warnf("$.secrets", inlineWarning))
+	}
+	for _, name := range p.EnvironmentNames() {
+		errs = append(errs, p.Environments[name].InlineSecretWarnings()...)
+	}
+	return errs
+}
+
+// InlineSecretWarnings warns about secrets in plain text in an environment.
+func (env *Environment) InlineSecretWarnings() Errors {
+	if env == nil || env.src == nil || len(env.Secrets) == 0 {
+		return nil
+	}
+	return Errors{env.src.warnf("$.secrets", inlineWarning)}
+}
+
+// secretStoreAvailable reports why a store cannot be read; nil for env and inline.
 func secretStoreAvailable(store string) error {
 	switch store {
-	case SecretStoreEnv:
+	case SecretStoreEnv, SecretStoreInline:
 		return nil
 	case SecretStoreLocal, SecretStoreShared:
 		return fmt.Errorf("the %s secret store is not available yet; set secretStore: env in the environment or project.yaml, or write ${secret:env/NAME}", store)

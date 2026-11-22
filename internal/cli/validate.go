@@ -245,6 +245,9 @@ func (v *validator) project(dir string) (p *model.Project, found bool, err error
 	} else if err != nil {
 		return nil, true, err
 	}
+	if p != nil {
+		v.report(p.InlineSecretWarnings())
+	}
 	v.projects[root] = p
 	return p, true, nil
 }

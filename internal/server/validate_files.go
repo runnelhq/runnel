@@ -20,9 +20,15 @@ func (s *Server) validateText(kind, name string, data []byte) (model.Errors, err
 			_, err := os.Stat(filepath.Join(s.dir, model.EnvironmentsDir, env+".yaml"))
 			return err == nil
 		}
-		_, err = model.ReadProject(name, data, exists)
+		var p *model.Project
+		if p, err = model.ReadProject(name, data, exists); err == nil {
+			return p.InlineSecretWarnings(), nil
+		}
 	case "environment":
-		_, err = model.ReadEnvironment(name, data)
+		var env *model.Environment
+		if env, err = model.ReadEnvironment(name, data); err == nil {
+			return env.InlineSecretWarnings(), nil
+		}
 	case "trigger":
 		var t *model.Trigger
 		if t, err = model.ParseTrigger(name, data); err == nil {

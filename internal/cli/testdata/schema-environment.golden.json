@@ -36,12 +36,20 @@
     },
     "secretStore": {
       "type": "string",
-      "description": "Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables) or local (the local secret store, not available yet)",
+      "description": "Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables), inline (secrets: in this file, plain text) or local (the local secret store, not available yet)",
       "enum": [
         "local",
         "shared",
-        "env"
+        "env",
+        "inline"
       ]
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Secrets of this environment in plain text for secretStore: inline, used as ${secret:NAME}; only for development and simple APIs",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "required": [

@@ -151,7 +151,8 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
   - `${secret:NAME}` bzw. `${secret:QUELLE/NAME}` – Secret aus einer Secret-Quelle; Standardquelle je Environment
     (`secretStore:`), sonst der lokale Store. Nur in Connections, Secret-Quellen, Feldern mit `format: runnel-secret`
     und als Token von HTTP-Triggern erlaubt, nie über eine Variable ([ADR 0022](adr/0022-connections-secrets.md),
-    Kap. 8). Seit S39a gibt es die Quelle `env` (Umgebungsvariablen, `secretStore: env`); `local` folgt mit S39d
+    Kap. 8). Seit S39a gibt es die Quelle `env` (Umgebungsvariablen, `secretStore: env`), seit S39a2 `inline` (Klartext unter
+    `secrets:` im Environment, mit Warnung; für Entwicklung und einfache APIs); `local` folgt mit S39d
   - `$${` – ein wörtliches `${`
   - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
 - Das Projekt wird über `project.yaml` im Ordner des Workflows oder einem übergeordneten Ordner gefunden (wie `.git`).

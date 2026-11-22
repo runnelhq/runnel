@@ -43,13 +43,21 @@
     },
     "secretStore": {
       "type": "string",
-      "description": "Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables) or local (the local secret store, not available yet)",
+      "description": "Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables), inline (secrets: in the file, plain text) or local (the local secret store, not available yet)",
       "enum": [
         "local",
         "shared",
-        "env"
+        "env",
+        "inline"
       ],
       "default": "local"
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Secrets in plain text for secretStore: inline, used as ${secret:NAME} where no environment has its own; only for development and simple APIs",
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "workflow": {
       "type": "object",
