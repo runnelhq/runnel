@@ -360,6 +360,57 @@
       "example": "duration: 30s\n"
     },
     {
+      "type": "db.execute",
+      "kind": "action",
+      "category": "database",
+      "label": "Execute SQL",
+      "description": "Runs an SQL statement on a database, e.g. to insert, update or delete rows",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the database (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "app-db"
+            ],
+            "x-runnel-connection": [
+              "sqlite"
+            ]
+          },
+          "sql": {
+            "type": "string",
+            "description": "The statement; values as @name with the value under params, never written into the statement",
+            "format": "runnel-sql",
+            "examples": [
+              "DELETE FROM orders WHERE status = 'cancelled'"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "description": "Values of the parameters @name of the statement; may use ${…} and {{ … }}",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time the statement may take",
+            "format": "runnel-duration",
+            "default": "5m"
+          }
+        },
+        "required": [
+          "connection",
+          "sql"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: app-db\nsql: DELETE FROM orders WHERE created \u003c @before\nparams:\n  before: ${CUTOFF_DATE}\n"
+    },
+    {
       "type": "file.copy",
       "kind": "action",
       "category": "files",

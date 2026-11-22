@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/schema"
 )
@@ -30,6 +31,10 @@ type ExecContext struct {
 	ActionID string
 	// Log writes a message to the run log.
 	Log func(level slog.Level, msg string)
+	// Connection returns a connection of the project (connections/<name>.yaml, ADR 0022)
+	// with variables and secrets resolved for the environment of the run; nil where
+	// connections are not supported. Its values must not be logged.
+	Connection connection.Resolver
 	// RunWorkflow runs another workflow of the project (core.run-workflow) and returns
 	// its outputs; nil where the caller of the engine does not support it.
 	RunWorkflow func(ctx context.Context, path string, params map[string]string) (map[string]any, error)

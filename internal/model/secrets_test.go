@@ -1,6 +1,8 @@
 package model
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -204,5 +206,40 @@ func TestInlineSecrets(t *testing.T) {
 	_, err = ReadEnvironment("environments/dev.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: dev\nsecrets:\n  \"bad name\": x\n"))
 	if err == nil || !strings.Contains(err.Error(), `invalid secret name "bad name"`) {
 		t.Errorf("bad name: %v", err)
+	}
+}
+
+// Connection files: kind, name = file name and type are required; LoadProject reads
+// them with the project.
+func TestReadConnection(t *testing.T) {
+	_, err := ReadConnection("connections/db.yaml", []byte("kind: Connection\napiVersion: runnel/v1\nname: other\nwith: { path: x.db }\n"))
+	for _, want := range []string{
+		`connections/db.yaml:3:7: connection name "other" must match the file name ("db")`,
+		`connections/db.yaml:1:1: missing required field "type" (the kind of connection, e.g. sqlite)`,
+	} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%v\nwant %s", err, want)
+		}
+	}
+	dir := t.TempDir()
+	writeFile(t, dir+"/project.yaml", "kind: Project\napiVersion: runnel/v1\nname: p\n")
+	writeFile(t, dir+"/connections/db.yaml", "kind: Connection\napiVersion: runnel/v1\nname: db\ntype: sqlite\nwith: { path: x.db }\n")
+	writeFile(t, dir+"/connections/bad.yaml", "kind: Connection\napiVersion: runnel/v1\nname: wrong\ntype: sqlite\n")
+	p, err := LoadProject(dir)
+	if err == nil || !strings.Contains(err.Error(), `connection name "wrong" must match the file name ("bad")`) || p == nil {
+		t.Fatalf("%v", err)
+	}
+	if strings.Join(p.ConnectionNames(), ",") != "db" || p.Connections["db"].Type != "sqlite" {
+		t.Errorf("connections %v", p.ConnectionNames())
+	}
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions/archive"
 	"github.com/runnelhq/runnel/internal/actions/core"
+	"github.com/runnelhq/runnel/internal/actions/db"
 	"github.com/runnelhq/runnel/internal/actions/file"
 	"github.com/runnelhq/runnel/internal/actions/http"
 )
@@ -19,6 +20,7 @@ import (
 var namespaces = []func(*action.Registry){
 	archive.Register,
 	core.Register,
+	db.Register,
 	file.Register,
 	http.Register,
 }

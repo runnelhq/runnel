@@ -121,6 +121,8 @@ func fileKind(p string) string {
 		return "environment"
 	case model.IsTriggerFile(p):
 		return "trigger"
+	case path.Dir(p) == model.ConnectionsDir && strings.HasSuffix(p, ".yaml"):
+		return "connection"
 	case strings.EqualFold(path.Ext(p), ".md"):
 		return "document"
 	case imageTypes[strings.ToLower(path.Ext(p))] != "":

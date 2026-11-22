@@ -81,11 +81,15 @@ type VarContext struct {
 // References to environment variables and secrets are not checked for existence,
 // since they depend on the machine the workflow runs on.
 func (w *Workflow) CheckVariables(contexts []VarContext) Errors {
+	return checkVarRefs(w.src, contexts)
+}
+
+func checkVarRefs(s *source, contexts []VarContext) Errors {
 	var errs Errors
-	for _, sc := range w.src.scalars() {
+	for _, sc := range s.scalars() {
 		refs, err := vars.Parse(sc.value)
 		if err != nil {
-			errs = append(errs, &Error{File: w.src.name, Pos: sc.pos, Path: sc.path, Msg: err.Error()})
+			errs = append(errs, &Error{File: s.name, Pos: sc.pos, Path: sc.path, Msg: err.Error()})
 			continue
 		}
 		for _, r := range refs {
@@ -99,7 +103,7 @@ func (w *Workflow) CheckVariables(contexts []VarContext) Errors {
 				}
 			}
 			if msg := undefinedMessage(r.Name, missing, len(contexts)); msg != "" {
-				errs = append(errs, &Error{File: w.src.name, Pos: sc.pos, Path: sc.path, Severity: SeverityWarning, Msg: msg})
+				errs = append(errs, &Error{File: s.name, Pos: sc.pos, Path: sc.path, Severity: SeverityWarning, Msg: msg})
 			}
 		}
 	}

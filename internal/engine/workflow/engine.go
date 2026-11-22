@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/paths"
@@ -57,6 +58,8 @@ type Options struct {
 	BaseDir string
 	// Mask hides the values of secrets in events and in the result (ADR 0022); nil: none.
 	Mask *vars.Mask
+	// Connections resolves the connections named by actions (ADR 0022); nil: none.
+	Connections connection.Resolver
 }
 
 // Status is the final state of a run.
@@ -316,10 +319,11 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 		return action.Result{}, err
 	}
 	ec := &action.ExecContext{
-		RunID:    runID,
-		ActionID: a.ID,
-		Log:      func(level slog.Level, msg string) { r.log(runID, a, level, prefix+msg) },
-		Respond:  r.opts.Respond,
+		RunID:      runID,
+		ActionID:   a.ID,
+		Log:        func(level slog.Level, msg string) { r.log(runID, a, level, prefix+msg) },
+		Respond:    r.opts.Respond,
+		Connection: r.opts.Connections,
 	}
 	if r.opts.Workflows != nil {
 		ec.RunWorkflow = func(ctx context.Context, path string, params map[string]string) (map[string]any, error) {

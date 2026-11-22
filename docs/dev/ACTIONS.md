@@ -91,6 +91,8 @@ Regeln:
   | `schema:"example=…"` | Beispielwert; für Pflichtfelder empfohlen, der Vertragstest verwendet ihn |
   | `schema:"format=runnel-duration"` | Zeitangabe wie `30s`, `5m`, `1h30m` |
   | `schema:"format=runnel-text"` | mehrzeiliger Text (der Editor zeigt ein wachsendes Textfeld statt einer Zeile) |
+  | `schema:"connection=sqlite"` | Name einer Connection (`connections/<name>.yaml`) der genannten Typen (`a\|b`); Format `runnel-connection`. Die Action holt sie mit `ec.Connection(ctx, name)` – Variablen und Secrets sind aufgelöst, Werte nie ausgeben ([ADR 0022](../adr/0022-connections-secrets.md)) |
+  | `schema:"format=runnel-sql"` | SQL-Anweisung: wird unverändert übergeben, `${…}` und `{{ … }}` darin sind ein Fehler; Werte als `@name` mit einem Feld `params` |
   | `schema:"format=runnel-secret"` | Secret, z. B. Passwort oder Token ([ADR 0022](../adr/0022-connections-secrets.md)): nur hier ist `${secret:…}` erlaubt; aufgelöst ohne Ausdrücke, vor dem Lauf gelesen, der Wert wird in Log, Fehlern und Ergebnissen maskiert. Die Action darf ihn trotzdem nicht selbst ausgeben |
 
   Optionen werden mit Komma getrennt (`schema:"required,example=30s"`); Werte dürfen daher kein Komma enthalten.

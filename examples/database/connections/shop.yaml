@@ -1,0 +1,9 @@
+# The database of the example: an SQLite file under out/ (ignored by Git), created on
+# first use. Workflows name it as connection: shop.
+kind: Connection
+apiVersion: runnel/v1
+name: shop
+description: Orders of the example shop
+type: sqlite
+with:
+  path: out/shop.db

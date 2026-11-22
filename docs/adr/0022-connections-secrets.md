@@ -374,3 +374,24 @@ Abgestimmt mit dem Maintainer. Abweichung von „Secrets liegen nie im Projekt�
 - **Portabler Betrieb** bleibt davon getrennt: Dort liegt der lokale Store neben der exe, mit Schlüsseldatei statt DPAPI
   (mit S39d bzw. dem portablen Modus).
 
+## Nachtrag 2026-11-22 (S20a): Connections zuerst mit SQLite
+
+Abgestimmt mit dem Maintainer vor der Umsetzung.
+
+- **Reihenfolge:** S20 wird geteilt. S20a bringt den Rahmen (Dateien, Registry der Typen, Prüfung, Auflösung) mit dem
+  Typ `sqlite` und der Action `db.execute`; S20b den Transform `db.table-input` und das Anpassen der Verweise beim
+  Umbenennen; S20c SQL Server und PostgreSQL. Der lokale Store (S39d) folgt danach; bis dahin kommen Secrets aus `env`
+  oder `inline`.
+- **SQLite zuerst:** `modernc.org/sqlite` ist reines Go (kein CGO), BSD-3, und lässt sich ohne Datenbank-Server in der CI
+  testen. Die Binärdatei wird um etwa 5 MB größer; derselbe Treiber dient später der Run-Historie (S26).
+- **Formate:** `connection:` hat das Format `runnel-connection`, die erlaubten Typen stehen unter
+  `x-runnel-connection` (Tag `schema:"connection=sqlite|…"`). SQL-Felder haben das Format `runnel-sql`: Die Engine
+  reicht sie unverändert weiter; `${…}` oder `{{ … }}` darin sind ein Fehler bei `validate` und vor dem Lauf.
+- **Auflösung:** Connections mit festem Namen werden vor dem Start aufgelöst. Eine fehlende Connection, Variable oder ein
+  fehlendes Secret verhindert den Lauf; Secrets und die Werte von `${env:…}` in einer Connection kommen in die Maske des
+  Laufs. Namen mit `${…}` oder `{{ … }}` werden beim Ausführen aufgelöst (Warnung bei `validate`).
+- **Pool:** je Datenbank (Treiber und Datenquelle) für die Lebensdauer des Prozesses, höchstens 4 offene Verbindungen.
+- **Pfade:** `path` einer SQLite-Connection ist relativ zum Projektordner (ADR 0020); der Ordner wird bei Bedarf angelegt.
+- **Editor:** Dateien unter `connections/` sind wie Trigger im YAML-Editor bearbeitbar und werden geprüft (Reference aus
+  `/schemas/connection`); ein eigenes Symbol und Formular folgen mit dem Mockup S39b.
+

@@ -27,7 +27,7 @@ func TestSchema(t *testing.T) {
 		})
 	}
 	code, _, errOut := run(t, "schema", "pipeline-x")
-	if code == 0 || !strings.Contains(errOut, `unknown file kind "pipeline-x" (expected environment, project, trigger)`) {
+	if code == 0 || !strings.Contains(errOut, `unknown file kind "pipeline-x" (expected connection, environment, project, trigger)`) {
 		t.Errorf("unknown kind: exit code %d, %s", code, errOut)
 	}
 	// The kind is not case-sensitive, as in kind: Project.

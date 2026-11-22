@@ -1,0 +1,46 @@
+# Statements with db.execute (S20a): values only as parameters @name under params,
+# never written into the statement – also not ${…} or {{ … }}.
+kind: Workflow
+apiVersion: runnel/v1
+name: orders
+parameters:
+  - name: CUSTOMER
+    default: Grace
+  - name: AMOUNT
+    type: number
+    default: "42.50"
+outputs:
+  - name: CLEANED
+    value: "{{ results.cleanup.output.rowsAffected }}"
+actions:
+  - id: start
+    type: core.start
+  - id: table
+    type: db.execute
+    with:
+      connection: shop
+      sql: |
+        CREATE TABLE IF NOT EXISTS orders (
+          id INTEGER PRIMARY KEY,
+          customer TEXT NOT NULL,
+          amount NUMERIC NOT NULL,
+          created TEXT NOT NULL
+        )
+  - id: insert
+    type: db.execute
+    with:
+      connection: shop
+      sql: INSERT INTO orders (customer, amount, created) VALUES (@customer, @amount, @created)
+      params:
+        customer: ${CUSTOMER}
+        amount: ${AMOUNT}
+        created: "{{ formatDate(now(), 'yyyy-MM-dd HH:mm:ss') }}"
+  - id: cleanup
+    type: db.execute
+    with:
+      connection: shop
+      sql: DELETE FROM orders WHERE id NOT IN (SELECT id FROM orders ORDER BY id DESC LIMIT 5)
+links:
+  - { from: start, to: table }
+  - { from: table, to: insert }
+  - { from: insert, to: cleanup }

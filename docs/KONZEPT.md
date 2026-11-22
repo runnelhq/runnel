@@ -340,7 +340,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | CLI | `spf13/cobra` |
 | HTTP-Router | `net/http` (Go 1.22+ Routing) |
 | Live-Events | Server-Sent Events mit `net/http` ([ADR 0016](adr/0016-live-events-sse.md)) |
-| Lokale DB | `modernc.org/sqlite` (pure Go, kein CGO) |
+| SQLite (Connections seit S20a, Run-Historie mit S26) | `modernc.org/sqlite` (pure Go, kein CGO, BSD-3) |
 | YAML | `goccy/go-yaml` (Fehlermeldungen mit Zeilennummer, zeilengenaues Bearbeiten über den AST) |
 | JSON Schema | eigenes Paket `internal/schema` (Schemas aus Konfigurations-Structs, ADR 0014); Validierung über Schemas bei Bedarf später |
 | Ausdrücke | `expr-lang/expr` (kompiliert, schnell, ohne Seiteneffekte) |
@@ -1084,7 +1084,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell, Programm starten |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
 | Netzwerk | HTTP-Request (`http.request`, seit S10), HTTP-Antwort (`http.respond`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`: upload, download, list, delete, move, mkdir, exists, wait; Protokoll in der Connection, S57), Mail senden, Mail abrufen (IMAP) |
-| Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
+| Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Tabelle existiert, Zeilen zählen |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,
 `file.mkdir`, `file.list`; Umbenennen ist `file.move` mit neuem Dateinamen als Ziel. Packen und Entpacken übernehmen

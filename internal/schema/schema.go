@@ -15,6 +15,8 @@
 //	    required, default=<value>, enum=<a>|<b>|…, example=<value>, format=<name>,
 //	    only=<field>:<a>|<b>|… (the field applies only when the sibling field has one of
 //	    these values, e.g. only=function:concat; "x-runnel-only" in the schema, E14).
+//	    connection=<type>|<type>|… (the name of a connection of one of these types, e.g.
+//	    connection=sqlite; format runnel-connection and "x-runnel-connection", ADR 0022).
 //	    Values must not contain commas.
 package schema
 
@@ -48,6 +50,17 @@ const FormatField = "runnel-field"
 // e.g. "to" of core.switch (E14b): the editor offers the targets of the links.
 const FormatTarget = "runnel-target"
 
+// FormatConnection marks the name of a connection (connections/<name>.yaml, ADR 0022);
+// ConnectionKey lists the connection types the field accepts.
+const FormatConnection = "runnel-connection"
+
+// ConnectionKey is the schema keyword of the option connection=.
+const ConnectionKey = "x-runnel-connection"
+
+// FormatSQL marks the text of an SQL statement (ADR 0022): it is passed as written,
+// without ${…} or {{ … }}; values come in as parameters @name.
+const FormatSQL = "runnel-sql"
+
 // FormatSecret marks a field that holds a secret, e.g. a password or token (ADR 0022):
 // only such fields may use ${secret:…}; their values are resolved without expressions
 // and never shown. The editor offers no value from the file.
@@ -72,6 +85,9 @@ type Schema struct {
 	Required    []string   `json:"required,omitempty"`
 	// Only: see OnlyKey; sibling field name → values.
 	Only map[string][]any `json:"x-runnel-only,omitempty"`
+	// Connection: see ConnectionKey; the connection types a field of format
+	// runnel-connection accepts.
+	Connection []string `json:"x-runnel-connection,omitempty"`
 	// AdditionalProperties is false for structs (unknown fields are errors) and the
 	// value schema for maps.
 	AdditionalProperties any `json:"additionalProperties,omitempty"`
@@ -264,6 +280,12 @@ func applyOptions(s *Schema, o options, path string) error {
 			s.Only[field] = append(s.Only[field], v)
 		}
 	}
+	if len(o.connection) > 0 {
+		if s.Type != "string" || (o.format != "" && o.format != FormatConnection) {
+			return fmt.Errorf("%s: connection= is only allowed for a text without another format", describe(path))
+		}
+		s.Connection, o.format = o.connection, FormatConnection
+	}
 	if o.format != "" {
 		switch {
 		case s.Type == "string":
@@ -327,6 +349,7 @@ type options struct {
 	enum         []string
 	format       string
 	only         string
+	connection   []string
 	err          error
 }
 
@@ -382,6 +405,8 @@ func parseOptions(tag string) options {
 			o.format = value
 		case key == "only" && hasValue:
 			o.only = value
+		case key == "connection" && hasValue:
+			o.connection = strings.Split(value, "|")
 		default:
 			o.err = fmt.Errorf("unknown schema option %q", opt)
 		}

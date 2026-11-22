@@ -247,6 +247,7 @@ func (v *validator) project(dir string) (p *model.Project, found bool, err error
 	}
 	if p != nil {
 		v.report(p.InlineSecretWarnings())
+		v.report(runs.CheckConnections(p, v.opts.env))
 	}
 	v.projects[root] = p
 	return p, true, nil

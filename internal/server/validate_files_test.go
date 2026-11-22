@@ -24,6 +24,10 @@ func TestValidateText(t *testing.T) {
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\n", nil},
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: prod\n", []string{`must match the file name`}},
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\nvariables: [\n", []string{""}},
+		// Connections (S20a): fields against the type.
+		{"connections/db.yaml", "kind: Connection\napiVersion: runnel/v1\nname: db\ntype: sqlite\nwith: { path: out/db.sqlite }\n", nil},
+		{"connections/db.yaml", "kind: Connection\napiVersion: runnel/v1\nname: db\ntype: sqlite\nwith: { file: x }\n", []string{`sqlite connection: unknown field "file"`}},
+		{"connections/db.yaml", "kind: Connection\napiVersion: runnel/v1\nname: db\ntype: oracle\n", []string{`unknown connection type "oracle"`}},
 		// Secrets in plain text (S39a2): a warning at secrets:, in the environment and in project.yaml.
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\nsecretStore: inline\nsecrets: { api-token: dev-123 }\n", []string{"secrets in plain text (secretStore: inline)"}},
 		{"project.yaml", "kind: Project\napiVersion: runnel/v1\nname: demo\nsecrets: { api-token: x }\n", []string{"secrets in plain text"}},
