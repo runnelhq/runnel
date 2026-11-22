@@ -107,7 +107,7 @@ var functions = []exprlang.Option{
 }
 
 // concat joins the values after the separator as text and leaves out empty ones (nothing,
-// empty text or only spaces), so that no separator stands alone: concat(', ', '', 'Köln')
+// empty text or only spaces), so that no separator stands alone: concat(', ', ”, 'Köln')
 // is "Köln". Lists count with their entries; numbers and dates are written as by Format.
 func concat(p ...any) (any, error) {
 	if len(p) == 0 {
