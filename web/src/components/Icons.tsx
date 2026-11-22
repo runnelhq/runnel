@@ -313,6 +313,9 @@ const actionIcons: Record<string, ReactNode> = {
   "file.list": <path d={`${folderPath}M7.5 11h9M7.5 14.5h6`} />,
   "file.mkdir": <path d={`${folderPath}M12 9.5v6M9 12.5h6`} />,
   "file.move": <path d={`${folderPath}M9 13h7M13.5 10.5L16 13l-2.5 2.5`} />,
+  // Archives (S54, variant A chosen by the maintainer): a box; packing with an arrow in, unpacking with an arrow out.
+  "archive.create": <path d="M3 4h18v4H3zM5 8v12h14V8M12 10.5v6.5M9.5 14.5L12 17l2.5-2.5" />,
+  "archive.extract": <path d="M3 4h18v4H3zM5 8v12h14V8M12 17.5V11M9.5 13.5L12 11l2.5 2.5" />,
   // Network: answering the caller; the same sign for the action and the transform.
   "http.respond": <path d={replyPath} />,
   "http.response": <path d={replyPath} />,

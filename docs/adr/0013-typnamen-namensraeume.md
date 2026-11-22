@@ -36,7 +36,7 @@ Code unübersichtlich.
 
 | Namensräume | Anbieter |
 |---|---|
-| `ai`, `core`, `csv`, `db`, `excel`, `file`, `ftp`, `http`, `json`, `mail`, `mcp`, `sftp`, `shell`, `xml`, `zip` | in Runnel eingebaut (reserviert, auch wenn noch nicht umgesetzt) |
+| `ai`, `archive` (vormals `zip`, siehe Nachtrag), `core`, `csv`, `db`, `excel`, `file`, `ftp`, `http`, `json`, `mail`, `mcp`, `sftp`, `shell`, `xml` | in Runnel eingebaut (reserviert, auch wenn noch nicht umgesetzt) |
 | `mcp-<connection>` | Werkzeuge eines MCP-Servers, der als Connection eingebunden ist (ADR 0012) |
 | jeder andere | genau ein Plugin, das ihn in `plugin.yaml` erklärt |
 
@@ -108,3 +108,9 @@ JSON-Schema (Editor, Kap. 7.4) und Ausgabedaten (S08) hinzu.
 **Negativ / zu beachten**
 - Derselbe Name mit unterschiedlicher Bedeutung je Art – Dokumentation und Editor müssen die Art immer zeigen.
 - Die Liste reservierter Namensräume muss bei neuen eingebauten Bereichen ergänzt werden (Vertragstest erinnert daran).
+
+## Nachtrag 2026-11-22 (S54): Namensraum `archive` statt `zip`
+
+Der reservierte Namensraum `zip` wird durch `archive` ersetzt. Die Actions `archive.create` und `archive.extract`
+verarbeiten ZIP, TAR und TAR.GZ und wählen das Format über `format` (bzw. die Endung); weitere Formate kommen als
+Wert von `format` hinzu, nicht als eigene Typnamen. `zip` ist nicht mehr reserviert, war aber nie umgesetzt.

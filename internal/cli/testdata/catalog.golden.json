@@ -1,6 +1,130 @@
 {
   "actions": [
     {
+      "type": "archive.create",
+      "kind": "action",
+      "category": "files",
+      "label": "Create Archive",
+      "description": "Packs files and folders into a ZIP, TAR or TAR.GZ archive; output: path, files and size",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "File or folder to pack, relative to the project folder or absolute; wildcards are allowed in the name, e.g. out/*.csv",
+            "examples": [
+              "out/*.csv"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Archive to write, e.g. archive/export.zip",
+            "examples": [
+              "archive/export.zip"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "description": "Format of the archive; auto: by the ending of target (.zip, .tar, .tar.gz or .tgz)",
+            "enum": [
+              "auto",
+              "zip",
+              "tar",
+              "tar.gz"
+            ],
+            "default": "auto"
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "What happens if the archive exists: replace it once the new one is complete, or fail",
+            "enum": [
+              "replace",
+              "fail"
+            ],
+            "default": "replace"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "example": "source: out/export\ntarget: archive/export.zip\n"
+    },
+    {
+      "type": "archive.extract",
+      "kind": "action",
+      "category": "files",
+      "label": "Extract Archive",
+      "description": "Unpacks a ZIP, TAR or TAR.GZ archive into a folder; output: the unpacked files",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Archive to unpack, relative to the project folder or absolute",
+            "examples": [
+              "inbox/delivery.zip"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Folder to unpack into; it is created if missing",
+            "examples": [
+              "inbox/delivery"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "description": "Format of the archive; auto: by the ending of source, else by its content",
+            "enum": [
+              "auto",
+              "zip",
+              "tar",
+              "tar.gz"
+            ],
+            "default": "auto"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Only files whose name matches, e.g. *.csv; empty: all files",
+            "examples": [
+              "*.csv"
+            ]
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "What happens to files that exist in the folder: fail before anything is written, replace them, or skip them",
+            "enum": [
+              "fail",
+              "replace",
+              "skip"
+            ],
+            "default": "fail"
+          },
+          "maxSize": {
+            "type": "string",
+            "description": "Largest total size of the unpacked files, e.g. 500MB or 10GB; protects against archives that unpack to far more than they hold",
+            "default": "1GB"
+          },
+          "maxFiles": {
+            "type": "integer",
+            "description": "Largest number of entries in the archive",
+            "default": 10000
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "example": "source: inbox/delivery.zip\ntarget: inbox/delivery\npattern: \"*.csv\"\n"
+    },
+    {
       "type": "core.abort",
       "kind": "action",
       "category": "general",

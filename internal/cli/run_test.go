@@ -117,6 +117,26 @@ func TestRunFilesExample(t *testing.T) {
 	}
 }
 
+func TestRunBundleExample(t *testing.T) {
+	chdirRepoRoot(t)
+	for _, name := range []string{"orders.zip", "orders.tar.gz"} {
+		dir := t.TempDir()
+		code, out, errOut := run(t, "run", "--param", "ARCHIVE="+filepath.Join(dir, name), "--param", "UNPACKED="+filepath.Join(dir, "unpacked"),
+			"examples/files/workflows/bundle.workflow.yaml")
+		if code != 0 {
+			t.Fatalf("%s: exit code %d:\n%s%s", name, code, out, errOut)
+		}
+		if !strings.Contains(out, "[pack] packed 3 files into ") || !strings.Contains(out, "unpacked 2 CSV files") ||
+			!strings.Contains(out, `output FILES = "2"`) {
+			t.Errorf("%s: output:\n%s", name, out)
+		}
+		files, _ := os.ReadDir(filepath.Join(dir, "unpacked"))
+		if len(files) != 2 || files[0].Name() != "orders-1.csv" {
+			t.Errorf("%s: unpacked files: %v", name, files)
+		}
+	}
+}
+
 func TestRunSubWorkflowsExample(t *testing.T) {
 	chdirRepoRoot(t)
 	code, out, errOut := run(t, "run", "examples/sub-workflows/workflows/nightly.workflow.yaml")

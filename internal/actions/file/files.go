@@ -66,6 +66,13 @@ func match(path string) ([]string, error) {
 	return out, nil
 }
 
+// Match is match for other namespaces (archive.create): the files and folders a path
+// with or without wildcards stands for, sorted; nothing found is no error.
+func Match(path string) ([]string, error) { return match(path) }
+
+// NameMatches is nameMatches for other namespaces (archive.extract).
+func NameMatches(pattern, name string) bool { return nameMatches(pattern, name) }
+
 // nameMatches matches a file name against wildcards; on Windows regardless of case.
 func nameMatches(pattern, name string) bool {
 	if runtime.GOOS == "windows" {

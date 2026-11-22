@@ -1,0 +1,48 @@
+# Archive actions. Relative paths refer to the project folder (output in out/); for example:
+#   runnel run -v examples/files/workflows/bundle.workflow.yaml
+# - "pack" packs the order files of the inbox into a ZIP; .tar or .tar.gz as ending of
+#   ARCHIVE choose those formats.
+# - "unpack" unpacks only the CSV files of the archive again, e.g. a delivery from outside;
+#   files that already exist are replaced, so that the example can run again.
+# - "report" uses the outputs: the number of packed files and the unpacked paths.
+kind: Workflow
+apiVersion: runnel/v1
+name: bundle
+parameters:
+  - name: ARCHIVE
+    description: Archive to write; the ending chooses the format (.zip, .tar, .tar.gz)
+    default: out/orders.zip
+  - name: UNPACKED
+    description: Folder to unpack the archive into
+    default: out/unpacked
+outputs:
+  - name: FILES
+    value: "{{ len(results.unpack.output) }}"
+actions:
+  - id: start
+    type: core.start
+  - id: pack
+    type: archive.create
+    with:
+      source: inbox/*
+      target: ${ARCHIVE}
+  - id: unpack
+    type: archive.extract
+    with:
+      source: "{{ results.pack.output.path }}"
+      target: ${UNPACKED}
+      pattern: "*.csv"
+      ifExists: replace
+  - id: report
+    type: core.log
+    with:
+      message: "Packed {{ results.pack.output.files }} files ({{ results.pack.output.size }} bytes), unpacked {{ len(results.unpack.output) }} CSV files"
+links:
+  - { from: start, to: pack }
+  - { from: pack, to: unpack }
+  - { from: unpack, to: report }
+layout:
+  start: { x: 0, y: 0 }
+  pack: { x: 240, y: 0 }
+  unpack: { x: 480, y: 0 }
+  report: { x: 720, y: 0 }
