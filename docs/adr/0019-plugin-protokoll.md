@@ -161,7 +161,7 @@ Paket (`internal/jsonrpc`), das auch der MCP-Server (S53) nutzt.
 
 - **Plugins sind Code mit den Rechten von Runnel** (beim Dienst: dessen Konto). Es gibt keine Sandbox. Vertrauen
   entsteht durch das Ablegen im Projektordner; wer dort schreiben darf, darf ohnehin Workflows ändern. Die Doku sagt
-  das deutlich.
+  das deutlich. Ergänzt durch die Freigabe je Projekt (Nachtrag vor S49).
 - **Kein Port:** Die Kommunikation läuft nur über die Pipes des Kindprozesses; kein anderer Prozess kann sich
   dazwischenschalten.
 - **Umgebung:** Das Plugin erhält die Umgebung von Runnel ohne Variablen, die Runnel selbst für Geheimnisse nutzt
@@ -187,3 +187,98 @@ Paket (`internal/jsonrpc`), das auch der MCP-Server (S53) nutzt.
 
 Mit dem Maintainer am 2026-11-21 abgestimmt: Plugins nur unter `plugins/` im Projekt, ein Prozess je Plugin und Lauf,
 keine Dienste des Hosts für Plugins.
+
+## Nachtrag 2026-11-22 (vor S49): Freigabe, Ausgänge, Schema, Fähigkeiten, Pfade
+
+Präzisierungen vor der Umsetzung, abgestimmt mit dem Maintainer.
+
+### 1. Freigabe je Projekt
+
+`describe` startet ein Plugin schon beim Laden des Projekts. Ohne weitere Regel würde ein fremdes Projekt – geklont,
+heruntergeladen, als Anhang erhalten – Code ausführen, sobald man es nur mit `runnel validate` prüft oder im Editor
+öffnet. Plugins werden deshalb erst gestartet, wenn sie **auf diesem Rechner für dieses Projekt freigegeben** sind.
+
+- **Was freigegeben wird:** je Plugin der absolute Projektordner (unter Windows ohne Unterscheidung der Groß- und
+  Kleinschreibung), der Name des Plugins und ein **SHA-256 über den Inhalt des Plugin-Ordners** (`plugin.yaml`, die
+  ausführbare Datei, DLLs, Skripte; Dateinamen und Inhalte, sortiert). Ändert sich eine Datei, ist die Freigabe
+  ungültig und muss erneuert werden. Liegt die ausführbare Datei außerhalb des Ordners (z. B. `executable: python.exe`
+  mit `args: [main.py]`), zählt sie nicht mit; die Skripte im Ordner schon. Grenzen für das Hashen: 1 GB und 10.000
+  Dateien je Plugin, darüber wird das Plugin nicht geladen.
+- **Wo die Freigaben liegen:** nie im Projekt (ein fremdes Projekt könnte sie sonst mitbringen).
+  - Für Benutzer in `<Konfigurationsordner>/runnel/trusted-plugins.json` (`os.UserConfigDir`, unter Windows
+    `%AppData%`).
+  - Für den Windows-Dienst in `%ProgramData%\runnel\trust\plugins.json`, geschützt wie der Ordner des Zertifikats:
+    nur Administratoren, SYSTEM und das Dienstkonto.
+  - Runnel liest beide Dateien; die des Dienstes schreiben nur Administratoren.
+- **Freigeben:** `runnel plugins trust [projektordner]` zeigt je Plugin Name, Version, Namensraum, ausführbare Datei
+  und Hash und fragt nach. `--yes` gilt für Skripte. `--service` schreibt in die Datei des Dienstes und braucht
+  Administratorrechte. `runnel plugins untrust` nimmt die Freigabe zurück; `runnel plugins` zeigt den Stand.
+  - Der Editor zeigt nicht freigegebene Plugins als Hinweis mit „Trust“ (S52, nach Mockup). Wer den Editor erreicht,
+    darf ohnehin Workflows ändern; die Abwehr von fremden Webseiten und DNS-Rebinding gilt auch hier.
+- **Ohne Freigabe:**
+  - Das Plugin wird nicht gestartet, auch nicht für `describe`.
+  - `runnel validate` und der Editor melden Bausteine seines Namensraums als Fehler mit Hinweis, z. B.
+    `plugin "sap-rfc" is not trusted on this computer; check it and run "runnel plugins trust"`.
+  - Ein Lauf, der sie braucht, startet nicht (Exit-Code 2).
+  - Andere Workflows des Projekts laufen normal.
+
+### 2. Ausgänge wie bei `core.switch`
+
+Pipeline-Links kennen keine Ports, nur Daten- und Fehler-Links; weitere Ausgänge laufen über Konfigurationsfelder mit
+`format: runnel-target` (wie `to:` bei `core.switch`, ADR 0021). Für Plugins gilt dasselbe:
+
+- `transform.emit` nennt statt `port` ein Ziel: `"to": "main"` (alle Daten-Links ohne eigenes Ziel), `"to": "error"`
+  (Fehler-Link) oder die **ID eines Transforms**, die in der `config` des Plugins in einem Feld mit `runnel-target`
+  steht. Die Engine prüft, dass dorthin ein Daten-Link führt; sonst ist es ein Fehler des Plugins.
+- `transform.open` meldet nur einen Eingang (`inputs` mit einem Eintrag). Mehrere Eingänge (Info-Links, S23) folgen
+  mit einer eigenen Erweiterung.
+
+### 3. Schema und „Felder ermitteln“ (ADR 0007, S46)
+
+Zwei **optionale** Methoden, die ein Plugin in `describe` je Transform ankündigt (`"init": true`,
+`"detectFields": true`):
+
+| Methode | Zweck |
+|---|---|
+| `transform.init` | `type`, `config`, Schema des Eingangs → Schema des Ausgangs (Felder mit Typ, `open`), Fehler der Konfiguration mit Feldnamen. Wird bei `validate`, im Editor und vor dem Lauf aufgerufen, Zeitgrenze 10 s. |
+| `transform.detectFields` | `type`, `config`, `limit` → vorgeschlagene Felder wie bei `csv.input` (S46). |
+
+Ohne `init` ist das Schema hinter dem Plugin offen, wie heute hinter `core.from-result`. Die Prüfung von Feldnamen
+endet dann dort.
+
+### 4. Weitere Angaben im Descriptor
+
+`describe` liefert je Baustein zusätzlich, alles optional:
+
+- `example`: YAML für die Hilfe im Panel (E14b); der Host prüft es gegen das Schema.
+- `recordErrors`: Der Transform darf einen Fehler-Link haben.
+- `parallel`: Der Transform erlaubt `copies`.
+- `init` und `detectFields`, siehe oben.
+
+`icon` folgt erst mit einem Format ohne HTML und Skript: nur SVG-Pfaddaten (`d`, höchstens 4 KB), gezeichnet im
+Rahmen der eingebauten Icons. Bis dahin zeigt der Editor das allgemeine Symbol.
+
+### 5. Relative Pfade (ADR 0020)
+
+- Das **Arbeitsverzeichnis** des Plugin-Prozesses ist der Projektordner. Relative Pfade in der `config` gelten damit
+  wie bei eingebauten Bausteinen; der Projektordner steht zusätzlich in `context.projectDir`.
+- `executable` und Dateien in `args` sind relativ zum Ordner des Plugins (wie bisher).
+
+### Sicherheit
+
+- **Ohne Freigabe** führt Runnel keinen Code eines Plugins aus, auch nicht beim Prüfen oder Anzeigen.
+- **Jede Änderung im Plugin-Ordner** macht die Freigabe ungültig.
+- **Ort der Freigaben:** Sie liegen außerhalb des Projekts; die des Dienstes ist nur für Administratoren schreibbar.
+- **Grenzen:** Hashen bis 1 GB und 10.000 Dateien je Plugin, `init` höchstens 10 s, Icons nur als Pfaddaten bis 4 KB.
+- **Ziele von `emit`** prüft die Engine gegen die Links, statt ihnen zu vertrauen.
+- **Tests** gehören zu S49:
+  - nicht freigegeben,
+  - Freigabe nach Änderung einer Datei ungültig,
+  - Datei des Dienstes nicht schreibbar ohne Administratorrechte (manuell, Testplan),
+  - `emit` auf ein fremdes Ziel.
+
+### Folgen für die Roadmap
+
+- S49 enthält die Freigabe mit `runnel plugins` (CLI).
+- S50 enthält Ziele statt Ports und `transform.init`.
+- S52 enthält den Hinweis mit „Trust“ im Editor (Mockup vorher).

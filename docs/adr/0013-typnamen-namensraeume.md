@@ -49,6 +49,9 @@ Code unübersichtlich.
 
 ### 3. `provides:` nach Art getrennt
 
+> Überholt durch [ADR 0019](0019-plugin-protokoll.md): `plugin.yaml` nennt die Typen nicht mehr; das Plugin meldet sie
+> mit `describe`, Typen außerhalb seines Namensraums sind ein Fehler beim Laden.
+
 ```yaml
 # plugins/sap-rfc/plugin.yaml
 name: sap-rfc
