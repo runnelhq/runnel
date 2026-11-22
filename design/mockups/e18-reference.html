@@ -1,0 +1,421 @@
+<!doctype html>
+<!--
+  Mockup E18 – Reference instead of the palette: the lower part of the sidebar follows the
+  kind of the open file. Workflows and pipelines keep the palette (E6b, S25a); project.yaml,
+  environments and triggers get "Reference" with the fields of the file (from the schemas of
+  S58: description, type, allowed values, default, example) and "Insert" at the cursor;
+  project.yaml and environments also get "Variables": every ${…} the project uses, where it
+  is set and where it is missing. Markdown and other files show the explorer only.
+  Builds on the approved mockups E4 (shell), E6b (palette), E9 (YAML view), E10 (other
+  files) and E17. Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                                   (default light)
+    state = project | variables | environment | trigger | insert | markdown  (default project)
+    controls = 0                                        hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>reference – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5; color: var(--foreground);
+         background: var(--background); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  .mono, code { font-family: var(--rn-font-mono); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; position: relative; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 3px 8px;
+                      border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); cursor: pointer; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); color: var(--sidebar-foreground);
+          border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 8px 0 16px; flex: none; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; flex: none; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .kind { color: var(--muted-foreground); display: inline-flex; }
+  .row.selected .kind { color: var(--accent-foreground); }
+  .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .icon-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: var(--rn-radius-sm);
+              background: transparent; color: var(--muted-foreground); }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); flex: none; }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; white-space: nowrap; }
+  .btn.small { height: 24px; padding: 0 8px; font-size: var(--rn-text-2xs); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn svg.i { width: 13px; height: 13px; }
+  .btn kbd { font: 10px var(--rn-font-mono); opacity: .75; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+  footer .dirty { color: var(--foreground); }
+
+  /* YAML view (E9) */
+  :root { --code-key: var(--foreground); --code-string: var(--rn-tiefe-700); --code-punct: var(--muted-foreground);
+          --code-comment: var(--muted-foreground); --code-var: var(--expression); --code-gutter: var(--rn-tiefe-400);
+          --code-line-active: var(--muted); }
+  [data-theme="dark"] { --code-string: var(--rn-tiefe-300); --code-gutter: var(--rn-tiefe-600); }
+  .code { flex: 1; overflow: auto; padding: var(--rn-space-2) 0 var(--rn-space-6); font-family: var(--rn-font-mono);
+          font-size: var(--rn-text-sm); line-height: 1.7; background: var(--background); }
+  .code.focus { box-shadow: inset 2px 0 0 var(--ring); }
+  .line { display: grid; grid-template-columns: 20px 40px 1fr; position: relative; }
+  .line.active { background: var(--code-line-active); }
+  .line.flash { background: var(--accent); }
+  .ln { text-align: right; padding-right: var(--rn-space-4); color: var(--code-gutter); user-select: none; }
+  .line.active .ln, .line.flash .ln { color: var(--foreground); }
+  .mark { text-align: center; font-size: 11px; font-weight: 700; }
+  .mark.warn { color: var(--warning); }
+  .src { white-space: pre; padding-right: var(--rn-space-4); }
+  .k { color: var(--code-key); font-weight: var(--rn-font-weight-medium); }
+  .s { color: var(--code-string); }
+  .p { color: var(--code-punct); }
+  .c { color: var(--code-comment); font-style: italic; }
+  .v { color: var(--code-var); background: var(--expression-soft); border-radius: 3px; }
+  .sel { background: color-mix(in srgb, var(--ring) 28%, transparent); outline: 1px solid var(--ring); border-radius: 2px; }
+  .caret { display: inline-block; width: 1px; height: 15px; background: var(--foreground); vertical-align: -3px; }
+  .wavy { text-decoration: underline wavy var(--warning); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+
+  /* Lower part of the sidebar: Reference and Variables (new in E18) */
+  .ctx { margin-top: 8px; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  .ctx-head { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 16px; flex: none; }
+  .ctx-head .segmented { margin-left: auto; }
+  .ctx-head .segmented button { padding: 2px 7px; font-size: var(--rn-text-2xs); }
+  .ctx-sub { margin: -4px 16px 8px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); flex: none; }
+  .ctx-sub .mono { font-size: var(--rn-text-2xs); }
+  .search { display: flex; align-items: center; gap: 6px; margin: 0 12px 8px; height: 28px; padding: 0 8px; flex: none;
+            border: 1px solid var(--input); border-radius: var(--rn-radius-md); background: var(--background); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .search kbd { margin-left: auto; font: 10px var(--rn-font-mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
+  .scroll { overflow: auto; flex: 1; padding-bottom: 12px; }
+  .grp { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 16px; font-size: var(--rn-text-xs); font-weight: 600; }
+  .grp .count { font-weight: 400; }
+  .grp.closed { color: var(--muted-foreground); font-weight: 500; }
+  .fl { list-style: none; margin: 0 0 4px; padding: 0 8px; }
+  .f { padding: 5px 8px; border-radius: var(--rn-radius-md); cursor: pointer; }
+  .f:hover { background: var(--sidebar-accent); }
+  .f.open { background: var(--card); border: 1px solid var(--border); box-shadow: var(--rn-shadow-sm); margin: 2px 0 6px; }
+  .f .top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .f .name { font: 500 var(--rn-text-xs) var(--rn-font-mono); color: var(--foreground); }
+  .f .req { color: var(--destructive); font-weight: 700; }
+  .f .type { margin-left: auto; font-size: 10px; color: var(--muted-foreground); padding: 0 5px; border: 1px solid var(--border); border-radius: var(--rn-radius-sm); }
+  .f .there { font-size: 10px; color: var(--success); }
+  .f .short { font-size: var(--rn-text-2xs); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .f.inside { padding-top: 2px; padding-bottom: 2px; }
+  .f.inside .name { color: var(--muted-foreground); font-weight: 400; }
+  .f .desc { font-size: var(--rn-text-xs); color: var(--foreground); margin: 6px 0; line-height: 1.45; }
+  .f .facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; font-size: var(--rn-text-2xs); margin-bottom: 8px; }
+  .f .facts dt { color: var(--muted-foreground); }
+  .f .facts dd { margin: 0; }
+  .chip { display: inline-block; font: 10px var(--rn-font-mono); padding: 0 5px; margin: 0 3px 3px 0; border-radius: var(--rn-radius-sm);
+          background: var(--muted); border: 1px solid var(--border); }
+  .chip.def { border-color: var(--primary); }
+  .f pre { margin: 0 0 8px; padding: 6px 8px; border-radius: var(--rn-radius-sm); background: var(--muted); font: 11px/1.5 var(--rn-font-mono); white-space: pre; overflow: hidden; }
+  .f .acts { display: flex; gap: 6px; align-items: center; }
+  .f .acts small { font-size: 10px; color: var(--muted-foreground); }
+
+  /* Variables table */
+  .vt { width: calc(100% - 16px); margin: 0 8px; border-collapse: collapse; font-size: var(--rn-text-xs); }
+  .vt th { font-size: 10px; font-weight: 600; color: var(--muted-foreground); text-align: center; padding: 2px 2px 4px; }
+  .vt th:first-child { text-align: left; padding-left: 8px; }
+  .vt th.cur { color: var(--foreground); }
+  .vt td { text-align: center; padding: 4px 2px; border-top: 1px solid var(--sidebar-border); }
+  .vt td:first-child { text-align: left; padding-left: 8px; font: 500 var(--rn-text-xs) var(--rn-font-mono); }
+  .vt td small { display: block; font: 10px var(--rn-font-sans); color: var(--muted-foreground); }
+  .vt td.cur { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+  .vt .set { color: var(--success); font-weight: 700; }
+  .vt .from { color: var(--muted-foreground); }
+  .vt .miss { color: var(--warning); font-weight: 700; }
+  .vt tr.open td { background: var(--card); }
+  .vdetail { margin: 0 8px 8px; padding: 8px 10px; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--rn-radius-md) var(--rn-radius-md);
+             background: var(--card); font-size: var(--rn-text-2xs); }
+  .vdetail .lvl { display: grid; grid-template-columns: 76px 1fr; gap: 2px 8px; margin-bottom: 8px; }
+  .vdetail .lvl span:nth-child(odd) { color: var(--muted-foreground); }
+  .vdetail .lvl .mono { font-size: 10px; word-break: break-all; }
+  .vdetail .uses { margin: 0 0 8px; padding: 0; list-style: none; }
+  .vdetail .uses li { display: flex; gap: 6px; padding: 1px 0; }
+  .vdetail .uses a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; font-family: var(--rn-font-mono); font-size: 10px; }
+  .vdetail .warnline { color: var(--warning); margin-bottom: 6px; }
+  .legend { margin: 8px 16px 0; font-size: 10px; color: var(--muted-foreground); line-height: 1.6; }
+
+  .toast { position: absolute; left: 58%; bottom: 40px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 12px;
+           height: 34px; padding: 0 6px 0 14px; background: var(--card); color: var(--card-foreground); border: 1px solid var(--border);
+           border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); }
+  .toast .btn { height: 24px; }
+  .tooltip { position: absolute; max-width: 360px; padding: 8px 10px; border-radius: var(--rn-radius-md); background: var(--popover);
+             color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); z-index: 5; }
+  .tooltip .w { color: var(--warning); font-weight: 700; }
+  .tooltip .where { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); margin-top: 2px; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+  .doc { flex: 1; overflow: auto; padding: 28px 40px; }
+  .md { max-width: 680px; margin: 0 auto; line-height: 1.65; }
+  .md h1 { font-size: var(--rn-text-xl); margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .md code { font: var(--rn-text-xs) var(--rn-font-mono); padding: 1px 5px; border-radius: var(--rn-radius-sm); background: var(--muted); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E18</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="project" href="#">project</a> <a data-state="variables" href="#">variables</a>
+  <a data-state="environment" href="#">environment</a> <a data-state="trigger" href="#">trigger</a>
+  <a data-state="insert" href="#">insert</a> <a data-state="markdown" href="#">markdown</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>hello</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\hello</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="panel-title"><span class="label">Explorer</span><span id="tree-actions"></span></div>
+      <ul class="tree" id="tree"></ul>
+      <section class="ctx" id="ctx" aria-label="Reference"></section>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div style="display:flex;flex:1;min-height:0" id="view"></div>
+    </main>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "project";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const kind = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    env: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/>',
+    trigger: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  };
+  const plusI = '<path d="M12 5v14M5 12h14"/>';
+  const reloadI = '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/>';
+  const searchI = '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>';
+  const insertI = '<path d="M12 5v14M5 12h14"/>';
+  const gotoI = '<path d="M5 12h14M13 6l6 6-6 6"/>';
+
+  const files = {
+    project: { path: "project.yaml", icon: kind.proj, kind: "Project" },
+    variables: { path: "project.yaml", icon: kind.proj, kind: "Project" },
+    environment: { path: "environments/prod.yaml", icon: kind.env, kind: "Environment" },
+    trigger: { path: "triggers/nightly.yaml", icon: kind.trigger, kind: "Trigger" },
+    insert: { path: "triggers/nightly.yaml", icon: kind.trigger, kind: "Trigger" },
+    markdown: { path: "README.md", icon: kind.doc, kind: "Document" },
+  };
+  const f = files[state] || files.project;
+  const name = f.path.split("/").pop();
+
+  // Explorer (E11, E17).
+  document.getElementById("tree-actions").innerHTML =
+    `<button class="icon-btn" aria-label="New">${icon(plusI, 15)}</button><button class="icon-btn" aria-label="Reload explorer">${icon(reloadI, 14)}</button>`;
+  const rows = [["folder", "environments", 0, "2"], ["env", "dev.yaml", 1], ["env", "prod.yaml", 1],
+    ["folder", "triggers", 0, "1"], ["trigger", "nightly.yaml", 1],
+    ["folder", "workflows", 0, "2"], ["wf", "hello.workflow.yaml", 1], ["wf", "import.workflow.yaml", 1],
+    ["proj", "project.yaml", 0], ["doc", "README.md", 0]];
+  document.getElementById("tree").innerHTML = rows.map(([k, n, d, c]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === name ? "selected" : ""}">` +
+    (k === "folder" ? chev : `<span style="width:12px"></span>`) +
+    `<span class="kind">${icon(kind[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}</div></li>`).join("");
+
+  // Tabs and file bar (E10).
+  const dirty = state === "insert";
+  document.getElementById("tabs").innerHTML =
+    `<div class="tab active">${icon(f.icon)} ${name} ${dirty ? "●" : "×"}</div>`;
+  const warn = state === "environment" || state === "variables";
+  document.getElementById("filebar").innerHTML = `<span class="crumbs"><b>${f.path}</b></span>
+    <span class="badge">${f.kind}</span>${warn ? '<span class="badge warn">⚠ 1</span>' : ""}<div class="spacer"></div>
+    <button class="btn ${dirty ? "primary" : ""}" ${dirty ? "" : 'style="opacity:.5"'}>Save <kbd>Ctrl+S</kbd></button>`;
+
+  // YAML of the files.
+  const hl = l => {
+    if (/^\s*#/.test(l)) return `<span class="c">${esc(l)}</span>`;
+    const m = l.match(/^(\s*-?\s*)([A-Za-z_][\w]*)(:)(.*)$/);
+    const val = v => esc(v).replace(/(\$\{[^}]+\})/g, '<span class="v">$1</span>');
+    if (m) return `${esc(m[1])}<span class="k">${m[2]}</span><span class="p">:</span><span class="s">${val(m[4])}</span>`;
+    return `<span class="s">${val(l)}</span>`;
+  };
+  const text = {
+    "project.yaml": ["kind: Project", "apiVersion: runnel/v1", "name: hello", "description: Greets and imports orders",
+      "defaultEnvironment: dev", "variables:", "  BASE: D:\\data", "  INBOX: ${BASE}\\inbox", "  GREETING: Hello"],
+    "prod.yaml": ["kind: Environment", "apiVersion: runnel/v1", "name: prod", "description: Production server",
+      "variables:", "  BASE: \\\\fileserver\\data", "  GREETING: Good morning"],
+    "nightly.yaml": ["kind: Trigger", "apiVersion: runnel/v1", "name: nightly", "type: cron",
+      "target: workflows/import.workflow.yaml", "environment: prod", "with:", "  schedule: \"0 2 * * 1-5\""],
+  };
+  const view = document.getElementById("view");
+  if (state === "markdown") {
+    view.innerHTML = `<div class="doc"><div class="md"><h1>hello</h1><p>Greets and imports orders. Variables are set in
+      <code>project.yaml</code> and <code>environments/</code>.</p></div></div>`;
+  } else {
+    let lines = text[name].slice();
+    let active = -1, flash = -1, markLine = -1;
+    if (state === "insert") { lines.push("  timezone: Europe/Berlin"); flash = lines.length - 1; }
+    if (state === "trigger") active = 7;
+    if (state === "project" || state === "variables") active = 4;
+    if (state === "environment") { active = 5; }
+    const extra = { [flash]: l => l.replace(/<span class="s"> Europe\/Berlin<\/span>/, '<span class="s"> <span class="sel">Europe/Berlin</span><span class="caret"></span></span>') };
+    view.innerHTML = `<div class="code ${state === "insert" ? "focus" : ""}">` + lines.map((l, i) => {
+      let h = hl(l); if (extra[i]) h = extra[i](h);
+      return `<div class="line ${i === active ? "active" : ""} ${i === flash ? "flash" : ""}"><span class="mark ${i === markLine ? "warn" : ""}"></span><span class="ln">${i + 1}</span><span class="src">${h || " "}</span></div>`;
+    }).join("") + `</div>`;
+  }
+  const nlines = state === "markdown" ? 3 : text[name].length + (state === "insert" ? 1 : 0);
+  document.getElementById("status").innerHTML = `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>` +
+    `<span>${state === "markdown" ? "Markdown" : "YAML"} · UTF-8 · ${nlines} lines</span>${dirty ? '<span class="dirty">● Unsaved changes</span>' : ""}<span class="spacer"></span><span>Runnel v0.1.0</span>`;
+
+  // Lower part of the sidebar.
+  const ctx = document.getElementById("ctx");
+  if (state === "markdown") {
+    // Markdown and other files: no palette, no reference – the explorer uses the height.
+    ctx.remove();
+  } else {
+    const hasVars = f.kind === "Project" || f.kind === "Environment";
+    const showVars = state === "variables" || state === "environment";
+    const seg = hasVars ? `<div class="segmented" role="tablist" aria-label="Help">
+        <button aria-pressed="${!showVars}">Fields</button><button aria-pressed="${showVars}">Variables</button></div>` : "";
+    let body = "";
+    if (!showVars) {
+      // Field entry: name, required, type, short text; one open with all facts.
+      const fld = (n, type, short, o = {}) => {
+        // Fields already in the file take one line; the others show their short text.
+        if (!o.open) return `<li class="f ${o.inside ? "inside" : ""}" title="${esc(short)}"><div class="top"><span class="name">${n}</span>${o.req ? '<span class="req">*</span>' : ""}` +
+          `${o.inside ? `<span class="there">✓ line ${o.inside}</span>` : ""}<span class="type">${type}</span></div>${o.inside ? "" : `<div class="short">${esc(short)}</div>`}</li>`;
+        return `<li class="f open"><div class="top"><span class="name">${n}</span>${o.req ? '<span class="req">*</span>' : ""}<span class="type">${type}</span></div>
+          <div class="desc">${o.desc}</div><dl class="facts">${o.facts || ""}</dl>${o.example ? `<pre>${esc(o.example)}</pre>` : ""}
+          <div class="acts">${o.inside ? `<button class="btn small">${icon(gotoI, 13)}Go to line ${o.inside}</button>` :
+            `<button class="btn small primary">${icon(insertI, 13)}Insert</button><small>at the cursor, or Enter</small>`}</div></li>`;
+      };
+      if (f.kind === "Project") {
+        body = `<div class="grp">${chev}project.yaml<span class="count">8</span></div><ul class="fl">` +
+          fld("kind", "text", "Type of the file", { req: 1, inside: 1 }) +
+          fld("apiVersion", "text", "Version of the file format", { req: 1, inside: 2 }) +
+          fld("name", "text", "Name of the project", { req: 1, inside: 3 }) +
+          fld("description", "text", "What the project does; shown in the editor", { inside: 4 }) +
+          fld("defaultEnvironment", "text", "Environment used when a run names none", { open: 1, inside: 5,
+            desc: "Environment used when a run names none, e.g. dev; the name of a file in <span class=\"mono\">environments/</span>.",
+            facts: `<dt>Allowed</dt><dd><span class="chip def">dev</span><span class="chip">prod</span></dd><dt>Default</dt><dd>none – runs use only project variables</dd>` }) +
+          fld("variables", "map", "Variables for all environments, used as ${NAME}", { inside: 6 }) +
+          fld("workflow", "object", "Defaults for all workflows of the project") +
+          fld("settings", "object", "Limits for the runs of the project") + `</ul>`;
+      } else {
+        body = `<div class="grp">${chev}All triggers<span class="count">10</span></div><ul class="fl">` +
+          fld("kind", "text", "Type of the file", { req: 1, inside: 1 }) +
+          fld("type", "choice", "cron, interval, file or http", { req: 1, inside: 4 }) +
+          fld("target", "text", "Workflow or pipeline to start", { req: 1, inside: 5 }) +
+          fld("environment", "text", "Environment of the runs", { inside: 6 }) +
+          fld("params", "map", "Values for the parameters of the target") +
+          fld("enabled", "yes/no", "false keeps the trigger without starting runs") + `</ul>` +
+          `<div class="grp">${chev}with: for <span class="mono">cron</span><span class="count">3</span></div><ul class="fl">` +
+          fld("schedule", "text", "When to run, e.g. 0 2 * * 1-5", { req: 1, inside: 8 }) +
+          (state === "insert" ? fld("timezone", "text", "Time zone of the schedule", { inside: 9 }) :
+          fld("timezone", "text", "Time zone of the schedule", { open: 1,
+            desc: "Time zone of the schedule, e.g. Europe/Berlin; empty: the time zone of the computer.",
+            facts: `<dt>Example</dt><dd><span class="chip">Europe/Berlin</span></dd><dt>Default</dt><dd>time zone of the computer</dd>`,
+            example: "with:\n  timezone: Europe/Berlin" })) +
+          fld("overlap", "choice", "skip or allow while the previous run runs") + `</ul>` +
+          `<div class="grp closed">${chevRight}Other types: interval, file, http<span class="count">13</span></div>`;
+      }
+      body = `<div class="search">${icon(searchI, 14)}Search fields<kbd>/</kbd></div><div class="scroll">${body}</div>`;
+    } else {
+      // Variables: every ${…} the project uses and where it is set.
+      const cur = state === "environment" ? "prod" : "";
+      const cell = (v, col) => `<td class="${col === cur ? "cur" : ""}">${v}</td>`;
+      const vr = (n, uses, p, d, pr, open) => `<tr class="${open ? "open" : ""}"><td>${n}<small>${uses}</small></td>${cell(p, "project")}${cell(d, "dev")}${cell(pr, "prod")}</tr>`;
+      const S = '<span class="set">●</span>', F = '<span class="from">↑</span>', M = '<span class="miss">⚠</span>', N = '<span class="from">–</span>';
+      body = `<div class="scroll"><table class="vt"><thead><tr><th>Variable</th><th>project</th><th>dev</th><th class="${cur === "prod" ? "cur" : ""}">prod</th></tr></thead><tbody>` +
+        vr("BASE", "2 uses", S, F, S) +
+        vr("INBOX", "3 uses", S, F, F) +
+        vr("GREETING", "1 use", S, F, S) +
+        vr("API_URL", "2 uses", N, S, M, true) +
+        `</tbody></table>
+        <div class="vdetail"><div class="warnline">⚠ Not set for <b>prod</b>: runs with prod fail.</div>
+          <div class="lvl"><span>project</span><span>–</span><span>dev</span><span class="mono">https://test.example.com</span><span>prod</span><span>missing</span></div>
+          <div style="color:var(--muted-foreground);margin-bottom:2px">Used in</div><ul class="uses"><li><a href="#">workflows/import.workflow.yaml:12</a></li><li><a href="#">workflows/hello.workflow.yaml:31</a></li></ul>
+          <div class="acts" style="display:flex;gap:6px"><button class="btn small primary">${icon(insertI, 13)}Add to ${cur ? "prod.yaml" : "environments/prod.yaml"}</button></div></div>
+        <div class="legend">● set here · ↑ from project.yaml · ⚠ used, but not set · – not set</div></div>`;
+    }
+    const where = f.kind === "Project" ? "project.yaml" : f.kind === "Environment" ? "environments/prod.yaml" : "triggers/nightly.yaml · type cron";
+    ctx.innerHTML = `<div class="ctx-head"><span class="label">${showVars ? "Variables" : "Reference"}</span>${seg}</div>
+      <div class="ctx-sub">${showVars ? (f.kind === "Environment" ? "Column <b>prod</b> is this file" : "Used as <span class=\"mono\">${…}</span> in the project") : `Fields of <span class="mono">${where}</span>`}</div>${body}`;
+  }
+
+  // The open field scrolls into view, as in the editor.
+  document.querySelector(".f.open")?.scrollIntoView({ block: "nearest" });
+
+  // Overlays.
+  const app = document.getElementById("app");
+  const top0 = params.get("controls") === "0" ? 0 : 40;
+  if (state === "insert") {
+    app.insertAdjacentHTML("beforeend", `<div class="toast">Inserted <span class="mono">timezone</span> under <span class="mono">with:</span> – change the value
+      <button class="btn">Undo <kbd>Ctrl+Z</kbd></button></div>`);
+  }
+  if (state === "environment") {
+    app.insertAdjacentHTML("beforeend", `<div class="tooltip" style="left:566px;top:${top0 + 112}px"><span class="w">⚠</span> Variable <span class="mono">API_URL</span> is used, but not set for prod
+      <span class="where">workflows/import.workflow.yaml:12 · workflows/hello.workflow.yaml:31</span></div>`);
+  }
+</script>
+</body>
+</html>
