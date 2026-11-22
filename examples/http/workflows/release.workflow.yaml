@@ -1,0 +1,62 @@
+# HTTP requests and checks. Run it with (needs access to api.github.com):
+#   runnel run -v examples/http/workflows/release.workflow.yaml
+#   runnel run -v --param REPO=cli/cli examples/http/workflows/release.workflow.yaml
+# - "fetch" asks the GitHub API for the latest release; the JSON answer is in
+#   results.fetch.output.body. A token would go into a header from an environment
+#   variable, e.g. Authorization: "Bearer ${env:GITHUB_TOKEN}" – never into the file.
+# - "check" fails if the release has no files; the failure link reports it.
+# - Status 404 (no release) fails "fetch"; the failure link reports that too.
+kind: Workflow
+apiVersion: runnel/v1
+name: release
+parameters:
+  - name: REPO
+    description: Repository as owner/name
+    default: golangci/golangci-lint
+outputs:
+  - name: VERSION
+    value: "{{ results.fetch.output?.body?.tag_name ?? '' }}"
+  - name: FILES
+    value: "{{ len(results.fetch.output?.body?.assets ?? []) }}"
+actions:
+  - id: start
+    type: core.start
+  - id: fetch
+    type: http.request
+    with:
+      url: ${API_URL}/repos/${REPO}/releases/latest
+      headers:
+        Accept: application/vnd.github+json
+      timeout: 30s
+  - id: check
+    type: core.check
+    with:
+      condition: "{{ len(results.fetch.output.body.assets) > 0 }}"
+      message: "Release {{ results.fetch.output.body.tag_name }} of ${REPO} has no files"
+  - id: report
+    type: core.log
+    with:
+      message: "${REPO} {{ results.fetch.output.body.tag_name }}: {{ len(results.fetch.output.body.assets) }} files, published {{ results.fetch.output.body.published_at }}"
+  - id: problem
+    type: core.log
+    with:
+      message: "{{ concat(' ', results.fetch.error, results.check?.error) }}"
+      level: warn
+  - id: done
+    type: core.success
+    join: first
+links:
+  - { from: start, to: fetch }
+  - { from: fetch, to: check }
+  - { from: fetch, to: problem, when: failure }
+  - { from: check, to: report }
+  - { from: check, to: problem, when: failure }
+  - { from: report, to: done }
+  - { from: problem, to: done }
+layout:
+  start: { x: 0, y: 0 }
+  fetch: { x: 240, y: 0 }
+  check: { x: 480, y: 0 }
+  report: { x: 720, y: 0 }
+  problem: { x: 600, y: 160 }
+  done: { x: 960, y: 0 }

@@ -38,3 +38,28 @@ func WriteJSON(w http.ResponseWriter, status int, v any, indent bool) {
 	}
 	_ = enc.Encode(v)
 }
+
+// Numbers turns the numbers of a JSON value read with UseNumber into int64 or float64.
+func Numbers(v any) any {
+	switch v := v.(type) {
+	case json.Number:
+		if n, err := v.Int64(); err == nil {
+			return n
+		}
+		f, _ := v.Float64()
+		return f
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for k, x := range v {
+			out[k] = Numbers(x)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, x := range v {
+			out[i] = Numbers(x)
+		}
+		return out
+	}
+	return v
+}

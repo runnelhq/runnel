@@ -1,0 +1,7 @@
+# Example for HTTP requests to a REST API (S10). Check it with:  runnel validate examples/http
+kind: Project
+apiVersion: runnel/v1
+name: http
+description: Read the latest release of a GitHub repository and check the answer
+variables:
+  API_URL: https://api.github.com

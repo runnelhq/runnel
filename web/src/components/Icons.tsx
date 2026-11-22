@@ -316,6 +316,10 @@ const actionIcons: Record<string, ReactNode> = {
   // Archives (S54, variant A chosen by the maintainer): a box; packing with an arrow in, unpacking with an arrow out.
   "archive.create": <path d="M3 4h18v4H3zM5 8v12h14V8M12 10.5v6.5M9.5 14.5L12 17l2.5-2.5" />,
   "archive.extract": <path d="M3 4h18v4H3zM5 8v12h14V8M12 17.5V11M9.5 13.5L12 11l2.5 2.5" />,
+  // Checking a condition (S10, variant A chosen by the maintainer): a diamond as in flowcharts, with a check mark.
+  "core.check": <path d="M12 3l9 9-9 9-9-9zM8.5 12l2.5 2.5 4.5-5" />,
+  // HTTP request (S10, variant B chosen by the maintainer): the request out, the answer back.
+  "http.request": <path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4" />,
   // Network: answering the caller; the same sign for the action and the transform.
   "http.respond": <path d={replyPath} />,
   "http.response": <path d={replyPath} />,

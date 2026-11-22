@@ -3,6 +3,9 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -114,6 +117,33 @@ func TestRunFilesExample(t *testing.T) {
 	code, out, _ = run(t, "run", "--param", "INBOX="+t.TempDir(), "--param", "ARCHIVE="+archive, "examples/files/workflows/archive.workflow.yaml")
 	if code != 0 || !strings.Contains(out, "[empty] No order files in") || !strings.Contains(out, `output FILES = "0"`) {
 		t.Errorf("empty inbox: exit code %d:\n%s", code, out)
+	}
+}
+
+func TestRunHTTPExample(t *testing.T) {
+	chdirRepoRoot(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/repos/acme/tool/releases/latest":
+			_, _ = io.WriteString(w, `{"tag_name":"v1.2.0","published_at":"2026-11-20T10:00:00Z","assets":[{"name":"a.zip"},{"name":"b.zip"}]}`)
+		case "/repos/acme/empty/releases/latest":
+			_, _ = io.WriteString(w, `{"tag_name":"v0.1.0","assets":[]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"message":"Not Found"}`)
+		}
+	}))
+	defer srv.Close()
+	for _, tt := range []struct{ repo, want, version string }{
+		{"acme/tool", "[report] acme/tool v1.2.0: 2 files, published 2026-11-20T10:00:00Z", "v1.2.0"},
+		{"acme/empty", "[problem] Release v0.1.0 of acme/empty has no files", "v0.1.0"},
+		{"acme/none", `[problem] GET ` + srv.URL + `/repos/acme/none/releases/latest answered with status 404 Not Found: {"message":"Not Found"}`, ""},
+	} {
+		code, out, errOut := run(t, "run", "--param", "API_URL="+srv.URL, "--param", "REPO="+tt.repo, "examples/http/workflows/release.workflow.yaml")
+		if code != 0 || !strings.Contains(out, tt.want) || !strings.Contains(out, `output VERSION = "`+tt.version+`"`) {
+			t.Errorf("%s: exit code %d:\n%s%s", tt.repo, code, out, errOut)
+		}
 	}
 }
 
