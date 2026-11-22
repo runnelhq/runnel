@@ -182,7 +182,8 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | – |
 | S24 (Teil) | Ergebnis-Datensätze auslagern | `resultSpillRows`: große Ergebnisse in eine temporäre Datei statt in den Speicher | S24a |
 | S17 (Teil) | `maxErrors` | Schwelle für Fehler-Links: mehr als n fehlerhafte Datensätze brechen die Pipeline ab | S17a |
-| S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | – |
+| S39a | Secret-Quellen & lokaler Store | `kind: SecretStore`, Standardquelle je Environment, `${secret:[quelle/]name}` nur in Connections, Secret-Quellen und `secret`-Feldern; Quellen `local`, `shared`, `env`; lokaler Store je Projekt (AES-256-GCM, DPAPI bzw. `RUNNEL_MASTER_KEY`), `runnel secret set/list/delete/missing/export/import` mit `--service`, Ablaufdatum, Maskierung ([ADR 0022](adr/0022-connections-secrets.md)) | – |
+| S20 | Connections & DB-Eingabe | `kind: Connection` mit Schema je Typ, Prüfung, Auswahl `connection:`, Verweise beim Umbenennen; Treiber SQL Server, PostgreSQL, SQLite (Lizenz je Treiber prüfen); `db.table-input` und Action `db.execute` mit Parametern `@name` ([ADR 0022](adr/0022-connections-secrets.md)) | S39a |
 | S21 | DB-Ausgabe | `db.table-output` (Insert, `commitSize`), `db.upsert` | S20 |
 | S23 | Lookups & Join | Info-Link, `core.stream-lookup`, `db.lookup`, `core.merge-join` | `db.lookup`: S20; danach Info-Links im Pipeline-Canvas |
 | S56 | Mapping: Engine und Prüfung | Transform `core.run-pipeline` ([ADR 0021](adr/0021-unter-pipelines.md)): eine Unter-Pipeline je Lauf, Datensätze strömen über `core.from-result`/`core.to-result` hindurch (Backpressure), Schema durch die Unter-Pipeline, Parameter, Selbstaufruf und Verschachtelung (max. 10) als Fehler, Log mit Präfix; Beschriftungen „Records from/to Caller“ | ADR 0021 |
@@ -192,7 +193,9 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S25d | Executor: Gruppen und Ergebnisse (Teil von S25) | `groupBy: size/field`, Ausgang `results` (ein Datensatz je Lauf) | S25c |
 | S25e | Workflow-Executor (Teil von S25) | `core.workflow-executor` nach demselben Muster, mit den `outputs` des Workflows | S25d |
 | S45 | Samples | Erste N Records pro Link je Lauf speichern, in Historie anzeigen | S26 |
-| S39 | Secret-Store | Verschlüsselung (AES-GCM), Schlüssel per DPAPI bzw. Master-Key, `${secret:…}`, Maskierung in Logs | bis dahin Umgebungsvariablen (`${env:…}`) |
+| S39b | Mockup: Connections & Secrets im Editor | Connections im Explorer, Formular aus dem Schema, „Test connection“, Secrets setzen/löschen (nie anzeigen), Hinweis auf fehlende und ablaufende Secrets | S20 |
+| S39c | Connections & Secrets im Editor | Umsetzung nach freigegebenem Mockup S39b; `POST /connections/{name}/test` (15 s, nur gespeicherte Connections) | S39b |
+| S57 | Dateitransfer | `transfer.upload/download/list/delete/move/mkdir/exists/wait` wie die `file.*`-Actions; Connection-Typen `sftp` (Hostschlüssel Pflicht), `ftps`, `ftp` (nur mit `insecure: true`) ([ADR 0022](adr/0022-connections-secrets.md), ADR 0013 Nachtrag) | S20 |
 | S40b | Netzwerkbetrieb des Editors | `--listen` für Editor und API, gemeinsamer Zugangsschlüssel, Client-Infos im Protokoll ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)) | S40a (TLS); bis dahin Editor nur auf `127.0.0.1` |
 | S38 (Teil) | HMAC für HTTP-Trigger | Signaturprüfung als weitere `auth`-Variante (z. B. GitHub, Shop-Systeme) | S38a |
 | S42 | Run-Konfigurationen | `RunConfig type: local`, Auswahl per CLI/Trigger/Action/Editor | – |
@@ -216,12 +219,13 @@ Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-
 
 | Bereich | Bausteine |
 |---|---|
-| Kommunikation | `mail.send` (SMTP), Mail abrufen (IMAP) |
+| Kommunikation | `mail.send` (SMTP mit OAuth2), Mail abrufen (IMAP) – Connections nach ADR 0022 |
+| Secret-Quellen | `windows-credentials`, `azure-keyvault`, `vault` (REST ohne SDK), Cloud-Tresore, Plugin-Quellen (`secrets.get`) – ADR 0022 |
 | Skripte & Programme | `shell.powershell` (Action + Transform), Programm starten, JavaScript (`core.script` als Action und Transform, mit goja) |
 | Dateiformate | Excel (Ein-/Ausgabe), XML, Fixed-Width |
-| Dateitransfer | SFTP/FTP Upload/Download (Packen und Entpacken: S54) |
+| Dateitransfer | siehe S57 (Packen und Entpacken: S54) |
 | Netzwerk-Transforms | REST-Eingabe mit Paging, HTTP-Lookup, REST-Ausgabe |
-| Datenbanken | Treiber MySQL/MariaDB, Oracle, ODBC |
+| Datenbanken | Treiber Oracle, ODBC; MySQL/MariaDB vorerst nicht (Lizenz, ADR 0022 – über ODBC oder Plugin) |
 | Editor | Schmale Fenster (einklappbarer Explorer, Tablet/Laptop) – der Editor zielt zunächst auf Desktop-PCs; Einstellungsmenü, sobald es mehrere Einstellungen gibt |
 | Transforms | Pivot/Unpivot, Feld teilen, Wertzuordnung, String-/Datum-Funktionen als eigene Transforms, Sequenz, externes Sortieren (große Datenmengen) |
 | KI ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Connections für Modell-Anbieter (Anthropic, OpenAI-kompatibel, Ollama); `ai.chat` (inkl. strukturierter Ausgabe per JSON Schema); `ai.agent` mit Werkzeugen (Workflows, Actions, MCP-Tools) und Positivliste; `mcp.call-tool` und MCP-Server als Plugin-Quelle; `core.approval` (Freigabe abwarten); Chat-Trigger mit Streaming und Gesprächsgedächtnis; Transforms `ai.chunk`, `ai.embed`, Vektor-Ausgabe (pgvector, Qdrant); MCP über HTTP (Token, später OAuth); Token-/Kosten-Erfassung und Rate-Limit je Connection; Link-Typ `tool` im Editor |

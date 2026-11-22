@@ -84,7 +84,9 @@ my-project/
 │   ├─ dev.yaml              # Variablen je Umgebung
 │   └─ prod.yaml
 ├─ connections/
-│   └─ erp-sql.yaml          # DB-/HTTP-/SMTP-/SFTP-Verbindungen (ohne Klartext-Secrets)
+│   └─ erp-sql.yaml          # DB-/HTTP-/SMTP-/SFTP-Verbindungen (ohne Klartext-Secrets, ADR 0022)
+├─ secret-stores/
+│   └─ company-vault.yaml    # Secret-Quellen, z. B. ein Tresor (ohne Werte, ADR 0022)
 ├─ triggers/
 │   └─ nightly-import.yaml   # Cron, HTTP, Datei-Überwachung, Intervall
 ├─ run-configs/
@@ -141,7 +143,9 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
   - `${NAME}` – Variable aus den Ebenen oben (kompatibel zu Apache Hop); Werte dürfen selbst Variablen enthalten
     (z. B. `INBOX: ${BASE}\inbox`), Zyklen sind ein Fehler
   - `${env:NAME}` – Umgebungsvariable des Betriebssystems, z. B. `${env:COMPUTERNAME}`, `${env:TEMP}`
-  - `${secret:NAME}` – Secret aus dem Secret-Store (Kap. 8)
+  - `${secret:NAME}` bzw. `${secret:QUELLE/NAME}` – Secret aus einer Secret-Quelle; Standardquelle je Environment
+    (`secretStore:`), sonst der lokale Store. Nur in Connections, Secret-Quellen und Feldern mit `secret`-Format
+    erlaubt ([ADR 0022](adr/0022-connections-secrets.md), Kap. 8)
   - `$${` – ein wörtliches `${`
   - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
 - Das Projekt wird über `project.yaml` im Ordner des Workflows oder einem übergeordneten Ordner gefunden (wie `.git`).
@@ -173,9 +177,29 @@ variables:
 
 ### 2.6 Connection & Credentials
 
-Wiederverwendbare Metadaten-Objekte (DB, HTTP-API, SMTP, SFTP, SharePoint …).
-Secrets werden **nie im Klartext in YAML** gespeichert, sondern referenziert: `password: ${secret:erp-sql-password}`.
-Der Secret-Store ist lokal verschlüsselt (siehe Kap. 8).
+Wiederverwendbare Metadaten-Objekte (DB, HTTP-API, SMTP, SFTP, KI-Anbieter, MCP-Server …), festgelegt in
+[ADR 0022](adr/0022-connections-secrets.md):
+
+```yaml
+# connections/erp-sql.yaml
+kind: Connection
+apiVersion: runnel/v1
+name: erp-sql                     # = Dateiname
+type: sqlserver
+with:
+  host: ${ERP_HOST}               # Unterschiede je Environment über Variablen
+  database: ERP
+  user: runnel_read
+  password: ${secret:erp-sql-password}
+```
+
+- `type` wählt die Art; ihre Felder beschreibt ein Schema (Prüfung bei `validate`, Formular im Editor).
+- Bausteine nennen sie mit `connection: <name>`; `validate` prüft Existenz und passenden Typ.
+- Secrets werden **nie im Klartext in YAML** gespeichert, sondern referenziert. Woher sie kommen, bestimmen
+  **Secret-Quellen** (`secret-stores/*.yaml`, Standardquelle je Environment): der lokale, verschlüsselte Store
+  (`local`, `shared`), Umgebungsvariablen (`env`) und später Tresore wie Azure Key Vault oder HashiCorp Vault (Kap. 8).
+- SQL bekommt Werte nur als Parameter (`@name`), nie als Text im SQL; Dateitransfer läuft über den Namensraum
+  `transfer` mit dem Protokoll in der Connection.
 
 ### 2.7 Trigger
 
@@ -316,7 +340,6 @@ Eingesetzt (fest gepinnt in `go.mod`): `goccy/go-yaml`, `expr-lang/expr`, `shops
 | Windows-Dienst / DPAPI / EventLog | `golang.org/x/sys/windows`, `.../svc`, `.../svc/eventlog` |
 | SQL Server | `microsoft/go-mssqldb` (inkl. Windows-Authentifizierung) |
 | PostgreSQL | `jackc/pgx/v5` |
-| MySQL/MariaDB | `go-sql-driver/mysql` |
 | Oracle | `sijms/go-ora` (pure Go) |
 | ODBC (optional, Access, Legacy) | `alexbrainman/odbc` |
 | Excel | `xuri/excelize/v2` |
@@ -898,8 +921,8 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Netzwerk | Server bindet standardmäßig nur an `127.0.0.1` und nimmt nur Anfragen an `localhost`/`127.0.0.1` ohne fremden `Origin` an (Schutz vor DNS-Rebinding und Anfragen fremder Webseiten). Für Netzzugriff auf den Editor später `--listen 0.0.0.0:7300` + TLS (S40b, Backlog). HTTP-Trigger haben einen eigenen Listener, im Netz nur mit TLS (seit S40a) |
 | Authentifizierung | **Keine Benutzerverwaltung** ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)). Lokal-Modus ohne Zugangsschutz; im Netzmodus (S40b) ein gemeinsamer Zugangsschlüssel für den Server (+ TLS), gleichzeitig nutzbar als API-Token. HTTP-Trigger: Token je Trigger oder `auth: none` (seit S38a) |
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
-| Secrets | Secret-Store in SQLite, verschlüsselt mit AES-256-GCM. Schlüssel geschützt per **Windows DPAPI** (Maschinen- oder Dienstkonto-Scope); alternativ Master-Passwort (portabler Modus) oder Umgebungsvariable `RUNNEL_MASTER_KEY` |
-| Secrets im Log | Automatische Maskierung aller bekannten Secret-Werte in Logs und Vorschauen |
+| Secrets | Über Secret-Quellen ([ADR 0022](adr/0022-connections-secrets.md)): lokaler Store je Projekt außerhalb des Projektordners, verschlüsselt mit AES-256-GCM, Schlüssel per **Windows DPAPI** (Benutzer- bzw. Dienstkonto), sonst `RUNNEL_MASTER_KEY` oder Master-Passwort; dazu Umgebungsvariablen und später Tresore. `${secret:…}` nur in Connections, Secret-Quellen und `secret`-Feldern; Pflege mit `runnel secret`, im Editor nur setzen, nie anzeigen
+| Secrets im Log | Automatische Maskierung aller aufgelösten Secret-Werte in Logs, Fehlermeldungen, Vorschauen und Ergebnissen (exakter Wert, ab 4 Zeichen) |
 | HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal; im Netz nur mit TLS – eigenes oder selbst erzeugtes Zertifikat – oder ausdrücklich `--triggers-insecure`, seit S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrent` ([ADR 0018](adr/0018-http-trigger.md)) |
 | Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
 | Dienstkonto | Empfehlung: dedizierter Dienstbenutzer mit minimalen Rechten (bzw. gMSA in Domänen) |
@@ -915,7 +938,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 |---|---|---|
 | Workflows, Pipelines, Trigger, Connections | Projektordner | YAML (Git) |
 | Run-Historie, Status, Metriken, Samples | `data\runnel.db` | SQLite (WAL-Modus) |
-| Secrets | `data\runnel.db` (Tabelle `secrets`) | verschlüsselt |
+| Secrets (lokaler Store) | `%LOCALAPPDATA%\runnel\secrets.db` bzw. `%ProgramData%\runnel\secrets\` (Dienst), nie im Projekt (ADR 0022) | verschlüsselt |
 | Run-Logs | `data\logs\<jahr>\<run-id>.log` | JSON-Lines (slog) |
 | Dienst-Ereignisse | Windows-Ereignisanzeige (Anwendung) | Quelle = Dienstname (Standard `runnel`): Start, Stopp, Warnungen, Fehler (seit S41) |
 | Server-Log des Dienstes | `%ProgramData%\runnel\logs\<dienst>.log` | Text, Rotation bei 10 MB nach `<dienst>.log.1` (seit S41) |
@@ -953,7 +976,6 @@ CREATE TABLE node_runs (
 );
 
 CREATE TABLE samples (run_id TEXT, link TEXT, seq INTEGER, record_json TEXT);
-CREATE TABLE secrets (name TEXT PRIMARY KEY, nonce BLOB, ciphertext BLOB, updated_at INTEGER);
 ```
 
 Aufbewahrung: konfigurierbare Retention (z. B. 30 Tage Historie, 7 Tage Samples), Bereinigung durch internen Job.
@@ -983,7 +1005,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern (`resume` mit S29, Backlog) |
 | POST | `/preview` | Pipeline-Vorschau bis Transform X (S44, `docs/dev/API.md`) |
-| GET/PUT | `/secrets/{name}` | Secrets setzen, Wert nie lesbar zurück (geplant, S39) |
+| GET/PUT | `/secrets/{name}` | Secrets setzen und löschen, Wert nie lesbar zurück (geplant, S39c; im Netzbetrieb standardmäßig aus) |
 | GET | `/triggers` | Trigger mit nächstem Zeitpunkt, letztem Ergebnis und Problemen (seit S37); ein-/ausschalten über die Datei (`enabled`) |
 | ANY | Pfade der HTTP-Trigger | auf dem eigenen Listener der Trigger, nicht unter `/api/v1` ([ADR 0018](adr/0018-http-trigger.md)) |
 | GET | `/events?since=&run=` | Live-Events als Server-Sent Events ([ADR 0016](adr/0016-live-events-sse.md)): `run.started`, `run.finished`, `action.waiting`, `action.started`, `action.finished`, `action.skipped`, `log`, `reset`; später Metriken und `file.changed` |
@@ -1361,7 +1383,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S56 (Mapping), S25c–e (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S56 (Mapping), S25c–e (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Quellen (S39a–c, S39a vor S20), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 
