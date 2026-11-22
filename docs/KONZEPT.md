@@ -202,7 +202,8 @@ Details: [ADR 0008](adr/0008-ausfuehrungsvarianten.md).
 | Ausführung pro Datensatz (Workflow) | `forEach` an jeder Action (seit S24b), optional `parallel`, z. B. an `core.run-pipeline` / `core.run-workflow` |
 | Datensätze zwischen Pipelines weitergeben | `core.to-result` / `core.from-result` |
 | Teilausführung | Editor: „Ab hier ausführen“, „Nur diese Action ausführen“, Pipeline-Vorschau bis Transform X |
-| Später | Mappings (wiederverwendbare Unter-Pipelines), Remote-Ausführung |
+| Mapping (wiederverwendbare Unter-Pipeline) | Transform `core.run-pipeline`: Datensätze strömen durch eine andere Pipeline ([ADR 0021](adr/0021-unter-pipelines.md), geplant als S56) |
+| Später | Remote-Ausführung |
 
 ### 2.9 KI-Funktionen
 
@@ -1355,7 +1356,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S25 (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S56 (Mapping), S25c–e (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

@@ -185,7 +185,12 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S20 | Connections & DB-Eingabe | Connection-Metadaten, Passwort zunächst über `${env:…}`; Treiber SQL Server, PostgreSQL, SQLite; `db.table-input`, Action `db.execute` | – |
 | S21 | DB-Ausgabe | `db.table-output` (Insert, `commitSize`), `db.upsert` | S20 |
 | S23 | Lookups & Join | Info-Link, `core.stream-lookup`, `db.lookup`, `core.merge-join` | `db.lookup`: S20; danach Info-Links im Pipeline-Canvas |
-| S25 (Teil) | Executor-Transforms | `core.pipeline-executor`, `core.workflow-executor` (pro Datensatz/Gruppe, Ausgänge `results`/`output`/`error`); zu teilen (Executor je Datensatz, Gruppen, Workflow-Executor) mit Mockup für die zusätzlichen Ausgänge im Canvas; dynamische Ziele: S25b | S18, S24 |
+| S56 | Mapping: Engine und Prüfung | Transform `core.run-pipeline` ([ADR 0021](adr/0021-unter-pipelines.md)): eine Unter-Pipeline je Lauf, Datensätze strömen über `core.from-result`/`core.to-result` hindurch (Backpressure), Schema durch die Unter-Pipeline, Parameter, Selbstaufruf und Verschachtelung (max. 10) als Fehler, Log mit Präfix; Beschriftungen „Records from/to Caller“ | ADR 0021 |
+| S56b | Mockup: Mapping-Knoten und Executor-Ausgänge | Mapping im Canvas (Unter-Pipeline öffnen, Zähler), Beschriftung der Ausgänge `results`/`rows` am Executor | S56 |
+| S56c | Mapping im Editor | Umsetzung nach freigegebenem Mockup S56b | S56b |
+| S25c | Pipeline-Executor je Datensatz (Teil von S25) | `core.pipeline-executor` mit `groupBy: none`, `params` je Datensatz, Durchreichen (`main`), Ausgang `rows` wie `core.switch`, Fehler-Link, `copies` | S56 |
+| S25d | Executor: Gruppen und Ergebnisse (Teil von S25) | `groupBy: size/field`, Ausgang `results` (ein Datensatz je Lauf) | S25c |
+| S25e | Workflow-Executor (Teil von S25) | `core.workflow-executor` nach demselben Muster, mit den `outputs` des Workflows | S25d |
 | S45 | Samples | Erste N Records pro Link je Lauf speichern, in Historie anzeigen | S26 |
 | S39 | Secret-Store | Verschlüsselung (AES-GCM), Schlüssel per DPAPI bzw. Master-Key, `${secret:…}`, Maskierung in Logs | bis dahin Umgebungsvariablen (`${env:…}`) |
 | S40b | Netzwerkbetrieb des Editors | `--listen` für Editor und API, gemeinsamer Zugangsschlüssel, Client-Infos im Protokoll ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)) | S40a (TLS); bis dahin Editor nur auf `127.0.0.1` |
@@ -222,7 +227,7 @@ Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-
 | KI ([ADR 0012](adr/0012-ki-faehigkeit.md)) | Connections für Modell-Anbieter (Anthropic, OpenAI-kompatibel, Ollama); `ai.chat` (inkl. strukturierter Ausgabe per JSON Schema); `ai.agent` mit Werkzeugen (Workflows, Actions, MCP-Tools) und Positivliste; `mcp.call-tool` und MCP-Server als Plugin-Quelle; `core.approval` (Freigabe abwarten); Chat-Trigger mit Streaming und Gesprächsgedächtnis; Transforms `ai.chunk`, `ai.embed`, Vektor-Ausgabe (pgvector, Qdrant); MCP über HTTP (Token, später OAuth); Token-/Kosten-Erfassung und Rate-Limit je Connection; Link-Typ `tool` im Editor |
 | Plugin-SDKs | Python, C#/.NET, Node |
 | Projekte | Bibliotheken: gemeinsame Workflows und Pipelines für mehrere Projekte, z. B. als Eintrag in `project.yaml` mit eigenem Präfix in Aufrufen (`lib:…`); Prüfung, Editor und Explorer sehen sie mit. Bis dahin nur über absolute Pfade; braucht eine ADR |
-| Später (Konzept) | Mappings, Remote-Runner (`RunConfig type: remote`), Git-Integration im Editor, Breakpoints, Import aus Apache Hop, Tray-Icon, `runnel update`, `winget`, Code-Signing |
+| Später (Konzept) | Remote-Runner (`RunConfig type: remote`), Git-Integration im Editor, Breakpoints, Import aus Apache Hop, Tray-Icon, `runnel update`, `winget`, Code-Signing |
 
 ---
 
