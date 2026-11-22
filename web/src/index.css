@@ -180,9 +180,11 @@
 .runnel-expr .cm-cursor {
   border-left-color: var(--foreground);
 }
-.runnel-expr .cm-selectionBackground,
+.runnel-expr .cm-selectionBackground {
+  background: color-mix(in srgb, var(--ring) 18%, transparent) !important;
+}
 .runnel-expr .cm-focused .cm-selectionBackground {
-  background: var(--accent) !important;
+  background: color-mix(in srgb, var(--ring) 34%, transparent) !important;
 }
 .rx-expr,
 .rx-var {
@@ -339,9 +341,14 @@
 .runnel-yaml .cm-cursor {
   border-left: 2px solid var(--foreground);
 }
-.runnel-yaml .cm-selectionBackground,
+/* Selected text, clearly visible in light and dark mode (fix): a mix of the focus colour,
+   weaker while the editor has no focus. CodeMirror draws it below the lines, so the
+   active line is translucent and lets it through. */
+.runnel-yaml .cm-selectionBackground {
+  background: color-mix(in srgb, var(--ring) 18%, transparent) !important;
+}
 .runnel-yaml .cm-focused .cm-selectionBackground {
-  background: var(--accent) !important;
+  background: color-mix(in srgb, var(--ring) 34%, transparent) !important;
 }
 .runnel-yaml .cm-gutters {
   background: var(--background);
@@ -353,7 +360,9 @@
   padding: 0 16px 0 4px;
   font-variant-numeric: tabular-nums;
 }
-.runnel-yaml .cm-activeLine,
+.runnel-yaml .cm-activeLine {
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
 .runnel-yaml .cm-activeLineGutter {
   background: var(--muted);
 }

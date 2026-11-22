@@ -217,3 +217,24 @@ test("keeps the selected element when switching between canvas and YAML", async 
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
   await expect(page.locator(".react-flow__edge.selected")).toHaveCount(1);
 });
+
+// Fix: selected text was hard to see – a pale colour, hidden on the active line, which
+// CodeMirror draws above the selection.
+test("shows selected text clearly, also on the line of the cursor", async ({ page }) => {
+  await openYAML(page);
+  for (const theme of ["Light", "Dark"]) {
+    await page.getByRole("button", { name: theme, exact: true }).click();
+    await line(page, "name: hello").click();
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Shift+ArrowDown");
+    await page.keyboard.press("Shift+End");
+    const [active, selection] = await page.evaluate(() => [
+      getComputedStyle(document.querySelector(".runnel-yaml .cm-activeLine")!).backgroundColor,
+      getComputedStyle(document.querySelector(".runnel-yaml .cm-selectionBackground")!).backgroundColor,
+    ]);
+    const alpha = (c: string) => Number(/\/\s*([\d.]+)\)$/.exec(c)?.[1] ?? /rgba\(.*,\s*([\d.]+)\)$/.exec(c)?.[1] ?? 1);
+    // The active line lets the selection through; the selection is a clear tint.
+    expect(alpha(active), theme).toBeLessThan(1);
+    expect(alpha(selection), theme).toBeGreaterThanOrEqual(0.3);
+  }
+});
