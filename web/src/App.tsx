@@ -6,6 +6,8 @@ import { Dialog } from "./components/Dialog";
 import { FileView, type FileHandle } from "./components/FileView";
 import { Header } from "./components/Header";
 import { Palette, type PaletteTarget } from "./components/Palette";
+import { ReferencePanel, type ReferenceAction, type ReferenceTarget } from "./components/ReferencePanel";
+import { missingIn, useVariables } from "./reference";
 import { Splitter, useExplorerHeight } from "./components/Splitter";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
@@ -26,6 +28,13 @@ export function App() {
   const [active, setActive] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [paletteTarget, setPaletteTarget] = useState<PaletteTarget | null>(null);
+  // The lower part of the sidebar follows the open file (mockup E18): the palette for
+  // workflows and pipelines, the reference for project.yaml, environments and triggers.
+  const [reference, setReference] = useState<ReferenceTarget | null>(null);
+  const [request, setRequest] = useState<{ path: string; seq: number; action: ReferenceAction } | null>(null);
+  // The variables of the project (E18a), loaded again after every save and file change.
+  const [varsKey, setVarsKey] = useState(0);
+  const variables = useVariables(varsKey);
   const [run, setRun] = useState<RunView | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [closing, setClosing] = useState<string | null>(null);
@@ -43,9 +52,11 @@ export function App() {
   // environments of the start.
   const loadProject = useCallback(() => {
     fetchProject().then(setProject, () => setProject(null));
+    setVarsKey((k) => k + 1);
   }, []);
   const onDirty = useCallback((path: string, isDirty: boolean) => {
     if (!isDirty && (path === "project.yaml" || path.startsWith("environments/"))) loadProject();
+    else if (!isDirty) setVarsKey((k) => k + 1);
     setDirty((d) => {
       if (d.has(path) === isDirty) return d;
       const next = new Set(d);
@@ -89,6 +100,27 @@ export function App() {
     setTabs((t) => (t.includes(path) ? t : [...t, path]));
     setActive(path);
   }, []);
+  // Requests of the reference go to their file, which opens if needed.
+  const onReferenceAction = useCallback(
+    (action: ReferenceAction) => {
+      open(action.path);
+      setRequest((r) => ({ path: action.path, seq: (r?.seq ?? 0) + 1, action }));
+    },
+    [open],
+  );
+  // Variables used but not set: a badge in the file bar of environments and project.yaml.
+  const variableWarning = (path: string) => {
+    if (!variables) return null;
+    const envs = path === "project.yaml" ? variables.environments : path.startsWith("environments/") ? [path.slice(13).replace(/\.ya?ml$/, "")] : [];
+    const missing = variables.variables.filter((v) => envs.some((e) => missingIn(v, e)));
+    if (missing.length === 0) return null;
+    const text = missing
+      .map((v) => `⚠ ${v.name} is used, but not set for ${envs.filter((e) => missingIn(v, e)).join(", ")} (${v.uses.filter((u) => !u.parameter).map((u) => `${u.file}:${u.line}`).join(", ")})`)
+      .join("\n");
+    return { count: missing.length, text };
+  };
+  // Without an open file the palette stays, with the hint to open a workflow or pipeline.
+  const sidePanel = !active || paletteTarget ? "palette" : reference ? "reference" : null;
   // The files of the project, for the links of documents (E17).
   const files = useMemo(() => {
     const out = new Set<string>();
@@ -120,13 +152,13 @@ export function App() {
   return (
     <div className="grid h-full grid-rows-[48px_1fr_24px]">
       <Header project={project} theme={theme} onTheme={setTheme} />
-      <div className="grid min-h-0 grid-cols-[248px_1fr]">
+      <div className="grid min-h-0 grid-cols-[280px_1fr]">
         <aside ref={sidebar} className="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
           <div
             ref={explorer}
             data-testid="explorer-pane"
             className="flex min-h-[120px] flex-col"
-            style={{ flex: "0 1 auto", height: explorerHeight ?? undefined }}
+            style={sidePanel ? { flex: "0 1 auto", height: explorerHeight ?? undefined } : { flex: "1 1 auto" }}
           >
             <Explorer
               tree={tree}
@@ -155,8 +187,9 @@ export function App() {
               }}
             />
           </div>
-          <Splitter container={sidebar} explorer={explorer} height={explorerHeight} onHeight={setExplorerHeight} />
-          <Palette target={active ? paletteTarget : null} />
+          {sidePanel && <Splitter container={sidebar} explorer={explorer} height={explorerHeight} onHeight={setExplorerHeight} />}
+          {sidePanel === "palette" && <Palette target={active ? paletteTarget : null} />}
+          {sidePanel === "reference" && reference && <ReferencePanel target={reference} variables={variables} onAction={onReferenceAction} />}
         </aside>
         <main className="flex min-h-0 min-w-0 flex-col bg-background">
           {state === "disconnected" && (
@@ -184,6 +217,9 @@ export function App() {
                   epoch={epoch}
                   onSummary={setSummary}
                   onPalette={setPaletteTarget}
+                  onReference={setReference}
+                  request={request?.path === path ? request : null}
+                  variableWarning={variableWarning(path)}
                   onDirty={onDirty}
                   onRegister={onRegister}
                   onReloadExplorer={loadTree}

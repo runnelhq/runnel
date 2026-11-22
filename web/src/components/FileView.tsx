@@ -34,6 +34,8 @@ import { Dialog } from "./Dialog";
 import { PropertiesPanel, type FieldValue, type LinkChange } from "./PropertiesPanel";
 import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
+import type { ReferenceAction, ReferenceTarget } from "./ReferencePanel";
+import { insertField } from "../reference";
 import {
   ChevronIcon,
   CodeIcon,
@@ -118,6 +120,12 @@ export function FileView(props: {
   files?: Set<string>;
   /** Opens a file of the project in its tab, e.g. from a link of a document. */
   onOpenFile?: (path: string) => void;
+  /** Reports the open project.yaml, environment or trigger for the reference (E18b). */
+  onReference?: (target: ReferenceTarget | null) => void;
+  /** A request of the reference for this file: go to a line, insert a field or a variable. */
+  request?: { seq: number; action: ReferenceAction } | null;
+  /** Variables used but not set for this environment (E18b): a warning badge. */
+  variableWarning?: { count: number; text: string } | null;
 }) {
   const { path, active, epoch, onSummary, onPalette, onDirty, onRegister, onRun } = props;
   const [state, setState] = useState<State>({ status: "loading" });
@@ -154,7 +162,7 @@ export function FileView(props: {
   // the line to show in the editor, and the function that hands over typed text at once.
   const [typing, setTyping] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [yamlFocus, setYamlFocus] = useState<{ line: number; seq: number } | null>(null);
+  const [yamlFocus, setYamlFocus] = useState<{ line: number; seq: number; from?: number; to?: number } | null>(null);
   const flushTyping = useRef<(() => void) | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   // The line of the cursor in the YAML view: switching to the canvas selects what is there.
@@ -664,11 +672,32 @@ export function FileView(props: {
     if (active) onPalette(graphKind ? { kind: graphKind, editable: canEdit, hasStart } : null);
   }, [active, graphKind, canEdit, hasStart, onPalette]);
 
-  const showInYAML = useCallback((line: number) => {
+  const showInYAML = useCallback((line: number, from?: number, to?: number) => {
     setView("yaml");
     setFocusLine(line);
-    setYamlFocus((f) => ({ line, seq: (f?.seq ?? 0) + 1 }));
+    setYamlFocus((f) => ({ line, seq: (f?.seq ?? 0) + 1, from, to }));
   }, []);
+
+  // The reference (E18b): which file it helps with, and its requests to this file.
+  const { onReference } = props;
+  const refKind = fileKind === "project" || fileKind === "environment" || fileKind === "trigger" ? fileKind : null;
+  useEffect(() => {
+    if (active) onReference?.(refKind && doc ? { path, kind: refKind, text: doc.text } : null);
+  }, [active, refKind, doc, path, onReference]);
+  const done = useRef(0);
+  useEffect(() => {
+    const req = props.request;
+    if (!req || req.seq === done.current || !docRef.current) return;
+    done.current = req.seq;
+    const a = req.action;
+    if (a.op === "goto") return showInYAML(a.line);
+    flushTyping.current?.();
+    const text = docRef.current.text;
+    const ins =
+      a.op === "insert" ? insertField(text, a.parent, a.key, a.schema) : insertField(text, "variables", a.name, { type: "string" });
+    setText(ins.text, "push");
+    showInYAML(ins.line, ins.from, ins.to);
+  }, [props.request, doc, setText, showInYAML]);
 
   // Switching keeps the element (focus fix): the YAML view opens at the selected step or
   // link, the canvas selects the step or link the cursor of the YAML view is in.
@@ -788,6 +817,11 @@ export function FileView(props: {
             onClick={openProblems}
           >
             ⚠ {validation.warnings}
+          </Badge>
+        )}
+        {props.variableWarning && props.variableWarning.count > 0 && (
+          <Badge testId="variable-warning" tone="warning" title={props.variableWarning.text}>
+            ⚠ {props.variableWarning.count}
           </Badge>
         )}
         {/* After the problem badges, so that they stay in place when switching views. */}
