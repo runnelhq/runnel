@@ -202,3 +202,27 @@ test("shows the log of the run, waiting actions and the result in the panel", as
   await node(page, "combine").click();
   await expect(page.getByTestId("last-run")).toContainText("✔ Succeeded in the last run");
 });
+
+// Fix: an environment created after the editor was opened did not appear in the run dialog
+// ("The project has no environments."), because the project was only loaded at the start.
+test("offers an environment created after opening the editor", async ({ page, request }) => {
+  await request.delete("/api/v1/files/environments/e2e-new.yaml");
+  await open(page);
+  await page.getByRole("button", { name: "Run with other values" }).click();
+  const dialog = page.getByRole("dialog", { name: "Run run.workflow.yaml" });
+  await expect(dialog.getByLabel("Environment").locator("option")).not.toContainText(["e2e-new"]);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menu", { name: "New" }).getByRole("menuitem", { name: /^Environment/ }).click();
+  const input = page.getByRole("tree").getByRole("textbox", { name: "Name of the new environment" });
+  await input.fill("e2e-new");
+  await input.press("Enter");
+  await expect(page.getByRole("tab", { name: /e2e-new\.yaml/ })).toHaveAttribute("aria-selected", "true");
+
+  await page.getByRole("tab", { name: /run\.workflow\.yaml/ }).click();
+  await page.getByRole("button", { name: "Run with other values" }).click();
+  await expect(dialog.getByLabel("Environment").locator("option", { hasText: "e2e-new" })).toHaveCount(1);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await request.delete("/api/v1/files/environments/e2e-new.yaml");
+});

@@ -37,7 +37,15 @@ export function App() {
   const sidebar = useRef<HTMLElement>(null);
   const explorer = useRef<HTMLDivElement>(null);
 
+  // The project (its environments, the default environment) is loaded again whenever the
+  // files of the project are: after creating, renaming or deleting files in the explorer and
+  // after saving project.yaml or an environment. Otherwise the run dialog keeps the
+  // environments of the start.
+  const loadProject = useCallback(() => {
+    fetchProject().then(setProject, () => setProject(null));
+  }, []);
   const onDirty = useCallback((path: string, isDirty: boolean) => {
+    if (!isDirty && (path === "project.yaml" || path.startsWith("environments/"))) loadProject();
     setDirty((d) => {
       if (d.has(path) === isDirty) return d;
       const next = new Set(d);
@@ -45,7 +53,7 @@ export function App() {
       else next.delete(path);
       return next;
     });
-  }, []);
+  }, [loadProject]);
   const onRegister = useCallback((path: string, handle: FileHandle | null) => {
     if (handle) handles.current.set(path, handle);
     else handles.current.delete(path);
@@ -60,6 +68,7 @@ export function App() {
   }, [dirty]);
 
   const loadTree = useCallback(() => {
+    loadProject();
     fetchTree().then(
       (t) => {
         setTree(t);
@@ -67,12 +76,11 @@ export function App() {
       },
       (err: unknown) => setTreeError(`Could not load the project files: ${err instanceof Error ? err.message : err}`),
     );
-  }, []);
+  }, [loadProject]);
 
   // Load at start and again on every reconnect: the server may have been restarted and
   // files may have changed. Loading does not wait for the event stream.
   useEffect(() => {
-    fetchProject().then(setProject, () => setProject(null));
     fetchVersion().then((v) => setVersion(v.version), () => setVersion(null));
     loadTree();
   }, [epoch, loadTree]);
