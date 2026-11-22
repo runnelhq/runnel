@@ -92,8 +92,7 @@ func FindProjectDir(start string) (string, bool, error) {
 func LoadProject(dir string) (*Project, error) {
 	var errs Errors
 	collect := func(err error) error {
-		var es Errors
-		if errors.As(err, &es) {
+		if es, ok := errors.AsType[Errors](err); ok {
 			errs = append(errs, es...)
 			return nil
 		}

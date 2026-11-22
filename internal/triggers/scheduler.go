@@ -205,8 +205,7 @@ func (s *Scheduler) Reload() {
 func Load(dir string) ([]*model.Trigger, model.Errors) {
 	var problems model.Errors
 	collect := func(err error) {
-		var es model.Errors
-		if errors.As(err, &es) {
+		if es, ok := errors.AsType[model.Errors](err); ok {
 			problems = append(problems, es...)
 		} else if err != nil {
 			problems = append(problems, &model.Error{File: filepath.Join(dir, model.TriggersDir), Msg: err.Error()})

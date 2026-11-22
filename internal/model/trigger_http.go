@@ -78,7 +78,7 @@ type Segment struct {
 // Segments returns the parts of the path of an http trigger; nil for "/".
 func (t *Trigger) Segments() []Segment {
 	var out []Segment
-	for _, part := range strings.Split(strings.Trim(t.With.Path, "/"), "/") {
+	for part := range strings.SplitSeq(strings.Trim(t.With.Path, "/"), "/") {
 		if part == "" {
 			continue
 		}
@@ -176,7 +176,7 @@ func (t *Trigger) checkURLPath() Errors {
 		return Errors{s.errorf("$.with.path", "path %q must not end with /", p)}
 	}
 	seen := map[string]bool{}
-	for _, part := range strings.Split(p[1:], "/") {
+	for part := range strings.SplitSeq(p[1:], "/") {
 		switch {
 		case part == "" && p != "/":
 			return Errors{s.errorf("$.with.path", "path %q has an empty part (//)", p)}

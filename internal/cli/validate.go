@@ -237,8 +237,7 @@ func (v *validator) project(dir string) (p *model.Project, found bool, err error
 		return p, true, nil
 	}
 	p, err = model.LoadProject(displayPath(root))
-	var diags model.Errors
-	if errors.As(err, &diags) {
+	if diags, ok := errors.AsType[model.Errors](err); ok {
 		v.report(diags)
 		if diags.HasErrors() {
 			p = nil

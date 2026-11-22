@@ -436,8 +436,7 @@ func (r *Runner) deriveSchemas() model.Errors {
 // Check returns the problems Prepare finds – errors and warnings –, e.g. for "runnel validate".
 func Check(p *model.Pipeline, opts Options) model.Errors {
 	r, err := Prepare(p, opts)
-	var diags model.Errors
-	if errors.As(err, &diags) {
+	if diags, ok := errors.AsType[model.Errors](err); ok {
 		return diags
 	}
 	if err != nil {
@@ -592,9 +591,7 @@ func (r *Runner) Run(parent context.Context) Result {
 		}
 		instances := append([]transform.Transform{r.transforms[i]}, r.copies[i]...)
 		distribute := t.Distribution == model.DistributeRoundRobin && len(dataLinks) > 1
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			start := now()
 			r.emit(Event{Time: start, Kind: TransformStarted, RunID: runID, TransformID: t.ID, TransformType: t.Type})
 
@@ -702,11 +699,9 @@ func (r *Runner) Run(parent context.Context) Result {
 			results := make([]error, len(instances))
 			var copiesWG sync.WaitGroup
 			for k, tr := range instances {
-				copiesWG.Add(1)
-				go func() {
-					defer copiesWG.Done()
+				copiesWG.Go(func() {
 					results[k] = runCopy(tr)
-				}()
+				})
 			}
 			copiesWG.Wait()
 			// The error of a copy that failed counts, not that of the others it stopped.
@@ -741,7 +736,7 @@ func (r *Runner) Run(parent context.Context) Result {
 			end := now()
 			r.emit(Event{Time: end, Kind: TransformFinished, RunID: runID, TransformID: t.ID, TransformType: t.Type,
 				Status: status, Err: err, Duration: end.Sub(start), Counts: c, LinkRows: rows})
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -791,9 +786,7 @@ func (r *Runner) input(ctx context.Context, links []chan transform.Batch, in []i
 	var inputs sync.WaitGroup
 	for _, li := range in {
 		inputs.Add(1)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer inputs.Done()
 			for b := range links[li] {
 				select {
@@ -804,14 +797,12 @@ func (r *Runner) input(ctx context.Context, links []chan transform.Batch, in []i
 					return
 				}
 			}
-		}()
+		})
 	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		inputs.Wait()
 		close(merged)
-	}()
+	})
 	return merged
 }
 

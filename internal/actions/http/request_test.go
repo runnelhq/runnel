@@ -56,7 +56,7 @@ func TestRequestJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Method != "POST" || got.URL.RawQuery != "a=1&status=open+%26+paid" || got.Header.Get("Authorization") != "Bearer secret-token" ||
+	if got.Method != http.MethodPost || got.URL.RawQuery != "a=1&status=open+%26+paid" || got.Header.Get("Authorization") != "Bearer secret-token" ||
 		got.Header.Get("Content-Type") != "application/json" || gotBody != `{"name":"Anna","tags":["a"]}` {
 		t.Errorf("request %s %s %v %q", got.Method, got.URL, got.Header, gotBody)
 	}

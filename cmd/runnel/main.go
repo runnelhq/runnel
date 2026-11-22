@@ -13,6 +13,11 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+// run executes the command and returns the exit code; main exits after the deferred calls.
+func run() int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -27,5 +32,5 @@ func main() {
 		os.Exit(cli.ExitCancelled)
 	}()
 
-	os.Exit(cli.ExecuteContext(ctx, os.Args[1:], os.Stdout, os.Stderr))
+	return cli.ExecuteContext(ctx, os.Args[1:], os.Stdout, os.Stderr)
 }

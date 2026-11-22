@@ -49,12 +49,12 @@ func TestEditPipelineAddMoveAndLinks(t *testing.T) {
 }
 
 func TestEditPipelineLinkType(t *testing.T) {
-	got := editPipeline(t, pipelineSource, PipelineEdit{UpdateLinks: []PipelineLinkUpdate{{Index: 1, Type: ptr(ErrorLink)}}})
+	got := editPipeline(t, pipelineSource, PipelineEdit{UpdateLinks: []PipelineLinkUpdate{{Index: 1, Type: new(ErrorLink)}}})
 	if !strings.Contains(got, "  - { from: types, to: write, type: error }\n") {
 		t.Errorf("to error:\n%s", got)
 	}
 	// data is the default and removes the field.
-	got = editPipeline(t, got, PipelineEdit{UpdateLinks: []PipelineLinkUpdate{{Index: 1, Type: ptr(DataLink)}}})
+	got = editPipeline(t, got, PipelineEdit{UpdateLinks: []PipelineLinkUpdate{{Index: 1, Type: new(DataLink)}}})
 	if got != pipelineSource {
 		t.Errorf("back to data:\n%s", got)
 	}
@@ -97,7 +97,7 @@ func TestEditPipelineErrors(t *testing.T) {
 		{PipelineEdit{Delete: []string{"nope"}}, `cannot delete transform "nope"`},
 		{PipelineEdit{Add: []NewAction{{ID: "read", Type: "csv.input"}}}, `cannot add transform "read": the id is already used`},
 		{PipelineEdit{AddLinks: []PipelineLink{{From: "read", To: "write", Type: "info"}}}, `link type "info" is not supported here`},
-		{PipelineEdit{UpdateLinks: []PipelineLinkUpdate{{Index: 5, Type: ptr(ErrorLink)}}}, "cannot change link #6"},
+		{PipelineEdit{UpdateLinks: []PipelineLinkUpdate{{Index: 5, Type: new(ErrorLink)}}}, "cannot change link #6"},
 		{PipelineEdit{Set: []SetField{{ID: "read", Field: "timeout", Value: "1s"}}}, `field "timeout" cannot be changed here`},
 		{PipelineEdit{Set: []SetField{{ID: "write", Field: "copies", Value: 2}}}, "flow style"},
 		{PipelineEdit{SetPipeline: []WorkflowField{{Field: "settings.timeout", Value: "1h"}}}, `field "settings.timeout" of the pipeline cannot be changed here`},

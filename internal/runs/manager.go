@@ -258,15 +258,13 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 	out.LinkRows = slices.Clone(out.LinkRows) // the events change the entry's slice
 	m.mu.Unlock()
 
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		defer cancel()
 		start(ctx)
 		m.mu.Lock()
 		m.ended(e)
 		m.mu.Unlock()
-	}()
+	})
 	return out, nil
 }
 
@@ -490,8 +488,8 @@ func (m *Manager) Runs() []Run {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]Run, 0, len(m.order))
-	for i := len(m.order) - 1; i >= 0; i-- {
-		r := m.runs[m.order[i]].run
+	for _, id := range slices.Backward(m.order) {
+		r := m.runs[id].run
 		r.LinkRows = slices.Clone(r.LinkRows)
 		out = append(out, r)
 	}

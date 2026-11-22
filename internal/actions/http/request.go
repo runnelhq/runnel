@@ -109,8 +109,8 @@ func parseSize(text string) (int64, error) {
 		suffix string
 		factor int64
 	}{{"KB", 1 << 10}, {"MB", 1 << 20}, {"GB", 1 << 30}, {"B", 1}} {
-		if strings.HasSuffix(s, u.suffix) {
-			s, unit = strings.TrimSpace(strings.TrimSuffix(s, u.suffix)), u.factor
+		if before, ok := strings.CutSuffix(s, u.suffix); ok {
+			s, unit = strings.TrimSpace(before), u.factor
 			break
 		}
 	}
@@ -203,8 +203,7 @@ func requestError(ctx context.Context, where string, timeout time.Duration, err 
 	case ctx.Err() != nil:
 		return ctx.Err()
 	}
-	var ue *url.Error
-	if errors.As(err, &ue) {
+	if ue, ok := errors.AsType[*url.Error](err); ok {
 		err = ue.Err
 	}
 	return fmt.Errorf("%s: %w", where, err)

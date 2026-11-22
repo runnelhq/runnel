@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -99,9 +100,7 @@ func (t *response) Process(ctx context.Context, in <-chan transform.Batch, out *
 		return err
 	}
 	headers := map[string]string{"Content-Type": "application/json; charset=utf-8"}
-	for k, v := range t.Headers {
-		headers[k] = v
-	}
+	maps.Copy(headers, t.Headers)
 	resp := action.Response{Status: status, Headers: headers, Body: json.RawMessage(body), Fallback: t.WhenEmpty}
 	switch {
 	case t.WhenEmpty:

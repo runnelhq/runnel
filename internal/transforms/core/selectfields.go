@@ -38,8 +38,7 @@ func newSelectFields(with map[string]any) (transform.Transform, error) {
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
-	switch {
-	case len(t.Fields) > 0 && len(t.Remove) > 0:
+	if len(t.Fields) > 0 && len(t.Remove) > 0 {
 		return nil, errors.New("use either fields (to keep) or remove, not both")
 	}
 	var names []string

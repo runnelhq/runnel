@@ -43,8 +43,7 @@ func CheckTrigger(t *model.Trigger, p *model.Project, projectDir string) model.E
 		errs = append(errs, t.ErrorAt("$.environment", "environment %q not found (%s)", t.Environment, hint))
 	}
 	params, what, err := TargetParams(t, projectDir)
-	var located *model.Error
-	if errors.As(err, &located) {
+	if located, ok := errors.AsType[*model.Error](err); ok {
 		return append(errs, located)
 	}
 	given := t.Params

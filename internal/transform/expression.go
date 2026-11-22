@@ -2,6 +2,7 @@ package transform
 
 import (
 	"errors"
+	"maps"
 	"reflect"
 	"regexp"
 	"time"
@@ -88,9 +89,7 @@ func (e *Expression) context(out *Output, r record.Record) map[string]any {
 	if e.env == nil || !sameMap(e.values, values) {
 		e.values = values
 		e.env = make(map[string]any, len(values)+1)
-		for k, v := range values {
-			e.env[k] = v
-		}
+		maps.Copy(e.env, values)
 		e.rec = map[string]any{}
 		e.env["record"] = e.rec
 	}

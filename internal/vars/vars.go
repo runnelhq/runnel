@@ -150,9 +150,9 @@ func NewScope(layers ...Layer) *Scope {
 
 // Lookup returns the raw (unexpanded) value of a variable and the name of the layer it comes from.
 func (s *Scope) Lookup(name string) (value, layer string, ok bool) {
-	for i := len(s.layers) - 1; i >= 0; i-- {
-		if v, ok := s.layers[i].Values[name]; ok {
-			return v, s.layers[i].Name, true
+	for _, l := range slices.Backward(s.layers) {
+		if v, ok := l.Values[name]; ok {
+			return v, l.Name, true
 		}
 	}
 	return "", "", false
@@ -215,10 +215,8 @@ func (s *Scope) resolve(r Ref, chain []string) (string, error) {
 		}
 		return s.LookupSecret(r.Name)
 	}
-	for _, c := range chain {
-		if c == r.Name {
-			return "", fmt.Errorf("variable cycle: %s → %s", strings.Join(chain, " → "), r.Name)
-		}
+	if slices.Contains(chain, r.Name) {
+		return "", fmt.Errorf("variable cycle: %s → %s", strings.Join(chain, " → "), r.Name)
 	}
 	v, _, ok := s.Lookup(r.Name)
 	if !ok {

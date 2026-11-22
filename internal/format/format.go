@@ -280,7 +280,7 @@ func (n numberFormat) format(d decimal.Decimal, fraction bool) string {
 	}
 	s := d.String()
 	if fraction || n.decimals > 0 {
-		s = d.StringFixed(int32(n.decimals))
+		s = d.StringFixed(int32(n.decimals)) //nolint:gosec // decimals come from a format pattern (a few digits)
 	}
 	sign := ""
 	if strings.HasPrefix(s, "-") {

@@ -144,17 +144,14 @@ func tokenPos(t *token.Token) Position {
 // yamlError converts an error of the YAML library into an Error with a
 // user-facing message (no Go type names).
 func yamlError(file string, err error) *Error {
-	var typeErr *yaml.TypeError
-	if errors.As(err, &typeErr) {
+	if typeErr, ok := errors.AsType[*yaml.TypeError](err); ok {
 		return &Error{File: file, Pos: tokenPos(typeErr.Token), Msg: fmt.Sprintf("expected %s, got %s",
 			yamlKind(typeErr.DstType), yamlKind(typeErr.SrcType))}
 	}
-	var syntaxErr *yaml.SyntaxError
-	if errors.As(err, &syntaxErr) {
+	if syntaxErr, ok := errors.AsType[*yaml.SyntaxError](err); ok {
 		return &Error{File: file, Pos: tokenPos(syntaxErr.Token), Msg: "syntax error: " + syntaxErr.Message}
 	}
-	var yerr yaml.Error
-	if errors.As(err, &yerr) {
+	if yerr, ok := errors.AsType[yaml.Error](err); ok {
 		return &Error{File: file, Pos: tokenPos(yerr.GetToken()), Msg: yerr.GetMessage()}
 	}
 	return &Error{File: file, Msg: err.Error()}

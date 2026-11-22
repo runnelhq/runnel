@@ -119,7 +119,7 @@ func (t *splitField) Process(ctx context.Context, in <-chan transform.Batch, out
 func (t *splitField) splitRows(r record.Record, v any, text string, out *transform.Output) error {
 	var parts []string
 	if v != nil && text != "" {
-		for _, p := range strings.Split(text, t.Separator) {
+		for p := range strings.SplitSeq(text, t.Separator) {
 			if p = t.part(p); p != "" || t.KeepEmpty {
 				parts = append(parts, p)
 			}

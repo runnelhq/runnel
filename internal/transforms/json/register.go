@@ -38,12 +38,10 @@ func plural(n int64, word string) string {
 // plain returns the reason of a file system error without the operation and path,
 // which the messages name themselves.
 func plain(err error) error {
-	var pe *fs.PathError
-	if errors.As(err, &pe) {
+	if pe, ok := errors.AsType[*fs.PathError](err); ok {
 		return pe.Err
 	}
-	var le *os.LinkError
-	if errors.As(err, &le) {
+	if le, ok := errors.AsType[*os.LinkError](err); ok {
 		return le.Err
 	}
 	return err

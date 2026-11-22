@@ -811,14 +811,14 @@ func literalBlock(indent, s string) ([]string, bool) {
 		return nil, false
 	}
 	head, body := "|-", s
-	if strings.HasSuffix(s, "\n") {
-		head, body = "|", strings.TrimSuffix(s, "\n")
+	if before, ok := strings.CutSuffix(s, "\n"); ok {
+		head, body = "|", before
 	}
 	if strings.HasSuffix(body, "\n") || strings.HasPrefix(body, " ") || strings.ContainsAny(body, "\t\r") {
 		return nil, false
 	}
 	lines := []string{head}
-	for _, l := range strings.Split(body, "\n") {
+	for l := range strings.SplitSeq(body, "\n") {
 		if l == "" {
 			lines = append(lines, "")
 		} else {

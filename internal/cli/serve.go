@@ -110,7 +110,7 @@ func runServer(ctx context.Context, c serveConfig) error {
 	}
 	defer func() { _ = srv.Close() }()
 
-	ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(c.Port)))
+	ln, err := new(net.ListenConfig).Listen(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(c.Port)))
 	if err != nil {
 		return fmt.Errorf("cannot listen on port %d (is another runnel serve or service running? use --port): %w", c.Port, err)
 	}
@@ -122,14 +122,14 @@ func runServer(ctx context.Context, c serveConfig) error {
 		<-ctx.Done()
 		if n := srv.Running(); c.StopTimeout > 0 && n > 0 {
 			c.Log(fmt.Sprintf("stopping: no new runs; waiting up to %s for %s to end", c.StopTimeout, plural(n, "running run")))
-			drain, cancel := context.WithTimeout(context.Background(), c.StopTimeout)
+			drain, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.StopTimeout)
 			err := srv.Drain(drain)
 			cancel()
 			if err != nil {
 				c.Warn(fmt.Sprintf("stopping: cancelling %s still running after %s", plural(srv.Running(), "run"), c.StopTimeout))
 			}
 		}
-		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdown, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
 		// First cancel the runs and end the event streams, then stop the HTTP server.
 		if err := srv.Shutdown(shutdown); err != nil {

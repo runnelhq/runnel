@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -435,7 +436,7 @@ func (h *handler) Execute(_ []string, requests <-chan svc.ChangeRequest, status 
 			case svc.Interrogate:
 				status <- r.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				status <- svc.Status{State: svc.StopPending, WaitHint: uint32(h.stopHint / time.Millisecond)}
+				status <- svc.Status{State: svc.StopPending, WaitHint: waitHint(h.stopHint)}
 				cancel()
 				if err := <-done; err != nil {
 					h.events.Error("the server has stopped: " + err.Error())
@@ -467,4 +468,10 @@ func ReadPassword(out io.Writer, in io.Reader, prompt string) (string, error) {
 		return "", fmt.Errorf("cannot read the password: %w", err)
 	}
 	return strings.TrimRight(line, "\r\n"), nil
+}
+
+// waitHint is the time the service manager should wait for the stop, in milliseconds
+// (at most about 49 days, the largest value it takes).
+func waitHint(d time.Duration) uint32 {
+	return uint32(min(max(d.Milliseconds(), 0), math.MaxUint32)) //nolint:gosec // limited to the range of uint32 above
 }

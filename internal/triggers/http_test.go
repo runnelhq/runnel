@@ -198,7 +198,7 @@ func TestHTTPListener(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if resp.StatusCode != 202 || !strings.Contains(string(body), `"runId":"run-1"`) {
+	if resp.StatusCode != http.StatusAccepted || !strings.Contains(string(body), `"runId":"run-1"`) {
 		t.Errorf("%d %s", resp.StatusCode, body)
 	}
 	cancel()
@@ -237,7 +237,7 @@ func TestHTTPListenerTLS(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = resp.Body.Close()
-	if resp.StatusCode != 202 {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Errorf("https: %d", resp.StatusCode)
 	}
 	// Plain HTTP and callers that do not trust the certificate get no answer.
@@ -417,5 +417,22 @@ func TestHTTPWorkflowList(t *testing.T) {
 	if w := (call{method: "GET", path: "/open?ID=1", contentType: "application/json", body: `[{"a": 1}]`}).do(s); w.Code != 400 ||
 		!strings.Contains(w.Body.String(), "the body must be a JSON object") {
 		t.Errorf("%d %s", w.Code, w.Body)
+	}
+}
+
+// The JSON body of http.respond belongs to the result of the run: writing the answer adds
+// the line break to a copy, never into spare room of the caller's slice.
+func TestWriteResponseKeepsBody(t *testing.T) {
+	buf := make([]byte, 0, 32)
+	buf = append(buf, `{"ok":true}`...)
+	spare := buf[:cap(buf)]
+	spare[len(buf)] = 'x'
+	rec := httptest.NewRecorder()
+	writeResponse(rec, action.Response{Status: http.StatusOK, Body: json.RawMessage(buf)})
+	if got := rec.Body.String(); got != "{\"ok\":true}\n" {
+		t.Errorf("body = %q", got)
+	}
+	if spare[len(buf)] != 'x' {
+		t.Error("writeResponse wrote into the body's backing array")
 	}
 }

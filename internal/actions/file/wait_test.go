@@ -30,7 +30,7 @@ func TestWaitForStableSize(t *testing.T) {
 	tree(t, dir, map[string]string{"growing.csv": "1"})
 	stop := make(chan struct{})
 	go func() { // the file grows for 300 ms
-		for i := 0; i < 6; i++ {
+		for range 6 {
 			time.Sleep(50 * time.Millisecond)
 			f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
 			_, _ = f.WriteString("more")

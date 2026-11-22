@@ -176,8 +176,7 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 
 // writeErr maps an error to a response; errors of type *httpError carry their status.
 func writeErr(w http.ResponseWriter, err error) {
-	var he *httpError
-	if errors.As(err, &he) {
+	if he, ok := errors.AsType[*httpError](err); ok {
 		writeError(w, he.status, he.msg)
 		return
 	}

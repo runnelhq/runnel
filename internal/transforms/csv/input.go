@@ -259,8 +259,7 @@ func (t *input) columns(first []string, header bool) ([]column, error) {
 
 // readError places an error of the CSV reader in the file.
 func (t *input) readError(err error) error {
-	var pe *stdcsv.ParseError
-	if errors.As(err, &pe) {
+	if pe, ok := errors.AsType[*stdcsv.ParseError](err); ok {
 		msg := pe.Err.Error()
 		if errors.Is(pe.Err, stdcsv.ErrFieldCount) {
 			msg = "the row has a different number of values than the first row"

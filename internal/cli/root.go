@@ -38,8 +38,7 @@ func ExecuteContext(ctx context.Context, args []string, out, errOut io.Writer) i
 	root := NewRootCommand(out, errOut)
 	root.SetArgs(args)
 	if err := root.ExecuteContext(ctx); err != nil {
-		var exit errExitCode
-		if errors.As(err, &exit) {
+		if exit, ok := errors.AsType[errExitCode](err); ok {
 			return int(exit)
 		}
 		root.PrintErrln("Error:", err)
