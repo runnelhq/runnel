@@ -5,3 +5,9 @@ name: http
 description: Read the latest release of a GitHub repository and check the answer
 variables:
   API_URL: https://api.github.com
+# Secrets in plain text (S39a2) so that the example works as it is: ${secret:NAME} reads
+# them from here. runnel validate warns about them; for real systems set another
+# secretStore (e.g. env) and keep the values out of the project.
+secretStore: inline
+secrets:
+  release-token: example-token
