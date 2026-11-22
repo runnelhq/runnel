@@ -163,3 +163,36 @@ func golden(t *testing.T, name string, got []byte) {
 		t.Errorf("result differs from %s (run with -update if intended)\n--- got:\n%s", path, got)
 	}
 }
+
+// TestOnly: only=<field>:<values> marks a field that applies to some values of a sibling (E14).
+func TestOnly(t *testing.T) {
+	type agg struct {
+		Function  string `json:"function" schema:"enum=sum|concat"`
+		Separator string `json:"separator" schema:"only=function:concat|join"`
+	}
+	s, err := For(agg{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sep, _ := s.Properties.Lookup("separator")
+	if got := sep.Only["function"]; len(got) != 2 || got[0] != "concat" || got[1] != "join" {
+		t.Errorf("only: %v", sep.Only)
+	}
+	data, _ := json.Marshal(sep)
+	if !strings.Contains(string(data), `"x-runnel-only":{"function":["concat","join"]}`) {
+		t.Errorf("json: %s", data)
+	}
+	type bad struct {
+		A string `json:"a" schema:"only=b:x"`
+	}
+	if _, err := For(bad{}); err == nil || !strings.Contains(err.Error(), "not another field") {
+		t.Errorf("unknown sibling: %v", err)
+	}
+	type malformed struct {
+		A string `json:"a" schema:"only=b"`
+		B string `json:"b"`
+	}
+	if _, err := For(malformed{}); err == nil {
+		t.Error("only without values must fail")
+	}
+}

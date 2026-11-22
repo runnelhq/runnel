@@ -237,7 +237,8 @@ export function place(wf: Workflow): Placement {
 /** Changes made on the canvas (see model.WorkflowEdit). */
 export interface KeyValue {
   key: string;
-  value: string;
+  /** A text; in the entries of a list also a number or true/false (E14). */
+  value: string | number | boolean;
 }
 
 export interface SetField {
@@ -246,6 +247,8 @@ export interface SetField {
   value: string | number | boolean | null;
   map?: KeyValue[];
   list?: KeyValue[][];
+  /** A list of texts, written as "[a, b]" (E14). */
+  texts?: string[];
 }
 
 export interface WorkflowEdit {

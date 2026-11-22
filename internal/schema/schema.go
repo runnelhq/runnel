@@ -12,7 +12,9 @@
 //	    or with json:"-" and unexported fields are not part of the schema.
 //	  - doc: description of the field for editor and tools (English, one sentence).
 //	  - schema: comma-separated options:
-//	    required, default=<value>, enum=<a>|<b>|…, example=<value>, format=<name>.
+//	    required, default=<value>, enum=<a>|<b>|…, example=<value>, format=<name>,
+//	    only=<field>:<a>|<b>|… (the field applies only when the sibling field has one of
+//	    these values, e.g. only=function:concat; "x-runnel-only" in the schema, E14).
 //	    Values must not contain commas.
 package schema
 
@@ -38,6 +40,10 @@ const FormatDuration = "runnel-duration"
 // field instead of a single line, decision for mockup E7).
 const FormatText = "runnel-text"
 
+// OnlyKey is the schema keyword of the option only=: the field applies only when a
+// sibling field has one of the given values. The editor hides it otherwise (mockup E14).
+const OnlyKey = "x-runnel-only"
+
 // Schema is a JSON Schema, limited to what configuration structs need.
 type Schema struct {
 	Schema      string     `json:"$schema,omitempty"`
@@ -51,6 +57,8 @@ type Schema struct {
 	Items       *Schema    `json:"items,omitempty"`
 	Properties  Properties `json:"properties,omitempty"`
 	Required    []string   `json:"required,omitempty"`
+	// Only: see OnlyKey; sibling field name → values.
+	Only map[string][]any `json:"x-runnel-only,omitempty"`
 	// AdditionalProperties is false for structs (unknown fields are errors) and the
 	// value schema for maps.
 	AdditionalProperties any `json:"additionalProperties,omitempty"`
@@ -213,10 +221,27 @@ func forStruct(t reflect.Type, path string, seen []reflect.Type) (*Schema, error
 			s.Required = append(s.Required, f.name)
 		}
 	}
+	for _, p := range s.Properties {
+		for sibling := range p.Schema.Only {
+			if _, ok := s.Properties.Lookup(sibling); !ok || sibling == p.Name {
+				return nil, fmt.Errorf("%s: only= names %q, which is not another field", describe(join(path, p.Name)), sibling)
+			}
+		}
+	}
 	return s, nil
 }
 
 func applyOptions(s *Schema, o options, path string) error {
+	if o.only != "" {
+		field, values, ok := strings.Cut(o.only, ":")
+		if !ok || field == "" || values == "" {
+			return fmt.Errorf("%s: only must be <field>:<value>|<value>…", describe(path))
+		}
+		s.Only = map[string][]any{}
+		for v := range strings.SplitSeq(values, "|") {
+			s.Only[field] = append(s.Only[field], v)
+		}
+	}
 	if o.format != "" {
 		if s.Type != "string" {
 			return fmt.Errorf("%s: format is only allowed for strings", describe(path))
@@ -274,6 +299,7 @@ type options struct {
 	example      *string
 	enum         []string
 	format       string
+	only         string
 	err          error
 }
 
@@ -325,6 +351,8 @@ func parseOptions(tag string) options {
 			o.enum = strings.Split(value, "|")
 		case key == "format" && hasValue:
 			o.format = value
+		case key == "only" && hasValue:
+			o.only = value
 		default:
 			o.err = fmt.Errorf("unknown schema option %q", opt)
 		}

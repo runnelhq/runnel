@@ -8,6 +8,7 @@ import {
   validate,
   type EntryEdit,
   type GraphKind,
+  type KeyValue,
   type Link,
   type Problem,
   type Validation,
@@ -326,6 +327,17 @@ export function FileView(props: {
   const onSetMap = useCallback(
     (id: string, field: string, map: { key: string; value: string }[]) =>
       void applyEdit({ set: [{ id, field, value: null, ...(map.length > 0 ? { map } : {}) }] }, `${id}:${field}`),
+    [applyEdit],
+  );
+  // Lists of the configuration (E14): one step per change of the list.
+  const onSetList = useCallback(
+    (id: string, field: string, list: KeyValue[][] | null) =>
+      void applyEdit({ set: [{ id, field, value: null, ...(list && list.length > 0 ? { list } : {}) }] }, `${id}:${field}`),
+    [applyEdit],
+  );
+  const onSetTexts = useCallback(
+    (id: string, field: string, texts: string[] | null) =>
+      void applyEdit({ set: [{ id, field, value: null, ...(texts && texts.length > 0 ? { texts } : {}) }] }, `${id}:${field}`),
     [applyEdit],
   );
   // The data preview (S44) runs the text shown, with the values remembered for Run.
@@ -864,6 +876,8 @@ export function FileView(props: {
           onSet={onSet}
           onSetWorkflow={onSetWorkflow}
           onSetMap={onSetMap}
+          onSetList={onSetList}
+          onSetTexts={onSetTexts}
           onEntry={(e) => void onEntry(e)}
           onLinkChange={onLinkChange}
           onDeleteLink={(index) => void onDelete([], [index])}

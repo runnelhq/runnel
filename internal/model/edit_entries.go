@@ -33,8 +33,10 @@ type EntryEdit struct {
 // KeyValue is an entry of a mapping set with SetField.Map, e.g. a parameter given to a
 // sub-workflow (with.params).
 type KeyValue struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key string `json:"key"`
+	// Value is a text, or in the entries of a list (SetField.List) also a number or
+	// true/false (E14), e.g. "descending: true".
+	Value any `json:"value"`
 }
 
 var (
@@ -82,6 +84,21 @@ func (d *docEntry) add(field, value string, always bool) {
 	if value != "" || always {
 		d.fields = append(d.fields, [2]string{field, flowScalar(value)})
 	}
+}
+
+// flowValue writes a text, a number or true/false for a flow mapping ({ … }).
+func flowValue(v any) string {
+	switch v := v.(type) {
+	case bool:
+		return strconv.FormatBool(v)
+	case float64:
+		return coord(v)
+	case int:
+		return strconv.Itoa(v)
+	case string:
+		return flowScalar(v)
+	}
+	return flowScalar(fmt.Sprint(v))
 }
 
 // flowScalar writes a text so that it can stand in a flow mapping or list ({ … }, [ … ]).

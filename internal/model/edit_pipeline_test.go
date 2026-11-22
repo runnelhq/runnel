@@ -151,3 +151,33 @@ func TestEditPipelineSetList(t *testing.T) {
 		t.Error("duplicate key: no error")
 	}
 }
+
+// TestEditPipelineTypedListAndTexts: entries of a list may hold numbers and true/false,
+// lists of texts are written in flow style (E14); other values are refused.
+func TestEditPipelineTypedListAndTexts(t *testing.T) {
+	got := editPipeline(t, pipelineSource, PipelineEdit{Set: []SetField{
+		{ID: "read", Field: "with.fields", List: [][]KeyValue{
+			{{Key: "name", Value: "total"}, {Key: "descending", Value: true}},
+			{{Key: "name", Value: "amount"}, {Key: "value", Value: 9.95}, {Key: "when", Value: "{{ record.a > 0 }}"}},
+		}},
+	}})
+	got = editPipeline(t, got, PipelineEdit{Set: []SetField{{ID: "read", Field: "with.groupBy", Texts: []string{"Datum", "Weber, Anna"}}}})
+	for _, want := range []string{
+		"        - { name: total, descending: true }\n",
+		"        - { name: amount, value: 9.95, when: \"{{ record.a > 0 }}\" }\n",
+		"      groupBy: [Datum, \"Weber, Anna\"]\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	for _, bad := range []SetField{
+		{ID: "read", Field: "with.fields", List: [][]KeyValue{{{Key: "name", Value: []any{"x"}}}}},
+		{ID: "read", Field: "with.params", Map: []KeyValue{{Key: "A", Value: 5.0}}},
+		{ID: "read", Field: "description", Texts: []string{"a"}},
+	} {
+		if _, err := EditPipeline("x.pipeline.yaml", []byte(pipelineSource), PipelineEdit{Set: []SetField{bad}}); err == nil {
+			t.Errorf("%+v: no error", bad)
+		}
+	}
+}
