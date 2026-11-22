@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -164,7 +165,16 @@ func checkExample(t *testing.T, def action.Definition, s *schema.Schema) {
 	if err != nil {
 		t.Fatalf("example is not valid YAML for with: %v", err)
 	}
-	if _, err := def.New(w.Actions[0].With); err != nil {
+	// Like the engine, numbers stand for text where the schema expects text, e.g. status: 404.
+	with := w.Actions[0].With
+	for _, prop := range s.Properties {
+		if v, ok := with[prop.Name]; ok && prop.Schema.Type == "string" {
+			if _, text := v.(string); !text {
+				with[prop.Name] = fmt.Sprint(v)
+			}
+		}
+	}
+	if _, err := def.New(with); err != nil {
 		t.Errorf("example was rejected: %v", err)
 	}
 }

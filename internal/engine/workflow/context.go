@@ -160,6 +160,27 @@ func (r *Runner) condition(when string, scope *vars.Scope, values map[string]any
 
 // evalWith resolves variables and expressions in an action's configuration. A field
 // that is text in the schema of the action gets the result as text.
+// asText writes numbers and true/false as text where the schema of the action expects
+// text, e.g. "status: 404" for a field that may also hold "{{ … }}" – as when the action
+// runs (evalWith) and like the pipeline engine, so that the check before a run agrees.
+func asText(with map[string]any, reg *action.Registry, typ string) map[string]any {
+	d, ok := reg.Descriptor(typ)
+	if !ok || d.Schema == nil || with == nil {
+		return with
+	}
+	out := maps.Clone(with)
+	for _, p := range d.Schema.Properties {
+		switch v := out[p.Name].(type) {
+		case string, nil, map[string]any, []any:
+		default:
+			if p.Schema.Type == "string" {
+				out[p.Name] = expr.Format(v)
+			}
+		}
+	}
+	return out
+}
+
 func (r *Runner) evalWith(a *model.Action, scope *vars.Scope, values map[string]any) (map[string]any, error) {
 	if a.With == nil {
 		return nil, nil

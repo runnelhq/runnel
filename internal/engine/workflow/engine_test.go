@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -624,5 +625,20 @@ links:
 `)
 	if _, trace := runWorkflow(t, w, nil); !strings.Contains(strings.Join(trace, "|"), `without reaching any of its end actions "ok1", "ok2"`) {
 		t.Errorf("two: %v", trace)
+	}
+}
+
+// TestNumberInTextField: a number in a field of type text (message: 42) is accepted
+// before the run and passed on as text, like in pipelines (e.g. status: 404 of http.respond).
+func TestNumberInTextField(t *testing.T) {
+	w := parse(t, `actions:
+  - { id: start, type: core.start }
+  - { id: say, type: core.log, with: { message: 42 } }
+links:
+  - { from: start, to: say }
+`)
+	res, trace := runWorkflow(t, w, nil)
+	if res.Status != Succeeded || !slices.Contains(trace, "log say: 42") {
+		t.Errorf("%s %v: %v", res.Status, res.Err, trace)
 	}
 }
