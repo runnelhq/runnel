@@ -56,6 +56,8 @@ classDiagram
     Project "1" --> "*" Pipeline
     Project "1" --> "*" Environment
     Project "1" --> "*" Connection
+    Project "1" --> "*" SecretStore
+    Project "1" --> "*" Plugin
     Project "1" --> "*" Trigger
     Project "1" --> "*" RunConfig
     Workflow "1" --> "*" Action
@@ -68,7 +70,10 @@ classDiagram
     Trigger ..> Pipeline : startet
     RunConfig ..> Workflow : "wie ausführen"
     RunConfig ..> Pipeline : "wie ausführen"
-    Transform ..> Pipeline : "Pipeline Executor"
+    Transform ..> Pipeline : "Mapping, Pipeline Executor"
+    Connection ..> SecretStore : "Secrets"
+    Plugin ..> Action : "bietet an"
+    Plugin ..> Transform : "bietet an"
     Transform ..> Connection : nutzt
     Action ..> Connection : nutzt
 ```
@@ -222,7 +227,7 @@ Details: [ADR 0008](adr/0008-ausfuehrungsvarianten.md).
 | Workflow oder einzelne Pipeline direkt ausführen | CLI, Editor, API, Trigger |
 | **Run-Konfiguration** (wie wird ausgeführt; S42, Backlog) | Metadaten-Objekt `RunConfig` (`local`, später `remote`): Puffergrößen, Parallelität, Sampling, Log-Level, Timeout. Auswahl per CLI, Editor, Trigger oder aufrufender Action |
 | Dynamisches Ziel | `pipeline: "pipelines/import-${MANDANT}.pipeline.yaml"`, immer im Projektordner, optional eingeschränkt über `allowedTargets` (seit S25b) |
-| Ausführung pro Datensatz (Pipeline) | `core.pipeline-executor`, `core.workflow-executor` – pro Datensatz, pro Gruppe fester Größe oder pro Feldwechsel |
+| Ausführung pro Datensatz (Pipeline) | `core.pipeline-executor`, `core.workflow-executor` – pro Datensatz, pro Gruppe fester Größe oder pro Feldwechsel (`groupBy`), höchstens `copies` Läufe gleichzeitig; Ausgänge wie bei `core.switch`: `results` (ein Datensatz je Lauf), `rows` (Datensätze aus `core.to-result`), alle übrigen Daten-Links die Eingangsdatensätze ([ADR 0021](adr/0021-unter-pipelines.md), geplant als S25c–e) |
 | Ausführung pro Datensatz (Workflow) | `forEach` an jeder Action (seit S24b), optional `parallel`, z. B. an `core.run-pipeline` / `core.run-workflow` |
 | Datensätze zwischen Pipelines weitergeben | `core.to-result` / `core.from-result` |
 | Teilausführung | Editor: „Ab hier ausführen“, „Nur diese Action ausführen“, Pipeline-Vorschau bis Transform X |
@@ -299,6 +304,8 @@ flowchart LR
 | Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
 | Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments und Triggern (seit S58), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
+| Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39a, [ADR 0022](adr/0022-connections-secrets.md)) |
+| Plugins (geplant) | `runnel plugins [trust\|untrust] [projektordner] [--service]` | Plugins anzeigen und für das Projekt freigeben (S49, [ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag) |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
@@ -312,7 +319,7 @@ flowchart LR
 | Single-Binary ohne Runtime | ✅ nativ | ✅ (AOT mit Einschränkungen bei Reflection) | ❌ | ✅ |
 | Nebenläufigkeit für Pipelines | ✅ Goroutinen + Channels ideal | ✅ Channels/Tasks | ⚠️ Single-Thread | ✅ (komplexer) |
 | Windows-Dienst | ✅ `x/sys/windows/svc` | ✅ | ⚠️ | ✅ |
-| DB-Treiber ohne CGO | ✅ MSSQL, Postgres, MySQL, Oracle, SQLite | ✅ | ✅ | ⚠️ |
+| DB-Treiber ohne CGO | ✅ MSSQL, Postgres, Oracle, SQLite (MySQL: Treiber MPL-2.0, vorerst nicht, ADR 0022) | ✅ | ✅ | ⚠️ |
 | Entwicklungsgeschwindigkeit | ✅ hoch | ✅ hoch | ✅ hoch | ⚠️ mittel |
 | Cross-Compile Linux/macOS | ✅ trivial | ✅ | ⚠️ | ✅ |
 
@@ -323,7 +330,8 @@ die Binary ist klein und ohne CGO cross-kompilierbar. .NET 9 wurde als Alternati
 
 Eingesetzt (fest gepinnt in `go.mod`): `goccy/go-yaml`, `expr-lang/expr`, `shopspring/decimal`, `robfig/cron/v3`,
 `spf13/cobra` (CLI), `golang.org/x/text` (Kodierungen) und `golang.org/x/sys` (Windows-Dienst, Ereignisanzeige). Die
-übrigen Einträge sind geplant und kommen mit ihrem Roadmap-Schritt.
+übrigen Einträge sind geplant und kommen mit ihrem Roadmap-Schritt; die Lizenz jedes Treibers und jeder Bibliothek wird
+im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 
 | Zweck | Bibliothek |
 |---|---|
@@ -342,10 +350,11 @@ Eingesetzt (fest gepinnt in `go.mod`): `goccy/go-yaml`, `expr-lang/expr`, `shops
 | SQL Server | `microsoft/go-mssqldb` (inkl. Windows-Authentifizierung) |
 | PostgreSQL | `jackc/pgx/v5` |
 | Oracle | `sijms/go-ora` (pure Go) |
-| ODBC (optional, Access, Legacy) | `alexbrainman/odbc` |
+| ODBC (optional, Access, Legacy; auch MySQL/MariaDB bis auf Weiteres) | `alexbrainman/odbc` |
 | Excel | `xuri/excelize/v2` |
 | CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
 | SFTP | `pkg/sftp` + `x/crypto/ssh` |
+| FTP/FTPS | offen; Auswahl mit S57 (Lizenz MIT-kompatibel) |
 | Mail | `wneessen/go-mail` |
 | Logging | `log/slog` (strukturiert, JSON) |
 | WebView2-Fenster | `jchv/go-webview2` oder Wails v2 |
@@ -896,14 +905,17 @@ Alle Bausteine (eingebaut, JS, extern) beschreiben sich über denselben **Descri
   "label": "HTTP Request",
   "description": "Sends an HTTP request for each record",
   "schema": { "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "properties": { "...": {} } },
-  "icon": "globe.svg",
-  "ports": { "in": 1, "out": ["main", "error"] },
-  "uiHints": { "body": { "widget": "code", "language": "json" } }
+  "example": "url: https://api.example.com/customers/{{ record.id }}",
+  "recordErrors": true,
+  "parallel": true
 }
 ```
 
-`type` bis `schema` gibt es seit E1 (`runnel catalog --json`); `icon`, `ports` und `uiHints` folgen mit den Schritten,
-die sie brauchen. Eingebaute Bausteine erzeugen `schema` aus ihrem Konfigurations-Struct (Tags `json`, `doc`,
+`type` bis `schema` gibt es seit E1 (`runnel catalog --json`); `example` (Hilfe im Panel, E14b), bei Transforms
+`recordErrors` (Fehler-Link erlaubt), `parallel` (`copies` erlaubt) und `detectFields` (S46) sind optional. Es gibt
+**keine Ports**: Pipeline-Links sind Daten- oder Fehler-Links, weitere Ausgänge nennen Felder mit
+`format: runnel-target` (wie `to:` bei `core.switch`, [ADR 0021](adr/0021-unter-pipelines.md)). Eigene Icons von
+Plugins kommen erst als SVG-Pfaddaten (höchstens 4 KB, ADR 0019 Nachtrag); bis dahin zeigt der Editor das allgemeine Symbol. Eingebaute Bausteine erzeugen `schema` aus ihrem Konfigurations-Struct (Tags `json`, `doc`,
 `schema`), Plugins liefern es fertig mit.
 
 Der Editor rendert Palette und Eigenschaftsdialog **vollständig aus dem Descriptor** – neue Plugins brauchen keinen Frontend-Code.
@@ -922,9 +934,12 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Netzwerk | Server bindet standardmäßig nur an `127.0.0.1` und nimmt nur Anfragen an `localhost`/`127.0.0.1` ohne fremden `Origin` an (Schutz vor DNS-Rebinding und Anfragen fremder Webseiten). Für Netzzugriff auf den Editor später `--listen 0.0.0.0:7300` + TLS (S40b, Backlog). HTTP-Trigger haben einen eigenen Listener, im Netz nur mit TLS (seit S40a) |
 | Authentifizierung | **Keine Benutzerverwaltung** ([ADR 0005](adr/0005-mehrbenutzerbetrieb.md)). Lokal-Modus ohne Zugangsschutz; im Netzmodus (S40b) ein gemeinsamer Zugangsschlüssel für den Server (+ TLS), gleichzeitig nutzbar als API-Token. HTTP-Trigger: Token je Trigger oder `auth: none` (seit S38a) |
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
-| Secrets | Über Secret-Quellen ([ADR 0022](adr/0022-connections-secrets.md)): lokaler Store je Projekt außerhalb des Projektordners, verschlüsselt mit AES-256-GCM, Schlüssel per **Windows DPAPI** (Benutzer- bzw. Dienstkonto), sonst `RUNNEL_MASTER_KEY` oder Master-Passwort; dazu Umgebungsvariablen und später Tresore. `${secret:…}` nur in Connections, Secret-Quellen und `secret`-Feldern; Pflege mit `runnel secret`, im Editor nur setzen, nie anzeigen
+| Secrets | Über Secret-Quellen ([ADR 0022](adr/0022-connections-secrets.md)): lokaler Store je Projekt außerhalb des Projektordners, verschlüsselt mit AES-256-GCM, Schlüssel per **Windows DPAPI** (Benutzer- bzw. Dienstkonto), sonst `RUNNEL_MASTER_KEY` oder Master-Passwort; dazu Umgebungsvariablen und später Tresore. `${secret:…}` nur in Connections, Secret-Quellen und `secret`-Feldern; Pflege mit `runnel secret`, im Editor nur setzen, nie anzeigen |
 | Secrets im Log | Automatische Maskierung aller aufgelösten Secret-Werte in Logs, Fehlermeldungen, Vorschauen und Ergebnissen (exakter Wert, ab 4 Zeichen) |
 | HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal; im Netz nur mit TLS – eigenes oder selbst erzeugtes Zertifikat – oder ausdrücklich `--triggers-insecure`, seit S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrent` ([ADR 0018](adr/0018-http-trigger.md)) |
+| Plugins | Start erst nach Freigabe je Projekt auf dem Rechner (`runnel plugins trust`, SHA-256 über den Plugin-Ordner, gespeichert außerhalb des Projekts; jede Änderung macht sie ungültig). Ohne Freigabe kein Code, auch nicht beim Prüfen oder Öffnen ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag) |
+| Datenbanken | Werte nur als Parameter (`@name`), Ausdrücke im SQL-Text sind ein Fehler; Bezeichner nur über geprüfte Felder; TLS mit Zertifikatsprüfung, Abschalten nur ausdrücklich mit Warnung ([ADR 0022](adr/0022-connections-secrets.md)) |
+| Connections | Zugangsdaten einer HTTP-Connection nur an deren Host; SFTP nur mit bekanntem Hostschlüssel; FTP ohne TLS nur mit `insecure: true` und Warnung; „Test connection“ nur für gespeicherte Connections, 15 s |
 | Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
 | Dienstkonto | Empfehlung: dedizierter Dienstbenutzer mit minimalen Rechten (bzw. gMSA in Domänen) |
 | Audit | Dateiänderungen über den Editor, manuelle Starts und Abbrüche werden mit Client-Informationen (IP, Rechnername, User-Agent) protokolliert |
@@ -937,12 +952,13 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 
 | Daten | Ort | Format |
 |---|---|---|
-| Workflows, Pipelines, Trigger, Connections | Projektordner | YAML (Git) |
+| Workflows, Pipelines, Trigger, Connections, Secret-Quellen, Plugins | Projektordner | YAML (Git); Plugins mit ausführbarer Datei |
 | Run-Historie, Status, Metriken, Samples | `data\runnel.db` | SQLite (WAL-Modus) |
 | Secrets (lokaler Store) | `%LOCALAPPDATA%\runnel\secrets.db` bzw. `%ProgramData%\runnel\secrets\` (Dienst), nie im Projekt (ADR 0022) | verschlüsselt |
 | Run-Logs | `data\logs\<jahr>\<run-id>.log` | JSON-Lines (slog) |
 | Dienst-Ereignisse | Windows-Ereignisanzeige (Anwendung) | Quelle = Dienstname (Standard `runnel`): Start, Stopp, Warnungen, Fehler (seit S41) |
 | Server-Log des Dienstes | `%ProgramData%\runnel\logs\<dienst>.log` | Text, Rotation bei 10 MB nach `<dienst>.log.1` (seit S41) |
+| Freigaben der Plugins | `<Konfigurationsordner>\runnel\trusted-plugins.json` (Benutzer) bzw. `%ProgramData%\runnel\trust\plugins.json` (Dienst, nur Administratoren), nie im Projekt (ADR 0019, Nachtrag) | JSON |
 | Selbst erzeugtes Zertifikat der HTTP-Trigger | `%ProgramData%\runnel\tls\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\tls\` | `triggers.crt`, `triggers.key` (PEM, seit S40a) |
 
 Standardpfade: `%ProgramData%\runnel\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\` (Desktop) bzw. neben der exe (portabel).
@@ -957,7 +973,7 @@ CREATE TABLE runs (
   file_hash     TEXT NOT NULL,             -- Version der ausgeführten Definition
   environment   TEXT,
   trigger       TEXT,                      -- manual | cron:<name> | interval:<name> | file:<name> | http:<name> | cli
-  parent_run_id TEXT REFERENCES runs(id),  -- Sub-Workflow / Pipeline aus Workflow
+  parent_run_id TEXT REFERENCES runs(id),  -- Sub-Workflow, Pipeline aus Workflow, Mapping, Executor
   status        TEXT NOT NULL,             -- queued|running|succeeded|failed|cancelled
   params_json   TEXT,
   client_info   TEXT,                      -- IP/Rechnername bei manuellen Starts
@@ -1008,7 +1024,9 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern (`resume` mit S29, Backlog) |
 | POST | `/preview` | Pipeline-Vorschau bis Transform X (S44, `docs/dev/API.md`) |
-| GET/PUT | `/secrets/{name}` | Secrets setzen und löschen, Wert nie lesbar zurück (geplant, S39c; im Netzbetrieb standardmäßig aus) |
+| GET | `/secrets` | Namen der Secrets mit Änderungszeit und Ablauf, nie Werte (geplant, S39c) |
+| PUT/DELETE | `/secrets/{name}` | Secret setzen bzw. löschen, Wert nie lesbar zurück (geplant, S39c; im Netzbetrieb standardmäßig aus) |
+| POST | `/connections/{name}/test` | Gespeicherte Connection für ein Environment testen, Zeitgrenze 15 s, Meldung ohne Secret-Werte (geplant, S39c) |
 | GET | `/triggers` | Trigger mit nächstem Zeitpunkt, letztem Ergebnis und Problemen (seit S37); ein-/ausschalten über die Datei (`enabled`) |
 | ANY | Pfade der HTTP-Trigger | auf dem eigenen Listener der Trigger, nicht unter `/api/v1` ([ADR 0018](adr/0018-http-trigger.md)) |
 | GET | `/events?since=&run=` | Live-Events als Server-Sent Events ([ADR 0016](adr/0016-live-events-sse.md)): `run.started`, `run.finished`, `action.waiting`, `action.started`, `action.finished`, `action.skipped`, `log`, `reset`; später Metriken und `file.changed` |
@@ -1063,7 +1081,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen (`core.check`, seit S10), Log schreiben, Schleife (ForEach über Liste/Dateien) |
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell, Programm starten |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
-| Netzwerk | HTTP-Request (`http.request`, seit S10), HTTP-Antwort (`http.respond`, seit S38b1), SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
+| Netzwerk | HTTP-Request (`http.request`, seit S10), HTTP-Antwort (`http.respond`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`: upload, download, list, delete, move, mkdir, exists, wait; Protokoll in der Connection, S57), Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,
@@ -1198,7 +1216,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Eingabe | CSV, Excel, JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
 | Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
-| Ausführung | Pipeline Executor, Workflow Executor, In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
+| Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
@@ -1352,7 +1370,7 @@ runnel/
 │  ├─ logfile/              # Log-Datei mit Rotation (Dienst)
 │  ├─ winsvc/               # Windows-Dienst, Ereignisanzeige (build tag windows)
 │  ├─ version/              # Versionsinformationen
-│  │                        # geplant: connections/, secrets/ (S39), store/ (SQLite, S26), plugin/ (S49)
+│  │                        # geplant: secretstore/ (S39a), connections/ (S20), store/ (SQLite, S26), plugin/ (S49)
 ├─ web/                     # Editor (React + Vite + TypeScript; Build → internal/webui/dist, per go:embed eingebettet)
 ├─ examples/                # Beispielprojekte
 ├─ docs/                    # Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (docs/dev/)
