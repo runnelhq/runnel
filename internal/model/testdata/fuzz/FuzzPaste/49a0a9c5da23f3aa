@@ -1,0 +1,2 @@
+go test fuzz v1
+string("transforms:\n  - id: a\n    type: Y) 010000\nlinks:\n  ! #0000000000000000000000000000000000000000000000")

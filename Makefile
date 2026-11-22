@@ -87,6 +87,7 @@ fuzz:
 	go test ./internal/expr -run '^$$' -fuzz FuzzCompile -fuzztime $(FUZZTIME)
 	go test ./internal/model -run '^$$' -fuzz FuzzParsePipeline -fuzztime $(FUZZTIME)
 	go test ./internal/model -run '^$$' -fuzz FuzzParseTrigger -fuzztime $(FUZZTIME)
+	go test ./internal/model -run '^$$' -fuzz FuzzPaste -fuzztime $(FUZZTIME)
 	go test ./internal/format -run '^$$' -fuzz FuzzParse -fuzztime $(FUZZTIME)
 	go test ./internal/transforms/csv -run '^$$' -fuzz FuzzInput -fuzztime $(FUZZTIME)
 	go test ./internal/transforms/csv -run '^$$' -fuzz FuzzDetectFields -fuzztime $(FUZZTIME)

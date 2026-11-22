@@ -408,6 +408,60 @@ export async function editWorkflow(path: string, content: string, edit: Workflow
   return body.content ?? content;
 }
 
+/** Copied actions or transforms (POST /copy, E16): YAML text for the clipboard. */
+export interface Clip {
+  text: string;
+  steps: number;
+  links: number;
+  /** Links to actions or transforms that were not copied. */
+  omitted: number;
+}
+
+/** What was pasted (model.Pasted). */
+export interface Pasted {
+  ids: string[];
+  links: number;
+  renamed?: Record<string, string>;
+  /** Expressions (workflows) or targets (pipelines) that now name a renamed step. */
+  references: number;
+}
+
+/** Copies actions or transforms with the links between them (E16). */
+export async function copySteps(path: string, content: string, ids: string[]): Promise<Clip> {
+  const res = await fetch(`${apiBase}/copy`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, content, ids }),
+  });
+  const body = (await res.json()) as Clip & { error?: string };
+  if (!res.ok) throw new APIError(body.error ?? `${res.status} ${res.statusText}`, res.status);
+  return body;
+}
+
+/** Pastes copied text into the text of a workflow or pipeline (not saved). */
+export async function pasteSteps(
+  path: string,
+  content: string,
+  paste: { text: string; at?: { x: number; y: number } },
+  kind: GraphKind,
+): Promise<{ content: string; pasted: Pasted }> {
+  const res = await fetch(`${apiBase}/${kind === "pipeline" ? "pipelines" : "workflows"}/edit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, content, paste }),
+  });
+  const body = (await res.json()) as { content?: string; pasted?: Pasted; error?: string };
+  if (!res.ok) throw new APIError(body.error ?? `${res.status} ${res.statusText}`, res.status);
+  return { content: body.content ?? content, pasted: body.pasted ?? { ids: [], links: 0, references: 0 } };
+}
+
+/** Text that may hold actions or transforms: checked before it is sent to the server. */
+export function clipKind(text: string): GraphKind | null {
+  if (/^actions:/m.test(text)) return "workflow";
+  if (/^transforms:/m.test(text)) return "pipeline";
+  return null;
+}
+
 /** A field proposed by "Detect fields" (POST /pipelines/fields, S46). */
 export interface DetectedField {
   name: string;

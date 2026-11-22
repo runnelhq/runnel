@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { APIError, fetchFile, fullPath, isYAML, kindLabel, kindOf, saveFile } from "../files";
 import {
+  clipKind,
+  copySteps,
   editWorkflow,
   fieldsList,
   graphOf,
   problemTarget,
+  pasteSteps,
   validate,
   type EntryEdit,
   type GraphKind,
   type KeyValue,
   type Link,
+  type Pasted,
   type Problem,
   type Validation,
   type WorkflowEdit,
@@ -46,6 +50,19 @@ import {
 } from "./Icons";
 
 type View = "canvas" | "yaml";
+
+/** A message at the bottom of the canvas (E6a, E16); with undo it offers to undo the last change. */
+interface Toast {
+  text: string;
+  detail?: string;
+  status?: "ok" | "error";
+  undo?: boolean;
+}
+
+/** The text copied last in this window (E16), to tell how many links were left out when it is pasted. */
+let lastCopy: { text: string; omitted: number } | null = null;
+
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
 /** A loaded file: the text shown (possibly changed), the saved text and its ETag. */
 interface Doc {
@@ -108,7 +125,11 @@ export function FileView(props: {
   const [validation, setValidation] = useState<Validation | null>(null);
   const [undo, setUndo] = useState<string[]>([]);
   const [redo, setRedo] = useState<string[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  // Changes when something was copied, so that the context menu offers Paste.
+  const [copies, setCopies] = useState(0);
+  // Position of the mouse on the canvas, where Ctrl+V pastes.
+  const pointer = useRef<{ x: number; y: number } | null>(null);
   const [conflict, setConflict] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -241,21 +262,23 @@ export function FileView(props: {
 
   // The edits on their way to the server, one after the other; saving waits for them.
   const pending = useRef<Promise<unknown> | null>(null);
-  const applyEdit = useCallback(
-    (edit: WorkflowEdit, field?: string): Promise<string | null> => {
+  const runEdit = useCallback(
+    (change: (text: string) => Promise<string>, field?: string, onError?: (message: string) => void): Promise<string | null> => {
       const run = async () => {
         await pending.current?.catch(() => undefined);
         const current = docRef.current;
         if (!current) return null;
         try {
-          const next = await editWorkflow(path, current.text, edit, graphKind ?? "workflow");
+          const next = await change(current.text);
           const merge = field !== undefined && lastField.current === field;
           setText(next, merge ? "merge" : "push");
           lastField.current = field ?? null;
           setEditError(null);
           return next;
         } catch (err) {
-          setEditError(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          if (onError) onError(message);
+          else setEditError(message);
           return null;
         }
       };
@@ -263,7 +286,11 @@ export function FileView(props: {
       pending.current = request;
       return request;
     },
-    [path, setText, graphKind],
+    [setText],
+  );
+  const applyEdit = useCallback(
+    (edit: WorkflowEdit, field?: string) => runEdit((text) => editWorkflow(path, text, edit, graphKind ?? "workflow"), field),
+    [runEdit, path, graphKind],
   );
 
   type Positions = Record<string, { x: number; y: number }>;
@@ -277,11 +304,11 @@ export function FileView(props: {
       const removed = after ? before - (after.links?.length ?? 0) : links.length;
       const linkText = `${removed} ${removed === 1 ? "link" : "links"}`;
       if (ids.length === 0) {
-        setToast(`Deleted ${linkText}`);
+        setToast({ text: `Deleted ${linkText}`, undo: true });
         return;
       }
       const what = ids.length === 1 ? ids[0] : `${ids.length} ${steps}`;
-      setToast(`Deleted ${what}${removed > 0 ? ` and ${linkText}` : ""}`);
+      setToast({ text: `Deleted ${what}${removed > 0 ? ` and ${linkText}` : ""}`, undo: true });
     },
     [applyEdit, graph, path, steps],
   );
@@ -293,6 +320,79 @@ export function FileView(props: {
     [applyEdit],
   );
   const onRename = useCallback((from: string, to: string) => void applyEdit({ rename: { [from]: to } }), [applyEdit]);
+
+  // Copy, cut and paste (mockup E16): the clipboard holds the YAML text of the steps.
+  const copy = useCallback(
+    async (ids: string[], cut: boolean) => {
+      if (ids.length === 0) return;
+      await pending.current?.catch(() => undefined);
+      const current = docRef.current;
+      if (!current) return;
+      try {
+        const clip = await copySteps(path, current.text, ids);
+        await navigator.clipboard.writeText(clip.text);
+        lastCopy = { text: clip.text, omitted: clip.omitted };
+        setCopies((n) => n + 1);
+        if (!cut) return;
+        if ((await applyEdit({ delete: ids })) === null) return;
+        const links = clip.links + clip.omitted;
+        setToast({ text: `Cut ${count(clip.steps, steps.slice(0, -1))}${links > 0 ? ` and ${count(links, "link")}` : ""}`, undo: true });
+      } catch (err) {
+        setToast({ text: cut ? "Could not cut" : "Could not copy", detail: err instanceof Error ? err.message : String(err), status: "error" });
+      }
+    },
+    [path, applyEdit, steps],
+  );
+  const paste = useCallback(
+    async (text: string, at: { x: number; y: number } | null) => {
+      if (!graphKind) return;
+      const kind = clipKind(text);
+      if (kind === null) return setToast({ text: "The clipboard holds no actions or transforms", status: "error" });
+      if (kind !== graphKind) {
+        const from = /^# Runnel: (\d+ \w+) and .* from (.+)$/m.exec(text);
+        return setToast({
+          text: `${kind === "workflow" ? "Actions" : "Transforms"} can't be pasted into a ${graphKind}`,
+          detail: from ? `the clipboard holds ${from[1]} from ${from[2].split("/").pop()}` : undefined,
+          status: "error",
+        });
+      }
+      const result: { pasted?: Pasted } = {};
+      const position = at ? { x: Math.round(at.x / 8) * 8, y: Math.round(at.y / 8) * 8 } : undefined;
+      const next = await runEdit(
+        async (current) => {
+          const r = await pasteSteps(path, current, position ? { text, at: position } : { text }, graphKind);
+          result.pasted = r.pasted;
+          return r.content;
+        },
+        undefined,
+        (message) => setToast({ text: "Could not paste", detail: message, status: "error" }),
+      );
+      const pasted = result.pasted;
+      if (next === null || !pasted) return;
+      setSelection({ actions: pasted.ids, links: [] });
+      const noun = graphKind === "pipeline" ? "transform" : "action";
+      const renamed = Object.entries(pasted.renamed ?? {});
+      const detail: string[] = [];
+      if (renamed.length > 0) detail.push(`renamed ${renamed.map(([a]) => a).join(", ")} to ${renamed.map(([, b]) => b).join(", ")}`);
+      if (lastCopy?.text === text && lastCopy.omitted > 0) detail.push(`${count(lastCopy.omitted, "link")} to other ${noun}s left out`);
+      if (pasted.references > 0) detail.push(`${count(pasted.references, graphKind === "pipeline" ? "target" : "expression")} updated`);
+      setToast({
+        text: `Pasted ${count(pasted.ids.length, noun)}${pasted.links > 0 ? ` and ${count(pasted.links, "link")}` : ""}`,
+        detail: detail.join(" · ") || undefined,
+        status: "ok",
+        undo: true,
+      });
+    },
+    [graphKind, path, runEdit],
+  );
+  const pasteFromMenu = useCallback(
+    (at: { x: number; y: number } | null) =>
+      void navigator.clipboard.readText().then(
+        (text) => paste(text, at),
+        () => setToast({ text: "This browser does not allow reading the clipboard", detail: "paste with Ctrl+V", status: "error" }),
+      ),
+    [paste],
+  );
   const onConnect = useCallback((link: Link) => void applyEdit({ addLinks: [link] }), [applyEdit]);
   // While a rename from the panel is on its way, the canvas briefly has no selection; keep the new id.
   const renamedTo = useRef<string | null>(null);
@@ -384,7 +484,7 @@ export function FileView(props: {
     async (id: string, fields: { name: string; type: string; format?: string }[]) => {
       const list = fieldsList(fields);
       const next = await applyEdit({ set: [{ id, field: "with.fields", value: null, ...(list.length > 0 ? { list } : {}) }] });
-      if (next !== null) setToast(`Wrote ${fields.length} ${fields.length === 1 ? "field" : "fields"} to ${id}`);
+      if (next !== null) setToast({ text: `Wrote ${fields.length} ${fields.length === 1 ? "field" : "fields"} to ${id}`, undo: true });
     },
     [applyEdit],
   );
@@ -394,7 +494,7 @@ export function FileView(props: {
       const name = e.op === "delete" ? (e.list === "parameters" ? graph?.parameters : graph?.outputs)?.[e.index ?? 0]?.name : undefined;
       const key = e.op === "set" ? `${e.list}:${e.index}:${e.field}` : undefined;
       const next = await applyEdit({ entries: [e] }, key);
-      if (next !== null && e.op === "delete") setToast(`Deleted ${e.list === "parameters" ? "parameter" : "output"} ${name ?? ""}`.trim());
+      if (next !== null && e.op === "delete") setToast({ text: `Deleted ${e.list === "parameters" ? "parameter" : "output"} ${name ?? ""}`.trim(), undo: true });
     },
     [applyEdit, graph],
   );
@@ -490,7 +590,9 @@ export function FileView(props: {
     [running, proceedRun],
   );
 
-  // Keyboard shortcuts of the active tab: Ctrl+S, Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z, F5 (run), Ctrl+. (cancel).
+  // Copy, cut and paste work on an editable canvas (E16).
+  const canvasEdit = isGraph && view === "canvas" && !!graph;
+  // Keyboard shortcuts of the active tab: Ctrl+S, Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z, F5 (run), Ctrl+. (cancel), Ctrl+C / Ctrl+X on the canvas.
   useEffect(() => {
     if (!active || !editsText) return;
     const onKey = (e: KeyboardEvent) => {
@@ -518,11 +620,27 @@ export function FileView(props: {
       } else if (k === "y" || (k === "z" && e.shiftKey)) {
         e.preventDefault();
         doRedo();
+      } else if ((k === "c" || k === "x") && canvasEdit && selection.actions.length > 0 && !window.getSelection()?.toString()) {
+        e.preventDefault();
+        void copy(selection.actions, k === "x");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, isGraph, editsText, save, doUndo, doRedo, requestRun, cancelRun]);
+  }, [active, isGraph, editsText, save, doUndo, doRedo, requestRun, cancelRun, canvasEdit, selection, copy]);
+
+  // Ctrl+V on the canvas pastes at the mouse (E16); in text fields it pastes text as usual.
+  useEffect(() => {
+    if (!active || !canvasEdit) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      e.preventDefault();
+      void paste(e.clipboardData?.getData("text/plain") ?? "", pointer.current);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [active, canvasEdit, paste]);
 
   useEffect(() => {
     if (!toast) return;
@@ -791,6 +909,10 @@ export function FileView(props: {
             onRename={editable ? onRename : undefined}
             onConnect={editable ? onConnect : undefined}
             onLinkKind={editable ? onLinkKind : undefined}
+            onClipboard={editable ? (op, ids) => void copy(ids, op === "cut") : undefined}
+            onPaste={editable ? pasteFromMenu : undefined}
+            canPaste={copies >= 0 && lastCopy !== null}
+            pointer={pointer}
             renaming={renaming}
             onRenaming={setRenaming}
             onSelect={onSelect}
@@ -846,18 +968,35 @@ export function FileView(props: {
         {toast && (
           <div
             role="status"
-            className="absolute bottom-5 left-1/2 inline-flex h-9 -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-card py-0 pr-1.5 pl-3.5 shadow-md"
+            className={
+              "absolute bottom-5 left-1/2 inline-flex min-h-9 w-max max-w-[min(560px,calc(100%-2rem))] -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-card py-1.5 pl-3.5 shadow-md " +
+              (toast.undo ? "pr-1.5" : "pr-3.5")
+            }
           >
-            <span>{toast}</span>
-            <SmallButton
-              onClick={() => {
-                doUndo();
-                setToast(null);
-              }}
-            >
-              <UndoIcon width={14} height={14} />
-              Undo
-            </SmallButton>
+            {toast.status && (
+              <span
+                aria-hidden
+                className={"grid size-[18px] shrink-0 place-items-center rounded-full text-[10px] font-bold " + (toast.status === "ok" ? "bg-success" : "bg-destructive")}
+                style={{ color: "var(--rn-tiefe-0)" }}
+              >
+                {toast.status === "ok" ? "✔" : "✖"}
+              </span>
+            )}
+            <span className="flex-1">
+              {toast.text}
+              {toast.detail && <span className="text-xs text-muted-foreground"> · {toast.detail}</span>}
+            </span>
+            {toast.undo && (
+              <SmallButton
+                onClick={() => {
+                  doUndo();
+                  setToast(null);
+                }}
+              >
+                <UndoIcon width={14} height={14} />
+                Undo
+              </SmallButton>
+            )}
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -31,7 +31,7 @@ import {
 } from "../workflow";
 import type { RunView } from "../run";
 import { ActionNode, type ActionNodeType } from "./ActionNode";
-import { ActionIcon, EyeIcon, FitIcon, LayoutIcon, MinusIcon, PlusIcon } from "./Icons";
+import { ActionIcon, CopyIcon, CutIcon, EyeIcon, FitIcon, LayoutIcon, MinusIcon, PasteIcon, PlusIcon, TrashIcon } from "./Icons";
 import { LinkEdge, linkPath, pipelineKinds, type LinkEdgeType, type SettableKind } from "./LinkEdge";
 
 const nodeTypes: NodeTypes = { action: ActionNode };
@@ -80,6 +80,14 @@ export interface CanvasProps {
   run?: RunView | null;
   /** The run shown is a data preview (S44): record counts are drawn dashed, and a hint says up to which transform it ran. */
   preview?: { upTo: string; limit: number; onClose: () => void } | null;
+  /** Copy or cut the given actions (context menu, E16). */
+  onClipboard?: (op: "copy" | "cut", ids: string[]) => void;
+  /** Paste at the given position (context menu); null without a position. */
+  onPaste?: (at: { x: number; y: number } | null) => void;
+  /** Something was copied, so the context menu offers Paste. */
+  canPaste?: boolean;
+  /** Is kept at the position of the mouse on the canvas (null outside), for pasting with Ctrl+V. */
+  pointer?: RefObject<{ x: number; y: number } | null>;
   /** Id of the action whose id is being edited. */
   renaming?: string | null;
   onRenaming?: (id: string | null) => void;
@@ -103,11 +111,15 @@ export function Canvas(props: CanvasProps) {
 function Graph(props: CanvasProps) {
   const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel, run, preview } =
     props;
+  const { onClipboard, onPaste, canPaste, pointer } = props;
   const pipeline = workflow.kind === "pipeline";
   const catalog = useCatalog(workflow.kind);
   const editable = onMove !== undefined;
   const { screenToFlowPosition } = useReactFlow();
   const [menu, setMenu] = useState<string | null>(null);
+  // Context menu of the selection or the free canvas (E16): position in the container and on the canvas.
+  const [context, setContext] = useState<{ x: number; y: number; at: { x: number; y: number }; ids: string[] } | null>(null);
+  const container = useRef<HTMLDivElement>(null);
   const [ghost, setGhost] = useState<{ type: string; x: number; y: number } | null>(null);
   // Starts with the selection of the file view, e.g. when switching back from the YAML view.
   const selectedRef = useRef(new Set<string>(props.selection?.actions ?? []));
@@ -280,6 +292,34 @@ function Graph(props: CanvasProps) {
     onAdd({ id, type }, withLayout({ [id]: dropPosition(e) }));
   };
 
+  const openContext = (e: ReactMouseEvent | MouseEvent, ids: string[]) => {
+    e.preventDefault();
+    if (!editable || !onClipboard) return;
+    const box = container.current?.getBoundingClientRect();
+    const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    setMenu(null);
+    setContext({ x: e.clientX - (box?.left ?? 0), y: e.clientY - (box?.top ?? 0), at: { x: snap(p.x), y: snap(p.y) }, ids });
+  };
+  // A right click on an action that is not selected selects it alone.
+  const onNodeContextMenu = (e: ReactMouseEvent, node: { id: string }) => {
+    let ids = [...selectedRef.current];
+    if (!selectedRef.current.has(node.id)) {
+      ids = [node.id];
+      selectedRef.current = new Set(ids);
+      selectedLinksRef.current = new Set();
+      setNodes((ns) => ns.map((n) => ({ ...n, selected: n.id === node.id })));
+      setEdges((es) => es.map((x) => ({ ...x, selected: false })));
+      onSelect?.({ actions: ids, links: [] });
+    }
+    openContext(e, ids);
+  };
+  useEffect(() => {
+    if (!context) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setContext(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [context]);
+
   const isValidConnection = useCallback(
     (c: Connection | LinkEdgeType) => {
       if (c.source === c.target) return false;
@@ -347,8 +387,15 @@ function Graph(props: CanvasProps) {
 
   return (
     <div
+      ref={container}
       className="runnel-canvas relative min-h-0 flex-1"
       data-testid="canvas"
+      onMouseMove={(e) => {
+        if (pointer) pointer.current = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      }}
+      onMouseLeave={() => {
+        if (pointer) pointer.current = null;
+      }}
       onDragOver={onDragOver}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setGhost(null);
@@ -374,8 +421,18 @@ function Graph(props: CanvasProps) {
         isValidConnection={isValidConnection}
         connectionLineComponent={pipeline ? DataConnectionLine : ConnectionLine}
         onEdgeClick={(_, e) => editable && openMenu(e.id)}
-        onPaneClick={() => setMenu(null)}
-        onNodeClick={() => setMenu(null)}
+        onPaneClick={() => {
+          setMenu(null);
+          setContext(null);
+        }}
+        onNodeClick={() => {
+          setMenu(null);
+          setContext(null);
+        }}
+        onNodeContextMenu={onNodeContextMenu}
+        onSelectionContextMenu={(e, ns) => openContext(e, ns.map((n) => n.id))}
+        onPaneContextMenu={(e) => openContext(e, [])}
+        onMoveStart={() => setContext(null)}
         nodesDraggable={editable}
         nodesConnectable={editable}
         elementsSelectable
@@ -432,6 +489,71 @@ function Graph(props: CanvasProps) {
           </Panel>
         )}
       </ReactFlow>
+      {context && (
+        <ContextMenu
+          {...context}
+          pipeline={pipeline}
+          canPaste={!!canPaste}
+          onClose={() => setContext(null)}
+          onClipboard={(op) => onClipboard?.(op, context.ids)}
+          onPaste={() => onPaste?.(context.at)}
+          onDelete={() => onDelete?.(context.ids, [])}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Context menu of the selected actions or of the free canvas (mockup E16, state "copy"). */
+function ContextMenu(props: {
+  x: number;
+  y: number;
+  ids: string[];
+  pipeline: boolean;
+  canPaste: boolean;
+  onClose: () => void;
+  onClipboard: (op: "copy" | "cut") => void;
+  onPaste: () => void;
+  onDelete: () => void;
+}) {
+  const { ids, pipeline } = props;
+  const noun = pipeline ? "transform" : "action";
+  const item = (label: string, key: string, icon: ReactNode, run: () => void, disabled = false, danger = false) => (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={() => {
+        props.onClose();
+        run();
+      }}
+      className={
+        "flex h-[30px] w-full cursor-pointer items-center gap-2.5 rounded-sm border-0 bg-transparent px-2 text-left hover:bg-muted disabled:cursor-default disabled:opacity-55 disabled:hover:bg-transparent " +
+        (danger ? "text-destructive" : "")
+      }
+    >
+      <span className={danger ? "" : "text-muted-foreground"}>{icon}</span>
+      {label}
+      <span className="ml-auto font-mono text-[10px] text-muted-foreground">{key}</span>
+    </button>
+  );
+  return (
+    <div
+      role="menu"
+      aria-label={ids.length > 0 ? `${ids.length} ${noun}${ids.length === 1 ? "" : "s"}` : "Canvas"}
+      className="absolute z-10 w-[196px] rounded-lg border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md"
+      style={{ left: props.x, top: props.y }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {ids.length > 0 && item("Cut", "Ctrl+X", <CutIcon width={15} height={15} />, () => props.onClipboard("cut"))}
+      {ids.length > 0 && item("Copy", "Ctrl+C", <CopyIcon width={15} height={15} />, () => props.onClipboard("copy"))}
+      {item("Paste", "Ctrl+V", <PasteIcon width={15} height={15} />, props.onPaste, !props.canPaste)}
+      {ids.length > 0 && (
+        <>
+          <hr className="mx-0 my-1 border-0 border-t border-border" />
+          {item("Delete", "Del", <TrashIcon width={15} height={15} />, props.onDelete, false, true)}
+        </>
+      )}
     </div>
   );
 }
