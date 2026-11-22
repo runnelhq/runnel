@@ -307,7 +307,7 @@ function Variables(props: { info: VariablesInfo | null; env: string; onAction: (
   const { info, env } = props;
   const [open, setOpen] = useState<string | null>(null);
   if (!info) return <p className="mx-4 text-xs text-muted-foreground">Loading the variables…</p>;
-  const envs = info.environments;
+  const envs = info.environments ?? [];
   const cell = (v: VariableInfo, e: string) => {
     if (v.environments[e]) return <span className="font-bold text-success" title={`set in environments/${e}.yaml`}>●</span>;
     if (missingIn(v, e)) return <span className="font-bold text-warning" title={`used, but not set for ${e}`}>⚠</span>;

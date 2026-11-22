@@ -228,6 +228,9 @@ test("shows selected text clearly, also on the line of the cursor", async ({ pag
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+ArrowDown");
     await page.keyboard.press("Shift+End");
+    // CodeMirror draws the selection in its next frame: wait for it before reading colours.
+    await expect(page.locator(".runnel-yaml .cm-selectionBackground").first()).toBeAttached();
+    await expect(page.locator(".runnel-yaml .cm-activeLine")).toBeAttached();
     const [active, selection] = await page.evaluate(() => [
       getComputedStyle(document.querySelector(".runnel-yaml .cm-activeLine")!).backgroundColor,
       getComputedStyle(document.querySelector(".runnel-yaml .cm-selectionBackground")!).backgroundColor,

@@ -111,7 +111,7 @@ export function App() {
   // Variables used but not set: a badge in the file bar of environments and project.yaml.
   const variableWarning = (path: string) => {
     if (!variables) return null;
-    const envs = path === "project.yaml" ? variables.environments : path.startsWith("environments/") ? [path.slice(13).replace(/\.ya?ml$/, "")] : [];
+    const envs = path === "project.yaml" ? (variables.environments ?? []) : path.startsWith("environments/") ? [path.slice(13).replace(/\.ya?ml$/, "")] : [];
     const missing = variables.variables.filter((v) => envs.some((e) => missingIn(v, e)));
     if (missing.length === 0) return null;
     const text = missing
