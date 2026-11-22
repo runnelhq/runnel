@@ -13,10 +13,11 @@ export type ReferenceKind = "project" | "environment" | "trigger";
 
 const schemas = new Map<ReferenceKind, Promise<Schema>>();
 
-/** useSchema loads the schema of a file kind once per page. */
-export function useSchema(kind: ReferenceKind): Schema | null {
+/** useSchema loads the schema of a file kind once per page (null: none). */
+export function useSchema(kind: ReferenceKind | null): Schema | null {
   const [schema, setSchema] = useState<Schema | null>(null);
   useEffect(() => {
+    if (!kind) return setSchema(null);
     let p = schemas.get(kind);
     if (!p) {
       p = fetch(`${apiBase}/schemas/${kind}`).then((r) => (r.ok ? (r.json() as Promise<Schema>) : Promise.reject(new Error(r.statusText))));
