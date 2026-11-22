@@ -57,6 +57,11 @@ var (
 	secretNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 )
 
+// ValidSecretName reports whether name is a valid secret name: letters, digits, ".", "-" and "_".
+func ValidSecretName(name string) bool {
+	return secretNamePattern.MatchString(name)
+}
+
 // ValidName reports whether name is a valid variable name: letters, digits and "_",
 // not starting with a digit.
 func ValidName(name string) bool {

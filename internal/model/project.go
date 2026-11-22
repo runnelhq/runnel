@@ -27,7 +27,8 @@ type Project struct {
 	Description        string            `yaml:"description,omitempty" json:"description,omitempty" doc:"What the project does; shown in the editor"`
 	DefaultEnvironment string            `yaml:"defaultEnvironment,omitempty" json:"defaultEnvironment,omitempty" doc:"Environment used when a run names none, e.g. dev; the name of a file in environments/" schema:"example=dev"`
 	Variables          map[string]string `yaml:"variables,omitempty" json:"variables,omitempty" doc:"Variables for all environments, used as ${NAME}; an environment can override them. Values may use other variables, e.g. ${BASE}\\inbox"`
-	SecretStore        string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables) or local (the local secret store, not available yet)" schema:"enum=local|shared|env,default=local"`
+	SecretStore        string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables), inline (secrets: in the file, plain text) or local (the local secret store, not available yet)" schema:"enum=local|shared|env|inline,default=local"`
+	Secrets            map[string]string `yaml:"secrets,omitempty" json:"-" doc:"Secrets in plain text for secretStore: inline, used as ${secret:NAME} where no environment has its own; only for development and simple APIs"`
 	// Workflow holds project-wide defaults for workflows.
 	Workflow ProjectWorkflowSettings `yaml:"workflow,omitempty" json:"workflow,omitzero" doc:"Defaults for all workflows of the project"`
 	// Settings control the runs of the project as a whole (roadmap S37).
@@ -61,7 +62,8 @@ type Environment struct {
 	Name        string            `yaml:"name" json:"name" doc:"Name of the environment; must match the file name" schema:"required,example=prod"`
 	Description string            `yaml:"description,omitempty" json:"description,omitempty" doc:"What the environment is for, e.g. the production system"`
 	Variables   map[string]string `yaml:"variables,omitempty" json:"variables,omitempty" doc:"Variables of this environment, used as ${NAME}; they override those of project.yaml"`
-	SecretStore string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables) or local (the local secret store, not available yet)" schema:"enum=local|shared|env"`
+	SecretStore string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables), inline (secrets: in this file, plain text) or local (the local secret store, not available yet)" schema:"enum=local|shared|env|inline"`
+	Secrets     map[string]string `yaml:"secrets,omitempty" json:"-" doc:"Secrets of this environment in plain text for secretStore: inline, used as ${secret:NAME}; only for development and simple APIs"`
 
 	src *source
 }
@@ -191,6 +193,7 @@ func ReadEnvironment(name string, data []byte) (*Environment, error) {
 	errs = append(errs, checkVariables(src, env.Variables)...)
 	errs = append(errs, checkReferenceSyntax(src)...)
 	errs = append(errs, checkSecretStore(src, env.SecretStore)...)
+	errs = append(errs, checkSecretNames(src, env.Secrets)...)
 	errs = append(errs, checkSecrets(src, nil, nil)...)
 	if err := errs.errOrNil(); err != nil {
 		return nil, err
@@ -230,6 +233,7 @@ func (p *Project) validate() Errors {
 	errs = append(errs, checkVariables(p.src, p.Variables)...)
 	errs = append(errs, checkReferenceSyntax(p.src)...)
 	errs = append(errs, checkSecretStore(p.src, p.SecretStore)...)
+	errs = append(errs, checkSecretNames(p.src, p.Secrets)...)
 	errs = append(errs, checkSecrets(p.src, nil, nil)...)
 	return errs
 }

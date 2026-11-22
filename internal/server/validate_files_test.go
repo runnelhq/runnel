@@ -24,6 +24,9 @@ func TestValidateText(t *testing.T) {
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\n", nil},
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: prod\n", []string{`must match the file name`}},
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\nvariables: [\n", []string{""}},
+		// Secrets in plain text (S39a2): a warning at secrets:, in the environment and in project.yaml.
+		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\nsecretStore: inline\nsecrets: { api-token: dev-123 }\n", []string{"secrets in plain text (secretStore: inline)"}},
+		{"project.yaml", "kind: Project\napiVersion: runnel/v1\nname: demo\nsecrets: { api-token: x }\n", []string{"secrets in plain text"}},
 		{"triggers/nightly.yaml", "kind: Trigger\napiVersion: runnel/v1\nname: nightly\ntype: cron\ntarget: workflows/import.workflow.yaml\nwith: { schedule: \"0 3 * * *\" }\n", nil},
 		{"triggers/new.yaml", "kind: Trigger\napiVersion: runnel/v1\nname: nightly\ntype: cron\ntarget: workflows/none.workflow.yaml\nwith: { schedule: \"0 3 * * *\" }\n",
 			[]string{`trigger name "nightly" is already used by nightly.yaml`, "none.workflow.yaml"}},

@@ -35,7 +35,7 @@ func TestSecretStores(t *testing.T) {
 		{"", "RUNNEL_TEST_UNSET", `secret "RUNNEL_TEST_UNSET": environment variable RUNNEL_TEST_UNSET is not set (secret store env)`},
 		{"local", "pw", `secret "pw": the local secret store is not available yet; set secretStore: env`},
 		{"shared", "pw", "the shared secret store is not available yet"},
-		{"vault", "pw", `unknown secret store "vault" (available: local, shared, env)`},
+		{"vault", "pw", `unknown secret store "vault" (available: local, shared, env, inline)`},
 	} {
 		if _, err := lookup(tt.store, tt.name); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("lookup(%q, %q): %v, want %q", tt.store, tt.name, err, tt.want)
@@ -64,7 +64,7 @@ func TestSecretStores(t *testing.T) {
 func TestSecretsInProjectFiles(t *testing.T) {
 	_, err := ReadProject("project.yaml", []byte("kind: Project\napiVersion: runnel/v1\nname: p\nsecretStore: vault\nvariables:\n  PW: ${secret:pw}\n"), nil)
 	for _, want := range []string{
-		`project.yaml:4:14: unknown secret store "vault" (expected local, shared, env)`,
+		`project.yaml:4:14: unknown secret store "vault" (expected local, shared, env, inline)`,
 		`project.yaml:6:7: ${secret:pw} is not allowed here: secrets may only be used in fields for secrets`,
 	} {
 		if err == nil || !strings.Contains(err.Error(), want) {
@@ -163,5 +163,46 @@ func TestTriggerTokenSecret(t *testing.T) {
 		if _, err := ParseTrigger("triggers/x.yaml", []byte(text)); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v\nwant %q", err, want)
 		}
+	}
+}
+
+// secretStore: inline reads secrets: of the environment, else of project.yaml; plain
+// text, so validate warns (Nachtrag S39a2).
+func TestInlineSecrets(t *testing.T) {
+	p, err := ReadProject("project.yaml", []byte("kind: Project\napiVersion: runnel/v1\nname: p\nsecretStore: inline\nsecrets:\n  api-token: proj-123\n  shared.key: proj-key\n"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev, err := ReadEnvironment("environments/dev.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: dev\nsecrets:\n  api-token: dev-123\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Environments = map[string]*Environment{"dev": dev}
+	lookup := SecretLookup(p, dev)
+	for name, want := range map[string]string{"api-token": "dev-123", "shared.key": "proj-key"} {
+		if v, err := lookup("", name); err != nil || v != want {
+			t.Errorf("%s = %q, %v", name, v, err)
+		}
+	}
+	if v, err := SecretLookup(p, nil)("inline", "api-token"); err != nil || v != "proj-123" {
+		t.Errorf("project only: %q, %v", v, err)
+	}
+	if _, err := lookup("", "missing"); err == nil || err.Error() != `secret "missing" is not set under secrets: in environments/dev.yaml or project.yaml (secret store inline)` {
+		t.Errorf("missing: %v", err)
+	}
+
+	warnings := p.InlineSecretWarnings()
+	if len(warnings) != 2 || warnings[0].Severity != SeverityWarning ||
+		!strings.Contains(warnings.Error(), "project.yaml:6:3: warning: secrets in plain text (secretStore: inline)") ||
+		!strings.Contains(warnings.Error(), "environments/dev.yaml:5:3: warning: secrets in plain text") {
+		t.Errorf("warnings: %v", warnings)
+	}
+	if (&Project{}).InlineSecretWarnings() != nil {
+		t.Error("no secrets, no warning")
+	}
+
+	_, err = ReadEnvironment("environments/dev.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: dev\nsecrets:\n  \"bad name\": x\n"))
+	if err == nil || !strings.Contains(err.Error(), `invalid secret name "bad name"`) {
+		t.Errorf("bad name: %v", err)
 	}
 }

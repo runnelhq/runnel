@@ -1,0 +1,15 @@
+# Starts the release check on request, only with the token (S39a2). Try it while
+# "runnel serve examples/http" runs:
+#   curl -X POST -H "Authorization: Bearer example-token" "http://127.0.0.1:7301/release?REPO=cli/cli"
+# Without the header or with another token the answer is 401. The token comes from the
+# secret release-token (secrets: in project.yaml) and never shows in the log.
+kind: Trigger
+apiVersion: runnel/v1
+name: release
+description: Checks the latest release of a repository on request
+type: http
+target: workflows/release.workflow.yaml
+with:
+  method: POST
+  path: /release            # REPO comes with the query, e.g. ?REPO=cli/cli
+  auth: { token: "${secret:release-token}" }
