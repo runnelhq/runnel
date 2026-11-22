@@ -13,8 +13,8 @@ import (
 // reservedNamespaces belong to the actions and transforms built into Runnel,
 // including those planned in the roadmap. Plugins must not use them.
 var reservedNamespaces = []string{
-	"ai", "archive", "core", "csv", "db", "excel", "file", "ftp", "http", "json",
-	"mail", "mcp", "sftp", "shell", "xml",
+	"ai", "archive", "core", "csv", "db", "excel", "file", "http", "json",
+	"mail", "mcp", "shell", "transfer", "xml",
 }
 
 // mcpNamespacePrefix starts the namespaces of tools provided by MCP connections,

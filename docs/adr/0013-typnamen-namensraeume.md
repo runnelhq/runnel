@@ -36,7 +36,7 @@ Code unübersichtlich.
 
 | Namensräume | Anbieter |
 |---|---|
-| `ai`, `archive` (vormals `zip`, siehe Nachtrag), `core`, `csv`, `db`, `excel`, `file`, `ftp`, `http`, `json`, `mail`, `mcp`, `sftp`, `shell`, `xml` | in Runnel eingebaut (reserviert, auch wenn noch nicht umgesetzt) |
+| `ai`, `archive` (vormals `zip`, siehe Nachtrag), `core`, `csv`, `db`, `excel`, `file`, `http`, `json`, `mail`, `mcp`, `shell`, `transfer` (vormals `ftp`, `sftp`, siehe Nachtrag), `xml` | in Runnel eingebaut (reserviert, auch wenn noch nicht umgesetzt) |
 | `mcp-<connection>` | Werkzeuge eines MCP-Servers, der als Connection eingebunden ist (ADR 0012) |
 | jeder andere | genau ein Plugin, das ihn in `plugin.yaml` erklärt |
 
@@ -117,3 +117,10 @@ JSON-Schema (Editor, Kap. 7.4) und Ausgabedaten (S08) hinzu.
 Der reservierte Namensraum `zip` wird durch `archive` ersetzt. Die Actions `archive.create` und `archive.extract`
 verarbeiten ZIP, TAR und TAR.GZ und wählen das Format über `format` (bzw. die Endung); weitere Formate kommen als
 Wert von `format` hinzu, nicht als eigene Typnamen. `zip` ist nicht mehr reserviert, war aber nie umgesetzt.
+
+## Nachtrag 2026-11-22 (ADR 0022): Namensraum `transfer` statt `ftp` und `sftp`
+
+Die reservierten Namensräume `ftp` und `sftp` werden durch **`transfer`** ersetzt. Dateitransfer-Actions
+(`transfer.upload`, `transfer.download`, `transfer.list` …) wählen das Protokoll über die Connection (`type: sftp |
+ftps | ftp`), nicht über den Typnamen – wie `archive` das Format über `format` ([ADR 0022](0022-connections-secrets.md),
+Abschnitt 6). `ftp` und `sftp` waren nie umgesetzt und sind nicht mehr reserviert.
