@@ -5,6 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 const port = 7399;
 /** Port of the server on a temporary copy of the example project (see e2e/serve-copy.mjs). */
 const editPort = 7398;
+/** Port of the server on examples/pipelines (documents, E17). */
+const docsPort = 7397;
 const binary = process.platform === "win32" ? "..\\bin\\runnel.exe" : "../bin/runnel";
 
 export default defineConfig({
@@ -24,6 +26,14 @@ export default defineConfig({
     {
       command: `${binary} serve ../examples/hello --port ${port}`,
       url: `http://127.0.0.1:${port}/api/v1/version`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      // examples/pipelines with its README.md, which opens at the start (e2e/markdown.spec.ts);
+      // only read, and on a server of its own so that other tests start without it.
+      command: `${binary} serve ../examples/pipelines --port ${docsPort} --triggers=`,
+      url: `http://127.0.0.1:${docsPort}/api/v1/version`,
       reuseExistingServer: false,
       timeout: 30_000,
     },

@@ -27,8 +27,8 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 |---|---|---|
 | GET | `/version` | `{"version", "commit", "date", "goVersion", "os", "arch"}` wie `runnel version --json` |
 | GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello", "environments": ["dev", "prod"], "defaultEnvironment": "dev"}` |
-| GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `trigger` (seit E10), `other`; versteckte Einträge und symbolische Links fehlen |
-| GET | `/files/{path}` | Inhalt der Datei, Header `ETag` |
+| GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `trigger` (seit E10), `document` (`*.md`), `image` (`*.png`, `*.jpg`, `*.jpeg`, `*.gif`, `*.webp`; beide seit E17), `other`; versteckte Einträge und symbolische Links fehlen |
+| GET | `/files/{path}` | Inhalt der Datei, Header `ETag`; Bilder (siehe `kind: image`) mit ihrem Typ (`image/png` …), damit Dokumente sie zeigen können. Dateien des Projekts sind Daten, keine Seiten des Editors: `X-Content-Type-Options: nosniff` und `Content-Security-Policy: default-src 'none'; …; sandbox` (seit E17), direkt im Browser geöffnet führt etwa eine SVG- oder HTML-Datei keine Skripte aus; SVG gilt deshalb nicht als Bild |
 | PUT | `/files/{path}` | Datei speichern (Body = Inhalt, max. 10 MiB); Antwort `{path, etag}` und Header `ETag` |
 | DELETE | `/files/{path}` | Datei löschen, `204`; `project.yaml` nicht (`409`: ohne sie findet `runnel serve` das Projekt nicht mehr) |
 | POST | `/folders` | Ordner anlegen (E11): `{"path": "data/archive"}` → `201`; fehlende Elternordner entstehen mit, `409`, wenn es ihn schon gibt |

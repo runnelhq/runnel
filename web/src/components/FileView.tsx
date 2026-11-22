@@ -28,6 +28,7 @@ import { previewRun, runPreview, type PreviewResult } from "../preview";
 import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
+import { MarkdownView } from "./MarkdownView";
 import { YamlEditor } from "./YamlEditor";
 import { Dialog } from "./Dialog";
 import { PropertiesPanel, type FieldValue, type LinkChange } from "./PropertiesPanel";
@@ -37,6 +38,8 @@ import {
   ChevronIcon,
   CodeIcon,
   CopyIcon,
+  EyeIcon,
+  LinesIcon,
   LockIcon,
   PanelIcon,
   PlayIcon,
@@ -82,7 +85,7 @@ export interface FileHandle {
 /** Summary of the shown file for the status bar, e.g. "YAML · UTF-8 · 40 lines". */
 export function fileSummary(path: string, text: string, encoding: string): string {
   const lines = text.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n").length;
-  return [isYAML(path) ? "YAML" : "Text", encoding, `${lines} ${lines === 1 ? "line" : "lines"}`].join(" · ");
+  return [isYAML(path) ? "YAML" : /\.md$/i.test(path) ? "Markdown" : "Text", encoding, `${lines} ${lines === 1 ? "line" : "lines"}`].join(" · ");
 }
 
 const historyLimit = 100;
@@ -111,6 +114,10 @@ export function FileView(props: {
   onDirty: (path: string, dirty: boolean) => void;
   onRegister: (path: string, handle: FileHandle | null) => void;
   onReloadExplorer: () => void;
+  /** Files of the project (paths), for the links of a document (E17). */
+  files?: Set<string>;
+  /** Opens a file of the project in its tab, e.g. from a link of a document. */
+  onOpenFile?: (path: string) => void;
 }) {
   const { path, active, epoch, onSummary, onPalette, onDirty, onRegister, onRun } = props;
   const [state, setState] = useState<State>({ status: "loading" });
@@ -119,8 +126,10 @@ export function FileView(props: {
   const graphKind: GraphKind | null = fileKind === "workflow" || fileKind === "pipeline" ? fileKind : null;
   const isGraph = graphKind !== null;
   // Files edited as text in the YAML view (E9, E10): graphs and the other files of a project.
-  const editsText = isGraph || fileKind === "project" || fileKind === "environment" || fileKind === "trigger";
-  const [view, setView] = useState<View>(isGraph ? "canvas" : "yaml");
+  // Documents (E17) show "canvas" as the formatted view ("Preview") and "yaml" as the text.
+  const isDoc = fileKind === "document";
+  const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger";
+  const [view, setView] = useState<View>(isGraph || isDoc ? "canvas" : "yaml");
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [undo, setUndo] = useState<string[]>([]);
@@ -209,7 +218,7 @@ export function FileView(props: {
   // The server checks the text shown and returns the parsed workflow or pipeline for the canvas.
   const text = doc?.text;
   useEffect(() => {
-    if (!editsText || text === undefined) return;
+    if (!editsText || isDoc || text === undefined) return;
     let cancelled = false;
     setChecking(true);
     validate(path, text)
@@ -221,7 +230,7 @@ export function FileView(props: {
     return () => {
       cancelled = true;
     };
-  }, [editsText, path, text]);
+  }, [editsText, isDoc, path, text]);
   const graph = useMemo(() => graphOf(validation), [validation]);
   const steps = graphKind === "pipeline" ? "transforms" : "actions";
 
@@ -846,6 +855,7 @@ export function FileView(props: {
             </button>
           </>
         )}
+        {isDoc && <ViewSwitch view={view} onView={switchView} document />}
         {isGraph && (
           <>
             <ViewSwitch view={view} onView={switchView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
@@ -881,9 +891,12 @@ export function FileView(props: {
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {!doc ? (
           <div className="flex-1" aria-busy="true" />
+        ) : view === "canvas" && isDoc ? (
+          <MarkdownView text={doc.text} path={path} files={props.files ?? noFiles} onOpen={(p) => props.onOpenFile?.(p)} />
         ) : view === "yaml" && editsText ? (
           <YamlEditor
             text={doc.text}
+            markdown={isDoc}
             problems={validation?.problems ?? []}
             focus={yamlFocus}
             onChange={(next) => setText(next, "push")}
@@ -1138,11 +1151,18 @@ const problemList = (v: Validation, severity: "error" | "warning") =>
     .map((p) => (p.line ? `${p.line}:${p.column ?? 1} ${p.message}` : p.message))
     .join("\n");
 
-function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean; notAGraph?: boolean }) {
-  const views: [View, string, typeof CodeIcon][] = [
-    ["canvas", "Canvas", props.pipeline ? PipelineIcon : WorkflowIcon],
-    ["yaml", "YAML", CodeIcon],
-  ];
+const noFiles = new Set<string>();
+
+function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean; notAGraph?: boolean; document?: boolean }) {
+  const views: [View, string, typeof CodeIcon][] = props.document
+    ? [
+        ["canvas", "Preview", EyeIcon],
+        ["yaml", "Text", LinesIcon],
+      ]
+    : [
+        ["canvas", "Canvas", props.pipeline ? PipelineIcon : WorkflowIcon],
+        ["yaml", "YAML", CodeIcon],
+      ];
   return (
     <div role="group" aria-label="View" className="inline-flex gap-0.5 rounded-md border border-border bg-muted p-0.5">
       {views.map(([v, label, Icon]) => (

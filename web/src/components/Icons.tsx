@@ -358,6 +358,22 @@ export function ActionIcon({ type, known, ...p }: P & { type: string; known: boo
   );
 }
 
+/** A document (Markdown, E17): a page with text lines. */
+export const DocumentIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v4h4M9 12h6M9 16h4" />
+  </Icon>
+);
+
+export const ImageIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <circle cx="9" cy="10" r="1.8" />
+    <path d="M21 16l-5-5-8 8" />
+  </Icon>
+);
+
 /** Icon of a file by its kind (workflow, environment, project …). */
 export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
   switch (kind) {
@@ -371,6 +387,10 @@ export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
       return <ProjectIcon {...p} />;
     case "trigger":
       return <TriggerIcon {...p} />;
+    case "document":
+      return <DocumentIcon {...p} />;
+    case "image":
+      return <ImageIcon {...p} />;
     default:
       return <FileIcon {...p} />;
   }

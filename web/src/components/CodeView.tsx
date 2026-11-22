@@ -9,6 +9,10 @@ const tokenClass: Record<TokenKind, string> = {
   // ${…} and {{ … }} in the expression colour (decision for mockup E4).
   var: "rounded-[3px] bg-expression-soft text-expression",
   text: "",
+  // Markdown (E17): the read-only view shows .md files only in the formatted view.
+  heading: "font-semibold text-foreground",
+  link: "text-primary",
+  code: "text-(--code-string)",
 };
 
 /** Read-only file view with line numbers; YAML files are highlighted. focusLine is scrolled into view and marked. */

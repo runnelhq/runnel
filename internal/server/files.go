@@ -121,6 +121,10 @@ func fileKind(p string) string {
 		return "environment"
 	case model.IsTriggerFile(p):
 		return "trigger"
+	case strings.EqualFold(path.Ext(p), ".md"):
+		return "document"
+	case imageTypes[strings.ToLower(path.Ext(p))] != "":
+		return "image"
 	}
 	return "other"
 }
@@ -136,9 +140,14 @@ func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	w.Header().Set("ETag", etag(data))
-	w.Header().Set("Content-Type", contentType(name))
-	w.Header().Set("Cache-Control", "no-store")
+	h := w.Header()
+	h.Set("ETag", etag(data))
+	h.Set("Content-Type", contentType(name))
+	h.Set("Cache-Control", "no-store")
+	// A file of the project is data, never a page of the editor: no guessing of its type,
+	// and opened directly in the browser it runs no scripts (e.g. an SVG or HTML file).
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
 	_, _ = w.Write(data)
 }
 
@@ -277,7 +286,14 @@ func etag(data []byte) string {
 	return `"` + hex.EncodeToString(sum[:16]) + `"`
 }
 
+// imageTypes are the images a Markdown document may show (E17); SVG is left out because
+// it can contain scripts.
+var imageTypes = map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
+
 func contentType(name string) string {
+	if t := imageTypes[strings.ToLower(path.Ext(name))]; t != "" {
+		return t
+	}
 	switch path.Ext(name) {
 	case ".yaml", ".yml":
 		return "application/yaml; charset=utf-8"

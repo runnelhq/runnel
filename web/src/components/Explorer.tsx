@@ -636,7 +636,7 @@ function ContextMenu(props: {
     </button>
   );
   const kindItems = (dir?: string) =>
-    (["workflow", "pipeline", "trigger", "environment"] as const).map((k) =>
+    (["workflow", "pipeline", "trigger", "environment", "document"] as const).map((k) =>
       item(
         dir === undefined ? newKinds[k].label : `New ${k}…`,
         k === "workflow" ? <WorkflowIcon /> : k === "pipeline" ? <PipelineIcon /> : <KindIcon kind={k} />,
@@ -663,7 +663,7 @@ function ContextMenu(props: {
     const empty = (entry.children?.length ?? 0) === 0;
     content = [
       <div key="l" className="label-caps px-2 pt-1.5 pb-0.5">{entry.name}</div>,
-      ...kindItems(entry.path).slice(0, 2),
+      ...kindItems(entry.path).filter((_, i) => i < 2 || i === 4),
       item("New file…", <KindIcon kind="other" />, () => props.onCreate("file", entry.path)),
       item("New folder…", <FolderIcon />, () => props.onCreate("folder", entry.path)),
       sep("s1"),

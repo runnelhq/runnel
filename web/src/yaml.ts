@@ -3,7 +3,8 @@
  * punctuation, values and ${…} / {{ … }} references. It works line by line and never
  * fails; unusual YAML is simply shown with less colour.
  */
-export type TokenKind = "comment" | "key" | "punct" | "value" | "var" | "text";
+/** Kinds of tokens; heading, link and code are those of Markdown (E17, markdown.ts). */
+export type TokenKind = "comment" | "key" | "punct" | "value" | "var" | "text" | "heading" | "link" | "code";
 
 export interface Token {
   kind: TokenKind;
