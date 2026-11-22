@@ -7,6 +7,7 @@ import (
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/transforms/core"
 	"github.com/runnelhq/runnel/internal/transforms/csv"
+	"github.com/runnelhq/runnel/internal/transforms/file"
 	"github.com/runnelhq/runnel/internal/transforms/http"
 	"github.com/runnelhq/runnel/internal/transforms/json"
 )
@@ -14,6 +15,7 @@ import (
 var namespaces = []func(*transform.Registry){
 	core.Register,
 	csv.Register,
+	file.Register,
 	json.Register,
 	http.Register,
 }

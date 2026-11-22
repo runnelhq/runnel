@@ -310,6 +310,7 @@ const actionIcons: Record<string, ReactNode> = {
       <path d="M18 16.3V18l1.2 1" />
     </>
   ),
+  // file.list: also the transform of the same name (S55, chosen by the maintainer), in the colour of its category.
   "file.list": <path d={`${folderPath}M7.5 11h9M7.5 14.5h6`} />,
   "file.mkdir": <path d={`${folderPath}M12 9.5v6M9 12.5h6`} />,
   "file.move": <path d={`${folderPath}M9 13h7M13.5 10.5L16 13l-2.5 2.5`} />,

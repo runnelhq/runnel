@@ -445,6 +445,33 @@ func TestRunGroupAndSortExample(t *testing.T) {
 	}
 }
 
+func TestRunInventoryExample(t *testing.T) {
+	chdirRepoRoot(t)
+	dir := t.TempDir()
+	for name, size := range map[string]int{"a.csv": 10, "sub/b.csv": 20, "c.txt": 5, "sub/deep/d.json": 100} {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, bytes.Repeat([]byte("x"), size), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	target := filepath.Join(t.TempDir(), "inventory.csv")
+	code, out, errOut := run(t, "run", "--param", "FOLDER="+dir, "--param", "OUTPUT="+target, "examples/pipelines/pipelines/inventory.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "extension;files;bytes\r\n.json;1;100\r\n.csv;2;30\r\n.txt;1;5\r\n"
+	if got := strings.TrimPrefix(string(b), "\xEF\xBB\xBF"); got != want {
+		t.Errorf("written file %q, want %q", got, want)
+	}
+}
+
 func TestRunResultRowsExample(t *testing.T) {
 	chdirRepoRoot(t)
 	code, out, errOut := run(t, "run", "-v", "examples/pipelines/workflows/files.workflow.yaml")

@@ -1,0 +1,47 @@
+# Files of a folder as records (file.list). Relative paths refer to the project folder (output in out/); for example:
+#   runnel run examples/pipelines/pipelines/inventory.pipeline.yaml
+#   runnel run --param FOLDER=C:\Exports examples/pipelines/pipelines/inventory.pipeline.yaml
+# - "files" reads every file below FOLDER: path, name, extension, size, modified, folder.
+# - "kinds" counts the files and their bytes per extension; "order" puts the largest first.
+kind: Pipeline
+apiVersion: runnel/v1
+name: inventory
+parameters:
+  - name: FOLDER
+    description: Folder to take stock of, with its subfolders (not the folder of OUTPUT, which changes while it is listed)
+    default: data
+  - name: OUTPUT
+    description: CSV file to write
+    default: out/inventory.csv
+transforms:
+  - id: files
+    type: file.list
+    with:
+      folder: ${FOLDER}
+      recursive: true
+  - id: kinds
+    type: core.group-by
+    with:
+      groupBy: [extension]
+      aggregates:
+        - { name: files, function: count }
+        - { name: bytes, function: sum, field: size }
+  - id: order
+    type: core.sort
+    with:
+      fields:
+        - { name: bytes, descending: true }
+  - id: write
+    type: csv.output
+    with:
+      path: ${OUTPUT}
+      delimiter: ";"
+links:
+  - { from: files, to: kinds }
+  - { from: kinds, to: order }
+  - { from: order, to: write }
+layout:
+  files: { x: 0, y: 0 }
+  kinds: { x: 240, y: 0 }
+  order: { x: 480, y: 0 }
+  write: { x: 720, y: 0 }

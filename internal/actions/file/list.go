@@ -47,28 +47,50 @@ func (a *listAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 	if a.Folder == "" {
 		return action.Result{}, errors.New("no folder given")
 	}
-	pattern := a.Pattern
+	entries := []any{}
+	err := Walk(ctx, paths.Resolve(ctx, a.Folder), a.Pattern, a.Include, a.Recursive, func(p string, info fs.FileInfo) error {
+		entries = append(entries, fileInfo(p, info))
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, ErrNoFolder) {
+			return action.Result{}, fmt.Errorf("folder %q does not exist", a.Folder)
+		}
+		return action.Result{}, err
+	}
+	word := "entries"
+	if len(entries) == 1 {
+		word = "entry"
+	}
+	ec.Logf(slog.LevelInfo, "found %d %s in %s", len(entries), word, a.Folder)
+	return action.Result{Output: entries}, nil
+}
+
+// ErrNoFolder is the error of Walk for a folder that does not exist.
+var ErrNoFolder = errors.New("no such folder")
+
+// Walk calls fn for the entries of a folder in the order of their paths, as file.list
+// lists them (also for the transform file.list): names matching pattern (empty: all),
+// include files, folders or all (empty: files), with the subfolders if recursive. A
+// missing folder gives an error that errors.Is matches with ErrNoFolder.
+func Walk(ctx context.Context, folder, pattern, include string, recursive bool, fn func(path string, info fs.FileInfo) error) error {
 	if pattern == "" {
 		pattern = "*"
 	}
 	if _, err := filepath.Match(pattern, ""); err != nil {
-		return action.Result{}, fmt.Errorf("invalid wildcard pattern %q", pattern)
+		return fmt.Errorf("invalid wildcard pattern %q", pattern)
 	}
-	include := a.Include
 	switch include {
 	case "":
 		include = "files"
 	case "files", "folders", "all":
 	default:
-		return action.Result{}, fmt.Errorf("invalid include %q (expected files, folders or all)", include)
+		return fmt.Errorf("invalid include %q (expected files, folders or all)", include)
 	}
-	folder := paths.Resolve(ctx, a.Folder)
 	if !isFolder(folder) {
-		return action.Result{}, fmt.Errorf("folder %q does not exist", a.Folder)
+		return ErrNoFolder
 	}
-
-	entries := []any{}
-	err := filepath.WalkDir(folder, func(p string, d fs.DirEntry, err error) error {
+	return filepath.WalkDir(folder, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("cannot read %q: %w", p, plain(err))
 		}
@@ -84,20 +106,13 @@ func (a *listAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 			if err != nil {
 				return fmt.Errorf("cannot read %q: %w", p, plain(err))
 			}
-			entries = append(entries, fileInfo(p, info))
+			if err := fn(p, info); err != nil {
+				return err
+			}
 		}
-		if d.IsDir() && !a.Recursive {
+		if d.IsDir() && !recursive {
 			return filepath.SkipDir
 		}
 		return nil
 	})
-	if err != nil {
-		return action.Result{}, err
-	}
-	word := "entries"
-	if len(entries) == 1 {
-		word = "entry"
-	}
-	ec.Logf(slog.LevelInfo, "found %d %s in %s", len(entries), word, a.Folder)
-	return action.Result{Output: entries}, nil
 }

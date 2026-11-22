@@ -25,6 +25,7 @@ actions / network
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
   csv.input           CSV Input      Reads the rows of a CSV file as records
+  file.list           List Files     Reads the files of a folder as records: path, name, extension, size, modified and folder
   json.input          JSON Input     Reads the objects of a JSON or NDJSON file as records
 transforms / transform
   core.calculate      Calculate      Sets fields to the result of an expression for every record

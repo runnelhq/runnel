@@ -1644,6 +1644,51 @@
       "recordErrors": true
     },
     {
+      "type": "file.list",
+      "kind": "transform",
+      "category": "input",
+      "label": "List Files",
+      "description": "Reads the files of a folder as records: path, name, extension, size, modified and folder",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string",
+            "description": "Folder to list, relative to the project folder or absolute",
+            "examples": [
+              "inbox"
+            ]
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Names to include, with wildcards, e.g. *.csv",
+            "default": "*"
+          },
+          "recursive": {
+            "type": "boolean",
+            "description": "Also list the subfolders",
+            "default": false
+          },
+          "include": {
+            "type": "string",
+            "description": "What to list",
+            "enum": [
+              "files",
+              "folders",
+              "all"
+            ],
+            "default": "files"
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "additionalProperties": false
+      },
+      "example": "folder: inbox\npattern: \"*.csv\"\nrecursive: true\n"
+    },
+    {
       "type": "http.response",
       "kind": "transform",
       "category": "output",
