@@ -1029,10 +1029,10 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 
 | Kategorie | Actions |
 |---|---|
-| Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen, Log schreiben, Schleife (ForEach über Liste/Dateien) |
+| Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen (`core.check`, seit S10), Log schreiben, Schleife (ForEach über Liste/Dateien) |
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell, Programm starten |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
-| Netzwerk | HTTP-Request, HTTP-Antwort (`http.respond`, seit S38b1), SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
+| Netzwerk | HTTP-Request (`http.request`, seit S10), HTTP-Antwort (`http.respond`, seit S38b1), SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,
@@ -1057,6 +1057,22 @@ seit S54 die Archiv-Actions (siehe unten).
   `{{ sum(map(results.list.output, .size)) }}`.
 - **Warten:** `file.wait` prüft alle `interval` (Standard 5 s), gibt nach `maxWait` auf und wartet mit `stableFor`,
   bis sich die Größe nicht mehr ändert (Datei fertig geschrieben).
+
+**HTTP-Request und Bedingung prüfen (umgesetzt mit S10):**
+
+- **`http.request`** ruft eine Adresse mit `http://` oder `https://` auf (GET, POST, PUT, PATCH, DELETE, HEAD).
+  `query` hängt Parameter kodiert an, `headers` setzt Header – Tokens kommen aus Variablen wie `${env:API_TOKEN}`,
+  nie aus der Datei. `body`: ein Text geht als Text (als `application/json`, wenn er gültiges JSON ist), Maps und Listen
+  gehen als JSON. Ergebnis: `status`, `headers` (Namen klein geschrieben) und `body`; eine JSON-Antwort wird zum Wert
+  (`{{ results.fetch.output.body.items }}`), sonst bleibt sie Text. Status ab 400 lässt die Action scheitern, die
+  Meldung nennt den Anfang der Antwort; mit `failOnError: false` steht der Status nur im Ergebnis.
+- **Grenzen:** `timeout` je Anfrage (Standard 60 s; der `timeout` der Action begrenzt alle Versuche mit `retry`
+  zusammen), `maxSize` für die Antwort (Standard 10 MB). Proxys kommen aus der Umgebung (`HTTPS_PROXY`), Zertifikate
+  werden immer geprüft. Log und Fehlermeldungen nennen Methode, Host und Pfad, aber weder Query noch Header, da diese
+  oft Schlüssel enthalten. Verbindungen über HTTP-Connections mit hinterlegten Zugangsdaten folgen mit den Connections.
+- **`core.check`** scheitert mit `message`, wenn `condition` falsch ist, z. B. `{{ len(results.list.output) > 0 }}`.
+  Anders als ein Bedingungs-Link endet damit die Action als Fehler: Der Fehler-Link meldet es, ohne einen endet der
+  Workflow als fehlgeschlagen.
 
 **Archiv-Actions (umgesetzt mit S54):** `archive.create` packt Dateien und Ordner in ein Archiv, `archive.extract`
 entpackt eines. Formate: ZIP, TAR und TAR.GZ; `format: auto` wählt nach der Endung (`.zip`, `.tar`, `.tar.gz`, `.tgz`),
@@ -1335,7 +1351,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S10, S20, S21, S23, S25, S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S25, S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

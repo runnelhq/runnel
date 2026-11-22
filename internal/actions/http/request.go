@@ -1,0 +1,276 @@
+package http
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"mime"
+	"net/http"
+	"net/url"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/httpx"
+	"github.com/runnelhq/runnel/internal/model"
+)
+
+// http.request sends an HTTP request, e.g. to a REST API (roadmap S10). A text body is
+// sent as text, other values (maps, lists) as JSON. An answer in JSON is read into a
+// value that later actions can use, e.g. {{ results.fetch.output.body.items }}.
+// Status 400 and above fail the action unless failOnError is false. The answer is
+// limited in size and time; headers are never written to the log, since they often
+// hold tokens. Output: status, headers and body of the answer.
+var requestDefinition = action.Definition{
+	Type:        "http.request",
+	Category:    action.CategoryNetwork,
+	Label:       "HTTP Request",
+	Description: "Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer",
+	Example:     "method: GET\nurl: https://api.example.com/orders\nquery:\n  status: open\nheaders:\n  Authorization: \"Bearer ${env:API_TOKEN}\"\n",
+	Config:      requestAction{},
+	New:         newRequest,
+}
+
+type requestAction struct {
+	Method      string            `json:"method" doc:"HTTP method" schema:"enum=GET|POST|PUT|PATCH|DELETE|HEAD,default=GET"`
+	URL         string            `json:"url" doc:"Address with http:// or https://, e.g. https://api.example.com/orders" schema:"required,example=https://api.example.com/orders"`
+	Query       map[string]string `json:"query" doc:"Query parameters, added to the address with encoding, e.g. status: open"`
+	Headers     map[string]string `json:"headers" doc:"Headers of the request, e.g. Authorization; take tokens from variables such as ${env:API_TOKEN}, never write them into the file"`
+	Body        any               `json:"body" doc:"Body: a text is sent as text, other values (maps, lists, numbers) as JSON"`
+	Timeout     string            `json:"timeout" doc:"Longest time for the request and its answer, e.g. 30s or 5m; the timeout of the action limits all attempts together" schema:"format=runnel-duration,default=60s"`
+	FailOnError *bool             `json:"failOnError" doc:"Fail the action if the answer has status 400 or above; false: the status is only in the output" schema:"default=true"`
+	MaxSize     string            `json:"maxSize" doc:"Largest answer to read, e.g. 10MB or 500KB" schema:"default=10MB"`
+}
+
+const (
+	defaultTimeout = 60 * time.Second
+	defaultMaxSize = 10 << 20
+)
+
+// client sends the requests of all http.request actions; proxies come from the
+// environment (HTTPS_PROXY), like in other programs.
+var client = &http.Client{Transport: http.DefaultTransport}
+
+func newRequest(with map[string]any) (action.Action, error) {
+	a := &requestAction{}
+	if err := action.DecodeConfig(with, a); err != nil {
+		return nil, err
+	}
+	switch strings.ToUpper(a.Method) {
+	case "", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD":
+	default:
+		return nil, fmt.Errorf("invalid method %q (expected GET, POST, PUT, PATCH, DELETE or HEAD)", a.Method)
+	}
+	if !dynamic(a.URL) {
+		if _, err := parseURL(a.URL); err != nil {
+			return nil, err
+		}
+	}
+	if !dynamic(a.Timeout) && a.Timeout != "" {
+		if _, err := model.Duration(a.Timeout).Value(); err != nil {
+			return nil, fmt.Errorf("timeout: %w", err)
+		}
+	}
+	if !dynamic(a.MaxSize) {
+		if _, err := parseSize(a.MaxSize); err != nil {
+			return nil, err
+		}
+	}
+	return a, nil
+}
+
+// dynamic reports whether a value is only known when the action runs.
+func dynamic(s string) bool {
+	return strings.Contains(s, "{{") || strings.Contains(s, "${")
+}
+
+func parseURL(s string) (*url.URL, error) {
+	u, err := url.Parse(strings.TrimSpace(s))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return nil, fmt.Errorf("url: %q is not an address with http:// or https://", s)
+	}
+	return u, nil
+}
+
+// parseSize reads a size like 500KB or 10MB; empty is the default.
+func parseSize(text string) (int64, error) {
+	s := strings.ToUpper(strings.TrimSpace(text))
+	if s == "" {
+		return defaultMaxSize, nil
+	}
+	unit := int64(1)
+	for _, u := range []struct {
+		suffix string
+		factor int64
+	}{{"KB", 1 << 10}, {"MB", 1 << 20}, {"GB", 1 << 30}, {"B", 1}} {
+		if strings.HasSuffix(s, u.suffix) {
+			s, unit = strings.TrimSpace(strings.TrimSuffix(s, u.suffix)), u.factor
+			break
+		}
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || n <= 0 || n > (1<<40)/unit {
+		return 0, fmt.Errorf("maxSize: %q is not a size like 500KB or 10MB", text)
+	}
+	return n * unit, nil
+}
+
+func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
+	u, err := parseURL(a.URL)
+	if err != nil {
+		return action.Result{}, err
+	}
+	if len(a.Query) > 0 {
+		q := u.Query()
+		for k, v := range a.Query {
+			q.Set(k, v)
+		}
+		u.RawQuery = q.Encode()
+	}
+	timeout := defaultTimeout
+	if a.Timeout != "" {
+		if timeout, err = model.Duration(a.Timeout).Value(); err != nil {
+			return action.Result{}, fmt.Errorf("timeout: %w", err)
+		}
+	}
+	maxSize, err := parseSize(a.MaxSize)
+	if err != nil {
+		return action.Result{}, err
+	}
+	method := strings.ToUpper(a.Method)
+	if method == "" {
+		method = http.MethodGet
+	}
+	body, contentType, err := encodeBody(a.Body)
+	if err != nil {
+		return action.Result{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	if err != nil {
+		return action.Result{}, fmt.Errorf("cannot send the request: %w", err)
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.Header.Set("User-Agent", "Runnel")
+	for k, v := range a.Headers {
+		req.Header.Set(k, v)
+	}
+	// Only scheme, host and path go into messages: the query may hold keys.
+	where := method + " " + u.Scheme + "://" + u.Host + u.Path
+	start := time.Now()
+	resp, err := client.Do(req)
+	if err != nil {
+		return action.Result{}, requestError(ctx, where, timeout, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxSize+1))
+	if err != nil {
+		return action.Result{}, requestError(ctx, where, timeout, err)
+	}
+	if int64(len(data)) > maxSize {
+		return action.Result{}, fmt.Errorf("%s: the answer is larger than %s; set maxSize if this is intended", where, sizeText(a.MaxSize))
+	}
+	out := map[string]any{"status": int64(resp.StatusCode), "headers": headers(resp.Header), "body": decodeBody(resp.Header.Get("Content-Type"), data)}
+	ec.Logf(slog.LevelInfo, "%s: %s (%d bytes in %s)", where, resp.Status, len(data), time.Since(start).Round(time.Millisecond))
+	if resp.StatusCode >= 400 && (a.FailOnError == nil || *a.FailOnError) {
+		return action.Result{Output: out}, fmt.Errorf("%s answered with status %s%s (set failOnError: false to go on)", where, resp.Status, excerpt(data))
+	}
+	return action.Result{Output: out}, nil
+}
+
+func sizeText(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "10MB"
+	}
+	return s
+}
+
+// requestError explains a failed request without the details of Go's network errors.
+func requestError(ctx context.Context, where string, timeout time.Duration, err error) error {
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		return fmt.Errorf("%s: no answer within %s (timeout)", where, timeout)
+	case ctx.Err() != nil:
+		return ctx.Err()
+	}
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		err = ue.Err
+	}
+	return fmt.Errorf("%s: %w", where, err)
+}
+
+// excerpt returns the beginning of an error answer for the message.
+func excerpt(data []byte) string {
+	s := strings.Join(strings.Fields(string(data)), " ")
+	if s == "" {
+		return ""
+	}
+	if r := []rune(s); len(r) > 200 {
+		s = string(r[:200]) + "…"
+	}
+	return ": " + s
+}
+
+// encodeBody returns the body to send and its content type.
+func encodeBody(v any) (io.Reader, string, error) {
+	switch v := v.(type) {
+	case nil:
+		return nil, "", nil
+	case string:
+		if v == "" {
+			return nil, "", nil
+		}
+		ct := "text/plain; charset=utf-8"
+		if t := strings.TrimSpace(v); strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[") {
+			if json.Valid([]byte(t)) {
+				ct = "application/json"
+			}
+		}
+		return strings.NewReader(v), ct, nil
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, "", fmt.Errorf("body: cannot write as JSON: %w", err)
+	}
+	return bytes.NewReader(data), "application/json", nil
+}
+
+// decodeBody reads an answer in JSON into a value; other answers stay text.
+func decodeBody(contentType string, data []byte) any {
+	media, _, _ := mime.ParseMediaType(contentType)
+	if media == "application/json" || strings.HasSuffix(media, "+json") {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber()
+		var v any
+		if err := dec.Decode(&v); err == nil && !dec.More() {
+			return httpx.Numbers(v)
+		}
+	}
+	return string(data)
+}
+
+// headers returns the headers of the answer with lowercase names; several values are
+// joined with ", ".
+func headers(h http.Header) map[string]any {
+	keys := make([]string, 0, len(h))
+	for k := range h {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make(map[string]any, len(h))
+	for _, k := range keys {
+		out[strings.ToLower(k)] = strings.Join(h[k], ", ")
+	}
+	return out
+}

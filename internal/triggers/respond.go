@@ -170,28 +170,3 @@ func requestOf(r *http.Request, body any, client string) map[string]any {
 	}
 	return map[string]any{"method": r.Method, "path": r.URL.Path, "headers": headers, "query": query, "body": body, "client": client}
 }
-
-// numbers turns the numbers of a JSON value read with UseNumber into int64 or float64.
-func numbers(v any) any {
-	switch v := v.(type) {
-	case json.Number:
-		if n, err := v.Int64(); err == nil {
-			return n
-		}
-		f, _ := v.Float64()
-		return f
-	case map[string]any:
-		out := make(map[string]any, len(v))
-		for k, x := range v {
-			out[k] = numbers(x)
-		}
-		return out
-	case []any:
-		out := make([]any, len(v))
-		for i, x := range v {
-			out[i] = numbers(x)
-		}
-		return out
-	}
-	return v
-}

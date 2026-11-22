@@ -311,14 +311,14 @@ func requestValues(r *http.Request, body []byte, list bool) (map[string]string, 
 			items, isList := v.([]any)
 			switch {
 			case err == nil && isObject:
-				bodyValue = numbers(obj)
+				bodyValue = httpx.Numbers(obj)
 			case err == nil && isList && list:
 				for i, item := range items {
 					if _, ok := item.(map[string]any); !ok {
 						return nil, nil, errorf(http.StatusBadRequest, "entry %d of the JSON list is not an object; the list holds the records for the pipeline", i+1)
 					}
 				}
-				return queryValues(r, values), numbers(items), nil
+				return queryValues(r, values), httpx.Numbers(items), nil
 			case list:
 				return nil, nil, errorf(http.StatusBadRequest, "%s", "the body must be a JSON object (parameters) or a list of objects (records), e.g. [{\"id\": 4711}]")
 			default:

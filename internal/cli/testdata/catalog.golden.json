@@ -144,6 +144,39 @@
       "example": "message: \"No orders found in ${INBOX}\"\n"
     },
     {
+      "type": "core.check",
+      "kind": "action",
+      "category": "general",
+      "label": "Check Condition",
+      "description": "Fails with a message when a condition is false",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "condition": {
+            "type": "string",
+            "description": "Expression that must be true, e.g. {{ results.fetch.output.status == 200 }}",
+            "examples": [
+              "{{ results.fetch.output.status == 200 }}"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Message when the condition is false; empty: \"the condition is false\"",
+            "format": "runnel-text",
+            "examples": [
+              "No order files in the inbox"
+            ]
+          }
+        },
+        "required": [
+          "condition"
+        ],
+        "additionalProperties": false
+      },
+      "example": "condition: \"{{ len(results.list.output) \u003e 0 }}\"\nmessage: No order files in the inbox\n"
+    },
+    {
       "type": "core.dummy",
       "kind": "action",
       "category": "general",
@@ -574,6 +607,77 @@
         "additionalProperties": false
       },
       "example": "path: inbox/*.csv\nmaxWait: 30m\nstableFor: 10s\n"
+    },
+    {
+      "type": "http.request",
+      "kind": "action",
+      "category": "network",
+      "label": "HTTP Request",
+      "description": "Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "description": "HTTP method",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "HEAD"
+            ],
+            "default": "GET"
+          },
+          "url": {
+            "type": "string",
+            "description": "Address with http:// or https://, e.g. https://api.example.com/orders",
+            "examples": [
+              "https://api.example.com/orders"
+            ]
+          },
+          "query": {
+            "type": "object",
+            "description": "Query parameters, added to the address with encoding, e.g. status: open",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers of the request, e.g. Authorization; take tokens from variables such as ${env:API_TOKEN}, never write them into the file",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "body": {
+            "description": "Body: a text is sent as text, other values (maps, lists, numbers) as JSON"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for the request and its answer, e.g. 30s or 5m; the timeout of the action limits all attempts together",
+            "format": "runnel-duration",
+            "default": "60s"
+          },
+          "failOnError": {
+            "type": "boolean",
+            "description": "Fail the action if the answer has status 400 or above; false: the status is only in the output",
+            "default": true
+          },
+          "maxSize": {
+            "type": "string",
+            "description": "Largest answer to read, e.g. 10MB or 500KB",
+            "default": "10MB"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "example": "method: GET\nurl: https://api.example.com/orders\nquery:\n  status: open\nheaders:\n  Authorization: \"Bearer ${env:API_TOKEN}\"\n"
     },
     {
       "type": "http.respond",

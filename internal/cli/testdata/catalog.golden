@@ -1,10 +1,11 @@
 actions / general
-  core.abort    Abort    Ends the workflow as failed
-  core.dummy    Dummy    Does nothing; collects branches into one point
-  core.log      Log      Writes a message to the run log
-  core.start    Start    Entry point of the workflow
-  core.success  Success  Ends the workflow successfully
-  core.wait     Wait     Waits for a given time
+  core.abort    Abort            Ends the workflow as failed
+  core.check    Check Condition  Fails with a message when a condition is false
+  core.dummy    Dummy            Does nothing; collects branches into one point
+  core.log      Log              Writes a message to the run log
+  core.start    Start            Entry point of the workflow
+  core.success  Success          Ends the workflow successfully
+  core.wait     Wait             Waits for a given time
 actions / execution
   core.run-pipeline  Run Pipeline  Runs a pipeline with parameters; output: the counts of its transforms
   core.run-workflow  Run Workflow  Runs another workflow with parameters; output: its outputs
@@ -19,6 +20,7 @@ actions / files
   file.move        Move Files       Moves files or folders; output: the new paths
   file.wait        Wait for File    Waits until files exist; output: the matching paths
 actions / network
+  http.request  HTTP Request   Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer
   http.respond  HTTP Response  Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
