@@ -149,8 +149,9 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
     (z. B. `INBOX: ${BASE}\inbox`), Zyklen sind ein Fehler
   - `${env:NAME}` – Umgebungsvariable des Betriebssystems, z. B. `${env:COMPUTERNAME}`, `${env:TEMP}`
   - `${secret:NAME}` bzw. `${secret:QUELLE/NAME}` – Secret aus einer Secret-Quelle; Standardquelle je Environment
-    (`secretStore:`), sonst der lokale Store. Nur in Connections, Secret-Quellen und Feldern mit `secret`-Format
-    erlaubt ([ADR 0022](adr/0022-connections-secrets.md), Kap. 8)
+    (`secretStore:`), sonst der lokale Store. Nur in Connections, Secret-Quellen, Feldern mit `format: runnel-secret`
+    und als Token von HTTP-Triggern erlaubt, nie über eine Variable ([ADR 0022](adr/0022-connections-secrets.md),
+    Kap. 8). Seit S39a gibt es die Quelle `env` (Umgebungsvariablen, `secretStore: env`); `local` folgt mit S39d
   - `$${` – ein wörtliches `${`
   - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
 - Das Projekt wird über `project.yaml` im Ordner des Workflows oder einem übergeordneten Ordner gefunden (wie `.git`).
@@ -304,7 +305,7 @@ flowchart LR
 | Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
 | Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments und Triggern (seit S58), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
-| Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39a, [ADR 0022](adr/0022-connections-secrets.md)) |
+| Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
 | Plugins (geplant) | `runnel plugins [trust\|untrust] [projektordner] [--service]` | Plugins anzeigen und für das Projekt freigeben (S49, [ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag) |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
@@ -1370,7 +1371,7 @@ runnel/
 │  ├─ logfile/              # Log-Datei mit Rotation (Dienst)
 │  ├─ winsvc/               # Windows-Dienst, Ereignisanzeige (build tag windows)
 │  ├─ version/              # Versionsinformationen
-│  │                        # geplant: secretstore/ (S39a), connections/ (S20), store/ (SQLite, S26), plugin/ (S49)
+│  │                        # geplant: secretstore/ (S39d), connections/ (S20), store/ (SQLite, S26), plugin/ (S49)
 ├─ web/                     # Editor (React + Vite + TypeScript; Build → internal/webui/dist, per go:embed eingebettet)
 ├─ examples/                # Beispielprojekte
 ├─ docs/                    # Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (docs/dev/)
@@ -1404,7 +1405,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S56 (Mapping), S25c–e (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Quellen (S39a–c, S39a vor S20), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S56 (Mapping), S25c–e (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Quellen (S39b–e; S39a mit der Quelle `env` ist umgesetzt), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

@@ -1,6 +1,8 @@
 package triggers
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -144,10 +146,42 @@ func TestCheckHTTPTrigger(t *testing.T) {
 		{"/x", "none", "params: { MODE: half }\n", "parameter MODE (string) of workflow workflows/target.workflow.yaml"},
 		{"/x", "none", "params: { YEARS: 1 }\n", "parameter YEARS is not declared"},
 		{"/x", `{ token: "${env:RUNNEL_TEST_UNSET}" }`, "", "environment variable RUNNEL_TEST_UNSET with the token is not set"},
+		// Without secretStore, ${secret:…} reads from the local store, which comes later (S39d).
+		{"/x", `{ token: "${secret:import-token}" }`, "", `secret "import-token": the local secret store is not available yet`},
+		{"/x", `{ token: "${secret:env/RUNNEL_TEST_UNSET}" }`, "", "environment variable RUNNEL_TEST_UNSET is not set (secret store env)"},
 	} {
 		errs := CheckTrigger(http(c.path, c.auth, c.params), p, dir)
 		if len(errs) == 0 || !strings.Contains(errs.Error(), c.want) {
 			t.Errorf("%s %s: got %v, want %q", c.path, c.params, errs, c.want)
+		}
+	}
+}
+
+// The token of an http trigger as a secret (ADR 0022): read from the default store of
+// the trigger's environment, and compared like a token from an environment variable.
+func TestHTTPTriggerSecretToken(t *testing.T) {
+	dir := project(t, map[string]string{
+		"workflows/target.workflow.yaml": triggerTarget,
+		"environments/prod.yaml":         "kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: env\n",
+	})
+	p, err := model.LoadProject(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, err := model.ParseTrigger("triggers/h.yaml", []byte("kind: Trigger\napiVersion: runnel/v1\nname: h\ntype: http\ntarget: workflows/target.workflow.yaml\n"+
+		"environment: prod\nwith:\n  method: GET\n  path: /days/{DAYS}\n  auth: { token: \"${secret:RUNNEL_TEST_TOKEN}\" }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RUNNEL_TEST_TOKEN", "t0ken-from-secret")
+	if errs := CheckTrigger(tr, p, dir); len(errs) != 0 {
+		t.Fatalf("valid: %v", errs)
+	}
+	for header, want := range map[string]bool{"Bearer t0ken-from-secret": true, "Bearer wrong": false, "": false} {
+		r := httptest.NewRequest(http.MethodGet, "/days/3", nil)
+		r.Header.Set("Authorization", header)
+		if got := authorized(tr, r); got != want {
+			t.Errorf("authorized(%q) = %v", header, got)
 		}
 	}
 }

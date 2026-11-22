@@ -88,6 +88,14 @@ type Trigger struct {
 	src      *source
 	schedule cron.Schedule
 	location *time.Location
+	// secrets reads ${secret:…} in the token of an http trigger (UseSecrets).
+	secrets func(store, name string) (string, error)
+}
+
+// UseSecrets sets how the trigger reads secrets (ADR 0022): the stores of its
+// environment, see SecretLookup.
+func (t *Trigger) UseSecrets(lookup func(store, name string) (string, error)) {
+	t.secrets = lookup
 }
 
 // TriggerSettings are the settings of a trigger under with:, by type.
@@ -122,7 +130,7 @@ type TriggerSettings struct {
 	// the URL path with placeholders, e.g. /api/customers/{id}.
 	Method string `yaml:"method,omitempty" json:"method,omitempty" doc:"http: HTTP method of the calls (required for http)" schema:"enum=GET|POST|PUT|PATCH|DELETE"`
 	// Auth is none or { token: ${env:NAME} } (http).
-	Auth any `yaml:"auth,omitempty" json:"auth,omitempty" doc:"http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${env:IMPORT_TOKEN} }"`
+	Auth any `yaml:"auth,omitempty" json:"auth,omitempty" doc:"http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${secret:import-token} } or { token: ${env:IMPORT_TOKEN} }"`
 	// Response is accepted (default: 202 with the run id at once) or run (the caller
 	// waits for the answer of the run, at most timeout).
 	Response string `yaml:"response,omitempty" json:"response,omitempty" doc:"http: answer at once with 202 and the run id (accepted), or wait for the answer of the run (run)" schema:"enum=accepted|run,default=accepted"`
@@ -279,6 +287,9 @@ func (t *Trigger) validate() error {
 	if fieldsOf[t.Type] != nil {
 		errs = append(errs, t.unusedFields()...)
 	}
+	// Secrets only as the token of an http trigger (ADR 0022); its store is checked
+	// against the project (triggers.CheckTrigger).
+	errs = append(errs, checkSecrets(s, func(path string) bool { return path == "$.with.auth.token" }, nil)...)
 	return errs.errOrNil()
 }
 

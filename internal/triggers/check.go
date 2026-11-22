@@ -42,6 +42,7 @@ func CheckTrigger(t *model.Trigger, p *model.Project, projectDir string) model.E
 		}
 		errs = append(errs, t.ErrorAt("$.environment", "environment %q not found (%s)", t.Environment, hint))
 	}
+	t.UseSecrets(model.SecretLookup(p, triggerEnvironment(t, p)))
 	params, what, err := TargetParams(t, projectDir)
 	if located, ok := errors.AsType[*model.Error](err); ok {
 		return append(errs, located)
@@ -87,9 +88,9 @@ func checkHTTPTrigger(t *model.Trigger, params []model.Parameter, what string) m
 			errs = append(errs, t.ErrorAt("$.with.path", "placeholder {%s} is also set under params; fixed values cannot come from the request", name))
 		}
 	}
-	if v := t.TokenVariable(); v != "" {
-		if _, ok := t.Token(); !ok {
-			errs = append(errs, t.ErrorAt("$.with.auth.token", "environment variable %s with the token is not set; set it for the server (for a service: as a system variable, then restart it)", v))
+	if t.HasToken() {
+		if _, err := t.Token(); err != nil {
+			errs = append(errs, t.ErrorAt("$.with.auth.token", "%v", err))
 		}
 	}
 	return errs
@@ -151,4 +152,17 @@ func TriggerParams(t *model.Trigger) map[string]string {
 		}
 	}
 	return out
+}
+
+// triggerEnvironment returns the environment the runs of a trigger use: its own, else
+// the default environment of the project; nil without one.
+func triggerEnvironment(t *model.Trigger, p *model.Project) *model.Environment {
+	if p == nil {
+		return nil
+	}
+	name := t.Environment
+	if name == "" {
+		name = p.DefaultEnvironment
+	}
+	return p.Environments[name]
 }

@@ -55,6 +55,8 @@ type Options struct {
 	// BaseDir is the folder relative paths of actions refer to (ADR 0020): the project
 	// folder, or the folder of the workflow file; empty: the working directory.
 	BaseDir string
+	// Mask hides the values of secrets in events and in the result (ADR 0022); nil: none.
+	Mask *vars.Mask
 }
 
 // Status is the final state of a run.
@@ -233,9 +235,10 @@ func (r *Runner) Run(ctx context.Context) Result {
 		}
 	}
 
-	res := Result{RunID: runID, Status: status, Err: err, Duration: now().Sub(started), Outputs: outputs}
-	r.emit(Event{Time: now(), Kind: RunFinished, RunID: runID, Status: status, Err: err,
-		Duration: res.Duration, Outputs: outputs})
+	m := r.opts.Mask
+	res := Result{RunID: runID, Status: status, Err: m.Error(err), Duration: now().Sub(started), Outputs: m.Map(outputs)}
+	r.emit(Event{Time: now(), Kind: RunFinished, RunID: runID, Status: status, Err: res.Err,
+		Duration: res.Duration, Outputs: res.Outputs})
 	return res
 }
 
@@ -361,6 +364,9 @@ func (r *Runner) log(runID string, a *model.Action, level slog.Level, msg string
 // emit passes an event to the observer. Events come from the scheduler and from
 // running actions (log messages); the observer is called by one goroutine at a time.
 func (r *Runner) emit(e Event) {
+	if m := r.opts.Mask; m != nil {
+		e.Message, e.Err, e.Outputs = m.String(e.Message), m.Error(e.Err), m.Map(e.Outputs)
+	}
 	if r.opts.Observer != nil {
 		r.emitMu.Lock()
 		defer r.emitMu.Unlock()

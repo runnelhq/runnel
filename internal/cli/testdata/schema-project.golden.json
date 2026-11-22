@@ -41,6 +41,16 @@
         "type": "string"
       }
     },
+    "secretStore": {
+      "type": "string",
+      "description": "Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables) or local (the local secret store, not available yet)",
+      "enum": [
+        "local",
+        "shared",
+        "env"
+      ],
+      "default": "local"
+    },
     "workflow": {
       "type": "object",
       "description": "Defaults for all workflows of the project",

@@ -5,6 +5,7 @@ import (
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/schema"
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
@@ -38,6 +39,11 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 		}
 		diags = append(diags, w.CheckVariables(contexts)...)
 	}
+	var stores []string // with the project known, the default stores are checked too
+	if c.Variables {
+		stores = model.SecretStoresOf(c.Project, c.Env)
+	}
+	diags = append(diags, w.CheckSecrets(ActionSecretField(c.Registry), stores)...)
 	if !diags.HasErrors() {
 		diags = append(diags, workflow.Check(w, workflow.Options{Registry: c.Registry})...)
 		diags = append(diags, CheckCalls(w, c.ProjectDir, c.File)...)
@@ -50,9 +56,45 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 // types, configurations and fields of its transforms (ADR 0007), only if diags (the
 // problems found so far) has no errors and registry is set. The result is sorted.
 func CheckPipeline(p *model.Pipeline, diags model.Errors, registry *transform.Registry) model.Errors {
+	diags = append(diags, p.CheckSecrets(TransformSecretField(registry), nil)...)
 	if !diags.HasErrors() && registry != nil {
 		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: registry})...)
 	}
 	diags.Sort()
 	return diags
+}
+
+// ActionSecretField tells whether a field of an action type holds a secret (format
+// runnel-secret, ADR 0022): only such fields may use ${secret:…}.
+func ActionSecretField(reg *action.Registry) func(typ, field string) bool {
+	return func(typ, field string) bool {
+		if reg == nil {
+			return false
+		}
+		d, ok := reg.Descriptor(typ)
+		return ok && secretField(d.Schema, field)
+	}
+}
+
+// TransformSecretField is ActionSecretField for transforms.
+func TransformSecretField(reg *transform.Registry) func(typ, field string) bool {
+	return func(typ, field string) bool {
+		if reg == nil {
+			return false
+		}
+		d, ok := reg.Descriptor(typ)
+		return ok && secretField(d.Schema, field)
+	}
+}
+
+func secretField(s *schema.Schema, field string) bool {
+	if s == nil {
+		return false
+	}
+	for _, p := range s.Properties {
+		if p.Name == field {
+			return p.Schema.Format == schema.FormatSecret
+		}
+	}
+	return false
 }

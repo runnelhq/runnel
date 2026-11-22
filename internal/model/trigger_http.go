@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -61,8 +63,32 @@ func (t *Trigger) ResponseTimeout() time.Duration {
 
 var (
 	segmentPattern = regexp.MustCompile(`^[A-Za-z0-9._~-]+$`)
-	tokenPattern   = regexp.MustCompile(`^\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$`)
+	envNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
+
+// tokenRef returns the reference that holds the token of an http trigger: exactly one
+// ${env:NAME} or ${secret:[STORE/]NAME} and nothing else.
+func tokenRef(s string) (vars.Ref, bool) {
+	refs, err := vars.Parse(s)
+	if err != nil || len(refs) != 1 || refs[0].String() != s {
+		return vars.Ref{}, false
+	}
+	r := refs[0]
+	switch {
+	case r.Kind == vars.KindEnv && envNamePattern.MatchString(r.Name), r.Kind == vars.KindSecret:
+		return r, true
+	}
+	return vars.Ref{}, false
+}
+
+func (t *Trigger) tokenText() string {
+	m, ok := t.With.Auth.(map[string]any)
+	if !ok {
+		return ""
+	}
+	s, _ := m["token"].(string)
+	return s
+}
 
 // HTTPMethod returns the method of an http trigger in capitals.
 func (t *Trigger) HTTPMethod() string {
@@ -109,28 +135,41 @@ func (t *Trigger) AuthNone() bool {
 }
 
 // TokenVariable returns the environment variable that holds the token of an http
-// trigger (auth: { token: ${env:NAME} }); empty with auth: none.
+// trigger (auth: { token: ${env:NAME} }); empty with auth: none or a secret.
 func (t *Trigger) TokenVariable() string {
-	m, ok := t.With.Auth.(map[string]any)
-	if !ok {
-		return ""
-	}
-	s, _ := m["token"].(string)
-	if g := tokenPattern.FindStringSubmatch(s); g != nil {
-		return g[1]
+	if r, ok := tokenRef(t.tokenText()); ok && r.Kind == vars.KindEnv {
+		return r.Name
 	}
 	return ""
 }
 
-// Token returns the token of an http trigger from its environment variable; false if
-// the variable is not set or empty.
-func (t *Trigger) Token() (string, bool) {
-	name := t.TokenVariable()
-	if name == "" {
-		return "", false
+// HasToken reports whether an http trigger expects a token (not auth: none).
+func (t *Trigger) HasToken() bool {
+	_, ok := tokenRef(t.tokenText())
+	return ok
+}
+
+// Token returns the token of an http trigger: from its environment variable
+// (${env:NAME}) or its secret (${secret:…}, read with UseSecrets). The error says why
+// there is none, without any value.
+func (t *Trigger) Token() (string, error) {
+	r, ok := tokenRef(t.tokenText())
+	switch {
+	case !ok:
+		return "", errors.New("the trigger has no token")
+	case r.Kind == vars.KindEnv:
+		if v := os.Getenv(r.Name); v != "" {
+			return v, nil
+		}
+		return "", fmt.Errorf("environment variable %s with the token is not set; set it for the server (for a service: as a system variable, then restart it)", r.Name)
+	case t.secrets == nil:
+		return "", fmt.Errorf("secret %q: secrets are not available", r.Name)
 	}
-	v := os.Getenv(name)
-	return v, v != ""
+	v, err := t.secrets(r.Store, r.Name)
+	if err == nil && v == "" {
+		err = fmt.Errorf("secret %q is empty", r.Name)
+	}
+	return v, err
 }
 
 func (t *Trigger) checkHTTP() Errors {
@@ -198,7 +237,7 @@ func (t *Trigger) checkURLPath() Errors {
 
 func (t *Trigger) checkAuth() Errors {
 	s := t.src
-	const hint = "auth: none, or auth: { token: ${env:NAME} } with the token in an environment variable"
+	const hint = "auth: none, or auth: { token: ${secret:NAME} } or { token: ${env:NAME} } with the token in a secret store or an environment variable"
 	switch a := t.With.Auth.(type) {
 	case nil:
 		return Errors{s.errorf("$.with", `missing required field "auth" (%s)`, hint)}
@@ -211,8 +250,8 @@ func (t *Trigger) checkAuth() Errors {
 		if len(a) != 1 || !ok {
 			return Errors{s.errorf("$.with.auth", "invalid auth (expected %s)", hint)}
 		}
-		if !tokenPattern.MatchString(tok) {
-			return Errors{s.errorf("$.with.auth.token", "the token must not be written into the file; put it into an environment variable and write token: ${env:NAME}")}
+		if _, ok := tokenRef(tok); !ok {
+			return Errors{s.errorf("$.with.auth.token", "the token must not be written into the file; write token: ${secret:NAME} (secret store) or token: ${env:NAME} (environment variable)")}
 		}
 	default:
 		return Errors{s.errorf("$.with.auth", "invalid auth (expected %s)", hint)}

@@ -2,6 +2,7 @@ package vars
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -99,7 +100,7 @@ func TestExpand(t *testing.T) {
 		{"${LOOP_A}", "", "variable cycle: LOOP_A → LOOP_B → LOOP_A"},
 		{"${MISSING}", "", `variable "NOPE" is undefined`},
 		{"${env:NOPE}", "", `environment variable "NOPE" is undefined`},
-		{"${secret:pw}", "", "secrets are not available"},
+		{"${secret:pw}", "", "${secret:pw}: secrets (${secret:…}) are only allowed in fields for secrets"},
 	}
 	for _, tt := range tests {
 		got, err := s.Expand(tt.text)
@@ -119,9 +120,55 @@ func TestExpand(t *testing.T) {
 		t.Errorf("undefined variable: error %v does not wrap ErrUndefined", err)
 	}
 
-	s.LookupSecret = func(n string) (string, error) { return "s3cret-" + n, nil }
-	if got, err := s.Expand("${secret:pw}"); err != nil || got != "s3cret-pw" {
-		t.Errorf("secret: got (%q, %v)", got, err)
+	if _, err := s.ExpandSecret("${secret:pw}"); err == nil || !strings.Contains(err.Error(), "secrets are not available") {
+		t.Errorf("secret without store: %v", err)
+	}
+}
+
+// Secrets (ADR 0022): resolved only by ExpandSecret and only when written into the
+// text itself, never through a variable; the store is optional.
+func TestExpandSecret(t *testing.T) {
+	s := NewScope(Layer{Name: "project", Values: map[string]string{"USER": "runnel", "PW": "${secret:pw}"}})
+	s.LookupSecret = func(store, name string) (string, error) {
+		if name == "missing" {
+			return "", fmt.Errorf("secret %q is not set", name)
+		}
+		return "[" + store + "]" + name, nil
+	}
+	for text, want := range map[string]string{
+		"${secret:pw}":              "[]pw",
+		"${secret:env/API_TOKEN}":   "[env]API_TOKEN",
+		"${USER}:${secret:db.pass}": "runnel:[]db.pass",
+		"$${secret:pw}":             "${secret:pw}",
+	} {
+		if got, err := s.ExpandSecret(text); err != nil || got != want {
+			t.Errorf("ExpandSecret(%q) = (%q, %v), want %q", text, got, err, want)
+		}
+	}
+	for text, want := range map[string]string{
+		"${PW}":             `variable "PW" contains a secret; write ${secret:pw} directly into the field for the secret`,
+		"${secret:missing}": `secret "missing" is not set`,
+	} {
+		if _, err := s.ExpandSecret(text); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("ExpandSecret(%q): %v, want %q", text, err, want)
+		}
+	}
+	for _, text := range []string{"${secret:pw}", "${PW}", "x ${secret:env/T}"} {
+		if _, err := s.Expand(text); !errors.Is(err, ErrSecretNotAllowed) {
+			t.Errorf("Expand(%q): %v, want ErrSecretNotAllowed", text, err)
+		}
+	}
+}
+
+func TestParseSecretStore(t *testing.T) {
+	refs, err := Parse("${secret:vault/db-pass} ${secret:pw}")
+	if err != nil || len(refs) != 2 || refs[0].Store != "vault" || refs[0].Name != "db-pass" || refs[1].Store != "" || refs[0].String() != "${secret:vault/db-pass}" {
+		t.Fatalf("%+v, %v", refs, err)
+	}
+	for _, bad := range []string{"${secret:a/b/c}", "${secret:/pw}", "${secret:my-store/pw}", "${secret:env/}"} {
+		if _, err := Parse(bad); err == nil {
+			t.Errorf("Parse(%q): no error", bad)
+		}
 	}
 }
 

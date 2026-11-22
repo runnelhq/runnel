@@ -1,19 +1,22 @@
 $ runnel validate internal/model/testdata/project/ok
 internal/model/testdata/project/ok/workflows/vars.workflow.yaml:17:12: warning: variable "API_URL" is not defined in environment "prod"
 internal/model/testdata/project/ok/workflows/vars.workflow.yaml:18:13: warning: variable "UNDEFINED_USER" is not defined (neither as workflow parameter nor in the project or environment)
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:19:17: error: ${secret:api-password} is not allowed here: secrets may only be used in fields for secrets (e.g. a password or token), so that they do not end up in logs or files
 internal/model/testdata/project/ok/workflows/vars.workflow.yaml:20:12: error: invalid variable name "not-valid" in "${not-valid}" (letters, digits and _, not starting with a digit)
-1 workflow file checked: 1 error, 2 warnings
+1 workflow file checked: 2 errors, 2 warnings
 exit code 1
 
 $ runnel validate --env dev internal/model/testdata/project/ok
 internal/model/testdata/project/ok/workflows/vars.workflow.yaml:18:13: warning: variable "UNDEFINED_USER" is not defined (neither as workflow parameter nor in the project or environment)
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:19:17: error: ${secret:api-password} is not allowed here: secrets may only be used in fields for secrets (e.g. a password or token), so that they do not end up in logs or files
 internal/model/testdata/project/ok/workflows/vars.workflow.yaml:20:12: error: invalid variable name "not-valid" in "${not-valid}" (letters, digits and _, not starting with a digit)
-1 workflow file checked: 1 error, 1 warning
+1 workflow file checked: 2 errors, 1 warning
 exit code 1
 
 $ runnel validate --env dev --param UNDEFINED_USER=me internal/model/testdata/project/ok
+internal/model/testdata/project/ok/workflows/vars.workflow.yaml:19:17: error: ${secret:api-password} is not allowed here: secrets may only be used in fields for secrets (e.g. a password or token), so that they do not end up in logs or files
 internal/model/testdata/project/ok/workflows/vars.workflow.yaml:20:12: error: invalid variable name "not-valid" in "${not-valid}" (letters, digits and _, not starting with a digit)
-1 workflow file checked: 1 error, 0 warnings
+1 workflow file checked: 2 errors, 0 warnings
 exit code 1
 
 $ runnel validate internal/model/testdata/project/invalid

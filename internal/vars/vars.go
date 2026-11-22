@@ -5,7 +5,8 @@
 //
 //	${NAME}         variable from the scope (project, environment, parameters, …)
 //	${env:NAME}     environment variable of the operating system
-//	${secret:NAME}  secret from the secret store
+//	${secret:NAME}  secret from the default secret store (ADR 0022)
+//	${secret:STORE/NAME} secret from a named secret store, e.g. ${secret:env/API_TOKEN}
 //	$${             literal "${" (escape)
 //
 // Variable values may reference other variables; they are expanded recursively.
@@ -35,6 +36,8 @@ const (
 type Ref struct {
 	Kind Kind
 	Name string
+	// Store is the secret store named in ${secret:STORE/NAME}; empty for the default store.
+	Store string
 	// Offset is the byte offset of "${" in the text.
 	Offset int
 }
@@ -42,6 +45,9 @@ type Ref struct {
 func (r Ref) String() string {
 	if r.Kind == KindVar {
 		return "${" + r.Name + "}"
+	}
+	if r.Store != "" {
+		return "${" + string(r.Kind) + ":" + r.Store + "/" + r.Name + "}"
 	}
 	return "${" + string(r.Kind) + ":" + r.Name + "}"
 }
@@ -119,9 +125,17 @@ func parseRef(body string, offset int) (Ref, error) {
 			return Ref{}, fmt.Errorf("invalid environment variable name %q in %q", name, "${"+body+"}")
 		}
 	case KindSecret:
+		store := ""
+		if s, n, ok := strings.Cut(name, "/"); ok {
+			store, name = s, n
+			if !varNamePattern.MatchString(store) {
+				return Ref{}, fmt.Errorf("invalid secret store %q in %q (letters, digits and _)", store, "${"+body+"}")
+			}
+		}
 		if !secretNamePattern.MatchString(name) {
 			return Ref{}, fmt.Errorf("invalid secret name %q in %q (letters, digits, ., - and _)", name, "${"+body+"}")
 		}
+		return Ref{Kind: kind, Store: store, Name: name, Offset: offset}, nil
 	default:
 		return Ref{}, fmt.Errorf("unknown reference type %q in %q (expected ${NAME}, ${env:NAME} or ${secret:NAME})", kind, "${"+body+"}")
 	}
@@ -139,8 +153,9 @@ type Scope struct {
 	layers []Layer
 	// LookupEnv reads environment variables; defaults to os.LookupEnv.
 	LookupEnv func(name string) (string, bool)
-	// LookupSecret reads secrets; nil means secrets are not available.
-	LookupSecret func(name string) (string, error)
+	// LookupSecret reads a secret from a store (empty: the default store); nil means
+	// secrets are not available. Only ExpandSecret uses it.
+	LookupSecret func(store, name string) (string, error)
 }
 
 // NewScope creates a scope from layers, ordered from lowest to highest priority.
@@ -167,19 +182,31 @@ func (s *Scope) Has(name string) bool {
 // ErrUndefined is returned (wrapped) by Expand for references to undefined variables.
 var ErrUndefined = errors.New("undefined")
 
+// ErrSecretNotAllowed is returned (wrapped) for ${secret:…} where secrets may not be used.
+var ErrSecretNotAllowed = errors.New("secrets (${secret:…}) are only allowed in fields for secrets")
+
 // Expand replaces all references in text. Variable values are expanded recursively.
+// Secrets are refused (ErrSecretNotAllowed): they may only reach fields for secrets
+// (ExpandSecret), never texts that end up in logs or files (ADR 0022).
 func (s *Scope) Expand(text string) (string, error) {
-	return s.expand(text, nil)
+	return s.expand(text, nil, false)
 }
 
-func (s *Scope) expand(text string, chain []string) (string, error) {
+// ExpandSecret is Expand for a field that holds a secret, e.g. a password or token:
+// ${secret:…} written directly in the text is resolved. Variables that contain a secret
+// are still refused, so that a secret cannot travel through a variable into other texts.
+func (s *Scope) ExpandSecret(text string) (string, error) {
+	return s.expand(text, nil, true)
+}
+
+func (s *Scope) expand(text string, chain []string, secrets bool) (string, error) {
 	var b strings.Builder
 	var firstErr error
 	err := scan(text, func(r Ref) {
 		if firstErr != nil {
 			return
 		}
-		v, err := s.resolve(r, chain)
+		v, err := s.resolve(r, chain, secrets)
 		if err != nil {
 			firstErr = err
 			return
@@ -197,7 +224,7 @@ func (s *Scope) expand(text string, chain []string) (string, error) {
 	return b.String(), nil
 }
 
-func (s *Scope) resolve(r Ref, chain []string) (string, error) {
+func (s *Scope) resolve(r Ref, chain []string, secrets bool) (string, error) {
 	switch r.Kind {
 	case KindEnv:
 		lookup := s.LookupEnv
@@ -210,10 +237,15 @@ func (s *Scope) resolve(r Ref, chain []string) (string, error) {
 		}
 		return v, nil
 	case KindSecret:
-		if s.LookupSecret == nil {
+		switch {
+		case len(chain) > 0:
+			return "", fmt.Errorf("variable %q contains a secret; write %s directly into the field for the secret: %w", chain[len(chain)-1], r, ErrSecretNotAllowed)
+		case !secrets:
+			return "", fmt.Errorf("%s: %w", r, ErrSecretNotAllowed)
+		case s.LookupSecret == nil:
 			return "", fmt.Errorf("secret %q: secrets are not available", r.Name)
 		}
-		return s.LookupSecret(r.Name)
+		return s.LookupSecret(r.Store, r.Name)
 	}
 	if slices.Contains(chain, r.Name) {
 		return "", fmt.Errorf("variable cycle: %s → %s", strings.Join(chain, " → "), r.Name)
@@ -222,7 +254,7 @@ func (s *Scope) resolve(r Ref, chain []string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("variable %q is %w", r.Name, ErrUndefined)
 	}
-	return s.expand(v, append(chain, r.Name))
+	return s.expand(v, append(chain, r.Name), secrets)
 }
 
 // Names returns the names of all variables of all layers, sorted.

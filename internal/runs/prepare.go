@@ -101,6 +101,8 @@ func Prepare(spec Spec) (*Prepared, error) {
 	}
 	p.Workflow = w
 	diags = append(diags, CheckCalls(w, spec.ProjectDir, spec.file())...)
+	// ${secret:…} outside the fields for secrets stops the run before it starts (ADR 0022).
+	diags = append(diags, w.CheckSecrets(ActionSecretField(spec.Registry), nil)...)
 	if diags.HasErrors() {
 		diags.Sort()
 		return p, diags
@@ -126,10 +128,15 @@ func Prepare(spec Spec) (*Prepared, error) {
 	if p.Env != nil {
 		envName = p.Env.Name
 	}
+	scope, mask := secretScope(model.Scope(w, p.Project, p.Env, spec.Params))
+	if errs := resolveSecrets(w, scope, spec.Registry); len(errs) > 0 {
+		return p, errs
+	}
 	p.Runner, err = workflow.Prepare(w, workflow.Options{
 		Registry:    spec.Registry,
 		DefaultJoin: defaultJoin,
-		Scope:       model.Scope(w, p.Project, p.Env, spec.Params),
+		Scope:       scope,
+		Mask:        mask,
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
 		Environment: envName,
