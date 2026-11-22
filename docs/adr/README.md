@@ -22,6 +22,7 @@
 | [0018](0018-http-trigger.md) | HTTP-Trigger – Läufe per HTTP starten und aus dem Lauf antworten | Angenommen |
 | [0019](0019-plugin-protokoll.md) | Plugin-Protokoll – eigene Prozesse, JSON-RPC über stdin/stdout | Angenommen |
 | [0020](0020-relative-pfade.md) | Relative Pfade beziehen sich auf den Projektordner | Angenommen |
+| [0021](0021-unter-pipelines.md) | Unter-Pipelines in Pipelines – Mapping und Executor | Angenommen |
 
 ## Wann eine ADR?
 

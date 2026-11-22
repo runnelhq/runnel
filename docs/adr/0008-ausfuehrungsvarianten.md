@@ -72,7 +72,7 @@ Ausdrücke enthalten:
 
 ### 3. Ausführung pro Datensatz
 
-**a) Executor-Transforms in Pipelines**
+**a) Executor-Transforms in Pipelines** (präzisiert durch [ADR 0021](0021-unter-pipelines.md))
 
 | Transform | Funktion |
 |---|---|
@@ -147,6 +147,7 @@ Technisch: `POST /api/v1/runs` mit `startAt: "<action-id>"` bzw. `only: "<action
 ### Später
 
 - **Mappings** (wiederverwendbare Unter-Pipelines mit definiertem Ein-/Ausgang, im Editor als ein Transform dargestellt).
+  Festgelegt gemeinsam mit den Executor-Transforms in [ADR 0021](0021-unter-pipelines.md).
 - **Remote-Ausführung** über `RunConfig type: remote`.
 
 ## Zeitplan
