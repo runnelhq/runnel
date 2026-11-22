@@ -5,6 +5,7 @@
 # - "calculate" writes the address in lower case without spaces and adds the gross
 #   amount (net plus VAT) and a label; "label" uses "brutto", calculated just before.
 # - "unique" keeps the first contact of each e-mail address.
+# - "number" numbers the remaining contacts 1, 2, 3 … (roadmap S16d).
 # - "write" writes the contacts with the new fields.
 kind: Pipeline
 apiVersion: runnel/v1
@@ -39,11 +40,16 @@ transforms:
     type: core.dedupe
     with:
       fields: [email]
+  - id: number
+    type: core.sequence
+    with:
+      name: nr
   - id: write
     type: csv.output
     with:
       path: ${OUTPUT}
       fields:
+        - { name: nr }
         - { name: kdnr }
         - { name: label }
         - { name: netto, format: "0.00" }
@@ -51,9 +57,11 @@ transforms:
 links:
   - { from: read, to: calculate }
   - { from: calculate, to: unique }
-  - { from: unique, to: write }
+  - { from: unique, to: number }
+  - { from: number, to: write }
 layout:
   read: { x: 0, y: 0 }
   calculate: { x: 240, y: 0 }
   unique: { x: 480, y: 0 }
-  write: { x: 720, y: 0 }
+  number: { x: 720, y: 0 }
+  write: { x: 960, y: 0 }

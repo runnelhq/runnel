@@ -1131,8 +1131,8 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
-Umgesetzt (Stand S16c): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
-`core.constant`, `core.convert`, `core.calculate`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
+Umgesetzt (Stand S16d): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
+`core.constant`, `core.convert`, `core.calculate`, `core.sequence`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
 `core.from-result`, `core.to-result`, `csv.input`, `csv.output` und `http.response`:
 
 - **`core.sort`** sortiert stabil nach `fields: [{ name, descending, ignoreCase }]`; leere Werte zuletzt (auch absteigend),
@@ -1172,6 +1172,10 @@ Umgesetzt (Stand S16c): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   allein behält den Typ seines Ergebnisses (Rechnen mit `decimal` bleibt exakt), Text um `{{ … }}` ergibt Text. Ein
   vorhandenes Feld behält seine Position. Der Typ der Felder steht erst beim Lauf fest (im Schema unbekannt; bei Bedarf
   danach `core.convert`). Lässt sich ein Ausdruck nicht auswerten, geht der Datensatz unverändert auf den Fehler-Link.
+- **`core.sequence`** nummeriert die Datensätze in der Reihenfolge, in der sie ankommen: Feld `name` (`int`), ab `start`
+  (Standard 1) im Abstand `step` (Standard 1, auch negativ; beide dürfen `${…}` sein). Mit `groupBy` zählt jede
+  Kombination von Werten für sich ab `start`, ohne dass die Datensätze sortiert sein müssen (Positionen je Bestellung);
+  dafür bleibt je Gruppe ein Zähler im Speicher. Für eine Rangliste davor `core.sort`.
 - **`core.convert`** wandelt Felder in einen anderen Typ um: Text mit Format (`"1.234,56"` → `decimal`, `"20.11.2026"` →
   `date`), in Text mit Format (`decimal` → `"1.234,56"`), Zahlen ineinander und `date` ↔ `datetime`. Was nicht passt,
   geht unverändert auf den Fehler-Link oder bricht mit Datensatz und Feld ab (`1.5` ist kein `int`; es wird nicht

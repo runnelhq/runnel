@@ -27,6 +27,7 @@ transforms / transform
   core.convert        Convert Types  Converts fields to another type, with a number or date format
   core.filter         Filter         Passes on the records for which a condition is true
   core.select-fields  Select Fields  Keeps, orders and renames fields, or removes fields
+  core.sequence       Sequence       Numbers the records in the order they arrive, also per group
 transforms / flow
   core.dummy   Dummy   Passes all records on unchanged
   core.switch  Switch  Passes each record to the link of the first case whose condition is true
