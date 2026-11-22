@@ -197,7 +197,7 @@ Details: [ADR 0008](adr/0008-ausfuehrungsvarianten.md).
 |---|---|
 | Workflow oder einzelne Pipeline direkt ausführen | CLI, Editor, API, Trigger |
 | **Run-Konfiguration** (wie wird ausgeführt; S42, Backlog) | Metadaten-Objekt `RunConfig` (`local`, später `remote`): Puffergrößen, Parallelität, Sampling, Log-Level, Timeout. Auswahl per CLI, Editor, Trigger oder aufrufender Action |
-| Dynamisches Ziel | `pipeline: "pipelines/import-${MANDANT}.pipeline.yaml"`, optional eingeschränkt über `allowedTargets` |
+| Dynamisches Ziel | `pipeline: "pipelines/import-${MANDANT}.pipeline.yaml"`, immer im Projektordner, optional eingeschränkt über `allowedTargets` (seit S25b) |
 | Ausführung pro Datensatz (Pipeline) | `core.pipeline-executor`, `core.workflow-executor` – pro Datensatz, pro Gruppe fester Größe oder pro Feldwechsel |
 | Ausführung pro Datensatz (Workflow) | `forEach` an jeder Action (seit S24b), optional `parallel`, z. B. an `core.run-pipeline` / `core.run-workflow` |
 | Datensätze zwischen Pipelines weitergeben | `core.to-result` / `core.from-result` |
@@ -1112,6 +1112,10 @@ Workflow des Projekts auf und wartet auf sein Ende.
 - Meldungen des Kinds erscheinen im Log der Action als `import-region/check: …`.
 - Feste Aufrufe prüft schon `runnel validate` (Datei, Parameter, Typen, Selbstaufruf); Pfade mit `${…}`/`{{ … }}` erst
   beim Lauf. Für mehrere Aufrufe dient `forEach` (seit S24b); `runConfig:` folgt mit S42 (Backlog).
+- **Ziele absichern (seit S25b):** Aufgerufen werden nur Dateien im Projektordner, auch nicht über `..` oder absolute
+  Pfade. Steht das Ziel erst beim Lauf fest (z. B. aus einem Parameter eines HTTP-Triggers), schränkt
+  `allowedTargets: [workflows/import-*.workflow.yaml]` es weiter ein; ohne meldet `runnel validate` eine Warnung.
+  Gilt ebenso für `core.run-pipeline` ([ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag S25b).
 
 **Pipelines aus Workflows (umgesetzt mit S18):** `core.run-pipeline` ruft eine Pipeline des Projekts auf, mit denselben
 Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, Log mit Präfix
@@ -1351,7 +1355,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S25, S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S25 (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

@@ -3,6 +3,8 @@
 #   runnel run -v --param SOUTH_ORDERS=500 examples/sub-workflows/workflows/nightly.workflow.yaml
 # - "north" and "south" call import-region.workflow.yaml, each with its own parameters;
 #   the path is relative to the project folder.
+# - "south" takes the workflow from the parameter IMPORT; allowedTargets lets it call only
+#   workflows/import-*.workflow.yaml, e.g. not nightly itself when IMPORT comes from outside.
 # - "report" and the output TOTAL use the outputs of the called workflows.
 # - With more than 100 orders the called workflow aborts, "south" fails and the
 #   failure link reports it.
@@ -13,6 +15,9 @@ parameters:
   - name: SOUTH_ORDERS
     type: integer
     default: "25"
+  - name: IMPORT
+    description: Workflow that imports the south; one of workflows/import-*.workflow.yaml
+    default: workflows/import-region.workflow.yaml
 outputs:
   - name: TOTAL
     type: integer
@@ -30,7 +35,8 @@ actions:
   - id: south
     type: core.run-workflow
     with:
-      workflow: workflows/import-region.workflow.yaml
+      workflow: ${IMPORT}
+      allowedTargets: [workflows/import-*.workflow.yaml]
       params:
         REGION: south
         ORDERS: ${SOUTH_ORDERS}

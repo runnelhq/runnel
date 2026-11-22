@@ -30,6 +30,8 @@ var runPipelineDefinition = action.Definition{
 type runPipeline struct {
 	Pipeline string         `json:"pipeline" doc:"Pipeline file, relative to the project folder" schema:"required,example=pipelines/import.pipeline.yaml"`
 	Params   map[string]any `json:"params" doc:"Values for the parameters of the pipeline, by name"`
+	// AllowedTargets restricts a pipeline given by ${…} or {{ … }} (ADR 0008, Nachtrag S25b).
+	AllowedTargets []string `json:"allowedTargets" doc:"Pipeline files this action may call, with wildcards and relative to the project folder, e.g. pipelines/import-*.pipeline.yaml; for a pipeline given by a variable or expression"`
 	// Rows is a list, usually from an expression; checked when the action runs.
 	Rows any `json:"rows" doc:"Records for core.from-result in the pipeline: a list, e.g. {{ results.files.output }}; items that are not objects become a record with the field value"`
 }
@@ -37,6 +39,9 @@ type runPipeline struct {
 func newRunPipeline(with map[string]any) (action.Action, error) {
 	a := &runPipeline{}
 	if err := action.DecodeConfig(with, a); err != nil {
+		return nil, err
+	}
+	if err := checkTargets(a.AllowedTargets); err != nil {
 		return nil, err
 	}
 	return a, nil
@@ -48,6 +53,9 @@ func (a *runPipeline) Execute(ctx context.Context, ec *action.ExecContext) (acti
 	}
 	if a.Pipeline == "" {
 		return action.Result{}, errors.New("no pipeline given")
+	}
+	if err := allowed(a.Pipeline, a.AllowedTargets, "pipeline"); err != nil {
+		return action.Result{}, err
 	}
 	if ec.RunPipeline == nil {
 		return action.Result{}, errors.New("running pipelines is not available here")

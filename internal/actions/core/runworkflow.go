@@ -27,11 +27,16 @@ var runWorkflowDefinition = action.Definition{
 type runWorkflow struct {
 	Workflow string         `json:"workflow" doc:"Workflow file, relative to the project folder" schema:"required,example=workflows/import.workflow.yaml"`
 	Params   map[string]any `json:"params" doc:"Values for the parameters of the workflow, by name"`
+	// AllowedTargets restricts a workflow given by ${…} or {{ … }} (ADR 0008, Nachtrag S25b).
+	AllowedTargets []string `json:"allowedTargets" doc:"Workflow files this action may call, with wildcards and relative to the project folder, e.g. workflows/import-*.workflow.yaml; for a workflow given by a variable or expression"`
 }
 
 func newRunWorkflow(with map[string]any) (action.Action, error) {
 	a := &runWorkflow{}
 	if err := action.DecodeConfig(with, a); err != nil {
+		return nil, err
+	}
+	if err := checkTargets(a.AllowedTargets); err != nil {
 		return nil, err
 	}
 	return a, nil
@@ -43,6 +48,9 @@ func (a *runWorkflow) Execute(ctx context.Context, ec *action.ExecContext) (acti
 	}
 	if a.Workflow == "" {
 		return action.Result{}, errors.New("no workflow given")
+	}
+	if err := allowed(a.Workflow, a.AllowedTargets, "workflow"); err != nil {
+		return action.Result{}, err
 	}
 	if ec.RunWorkflow == nil {
 		return action.Result{}, errors.New("running other workflows is not available here")

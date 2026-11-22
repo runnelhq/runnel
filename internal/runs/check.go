@@ -19,11 +19,16 @@ const ActionTypeRunWorkflow = "core.run-workflow"
 // CheckCalls checks the calls of other workflows (core.run-workflow) whose path is
 // fixed (ADR 0008): the file exists and can be read, the parameters are declared,
 // required ones are given and fixed values fit, and no workflow calls itself, also
-// not through others. Paths with ${…} or {{ … }} are checked when the action runs.
+// not through others, and the file lies in the project folder. Paths with ${…} or
+// {{ … }} are checked when the action runs; without allowedTargets they get a warning,
+// since their target is only known then (ADR 0008, Nachtrag S25b).
 // projectDir and file are as in Spec (file: the workflow file on disk).
 func CheckCalls(w *model.Workflow, projectDir, file string) model.Errors {
 	var errs model.Errors
 	for i, a := range w.Actions {
+		if a.Type == ActionTypeRunPipeline || a.Type == ActionTypeRunWorkflow {
+			errs = append(errs, checkDynamicTarget(w, i, a)...)
+		}
 		if a.Type == ActionTypeRunPipeline {
 			errs = append(errs, checkPipelineCall(w, i, a, projectDir, file)...)
 			continue
@@ -34,6 +39,10 @@ func CheckCalls(w *model.Workflow, projectDir, file string) model.Errors {
 		}
 		at := fmt.Sprintf("$.actions[%d].with", i)
 		childFile, name := Resolve(projectDir, file, path)
+		if err := InProject(projectDir, childFile, "workflow", name); err != nil {
+			errs = append(errs, w.ErrorAt(at+".workflow", "action %q: %v", a.ID, err))
+			continue
+		}
 		child, err := readWorkflow(childFile, name)
 		if err != nil {
 			errs = append(errs, w.ErrorAt(at+".workflow", "action %q: %v", a.ID, err))
@@ -47,6 +56,21 @@ func CheckCalls(w *model.Workflow, projectDir, file string) model.Errors {
 		}
 	}
 	return errs
+}
+
+// checkDynamicTarget warns about a call whose target is only known when the action runs
+// and that has no allowedTargets: a value from outside (parameters of a trigger, data)
+// could then call any workflow or pipeline of the project.
+func checkDynamicTarget(w *model.Workflow, i int, a model.Action) model.Errors {
+	key, what, example := "pipeline", "pipeline", "pipelines/import-*.pipeline.yaml"
+	if a.Type == ActionTypeRunWorkflow {
+		key, what, example = "workflow", "workflow", "workflows/import-*.workflow.yaml"
+	}
+	if _, static := StaticText(a.With[key]); static || a.With[key] == nil || a.With["allowedTargets"] != nil {
+		return nil
+	}
+	return model.Errors{w.WarningAt(fmt.Sprintf("$.actions[%d].with.%s", i, key),
+		"action %q: the %s is only known when the action runs; restrict it with allowedTargets, e.g. [%s]", a.ID, what, example)}
 }
 
 // StaticText returns a value as text if it is fixed, i.e. contains no ${…} or {{ … }}.
@@ -89,6 +113,9 @@ func checkPipelineCall(w *model.Workflow, i int, a model.Action, projectDir, fil
 	}
 	at := fmt.Sprintf("$.actions[%d].with", i)
 	childFile, name := Resolve(projectDir, file, path)
+	if err := InProject(projectDir, childFile, "pipeline", name); err != nil {
+		return model.Errors{w.ErrorAt(at+".pipeline", "action %q: %v", a.ID, err)}
+	}
 	data, err := os.ReadFile(childFile)
 	if errors.Is(err, fs.ErrNotExist) {
 		return model.Errors{w.ErrorAt(at+".pipeline", "action %q: pipeline file %s not found", a.ID, name)}
