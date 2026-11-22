@@ -29,6 +29,7 @@ var responseDefinition = transform.Definition{
 	Category:    transform.CategoryOutput,
 	Label:       "HTTP Response",
 	Description: "Answers the caller of an HTTP trigger with the records as JSON and passes them on",
+	Example:     "status: 200\nsingle: true\n",
 	Config:      response{},
 	New:         newResponse,
 }

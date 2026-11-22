@@ -150,6 +150,7 @@ der Form, in der `/catalog` (E2) sie ausliefert.
   bietet die bekannten Felder an), `runnel-target` die Id eines Transforms, zu dem ein Daten-Link führt (`to` und
   `default` von `core.switch`). An einer Liste von Texten (`[]string`, z. B. `groupBy`) gilt das Format für jeden Text
   (`items.format`).
-- **`example` im Descriptor der Transforms:** die `with:`-Werte eines kleinen Beispiels in YAML (`Definition.Example`),
-  angezeigt im Abschnitt „Help“ des Panels. Pflicht für Transforms mit einer Liste in der Konfiguration; der Vertragstest
-  liest es wie eine Pipeline-Datei und prüft, dass `New` es annimmt.
+- **`example` im Descriptor** von Actions und Transforms: die `with:`-Werte eines kleinen Beispiels in YAML
+  (`Definition.Example`), angezeigt im Abschnitt „Help“ des Panels. Pflicht für jeden Baustein mit Konfiguration (seit
+  dem Fix nach E14b; vorher nur für Transforms mit Listen); die Vertragstests lesen es wie eine Workflow- bzw.
+  Pipeline-Datei und prüfen, dass `New` es annimmt. Bausteine ohne Konfiguration zeigen in „Help“ nur `id` und `type`.

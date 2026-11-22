@@ -28,9 +28,9 @@ internal/transforms/<namensraum>/
   stehen.
 - **Für den Editor (E14):** Namen vorhandener Felder der eingehenden Datensätze mit `schema:"format=runnel-field"` (auch an
   Listen von Texten wie `groupBy`), Ziele von Daten-Links mit `format=runnel-target`, Eigenschaften, die nur für einige
-  Werte einer anderen gelten, mit `only=<feld>:<a>|<b>`. Namen neuer Felder bleiben ohne Format. Ein Transform mit einer
-  Liste in der Konfiguration bekommt ein **`Example`** (die `with:`-Werte in YAML) für die Hilfe im Panel; der
-  Vertragstest prüft, dass `New` es annimmt.
+  Werte einer anderen gelten, mit `only=<feld>:<a>|<b>`. Namen neuer Felder bleiben ohne Format. Jeder Transform mit
+  Konfiguration bekommt ein **`Example`** (die `with:`-Werte in YAML) für die Hilfe im Panel; der Vertragstest prüft,
+  dass `New` es annimmt.
 
 ## 2. Verarbeiten (`Process`)
 
@@ -109,7 +109,7 @@ func TestUpper(t *testing.T) {
 ## 5. Checkliste für den PR
 
 - [ ] Eine Datei je Transform, Eintrag in `register.go`, Kategorie, Label, Beschreibung, `doc` für jedes Feld
-- [ ] Feldnamen mit `format=runnel-field`, Link-Ziele mit `format=runnel-target`; bei Listen ein `Example`
+- [ ] Feldnamen mit `format=runnel-field`, Link-Ziele mit `format=runnel-target`; ein `Example`
 - [ ] Werte mit Variablen werden in `Process` geprüft; `Emit`-Fehler werden zurückgegeben
 - [ ] `Init` meldet das Ausgabeschema und alle gelesenen Felder (`ic.Use`), mit Tests
 - [ ] Tests mit `transformtest`, Vertragstest grün, Katalog-Goldens geprüft

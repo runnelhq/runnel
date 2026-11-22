@@ -49,6 +49,7 @@ func TestContract(t *testing.T) {
 			if _, err := def.New(sample(desc.Schema)); err != nil {
 				t.Errorf("configuration built from the schema was rejected (Config and New must use the same struct): %v", err)
 			}
+			checkExample(t, def, desc.Schema)
 		})
 	}
 }
@@ -144,5 +145,26 @@ func TestContractCancellation(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Errorf("%s: still running 2s after the run was cancelled", typ)
 		}
+	}
+}
+
+// checkExample: every action with a configuration has an example for the help of the
+// editor, read as in a workflow file, and New accepts it.
+func checkExample(t *testing.T, def action.Definition, s *schema.Schema) {
+	t.Helper()
+	if def.Example == "" {
+		if len(s.Properties) > 0 {
+			t.Error("missing Example for the help of the editor")
+		}
+		return
+	}
+	indented := "      " + strings.ReplaceAll(strings.TrimSuffix(def.Example, "\n"), "\n", "\n      ")
+	src := "kind: Workflow\napiVersion: runnel/v1\nname: example\nactions:\n  - id: a\n    type: " + def.Type + "\n    with:\n" + indented + "\n"
+	w, err := model.ParseWorkflow("example.workflow.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("example is not valid YAML for with: %v", err)
+	}
+	if _, err := def.New(w.Actions[0].With); err != nil {
+		t.Errorf("example was rejected: %v", err)
 	}
 }

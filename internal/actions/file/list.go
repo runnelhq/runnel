@@ -20,6 +20,7 @@ var listDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "List Files",
 	Description: "Lists the files of a folder; output: path, name, size, modified and folder of each entry",
+	Example:     "folder: inbox\npattern: \"*.csv\"\n",
 	Config:      listAction{},
 	New:         newList,
 }

@@ -18,6 +18,7 @@ var mkdirDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "Create Folder",
 	Description: "Creates a folder with its parent folders; output: the path",
+	Example:     "path: \"archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n",
 	Config:      mkdir{},
 	New:         newMkdir,
 }

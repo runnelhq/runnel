@@ -19,6 +19,7 @@ var runWorkflowDefinition = action.Definition{
 	Category:    action.CategoryExecution,
 	Label:       "Run Workflow",
 	Description: "Runs another workflow with parameters; output: its outputs",
+	Example:     "workflow: workflows/import-region.workflow.yaml\nparams:\n  REGION: north\n",
 	Config:      runWorkflow{},
 	New:         newRunWorkflow,
 }

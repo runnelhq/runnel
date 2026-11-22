@@ -137,14 +137,13 @@ func TestContractCancellation(t *testing.T) {
 	}
 }
 
-// checkExample: a transform with a list in its configuration has an example for the help
-// of the editor (E14b), and New accepts it.
+// checkExample: every transform with a configuration has an example for the help of the
+// editor (E14b), and New accepts it.
 func checkExample(t *testing.T, def transform.Definition, s *schema.Schema) {
 	t.Helper()
-	hasList := slices.ContainsFunc(s.Properties, func(p schema.Property) bool { return p.Schema.Type == "array" })
 	if def.Example == "" {
-		if hasList {
-			t.Error("a configuration with a list needs an Example for the help of the editor")
+		if len(s.Properties) > 0 {
+			t.Error("missing Example for the help of the editor")
 		}
 		return
 	}

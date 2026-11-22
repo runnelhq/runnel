@@ -17,6 +17,7 @@ var existsDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "File Exists",
 	Description: "Checks whether files or folders exist; output: the matching paths",
+	Example:     "path: inbox/orders-*.csv\nkind: file\n",
 	Config:      exists{},
 	New:         newExists,
 }

@@ -312,7 +312,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           )}
         </Section>
       )}
-      {d?.example && <HelpSection id={action.id} type={action.type} example={d.example} onShowInYAML={props.onShowInYAML} />}
+      {d && <HelpSection id={action.id} type={action.type} example={d.example} onShowInYAML={props.onShowInYAML} />}
       {detect && (
         <FieldsSection value={action.with?.fields} problems={at("with.fields", "fields")} onDetect={props.onDetectFields && (() => props.onDetectFields!(action.id))} />
       )}
@@ -330,12 +330,14 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
 }
 
 /**
- * Help of a transform (mockup E14, state "help"): a short example of its configuration
- * from the descriptor, to look at, copy or compare with the YAML view.
+ * Help of an action or transform (mockup E14, state "help"): a short example of its
+ * configuration from the descriptor, to look at, copy or compare with the YAML view.
  */
-function HelpSection(props: { id: string; type: string; example: string; onShowInYAML?: (id: string) => void }) {
+function HelpSection(props: { id: string; type: string; example?: string; onShowInYAML?: (id: string) => void }) {
   const [copied, setCopied] = useState(false);
-  const snippet = `- id: ${props.id}\n  type: ${props.type}\n  with:\n` + props.example.replace(/\n$/, "").replace(/^/gm, "    ") + "\n";
+  const snippet =
+    `- id: ${props.id}\n  type: ${props.type}\n` +
+    (props.example ? "  with:\n" + props.example.replace(/\n$/, "").replace(/^/gm, "    ") + "\n" : "");
   const button = "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted";
   return (
     <Section title="Help" summary="example" defaultOpen={false}>

@@ -15,6 +15,7 @@ var logDefinition = action.Definition{
 	Category:    action.CategoryGeneral,
 	Label:       "Log",
 	Description: "Writes a message to the run log",
+	Example:     "message: \"Imported {{ results.import.output.write.written }} records\"\nlevel: info\n",
 	Config:      logAction{},
 	New:         newLog,
 }

@@ -17,6 +17,7 @@ var filterDefinition = transform.Definition{
 	Category:     transform.CategoryTransform,
 	Label:        "Filter",
 	Description:  "Passes on the records for which a condition is true",
+	Example:      "condition: \"{{ record.umsatz > 0 && record.ort != '' }}\"\n",
 	Config:       filter{},
 	New:          newFilter,
 }

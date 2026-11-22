@@ -17,6 +17,7 @@ var deleteDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "Delete Files",
 	Description: "Deletes files or folders; output: the deleted paths",
+	Example:     "path: out/*.tmp\n",
 	Config:      deleteAction{},
 	New:         newDelete,
 }

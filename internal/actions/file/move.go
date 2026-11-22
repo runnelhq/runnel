@@ -20,6 +20,7 @@ var moveDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "Move Files",
 	Description: "Moves files or folders; output: the new paths",
+	Example:     "source: inbox/orders.csv\ntarget: done/\n",
 	Config:      transfer{},
 	New:         newMove,
 }
