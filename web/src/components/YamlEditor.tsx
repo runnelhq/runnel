@@ -23,6 +23,9 @@ import { highlightLine, type Token, type TokenKind } from "../yaml";
 import { highlightMarkdownLine } from "../markdown";
 import type { Problem } from "../workflow";
 import { applyDelay } from "./PropertiesPanel";
+import { yamlAssist, type AssistContext } from "../yamlAssist";
+
+const noAssist: AssistContext = { schema: null, catalog: new Map(), environments: [] };
 
 /** Classes of the tokens (index.css, section "YAML editor"); colours as in the read-only view (mockup E4). */
 const tokenClass: Partial<Record<TokenKind, string>> = {
@@ -198,6 +201,8 @@ export function YamlEditor(props: {
   problems: Problem[];
   /** A line to show and put the cursor on; seq changes with every request. */
   focus?: { line: number; seq: number; from?: number; to?: number } | null;
+  /** Suggestions and hover from the schemas (E19); none for Markdown. */
+  assist?: AssistContext;
   onChange: (text: string) => void;
   /** Whether typed text waits for the typing pause (for "Checking…"). */
   onPending: (pending: boolean) => void;
@@ -246,6 +251,7 @@ export function YamlEditor(props: {
           highlighter(props.markdown ? highlightMarkdownLine : highlightLine),
           cursorTooltip,
           hoverProblems,
+          props.markdown ? [] : yamlAssist(() => latest.current.assist ?? noAssist),
           search({ top: true }),
           indentTwo,
           keymap.of([

@@ -35,7 +35,9 @@ import { PropertiesPanel, type FieldValue, type LinkChange } from "./PropertiesP
 import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
 import type { ReferenceAction, ReferenceTarget } from "./ReferencePanel";
-import { insertField } from "../reference";
+import { insertField, useSchema } from "../reference";
+import { useCatalog } from "../catalog";
+import type { AssistContext } from "../yamlAssist";
 import {
   ChevronIcon,
   CodeIcon,
@@ -681,6 +683,20 @@ export function FileView(props: {
   // The reference (E18b): which file it helps with, and its requests to this file.
   const { onReference } = props;
   const refKind = fileKind === "project" || fileKind === "environment" || fileKind === "trigger" ? fileKind : null;
+  // Suggestions and hover in the YAML editor (E19): the schema of the file kind or the catalog.
+  const refSchema = useSchema(refKind);
+  const catalog = useCatalog(graphKind ?? "workflow");
+  const environments = props.project?.environments;
+  const assist = useMemo<AssistContext>(
+    () => ({
+      schema: refKind ? refSchema : null,
+      catalog: graphKind ? catalog : new Map(),
+      steps: graphKind ? (graphKind === "pipeline" ? "transforms" : "actions") : undefined,
+      environments: environments ?? [],
+      trigger: refKind === "trigger",
+    }),
+    [refKind, refSchema, graphKind, catalog, environments],
+  );
   useEffect(() => {
     if (active) onReference?.(refKind && doc ? { path, kind: refKind, text: doc.text } : null);
   }, [active, refKind, doc, path, onReference]);
@@ -933,6 +949,7 @@ export function FileView(props: {
             markdown={isDoc}
             problems={validation?.problems ?? []}
             focus={yamlFocus}
+            assist={isDoc ? undefined : assist}
             onChange={(next) => setText(next, "push")}
             onPending={setTyping}
             onUndo={doUndo}
