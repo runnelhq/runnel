@@ -57,7 +57,7 @@ func newProject(t *testing.T) (string, *Server) {
 	return dir, s
 }
 
-func writeFile(t *testing.T, path, content string) {
+func writeFile(t testing.TB, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -68,7 +68,7 @@ func writeFile(t *testing.T, path, content string) {
 }
 
 // do sends a request as a local client would.
-func do(t *testing.T, s *Server, method, target, body string, header ...string) *httptest.ResponseRecorder {
+func do(t testing.TB, s *Server, method, target, body string, header ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
 	req.Host = "127.0.0.1:7300"

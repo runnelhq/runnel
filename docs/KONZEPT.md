@@ -1001,6 +1001,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | POST | `/workflows/edit` · `/pipelines/edit` | Änderung vom Canvas zeilengenau auf den YAML-Text anwenden (verschieben, löschen, anlegen, umbenennen, Links), Kommentare bleiben erhalten (seit E6a/E6b, Pipelines seit S25a) |
 | GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
 | GET | `/schemas/{kind}` | JSON Schema einer Dateiart: `project`, `environment`, `trigger` (seit S58) |
+| GET | `/variables` | Genutzte und definierte Variablen mit Fundstellen und Werten je Ebene (seit E18a) |
 | GET | `/expressions` · `/version` | Wurzeln, Funktionen und Variablen für den Ausdruckseditor · Version des Servers |
 | POST | `/runs` | Run starten `{ path, environment, params }`; später `runConfig`, `startAt`, `only`, `reuseResultsFrom` |
 | GET | `/runs?status=&path=` | Historie (seit E3 im Speicher, Filter folgen mit S26 – zurückgestellt) |
