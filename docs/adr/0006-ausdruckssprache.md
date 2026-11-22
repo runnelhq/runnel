@@ -56,7 +56,7 @@ Zusätzlich zu den eingebauten Operatoren und Funktionen von `expr` (`upper`, `l
 | Bereich | Funktionen |
 |---|---|
 | Datum/Zeit | `now()`, `today()`, `addDays(d, n)`, `addHours(d, n)`, `addMonths(d, n)`, `formatDate(d, "yyyy-MM-dd")`, `parseDate(s, "dd.MM.yyyy")`, `dayOfWeek(d)`, `diffDays(a, b)` |
-| Text | `padLeft(s, n, "0")`, `padRight`, `substr(s, start, len)`, `left`, `right`, `normalize` (Umlaute/Leerzeichen) |
+| Text | `padLeft(s, n, "0")`, `padRight`, `substr(s, start, len)`, `left`, `right`, `normalize` (Umlaute/Leerzeichen), `concat(trenner, a, b, …)` (seit S16e) |
 | Zahlen | `round(x, stellen)`, `decimal(s)`, `formatNumber(x, "#.##0,00")`, `parseNumber(s, "de-DE")` |
 | Null/Leer | `coalesce(a, b, …)`, `isEmpty(x)` |
 | Sonstiges | `uuid()`, `sha256(s)`, `md5(s)`, `basename(p)`, `dirname(p)`, `ext(p)` |
@@ -160,6 +160,10 @@ when:      "{{ result.rows > 0 }}"
 - **Prüfung:** Die Bedingung wird beim Laden übersetzt; die verwendeten Felder (`record.betrag`) prüft die Engine gegen
   das Schema (ADR 0007): fehlt ein Feld im geschlossenen Schema, ist das ein Fehler mit Vorschlag.
 - `decimal()`, `round()`, `formatNumber()` und `parseNumber()` folgen mit `core.calculate` bzw. bei Bedarf.
+- **Nachtrag 2026-11-22 (S16e):** `concat(trenner, a, b, …)` verbindet Werte als Text und lässt leere weg (nichts, leerer
+  Text, nur Leerzeichen – wie `isEmpty`), damit kein Trenner allein steht: `concat(', ', '', 'Köln')` ist `Köln`.
+  Listen zählen mit ihren Einträgen; Zahlen und Daten werden wie bei `Format` geschrieben. Statt eines eigenen
+  Transforms „Concat“, weil `core.calculate` mit dieser Funktion dasselbe kann.
 
 ## Konsequenzen
 

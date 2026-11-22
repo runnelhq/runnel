@@ -160,6 +160,13 @@ func TestTextAndNullFunctions(t *testing.T) {
 		{"{{ right('Grüße', 2) }}", "ße"},
 		{"{{ right('ab', 5) }}", "ab"},
 		{"{{ normalize(params.NAME) }}", "Juergen Gross"},
+		{"{{ concat(', ', 'Hauptstr. 1', 'Köln') }}", "Hauptstr. 1, Köln"},
+		{"{{ concat(', ', params.MISSING, params.EMPTY, 'Köln') }}", "Köln"},
+		{"{{ concat(' ', 'Dr.', '', 'Anna', params.MISSING, 'Weber') }}", "Dr. Anna Weber"},
+		{"{{ concat('-', 50667, 1.5, true) }}", "50667-1.5-true"},
+		{"{{ concat('/', ['a', '', 'b'], 'c') }}", "a/b/c"},
+		{"{{ concat(', ') }}", ""},
+		{"{{ concat(', ', params.MISSING) }}", ""},
 		{"{{ coalesce(params.MISSING, params.EMPTY, 'x', 'y') }}", "x"},
 		{"{{ coalesce(params.MISSING) }}", nil},
 		{"{{ isEmpty(params.EMPTY) }}", true},
@@ -222,5 +229,19 @@ func TestEvaluator(t *testing.T) {
 	}
 	if got, err := e.EvalBool(map[string]any{"record": map[string]any{"n": int64(5)}}); err != nil || !got {
 		t.Errorf("after an error: %v %v", got, err)
+	}
+}
+
+// TestConcatErrors: the separator comes first and is a text.
+func TestConcatErrors(t *testing.T) {
+	env := map[string]any{"params": map[string]any{"N": int64(5)}}
+	for _, src := range []string{"{{ concat(params.N, 'a') }}", "{{ concat() }}"} {
+		tpl, err := Compile(src, WorkflowRoots)
+		if err == nil {
+			_, err = tpl.Eval(env)
+		}
+		if err == nil || !strings.Contains(err.Error(), "concat") {
+			t.Errorf("%s: %v, want an error about concat", src, err)
+		}
 	}
 }

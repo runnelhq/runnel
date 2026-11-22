@@ -88,6 +88,8 @@ var functions = []exprlang.Option{
 	exprlang.Function("normalize", func(p ...any) (any, error) { return normalize(toString(p[0])), nil },
 		new(func(string) string)),
 
+	exprlang.Function("concat", concat, new(func(string, ...any) string)),
+
 	exprlang.Function("coalesce", func(p ...any) (any, error) {
 		for _, v := range p {
 			if !isEmpty(v) {
@@ -102,6 +104,36 @@ var functions = []exprlang.Option{
 		}
 		return isEmpty(p[0]), nil
 	}),
+}
+
+// concat joins the values after the separator as text and leaves out empty ones (nothing,
+// empty text or only spaces), so that no separator stands alone: concat(', ', ”, 'Köln')
+// is "Köln". Lists count with their entries; numbers and dates are written as by Format.
+func concat(p ...any) (any, error) {
+	if len(p) == 0 {
+		return nil, fmt.Errorf("concat expects a separator and values, e.g. concat(', ', a, b)")
+	}
+	sep, ok := p[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("concat: the first argument is the separator (a text), got %s", Format(p[0]))
+	}
+	var parts []string
+	var add func(v any)
+	add = func(v any) {
+		if l, ok := v.([]any); ok {
+			for _, e := range l {
+				add(e)
+			}
+			return
+		}
+		if !isEmpty(v) {
+			parts = append(parts, Format(v))
+		}
+	}
+	for _, v := range p[1:] {
+		add(v)
+	}
+	return strings.Join(parts, sep), nil
 }
 
 // dateFunc declares f(date, number) for a date given as date or text.

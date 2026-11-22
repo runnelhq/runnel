@@ -81,6 +81,9 @@ var Functions = []Doc{
 	{Group: "Text", Name: "substr", Signature: "substr(text, start, length)", Type: "string", Description: "Part of a text, counting from 0; length is optional", Example: "{{ substr('Runnel', 1, 3) }}"},
 	{Group: "Text", Name: "left", Signature: "left(text, n)", Type: "string", Description: "The first n characters", Example: "{{ left('Runnel', 3) }}"},
 	{Group: "Text", Name: "right", Signature: "right(text, n)", Type: "string", Description: "The last n characters", Example: "{{ right('Runnel', 3) }}"},
+	{Group: "Text", Name: "concat", Signature: "concat(separator, a, b, …)", Type: "string",
+		Description: "Joins values with a separator and leaves out empty ones, so no separator stands alone; lists count with their entries",
+		Example:     "{{ concat(', ', record.street, record.city) }}"},
 	{Group: "Text", Name: "normalize", Signature: "normalize(text)", Type: "string", Description: "Replaces umlauts and ß, joins spaces – e.g. for file names", Example: "{{ normalize('Jürgen Groß') }}"},
 
 	{Group: "Numbers and lists", Name: "len", Signature: "len(value)", Type: "integer", Description: "Number of characters, entries of a list or keys of a map", Example: "{{ len(['a', 'b']) }}"},
