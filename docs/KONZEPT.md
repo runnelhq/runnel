@@ -1131,8 +1131,8 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
-Umgesetzt (Stand S16d): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
-`core.constant`, `core.convert`, `core.calculate`, `core.sequence`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
+Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
+`core.constant`, `core.convert`, `core.calculate`, `core.sequence`, `core.map-values`, `core.split-field`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
 `core.from-result`, `core.to-result`, `csv.input`, `csv.output` und `http.response`:
 
 - **`core.sort`** sortiert stabil nach `fields: [{ name, descending, ignoreCase }]`; leere Werte zuletzt (auch absteigend),
@@ -1176,6 +1176,14 @@ Umgesetzt (Stand S16d): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   (Standard 1) im Abstand `step` (Standard 1, auch negativ; beide dürfen `${…}` sein). Mit `groupBy` zählt jede
   Kombination von Werten für sich ab `start`, ohne dass die Datensätze sortiert sein müssen (Positionen je Bestellung);
   dafür bleibt je Gruppe ein Zähler im Speicher. Für eine Rangliste davor `core.sort`.
+- **`core.map-values`** ersetzt die Werte eines Feldes über eine Tabelle `values: [{ from, to }]` (z. B. Codes durch
+  Namen), wahlweise in ein anderes Feld (`target`). Verglichen wird als Text (`1` = `"1"`), mit `ignoreCase` ohne Groß-
+  und Kleinschreibung; ein leeres `from` trifft leere Werte, ein fehlendes `to` leert. Werte, die nicht in der Tabelle
+  stehen, bekommen `default` oder bleiben, wie sie sind.
+- **`core.split-field`** teilt den Text eines Feldes an `separator`: mit `into: [a, b]` in Felder desselben Datensatzes
+  (mehr Teile als Felder bleiben im letzten zusammen, fehlende sind leer), mit `rows: true` in einen Datensatz je Teil
+  (wahlweise mit `indexField` für die Position; leere Teile nur mit `keepEmpty`; ein Datensatz ohne Wert geht einmal
+  weiter). `trim` entfernt Leerzeichen um die Teile. Beides zugleich ist ein Fehler; nacheinander mit zwei Transforms.
 - **`core.convert`** wandelt Felder in einen anderen Typ um: Text mit Format (`"1.234,56"` → `decimal`, `"20.11.2026"` →
   `date`), in Text mit Format (`decimal` → `"1.234,56"`), Zahlen ineinander und `date` ↔ `datetime`. Was nicht passt,
   geht unverändert auf den Fehler-Link oder bricht mit Datensatz und Feld ab (`1.5` ist kein `int`; es wird nicht

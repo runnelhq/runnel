@@ -1,0 +1,69 @@
+# Maps codes to names and splits fields (roadmap S16f). Relative paths refer to the project folder; for example:
+#   runnel run examples/pipelines/pipelines/people.pipeline.yaml
+# - "read" reads people with a status code and tags separated by "|".
+# - "status" writes the name of the status code; codes not in the table become "Unknown".
+# - "name" splits "Weber, Anna" into last and first name.
+# - "tags" passes one record per tag, with its position; a person without tags is passed on once.
+# - "write" writes one line per person and tag.
+kind: Pipeline
+apiVersion: runnel/v1
+name: people
+parameters:
+  - name: OUTPUT
+    description: CSV file to write
+    default: out/people.csv
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: crm/people.csv
+      delimiter: ";"
+      fields:
+        - { name: kdnr, type: int }
+        - { name: name }
+        - { name: status }
+        - { name: tags }
+  - id: status
+    type: core.map-values
+    with:
+      field: status
+      target: statusText
+      values:
+        - { from: A, to: Active }
+        - { from: I, to: Inactive }
+      default: Unknown
+  - id: name
+    type: core.split-field
+    with:
+      field: name
+      separator: ", "
+      into: [lastName, firstName]
+  - id: tags
+    type: core.split-field
+    with:
+      field: tags
+      separator: "|"
+      rows: true
+      indexField: tagNo
+  - id: write
+    type: csv.output
+    with:
+      path: ${OUTPUT}
+      fields:
+        - { name: kdnr }
+        - { name: lastName }
+        - { name: firstName }
+        - { name: statusText }
+        - { name: tagNo }
+        - { name: tags }
+links:
+  - { from: read, to: status }
+  - { from: status, to: name }
+  - { from: name, to: tags }
+  - { from: tags, to: write }
+layout:
+  read: { x: 0, y: 0 }
+  status: { x: 240, y: 0 }
+  name: { x: 480, y: 0 }
+  tags: { x: 720, y: 0 }
+  write: { x: 960, y: 0 }
