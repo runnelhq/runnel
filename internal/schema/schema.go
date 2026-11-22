@@ -40,6 +40,14 @@ const FormatDuration = "runnel-duration"
 // field instead of a single line, decision for mockup E7).
 const FormatText = "runnel-text"
 
+// FormatField marks the name of a field of the incoming records (E14b): the editor offers
+// the fields known on the incoming link. Names of new fields are not marked.
+const FormatField = "runnel-field"
+
+// FormatTarget marks the id of a transform that a data link of this transform leads to,
+// e.g. "to" of core.switch (E14b): the editor offers the targets of the links.
+const FormatTarget = "runnel-target"
+
 // OnlyKey is the schema keyword of the option only=: the field applies only when a
 // sibling field has one of the given values. The editor hides it otherwise (mockup E14).
 const OnlyKey = "x-runnel-only"
@@ -243,10 +251,15 @@ func applyOptions(s *Schema, o options, path string) error {
 		}
 	}
 	if o.format != "" {
-		if s.Type != "string" {
-			return fmt.Errorf("%s: format is only allowed for strings", describe(path))
+		switch {
+		case s.Type == "string":
+			s.Format = o.format
+		case s.Type == "array" && s.Items != nil && s.Items.Type == "string":
+			// A list of texts: the format describes each text, e.g. field names (E14b).
+			s.Items.Format = o.format
+		default:
+			return fmt.Errorf("%s: format is only allowed for strings and lists of strings", describe(path))
 		}
-		s.Format = o.format
 	}
 	var err error
 	if o.defaultValue != nil {

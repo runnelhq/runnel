@@ -181,6 +181,9 @@ type Definition struct {
 	Category    string
 	Label       string
 	Description string
+	// Example is a short configuration ("with:", in YAML) shown in the help of the editor
+	// (E14b); empty: none. The contract test checks that New accepts it.
+	Example string
 	// Config is the configuration struct that New decodes "with" into; nil for none.
 	Config any
 	// New creates a transform from its "with" configuration (variables resolved).
@@ -206,6 +209,8 @@ type Descriptor struct {
 	Label       string         `json:"label"`
 	Description string         `json:"description"`
 	Schema      *schema.Schema `json:"schema"`
+	// Example: see Definition.Example.
+	Example string `json:"example,omitempty"`
 	// RecordErrors: the transform can pass records to an error link (Definition.RecordErrors).
 	RecordErrors bool `json:"recordErrors,omitempty"`
 	// Parallel: the transform can run in several copies (Definition.Parallel).
@@ -242,7 +247,7 @@ func (r *Registry) Register(d Definition) {
 		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
 	}
 	r.defs[d.Type] = d
-	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
+	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, Example: d.Example, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
 		DetectFields: d.DetectFields != nil}
 }
 

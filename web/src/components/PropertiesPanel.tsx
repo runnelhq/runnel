@@ -63,6 +63,8 @@ export interface PropertiesProps {
   onDetectFields?: (id: string) => void;
   /** Pipelines: runs the data preview up to a transform (S44). */
   onPreview?: (id: string) => void;
+  /** Shows a transform in the YAML view (help, E14b). */
+  onShowInYAML?: (id: string) => void;
 }
 
 /** A change of a link in the panel. */
@@ -165,6 +167,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       (p) =>
         p.path === `${base}.${field}` ||
         p.path?.startsWith(`${base}.${field}.`) ||
+        p.path?.startsWith(`${base}.${field}[`) ||
         (name !== undefined && p.path === `${base}.with` && p.message.includes(`field "${name}"`)),
     );
     found.forEach((p) => used.add(p));
@@ -179,6 +182,10 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
   const config = Object.entries(schema?.properties ?? {}).filter(([name]) => !(detect && name === "fields"));
 
   const declared = useDeclaredParameters(action);
+  const listEnv = {
+    fields: props.schemas?.[action.id]?.input?.fields ?? null,
+    targets: (workflow.links ?? []).filter((l) => l.from === action.id && (l.type ?? "data") === "data" && !l.disabled).map((l) => l.to),
+  };
   const configFields = config.map(([name, s]) => (
     <SchemaField
       key={name}
@@ -193,6 +200,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       onChangeMap={props.onSetMap ? (m) => props.onSetMap!(action.id, `with.${name}`, m) : undefined}
       onChangeList={props.onSetList ? (l) => props.onSetList!(action.id, `with.${name}`, l) : undefined}
       onChangeTexts={props.onSetTexts ? (t) => props.onSetTexts!(action.id, `with.${name}`, t) : undefined}
+      listEnv={listEnv}
       mapHelp={name === "params" ? declared : undefined}
     />
   ));
@@ -304,6 +312,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           )}
         </Section>
       )}
+      {d?.example && <HelpSection id={action.id} type={action.type} example={d.example} onShowInYAML={props.onShowInYAML} />}
       {detect && (
         <FieldsSection value={action.with?.fields} problems={at("with.fields", "fields")} onDetect={props.onDetectFields && (() => props.onDetectFields!(action.id))} />
       )}
@@ -317,6 +326,42 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       </Section>
       {pipeline && <IncomingFields workflow={workflow} action={action} schemas={props.schemas} />}
     </div>
+  );
+}
+
+/**
+ * Help of a transform (mockup E14, state "help"): a short example of its configuration
+ * from the descriptor, to look at, copy or compare with the YAML view.
+ */
+function HelpSection(props: { id: string; type: string; example: string; onShowInYAML?: (id: string) => void }) {
+  const [copied, setCopied] = useState(false);
+  const snippet = `- id: ${props.id}\n  type: ${props.type}\n  with:\n` + props.example.replace(/\n$/, "").replace(/^/gm, "    ") + "\n";
+  const button = "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted";
+  return (
+    <Section title="Help" summary="example" defaultOpen={false}>
+      <pre data-testid="help-example" className="mx-4 mt-0 mb-2 overflow-auto rounded-md bg-muted px-2.5 py-2 font-mono text-2xs leading-relaxed text-foreground">
+        {snippet}
+      </pre>
+      <div className="mx-4 mb-2 flex gap-1.5">
+        {props.onShowInYAML && (
+          <button type="button" className={button} onClick={() => props.onShowInYAML!(props.id)}>
+            Show in YAML
+          </button>
+        )}
+        <button
+          type="button"
+          className={button}
+          onClick={() => {
+            void navigator.clipboard?.writeText(snippet).then(() => setCopied(true));
+          }}
+        >
+          {copied ? "Copied" : "Copy example"}
+        </button>
+      </div>
+      <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
+        All fields with types and defaults: <span className="font-mono">runnel catalog {props.type}</span>
+      </p>
+    </Section>
   );
 }
 
@@ -543,6 +588,8 @@ function SchemaField(props: {
   /** Sets a list (E14); without them, lists are changed in the YAML view. */
   onChangeList?: (list: KeyValue[][] | null) => void;
   onChangeTexts?: (texts: string[] | null) => void;
+  /** Fields of the incoming records and targets of the data links, offered in lists (E14b). */
+  listEnv?: { fields: { name: string; type?: string }[] | null; targets: string[] };
 }) {
   const { name, schema: s, value } = props;
   const [localError, setLocalError] = useState<string | null>(null);
@@ -567,12 +614,27 @@ function SchemaField(props: {
       />
     );
   }
-  // A list, edited as table, cards or chips (mockup E14).
+  // A list, edited as table, cards or chips (mockup E14); problems of an entry are shown at it (E14b).
+  const entryAt = (p: Problem) => p.path?.match(new RegExp(`\\.with\\.${name}\\[(\\d+)\\]`));
+  const entryProblems = props.problems.flatMap((p) => {
+    const m = entryAt(p);
+    return m ? [{ index: Number(m[1]), message: p.message, warning: p.severity === "warning" }] : [];
+  });
+  const listProblems = props.problems.filter((p) => !entryAt(p));
   if (s.type === "array" && props.onChangeList && props.onChangeTexts && (value === undefined || value === null || Array.isArray(value))) {
     return (
-      <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={props.problems}>
+      <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={listProblems}>
         {(p) => (
-          <ListField name={name} labelId={p.labelId} schema={s} value={value} ctx={props.ctx} onList={props.onChangeList!} onTexts={props.onChangeTexts!} />
+          <ListField
+            name={name}
+            labelId={p.labelId}
+            schema={s}
+            value={value}
+            env={{ ctx: props.ctx, fields: props.listEnv?.fields ?? null, targets: props.listEnv?.targets ?? [] }}
+            problems={entryProblems}
+            onList={props.onChangeList!}
+            onTexts={props.onChangeTexts!}
+          />
         )}
       </Field>
     );

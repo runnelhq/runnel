@@ -24,6 +24,7 @@ var inputDefinition = transform.Definition{
 	Category:     transform.CategoryInput,
 	Label:        "CSV Input",
 	Description:  "Reads the rows of a CSV file as records",
+	Example:      "path: data/orders.csv\ndelimiter: \";\"\nfields:\n  - { name: Nr, type: int }\n  - { name: Betrag, type: decimal, format: \"#.##0,00\" }\n",
 	Config:       input{},
 	New:          newInput,
 	DetectFields: detectFields,

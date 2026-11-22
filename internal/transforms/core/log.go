@@ -21,6 +21,7 @@ var logDefinition = transform.Definition{
 	Category:    transform.CategoryOutput,
 	Label:       "Log",
 	Description: "Writes records to the run log and passes them on",
+	Example:     "fields: [kdnr, name]\n",
 	Config:      logRecords{},
 	New:         newLog,
 }
@@ -28,7 +29,7 @@ var logDefinition = transform.Definition{
 type logRecords struct {
 	Level  string   `json:"level" doc:"Log level of the messages" schema:"enum=debug|info|warn|error,default=info"`
 	Every  int64    `json:"every" doc:"Writes every n-th record, e.g. 1000 for large data" schema:"default=1"`
-	Fields []string `json:"fields" doc:"Fields to write, in this order; empty: all fields"`
+	Fields []string `json:"fields" doc:"Fields to write, in this order; empty: all fields" schema:"format=runnel-field"`
 }
 
 // Init checks the fields to write against the incoming schema and passes it on.

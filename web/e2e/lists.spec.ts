@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Lists in the properties panel (mockup design/mockups/e14-lists.html, step E14a): tables,
-// cards and chips built from the schema. Against the server on a temporary copy of
+// Lists in the properties panel (mockup design/mockups/e14-lists.html, steps E14a and
+// E14b): tables, cards and chips built from the schema, the fields of the incoming records
+// and the targets of the data links to choose from, problems at the entry, the help. Against the server on a temporary copy of
 // examples/hello (e2e/serve-copy.mjs).
 test.use({ baseURL: "http://127.0.0.1:7398" });
 test.describe.configure({ mode: "serial" });
@@ -29,10 +30,19 @@ transforms:
         - { name: n }
   - id: days
     type: core.group-by
+  - id: route
+    type: core.switch
+    with:
+      cases:
+        - { when: "{{ record.n == 1 }}", to: sink }
+  - id: sink
+    type: core.dummy
 links:
   - { from: gen, to: tag }
   - { from: tag, to: order }
   - { from: order, to: days }
+  - { from: gen, to: route }
+  - { from: route, to: sink }
 `;
 
 test.beforeEach(async ({ request }) => {
@@ -98,8 +108,8 @@ test("chips for texts, cards with fields that apply only sometimes", async ({ pa
   await open(page, "days");
   // groupBy: a list of texts.
   await page.getByRole("button", { name: "Add field" }).click();
-  await page.getByRole("textbox", { name: "New field" }).fill("source");
-  await page.getByRole("textbox", { name: "New field" }).press("Enter");
+  await page.getByRole("combobox", { name: "New field" }).fill("source");
+  await page.getByRole("combobox", { name: "New field" }).press("Enter");
   await expect(page.getByRole("listitem").filter({ hasText: "source" })).toBeVisible();
 
   // aggregates: cards; separator only for concat.
@@ -107,13 +117,62 @@ test("chips for texts, cards with fields that apply only sometimes", async ({ pa
   await cards.getByRole("button", { name: "Add aggregate" }).click();
   const card = cards.getByRole("listitem", { name: "New aggregate" });
   await expect(card.getByText("Separator", { exact: true })).toHaveCount(0);
-  await card.getByRole("combobox").selectOption("concat");
+  await card.getByRole("combobox", { name: "Function" }).selectOption("concat");
   await expect(card.getByText("Separator", { exact: true })).toBeVisible();
-  await card.getByRole("combobox").selectOption("count");
+  await card.getByRole("combobox", { name: "Function" }).selectOption("count");
   await type(page, card.getByRole("textbox").first(), "orders");
   await expect(cards.getByRole("listitem", { name: "aggregate 1" })).toBeVisible();
   const text = await saved(page);
   expect(text).toContain("      groupBy: [source]\n");
   expect(text).toContain("        - { name: orders, function: count }\n");
   expect(text).not.toContain("separator");
+});
+
+test("offers the fields of the incoming records", async ({ page }) => {
+  await open(page, "order");
+  const name = page.getByTestId("list-fields").getByRole("row", { name: "field 1" }).getByRole("combobox");
+  await name.click();
+  const options = page.getByRole("listbox", { name: "Fields of the incoming records" }).getByRole("option");
+  await expect(options.filter({ hasText: "source" })).toBeVisible();
+  await expect(options.filter({ hasText: /^n/ })).toContainText("int");
+  // Typing narrows the list; Enter takes the chosen one.
+  await name.fill("sou");
+  await expect(options).toHaveCount(1);
+  await name.press("ArrowDown");
+  await name.press("Enter");
+  await expect(name).toHaveValue("source");
+  expect(await saved(page)).toContain("        - { name: source }\n");
+});
+
+test("shows a problem at its entry", async ({ page, request }) => {
+  await request.put(fileURL, { headers: { "If-Match": "*" }, data: original.replace("        - { name: n }\n", "        - { name: n }\n        - { name: nn }\n") });
+  await open(page, "order");
+  const list = page.getByTestId("list-fields");
+  await expect(list.getByTestId("entry-problems")).toHaveCount(1);
+  await expect(list.getByTestId("entry-problems")).toContainText('"nn"');
+});
+
+test("offers the targets of the data links", async ({ page }) => {
+  await open(page, "route");
+  const cards = page.getByTestId("list-cases");
+  await cards.getByRole("button", { name: "Add case" }).click();
+  const card = cards.getByRole("listitem", { name: "New case" });
+  const to = card.getByRole("combobox", { name: "To" });
+  await expect(to.getByRole("option")).toHaveText(["to", "sink"]);
+  await to.selectOption("sink");
+  // fill, not typing: the editor closes "{{" by itself.
+  await card.getByRole("textbox").first().fill("{{ record.n > 1 }}");
+  await card.getByRole("textbox").first().blur();
+  await expect(cards.getByRole("listitem", { name: "case 2" })).toBeVisible();
+  expect(await saved(page)).toContain('        - { when: "{{ record.n == 1 }}", to: sink }\n        - { when: "{{ record.n > 1 }}", to: sink }\n');
+});
+
+test("help with an example of the configuration", async ({ page }) => {
+  await open(page, "tag");
+  await page.getByRole("button", { name: "Help" }).click();
+  await expect(page.getByTestId("help-example")).toContainText("- id: tag\n  type: core.constant\n  with:\n    fields:");
+  await expect(page.getByText("runnel catalog core.constant")).toBeVisible();
+  await page.getByRole("button", { name: "Show in YAML" }).click();
+  const line = original.split("\n").findIndex((l) => l.includes("id: tag")) + 1;
+  await expect(page.getByTestId("file-summary")).toContainText(`Ln ${line},`);
 });

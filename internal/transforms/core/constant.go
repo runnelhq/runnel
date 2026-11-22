@@ -20,6 +20,7 @@ var constantDefinition = transform.Definition{
 	Category:    transform.CategoryTransform,
 	Label:       "Add Constants",
 	Description: "Adds fields with the same value to every record",
+	Example:     "fields:\n  - { name: source, value: runnel }\n  - { name: batch, value: \"{{ params.BATCH }}\" }\n",
 	Config:      constant{},
 	New:         newConstant,
 }

@@ -18,6 +18,7 @@ var convertDefinition = transform.Definition{
 	Category:     transform.CategoryTransform,
 	Label:        "Convert Types",
 	Description:  "Converts fields to another type, with a number or date format",
+	Example:      "fields:\n  - { name: kdnr, type: int }\n  - { name: umsatz, type: decimal, format: \"#.##0,00\" }\n",
 	Config:       convert{},
 	New:          newConvert,
 }
@@ -29,7 +30,7 @@ type convert struct {
 }
 
 type convertField struct {
-	Name   string `json:"name" doc:"Name of the field" schema:"required,example=amount"`
+	Name   string `json:"name" doc:"Name of the field" schema:"required,format=runnel-field,example=amount"`
 	Type   string `json:"type" doc:"Type to convert to" schema:"required,enum=string|int|decimal|float|bool|date|datetime|json"`
 	Format string `json:"format" doc:"Number pattern like #.##0,00 or date pattern like dd.MM.yyyy, to read text or to write text; empty: 1234.5 and ISO dates" schema:"example=dd.MM.yyyy"`
 }

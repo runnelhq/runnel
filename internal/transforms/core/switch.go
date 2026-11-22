@@ -20,6 +20,7 @@ var switchDefinition = transform.Definition{
 	Category:     transform.CategoryFlow,
 	Label:        "Switch",
 	Description:  "Passes each record to the link of the first case whose condition is true",
+	Example:      "cases:\n  - { when: \"{{ record.umsatz >= 10000 }}\", to: key-accounts }\n  - { when: \"{{ record.umsatz > 0 }}\", to: standard }\ndefault: others\n",
 	Config:       switchRecords{},
 	New:          newSwitch,
 	RecordErrors: true,
@@ -27,14 +28,14 @@ var switchDefinition = transform.Definition{
 
 type switchRecords struct {
 	Cases   []switchCase `json:"cases" doc:"Conditions in order; the first one that is true decides" schema:"required"`
-	Default string       `json:"default" doc:"Transform for records that match no case; empty: they are dropped" schema:"example=others"`
+	Default string       `json:"default" doc:"Transform for records that match no case; empty: they are dropped" schema:"format=runnel-target,example=others"`
 
 	conds []*transform.Expression
 }
 
 type switchCase struct {
 	When string `json:"when" doc:"Condition, e.g. {{ record.country == 'DE' }}; a comparison with an empty value is false" schema:"required,format=runnel-text,example={{ record.amount > 0 }}"`
-	To   string `json:"to" doc:"Id of the transform the record goes to; a data link must lead there" schema:"required,example=germany"`
+	To   string `json:"to" doc:"Id of the transform the record goes to; a data link must lead there" schema:"required,format=runnel-target,example=germany"`
 }
 
 func newSwitch(with map[string]any) (transform.Transform, error) {

@@ -24,6 +24,7 @@ var outputDefinition = transform.Definition{
 	Category:     transform.CategoryOutput,
 	Label:        "CSV Output",
 	Description:  "Writes records to a CSV file and passes them on",
+	Example:      "path: out/orders.csv\nfields:\n  - { name: Datum, format: dd.MM.yyyy }\n  - { name: Betrag, format: \"#.##0,00\" }\n",
 	Config:       output{},
 	New:          newOutput,
 }
@@ -42,7 +43,7 @@ type output struct {
 
 // outField is a column of csv.output.
 type outField struct {
-	Name   string `json:"name" doc:"Name of the field to write (and of the column in the header)" schema:"required,example=amount"`
+	Name   string `json:"name" doc:"Name of the field to write (and of the column in the header)" schema:"required,format=runnel-field,example=amount"`
 	Format string `json:"format" doc:"Number pattern like #.##0,00 or date pattern like dd.MM.yyyy; empty: 1234.5 and ISO dates" schema:"example=dd.MM.yyyy"`
 }
 
