@@ -18,17 +18,18 @@ var selectFieldsDefinition = transform.Definition{
 	Category:    transform.CategoryTransform,
 	Label:       "Select Fields",
 	Description: "Keeps, orders and renames fields, or removes fields",
+	Example:     "fields:\n  - { name: kdnr, rename: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
 	Config:      selectFields{},
 	New:         newSelectFields,
 }
 
 type selectFields struct {
 	Fields []selectField `json:"fields" doc:"Fields to keep, in this order, optionally renamed; all others are removed"`
-	Remove []string      `json:"remove" doc:"Fields to remove; all others are kept. Use either fields or remove"`
+	Remove []string      `json:"remove" doc:"Fields to remove; all others are kept. Use either fields or remove" schema:"format=runnel-field"`
 }
 
 type selectField struct {
-	Name   string `json:"name" doc:"Name of the field in the incoming records" schema:"required,example=kdnr"`
+	Name   string `json:"name" doc:"Name of the field in the incoming records" schema:"required,format=runnel-field,example=kdnr"`
 	Rename string `json:"rename" doc:"New name of the field; empty: the name stays" schema:"example=customerId"`
 }
 

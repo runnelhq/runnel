@@ -143,3 +143,13 @@ der Form, in der `/catalog` (E2) sie ausliefert.
   Ein Name, der keine Geschwister-Eigenschaft ist, ist ein Fehler beim Erzeugen des Schemas.
 - **`runnel-text`** kennzeichnet auch Bedingungen in Listen (`when` von `core.switch`): lange Texte, die der Editor als
   Karte statt als Tabellenzelle zeigt (Mockup E14).
+
+## Nachtrag 2026-11-22 (E14b)
+
+- **Formate für den Editor:** `runnel-field` kennzeichnet den Namen eines Felds der eingehenden Datensätze (der Editor
+  bietet die bekannten Felder an), `runnel-target` die Id eines Transforms, zu dem ein Daten-Link führt (`to` und
+  `default` von `core.switch`). An einer Liste von Texten (`[]string`, z. B. `groupBy`) gilt das Format für jeden Text
+  (`items.format`).
+- **`example` im Descriptor der Transforms:** die `with:`-Werte eines kleinen Beispiels in YAML (`Definition.Example`),
+  angezeigt im Abschnitt „Help“ des Panels. Pflicht für Transforms mit einer Liste in der Konfiguration; der Vertragstest
+  liest es wie eine Pipeline-Datei und prüft, dass `New` es annimmt.

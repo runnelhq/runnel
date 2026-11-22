@@ -20,6 +20,7 @@ var sortDefinition = transform.Definition{
 	Category:     transform.CategoryCombine,
 	Label:        "Sort",
 	Description:  "Sorts the records by fields; keeps all records in memory",
+	Example:      "fields:\n  - { name: total, descending: true }\n  - { name: name, ignoreCase: true }\n",
 	Config:       sortRecords{},
 	New:          newSort,
 	RecordErrors: true,
@@ -30,7 +31,7 @@ type sortRecords struct {
 }
 
 type sortField struct {
-	Name       string `json:"name" doc:"Name of the field" schema:"required,example=country"`
+	Name       string `json:"name" doc:"Name of the field" schema:"required,format=runnel-field,example=country"`
 	Descending bool   `json:"descending" doc:"Largest value first" schema:"default=false"`
 	IgnoreCase bool   `json:"ignoreCase" doc:"Compare text regardless of upper and lower case" schema:"default=false"`
 }

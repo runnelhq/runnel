@@ -877,6 +877,10 @@ export function FileView(props: {
           onSetWorkflow={onSetWorkflow}
           onSetMap={onSetMap}
           onSetList={onSetList}
+          onShowInYAML={(id) => {
+            const item = listItems(doc?.text ?? "", graphKind === "pipeline" ? "transforms" : "actions").find((i) => i.id === id);
+            if (item) showInYAML(item.from);
+          }}
           onSetTexts={onSetTexts}
           onEntry={(e) => void onEntry(e)}
           onLinkChange={onLinkChange}

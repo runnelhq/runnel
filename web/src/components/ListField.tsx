@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useId, useState, type DragEvent, type ReactNode } from "react";
 import type { Schema } from "../catalog";
 import type { ExprContext } from "../expressions";
 import type { KeyValue } from "../workflow";
@@ -6,6 +6,22 @@ import { ExpressionInput } from "./ExpressionInput";
 import { ChevronIcon, PlusIcon } from "./Icons";
 
 type Item = Record<string, unknown>;
+
+/** What the panel knows around the list (E14b): fields of the incoming records, targets of the data links. */
+export interface ListContext {
+  ctx: ExprContext;
+  /** Fields of the incoming records; null while unknown. */
+  fields: { name: string; type?: string }[] | null;
+  /** Ids of the transforms the data links lead to. */
+  targets: string[];
+}
+
+/** A problem of an entry, located by its index in the list. */
+export interface EntryProblem {
+  index: number;
+  message: string;
+  warning: boolean;
+}
 
 /**
  * A list of the configuration in the properties panel (mockup design/mockups/e14-lists.html),
@@ -19,7 +35,9 @@ export function ListField(props: {
   labelId: string;
   schema: Schema;
   value: unknown;
-  ctx: ExprContext;
+  env: ListContext;
+  /** Problems of single entries, shown at the entry (E14b). */
+  problems?: EntryProblem[];
   onList: (list: KeyValue[][] | null) => void;
   onTexts: (texts: string[] | null) => void;
 }) {
@@ -28,13 +46,28 @@ export function ListField(props: {
   if (!items.properties) {
     const texts = Array.isArray(props.value) ? props.value.map((v) => String(v)) : [];
     // The lists of texts so far are lists of field names (groupBy, remove, fields of core.log).
-    return <Chips labelId={props.labelId} texts={texts} noun={props.name.endsWith("s") ? noun : "field"} onChange={(t) => props.onTexts(t.length > 0 ? t : null)} />;
+    return (
+      <Chips
+        labelId={props.labelId}
+        texts={texts}
+        noun={props.name.endsWith("s") ? noun : "field"}
+        fields={items.format === "runnel-field" ? props.env.fields : null}
+        onChange={(t) => props.onTexts(t.length > 0 ? t : null)}
+      />
+    );
   }
   return <Entries {...props} items={items} noun={noun} />;
 }
 
 /** A list of texts, e.g. groupBy of core.group-by. */
-function Chips(props: { labelId: string; texts: string[]; noun: string; onChange: (texts: string[]) => void }) {
+function Chips(props: {
+  labelId: string;
+  texts: string[];
+  noun: string;
+  /** Field names to offer (runnel-field); null: free text only. */
+  fields: { name: string; type?: string }[] | null;
+  onChange: (texts: string[]) => void;
+}) {
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
   const add = () => {
@@ -58,6 +91,21 @@ function Chips(props: { labelId: string; texts: string[]; noun: string; onChange
         </span>
       ))}
       {adding ? (
+        props.fields ? (
+          <div className="w-40">
+            <FieldCombo
+              label={`New ${props.noun}`}
+              value=""
+              fields={props.fields}
+              used={new Set(props.texts)}
+              autoFocus
+              onCommit={(v) => {
+                if (v.trim()) props.onChange([...props.texts, v.trim()]);
+                setAdding(false);
+              }}
+            />
+          </div>
+        ) : (
         <input
           autoFocus
           aria-label={`New ${props.noun}`}
@@ -76,6 +124,7 @@ function Chips(props: { labelId: string; texts: string[]; noun: string; onChange
           }}
           className="h-[22px] w-28 rounded-full border border-ring bg-background px-2 font-mono text-xs text-foreground outline-none"
         />
+        )
       ) : (
         <button
           type="button"
@@ -136,7 +185,8 @@ function Entries(props: {
   labelId: string;
   items: Schema;
   value: unknown;
-  ctx: ExprContext;
+  env: ListContext;
+  problems?: EntryProblem[];
   noun: string;
   onList: (list: KeyValue[][] | null) => void;
 }) {
@@ -149,6 +199,9 @@ function Entries(props: {
   const [dragged, setDragged] = useState<number | null>(null);
   const table = schemaProps.length <= 3 && schemaProps.every(([, s]) => s.format !== "runnel-text" && !s["x-runnel-only"]);
 
+  const rowProblems = (i: number) => (props.problems ?? []).filter((p) => p.index === i);
+  /** Values of a property in the other entries, e.g. fields converted above. */
+  const used = (k: string, i: number | "new") => new Set(entries.flatMap((e, j) => (j !== i && !isEmpty(e[k]) ? [String(e[k])] : [])));
   const commit = (list: Item[]) => props.onList(list.length > 0 ? list.map((item) => toKeyValues(item, schemaProps)) : null);
   const complete = (item: Item) => schemaProps.every(([k]) => !required.has(k) || !isEmpty(item[k]));
   const change = (i: number | "new", k: string, v: unknown) => {
@@ -268,9 +321,10 @@ function Entries(props: {
           >
             {handle(key)}
             {schemaProps.map(([k, s]) => (
-              <Cell key={k} name={k} schema={s} value={item[k]} labelId={`${props.labelId}-${k}`} ctx={props.ctx} compact onChange={(v) => change(key, k, v)} />
+              <Cell key={k} name={k} schema={s} value={item[k]} labelId={`${props.labelId}-${k}`} env={props.env} used={used(k, key)} compact onChange={(v) => change(key, k, v)} />
             ))}
             {removeButton(key)}
+            {key !== "new" && <RowProblems problems={rowProblems(key)} className="col-span-full" />}
           </div>
         ))}
         {addButton}
@@ -315,7 +369,7 @@ function Entries(props: {
                   .filter(([, s]) => applies(s, item))
                   .map(([k, s]) => (
                     <SubField key={k} id={`${props.labelId}-${key}-${k}`} name={k} schema={s} required={required.has(k)}>
-                      <Cell name={k} schema={s} value={item[k]} labelId={`${props.labelId}-${key}-${k}`} ctx={props.ctx} onChange={(v) => change(key, k, v)} />
+                      <Cell name={k} schema={s} value={item[k]} labelId={`${props.labelId}-${key}-${k}`} env={props.env} used={used(k, key)} onChange={(v) => change(key, k, v)} />
                     </SubField>
                   ))}
               </div>
@@ -363,7 +417,9 @@ function Cell(props: {
   schema: Schema;
   value: unknown;
   labelId: string;
-  ctx: ExprContext;
+  env: ListContext;
+  /** Values of this property in the other entries. */
+  used: Set<string>;
   compact?: boolean;
   onChange: (value: unknown) => void;
 }) {
@@ -394,6 +450,24 @@ function Cell(props: {
     );
   }
   const text = isEmpty(props.value) ? "" : String(props.value);
+  // Ids of transforms a data link leads to (runnel-target, e.g. "to" of core.switch).
+  if (s.format === "runnel-target") {
+    const options = props.env.targets.includes(text) || text === "" ? props.env.targets : [...props.env.targets, text];
+    return (
+      <select aria-labelledby={props.labelId} value={text} onChange={(e) => props.onChange(e.target.value)} className={field + " font-mono" + (text ? "" : " text-muted-foreground")}>
+        <option value="">{props.name}</option>
+        {options.map((t) => (
+          <option key={t} value={t}>
+            {props.env.targets.includes(t) ? t : `${t} (no data link)`}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  // Names of fields of the incoming records (runnel-field).
+  if (s.format === "runnel-field" && props.env.fields) {
+    return <FieldCombo labelledBy={props.labelId} value={text} fields={props.env.fields} used={props.used} compact={props.compact} onCommit={(v) => props.onChange(v)} />;
+  }
   return (
     <div className={props.compact ? "runnel-expr-sm min-w-0" : "min-w-0"}>
       <ExpressionInput
@@ -404,9 +478,125 @@ function Cell(props: {
         placeholder={!props.compact && s.examples?.[0] !== undefined ? `e.g. ${String(s.examples[0])}` : props.name}
         multiline={s.format === "runnel-text"}
         problems={[]}
-        ctx={props.ctx}
+        ctx={props.env.ctx}
         onCommit={(v) => props.onChange(typedValue(s, v))}
       />
+    </div>
+  );
+}
+
+/** Problems of an entry below it, with the suggestion of the check ("did you mean …?"). */
+function RowProblems(props: { problems: EntryProblem[]; className?: string }) {
+  if (props.problems.length === 0) return null;
+  return (
+    <div className={(props.className ?? "") + " text-2xs"} data-testid="entry-problems">
+      {props.problems.map((p, i) => (
+        <div key={i} className={p.warning ? "text-warning" : "text-destructive"}>
+          {p.warning ? "⚠" : "✖"} {p.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A field name with the fields of the incoming records to choose from (mockup E14, state
+ * "convert"): fields used in other entries are marked; a name that is not listed can be typed.
+ */
+function FieldCombo(props: {
+  labelledBy?: string;
+  label?: string;
+  value: string;
+  fields: { name: string; type?: string }[];
+  used: Set<string>;
+  compact?: boolean;
+  autoFocus?: boolean;
+  onCommit: (value: string) => void;
+}) {
+  const listId = useId();
+  const [text, setText] = useState(props.value);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  useEffect(() => setText(props.value), [props.value]);
+  // While the name is unchanged all fields are offered, after typing those that contain it.
+  const filter = text === props.value ? "" : text.toLowerCase();
+  const shown = props.fields.filter((f) => f.name.toLowerCase().includes(filter));
+  const commit = (v: string) => {
+    setOpen(false);
+    setActive(-1);
+    setText(v);
+    if (v !== props.value || props.autoFocus) props.onCommit(v);
+  };
+  return (
+    <div className="relative min-w-0">
+      <input
+        role="combobox"
+        aria-labelledby={props.labelledBy}
+        aria-label={props.label}
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        autoFocus={props.autoFocus}
+        value={text}
+        placeholder="field"
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          setText(e.target.value);
+          setOpen(true);
+          setActive(-1);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            setOpen(true);
+            const step = e.key === "ArrowDown" ? 1 : -1;
+            setActive((a) => (shown.length === 0 ? -1 : (a + step + shown.length) % shown.length));
+          }
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit(open && active >= 0 && shown[active] ? shown[active].name : text.trim());
+          }
+          if (e.key === "Escape") {
+            setText(props.value);
+            setOpen(false);
+          }
+        }}
+        onBlur={() => commit(text.trim())}
+        className={
+          "w-full min-w-0 rounded-md border border-input bg-background px-1.5 font-mono text-xs text-foreground outline-none focus:border-ring " +
+          (props.compact ? "h-[26px]" : "h-[30px]")
+        }
+      />
+      {open && shown.length > 0 && (
+        <div
+          id={listId}
+          role="listbox"
+          aria-label="Fields of the incoming records"
+          className="absolute top-[calc(100%+2px)] right-0 left-0 z-20 min-w-44 rounded-md border border-border bg-popover text-xs shadow-md"
+        >
+          <div className="px-2.5 pt-1.5 pb-1 text-[10px] text-muted-foreground">Fields of the incoming records</div>
+          {shown.map((f, i) => (
+            <div
+              key={f.name}
+              role="option"
+              aria-selected={i === active}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                commit(f.name);
+              }}
+              className={
+                "flex h-[26px] cursor-pointer items-center justify-between gap-2 px-2.5 " +
+                (i === active ? "bg-accent text-accent-foreground" : "hover:bg-muted") +
+                (props.used.has(f.name) ? " text-muted-foreground" : "")
+              }
+            >
+              <span className="truncate font-mono">{f.name}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{props.used.has(f.name) ? "used" : (f.type ?? "")}</span>
+            </div>
+          ))}
+          <div className="border-t border-border px-2.5 pt-1 pb-1.5 text-[10px] text-muted-foreground">↑↓ choose · Enter takes it · other names can be typed</div>
+        </div>
+      )}
     </div>
   );
 }

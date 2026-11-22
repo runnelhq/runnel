@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -50,6 +51,7 @@ func TestContract(t *testing.T) {
 			if _, err := def.New(sample(desc.Schema)); err != nil {
 				t.Errorf("configuration built from the schema was rejected (Config and New must use the same struct): %v", err)
 			}
+			checkExample(t, def, desc.Schema)
 		})
 	}
 }
@@ -132,5 +134,37 @@ func TestContractCancellation(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Errorf("%s: Process did not return after cancellation", typ)
 		}
+	}
+}
+
+// checkExample: a transform with a list in its configuration has an example for the help
+// of the editor (E14b), and New accepts it.
+func checkExample(t *testing.T, def transform.Definition, s *schema.Schema) {
+	t.Helper()
+	hasList := slices.ContainsFunc(s.Properties, func(p schema.Property) bool { return p.Schema.Type == "array" })
+	if def.Example == "" {
+		if hasList {
+			t.Error("a configuration with a list needs an Example for the help of the editor")
+		}
+		return
+	}
+	// Read as in a pipeline file, so that values arrive as the engine passes them on.
+	indented := "      " + strings.ReplaceAll(strings.TrimSuffix(def.Example, "\n"), "\n", "\n      ")
+	src := "kind: Pipeline\napiVersion: runnel/v1\nname: example\ntransforms:\n  - id: t\n    type: " + def.Type + "\n    with:\n" + indented + "\n"
+	p, err := model.ParsePipeline("example.pipeline.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("example is not valid YAML for with: %v", err)
+	}
+	// Like the engine (asText), numbers stand for text where the schema expects text, e.g. rows: 10.
+	with := p.Transforms[0].With
+	for _, prop := range s.Properties {
+		if v, ok := with[prop.Name]; ok && prop.Schema.Type == "string" {
+			if _, text := v.(string); !text {
+				with[prop.Name] = fmt.Sprint(v)
+			}
+		}
+	}
+	if _, err := def.New(with); err != nil {
+		t.Errorf("example was rejected: %v", err)
 	}
 }

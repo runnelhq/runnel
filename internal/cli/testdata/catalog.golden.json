@@ -511,6 +511,7 @@
         ],
         "additionalProperties": false
       },
+      "example": "fields:\n  - { name: source, value: runnel }\n  - { name: batch, value: \"{{ params.BATCH }}\" }\n",
       "parallel": true
     },
     {
@@ -532,6 +533,7 @@
                 "name": {
                   "type": "string",
                   "description": "Name of the field",
+                  "format": "runnel-field",
                   "examples": [
                     "amount"
                   ]
@@ -571,6 +573,7 @@
         ],
         "additionalProperties": false
       },
+      "example": "fields:\n  - { name: kdnr, type: int }\n  - { name: umsatz, type: decimal, format: \"#.##0,00\" }\n",
       "recordErrors": true,
       "parallel": true
     },
@@ -674,7 +677,8 @@
           "rows"
         ],
         "additionalProperties": false
-      }
+      },
+      "example": "rows: 10\nrowNumberField: n\nfields:\n  - { name: status, value: new }\n"
     },
     {
       "type": "core.group-by",
@@ -690,7 +694,8 @@
             "type": "array",
             "description": "Fields whose values form a group; empty: one record for all",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "runnel-field"
             }
           },
           "aggregates": {
@@ -724,6 +729,7 @@
                 "field": {
                   "type": "string",
                   "description": "Field the function is applied to; empty for count: all records",
+                  "format": "runnel-field",
                   "examples": [
                     "amount"
                   ]
@@ -751,6 +757,7 @@
         },
         "additionalProperties": false
       },
+      "example": "groupBy: [Datum]\naggregates:\n  - { name: orders, function: count }\n  - { name: total, function: sum, field: Betrag }\n",
       "recordErrors": true
     },
     {
@@ -783,12 +790,14 @@
             "type": "array",
             "description": "Fields to write, in this order; empty: all fields",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "runnel-field"
             }
           }
         },
         "additionalProperties": false
       },
+      "example": "fields: [kdnr, name]\n",
       "parallel": true
     },
     {
@@ -810,6 +819,7 @@
                 "name": {
                   "type": "string",
                   "description": "Name of the field in the incoming records",
+                  "format": "runnel-field",
                   "examples": [
                     "kdnr"
                   ]
@@ -832,12 +842,14 @@
             "type": "array",
             "description": "Fields to remove; all others are kept. Use either fields or remove",
             "items": {
-              "type": "string"
+              "type": "string",
+              "format": "runnel-field"
             }
           }
         },
         "additionalProperties": false
       },
+      "example": "fields:\n  - { name: kdnr, rename: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
       "parallel": true
     },
     {
@@ -859,6 +871,7 @@
                 "name": {
                   "type": "string",
                   "description": "Name of the field",
+                  "format": "runnel-field",
                   "examples": [
                     "country"
                   ]
@@ -886,6 +899,7 @@
         ],
         "additionalProperties": false
       },
+      "example": "fields:\n  - { name: total, descending: true }\n  - { name: name, ignoreCase: true }\n",
       "recordErrors": true
     },
     {
@@ -915,6 +929,7 @@
                 "to": {
                   "type": "string",
                   "description": "Id of the transform the record goes to; a data link must lead there",
+                  "format": "runnel-target",
                   "examples": [
                     "germany"
                   ]
@@ -930,6 +945,7 @@
           "default": {
             "type": "string",
             "description": "Transform for records that match no case; empty: they are dropped",
+            "format": "runnel-target",
             "examples": [
               "others"
             ]
@@ -940,6 +956,7 @@
         ],
         "additionalProperties": false
       },
+      "example": "cases:\n  - { when: \"{{ record.umsatz \u003e= 10000 }}\", to: key-accounts }\n  - { when: \"{{ record.umsatz \u003e 0 }}\", to: standard }\ndefault: others\n",
       "recordErrors": true,
       "parallel": true
     },
@@ -1049,6 +1066,7 @@
         ],
         "additionalProperties": false
       },
+      "example": "path: data/orders.csv\ndelimiter: \";\"\nfields:\n  - { name: Nr, type: int }\n  - { name: Betrag, type: decimal, format: \"#.##0,00\" }\n",
       "recordErrors": true,
       "detectFields": true
     },
@@ -1110,6 +1128,7 @@
                 "name": {
                   "type": "string",
                   "description": "Name of the field to write (and of the column in the header)",
+                  "format": "runnel-field",
                   "examples": [
                     "amount"
                   ]
@@ -1134,6 +1153,7 @@
         ],
         "additionalProperties": false
       },
+      "example": "path: out/orders.csv\nfields:\n  - { name: Datum, format: dd.MM.yyyy }\n  - { name: Betrag, format: \"#.##0,00\" }\n",
       "recordErrors": true
     },
     {

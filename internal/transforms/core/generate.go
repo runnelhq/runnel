@@ -18,6 +18,7 @@ var generateRowsDefinition = transform.Definition{
 	Category:    transform.CategoryInput,
 	Label:       "Generate Rows",
 	Description: "Creates records with constant fields",
+	Example:     "rows: 10\nrowNumberField: n\nfields:\n  - { name: status, value: new }\n",
 	Config:      generateRows{},
 	New:         newGenerateRows,
 }

@@ -22,20 +22,21 @@ var groupByDefinition = transform.Definition{
 	Category:     transform.CategoryCombine,
 	Label:        "Group By",
 	Description:  "Combines records with the same values into one, with count, sum and other aggregates",
+	Example:      "groupBy: [Datum]\naggregates:\n  - { name: orders, function: count }\n  - { name: total, function: sum, field: Betrag }\n",
 	Config:       groupBy{},
 	New:          newGroupBy,
 	RecordErrors: true,
 }
 
 type groupBy struct {
-	GroupBy    []string    `json:"groupBy" doc:"Fields whose values form a group; empty: one record for all"`
+	GroupBy    []string    `json:"groupBy" doc:"Fields whose values form a group; empty: one record for all" schema:"format=runnel-field"`
 	Aggregates []aggregate `json:"aggregates" doc:"Fields computed per group, after the group fields"`
 }
 
 type aggregate struct {
 	Name      string `json:"name" doc:"Name of the new field" schema:"required,example=total"`
 	Function  string `json:"function" doc:"count: records (or values of field), countDistinct: different values, sum, avg, min, max, first, last, concat: values as text" schema:"required,enum=count|countDistinct|sum|avg|min|max|first|last|concat"`
-	Field     string `json:"field" doc:"Field the function is applied to; empty for count: all records" schema:"example=amount"`
+	Field     string `json:"field" doc:"Field the function is applied to; empty for count: all records" schema:"format=runnel-field,example=amount"`
 	Separator string `json:"separator" doc:"Text between the values of concat; empty: comma and space" schema:"example= / ,only=function:concat"`
 }
 
