@@ -22,7 +22,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e14-lists.html`](e14-lists.html) | E14 – Listen im Panel bearbeiten | `constant`, `convert`, `group`, `switch`, `help` | freigegeben mit PR #109; umgesetzt mit E14a (Listen-Editor) und E14b (Feldauswahl, Meldungen an der Zeile, Help) |
 | [`e16-copy-paste.html`](e16-copy-paste.html) | E16 – Kopieren und Einfügen im Canvas | `copy`, `paste`, `refs`, `wrongkind` | freigegeben mit PR #115; umgesetzt mit E16 |
 | [`e17-markdown.html`](e17-markdown.html) | E17 – Markdown-Dokumente im Projekt | `open`, `text`, `new`, `links` | freigegeben mit PR #117; umgesetzt mit E17 |
-| [`s16d-icons.html`](s16d-icons.html) | S16d – Icons für Berechnen, Duplikate entfernen und Sequenz | `choice`, `canvas` | zur Freigabe |
+| [`s16d-icons.html`](s16d-icons.html) | S16d – Icons für Berechnen, Duplikate entfernen und Sequenz | `choice`, `canvas` | freigegeben mit PR #120 (Variante A); umgesetzt mit S16d |
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 

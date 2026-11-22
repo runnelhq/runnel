@@ -945,6 +945,49 @@
       "parallel": true
     },
     {
+      "type": "core.sequence",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Sequence",
+      "description": "Numbers the records in the order they arrive, also per group",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the field for the number; an existing field of the same name gets the number",
+            "examples": [
+              "position"
+            ]
+          },
+          "start": {
+            "type": "string",
+            "description": "Number of the first record, e.g. 1 or ${START}",
+            "default": "1"
+          },
+          "step": {
+            "type": "string",
+            "description": "Difference between two numbers, e.g. 10 for 10, 20, 30; may be negative",
+            "default": "1"
+          },
+          "groupBy": {
+            "type": "array",
+            "description": "Fields whose values form a group that counts on its own from start; empty: one count for all records",
+            "items": {
+              "type": "string",
+              "format": "runnel-field"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "example": "name: position\nstart: 10\nstep: 10\ngroupBy: [Nr]\n"
+    },
+    {
       "type": "core.sort",
       "kind": "transform",
       "category": "combine",

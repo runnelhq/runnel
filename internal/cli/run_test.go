@@ -194,7 +194,7 @@ func TestRunCSVExample(t *testing.T) {
 	}
 }
 
-// TestRunCalculateDedupeExample: core.calculate and core.dedupe (S16c) in
+// TestRunCalculateDedupeExample: core.calculate and core.dedupe (S16c) and core.sequence (S16d) in
 // examples/pipelines/pipelines/contacts.pipeline.yaml.
 func TestRunCalculateDedupeExample(t *testing.T) {
 	chdirRepoRoot(t)
@@ -211,9 +211,9 @@ func TestRunCalculateDedupeExample(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The second Müller GmbH has the same address once in lower case; gross = net * 1.19.
-	want := "\xEF\xBB\xBFkdnr,label,netto,brutto\r\n4711,Müller GmbH <einkauf@mueller.example>,1000.00,1190.00\r\n" +
-		"4712,Schmidt & Söhne <info@schmidt.example>,89.90,106.98\r\n" +
-		"4713,\"Weber, Anna <anna.weber@example.com>\",250.00,297.50\r\n4714,Klein KG <klein@example.com>,12.50,14.88\r\n"
+	want := "\xEF\xBB\xBFnr,kdnr,label,netto,brutto\r\n1,4711,Müller GmbH <einkauf@mueller.example>,1000.00,1190.00\r\n" +
+		"2,4712,Schmidt & Söhne <info@schmidt.example>,89.90,106.98\r\n" +
+		"3,4713,\"Weber, Anna <anna.weber@example.com>\",250.00,297.50\r\n4,4714,Klein KG <klein@example.com>,12.50,14.88\r\n"
 	if string(b) != want {
 		t.Errorf("written file %q, want %q", b, want)
 	}
