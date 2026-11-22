@@ -842,6 +842,11 @@ Windows, gRPC für andere Sprachen).
 - **Ein Prozess je Plugin und Lauf**; unter Windows in einem Job Object, damit beim Abbruch auch Kindprozesse enden.
   Absturz eines Plugins lässt die Bausteine scheitern, nicht den Server.
 - Plugins nutzen **keine Dienste des Hosts**: Variablen, Ausdrücke und Secrets löst der Host vorher in der `config` auf.
+- **Freigabe je Projekt:** Ein Plugin startet erst, wenn es auf dem Rechner für das Projekt freigegeben ist
+  (`runnel plugins trust`, Hash über den Plugin-Ordner, gespeichert außerhalb des Projekts). Ein fremdes Projekt führt
+  so beim Prüfen oder Öffnen keinen Code aus ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag).
+- Weitere Ausgänge wie bei `core.switch` (Ziel-IDs in der `config`), optional `transform.init` für das Schema und
+  `transform.detectFields`; Arbeitsverzeichnis des Plugins ist der Projektordner.
 - SDKs: Go (Referenz, `pkg/sdk`), später Python, C#/.NET, Node – jeweils dünne Wrapper.
 
 ```yaml
