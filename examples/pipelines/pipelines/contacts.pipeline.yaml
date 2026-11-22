@@ -35,7 +35,7 @@ transforms:
       fields:
         - { name: email, value: "{{ lower(trim(record.email)) }}" }
         - { name: brutto, value: "{{ record.netto * (1 + params.VAT) }}" }
-        - { name: label, value: "{{ record.name }} <{{ record.email }}>" }
+        - { name: label, value: "{{ concat(' ', record.name, '<' + record.email + '>') }}" }
   - id: unique
     type: core.dedupe
     with:
