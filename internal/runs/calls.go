@@ -41,6 +41,22 @@ func Resolve(projectDir, callerFile, path string) (file, name string) {
 	return file, filepath.ToSlash(file)
 }
 
+// InProject checks that a called file lies in the project folder (ADR 0008, Nachtrag
+// S25b): calls cannot reach other files, also not with .. or an absolute path, so that
+// a target built from values of a caller (e.g. parameters of an http trigger) stays in
+// the project. Without a project folder every path is allowed. what is "workflow" or
+// "pipeline", name the path for messages.
+func InProject(projectDir, file, what, name string) error {
+	if projectDir == "" {
+		return nil
+	}
+	rel, err := filepath.Rel(absolute(projectDir), absolute(file))
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return fmt.Errorf("%s file %s lies outside the project folder; only files of the project can be called", what, name)
+	}
+	return nil
+}
+
 // absolute returns an absolute, cleaned path for comparisons (case-insensitive on Windows).
 func absolute(path string) string {
 	if abs, err := filepath.Abs(path); err == nil {
@@ -66,6 +82,9 @@ func (spec Spec) workflows(envName string) action.WorkflowRunner {
 	chain := append(append([]caller(nil), spec.chain...), caller{file: absolute(spec.file()), name: spec.Name})
 	return func(ctx context.Context, call action.WorkflowCall) (map[string]any, error) {
 		file, name := Resolve(spec.ProjectDir, spec.file(), call.Path)
+		if err := InProject(spec.ProjectDir, file, "workflow", name); err != nil {
+			return nil, err
+		}
 		abs := absolute(file)
 		for _, c := range chain {
 			if c.file == abs {

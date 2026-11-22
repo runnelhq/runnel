@@ -161,6 +161,9 @@ func TestRunWorkflowCallFails(t *testing.T) {
 		// Paths with variables are checked when the action runs.
 		{"workflows/missing.workflow.yaml", "workflow file workflows/missing.workflow.yaml not found"},
 		{"workflows/parent.workflow.yaml", "workflow workflows/parent.workflow.yaml calls itself (workflows/parent.workflow.yaml → workflows/parent.workflow.yaml)"},
+		// A target from outside (e.g. a parameter of an http trigger) stays in the project.
+		{"../secret.workflow.yaml", "workflow file ../secret.workflow.yaml lies outside the project folder; only files of the project can be called"},
+		{"workflows/../../secret.workflow.yaml", "lies outside the project folder"},
 	} {
 		res, _, err := start(t, dir, map[string]string{"TARGET": tt.target})
 		if err != nil || res.Status != workflow.Failed || !strings.Contains(res.Err.Error(), tt.want) {
@@ -171,6 +174,26 @@ func TestRunWorkflowCallFails(t *testing.T) {
 	res, _, _ := start(t, dir, nil)
 	if res.Err == nil || !strings.Contains(res.Err.Error(), `workflow workflows/child.workflow.yaml cannot be started: parameter(s) [EXTRA] not declared by workflow "child" (declared: NAME, COUNT, FAIL)`) {
 		t.Errorf("undeclared: %v", res.Err)
+	}
+}
+
+// allowedTargets restricts a target only known at run time (ADR 0008, Nachtrag S25b).
+func TestRunWorkflowCallAllowedTargets(t *testing.T) {
+	dir := project(t, map[string]string{
+		"workflows/child.workflow.yaml": childWorkflow,
+		"workflows/other.workflow.yaml": childWorkflow,
+		"workflows/parent.workflow.yaml": parent(`      workflow: "${TARGET}"
+      allowedTargets: [workflows/child*.workflow.yaml]
+      params: { NAME: Ada }`),
+	})
+	res, _, err := start(t, dir, map[string]string{"TARGET": "./workflows/child.workflow.yaml"})
+	if err != nil || res.Status != workflow.Succeeded {
+		t.Errorf("allowed: %v %v", err, res.Err)
+	}
+	res, _, err = start(t, dir, map[string]string{"TARGET": "workflows/other.workflow.yaml"})
+	want := "workflow workflows/other.workflow.yaml is not one of the allowed targets (workflows/child*.workflow.yaml)"
+	if err != nil || res.Status != workflow.Failed || !strings.Contains(res.Err.Error(), want) {
+		t.Errorf("not allowed: %v %v", err, res.Err)
 	}
 }
 
@@ -256,7 +279,12 @@ func TestCheckCalls(t *testing.T) {
 		{"      workflow: workflows/child.workflow.yaml\n      params: { NAME: x, COUNT: 3 }", ""},
 		// Values with variables or expressions are checked when the action runs.
 		{"      workflow: workflows/child.workflow.yaml\n      params: { NAME: x, COUNT: \"${N}\", FAIL: \"{{ 1 > 2 }}\" }", ""},
-		{"      workflow: \"workflows/${X}.workflow.yaml\"", ""},
+		// A target only known at run time gets a warning unless allowedTargets restricts it.
+		{"      workflow: \"workflows/${X}.workflow.yaml\"", `:13:17: warning: action "call": the workflow is only known when the action runs; restrict it with allowedTargets, e.g. [workflows/import-*.workflow.yaml]`},
+		{"      workflow: \"workflows/${X}.workflow.yaml\"\n      allowedTargets: [workflows/import-*.workflow.yaml]", ""},
+		// Calls stay in the project folder.
+		{"      workflow: ../outside.workflow.yaml", `action "call": workflow file ../outside.workflow.yaml lies outside the project folder; only files of the project can be called`},
+		{"      workflow: " + filepath.Join(filepath.Dir(dir), "x.workflow.yaml"), "lies outside the project folder"},
 		{"      workflow: workflows/child.workflow.yaml", `:13:7: action "call": missing required parameter NAME of workflow workflows/child.workflow.yaml`},
 		{"      workflow: workflows/child.workflow.yaml\n      params: { NAME: x, COUNT: many, COLOR: red }",
 			`:14:46: action "call": parameter COLOR is not declared by workflow workflows/child.workflow.yaml (declared: NAME, COUNT, FAIL)` + "\n" +

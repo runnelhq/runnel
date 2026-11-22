@@ -247,6 +247,13 @@
             "description": "Values for the parameters of the pipeline, by name",
             "additionalProperties": {}
           },
+          "allowedTargets": {
+            "type": "array",
+            "description": "Pipeline files this action may call, with wildcards and relative to the project folder, e.g. pipelines/import-*.pipeline.yaml; for a pipeline given by a variable or expression",
+            "items": {
+              "type": "string"
+            }
+          },
           "rows": {
             "description": "Records for core.from-result in the pipeline: a list, e.g. {{ results.files.output }}; items that are not objects become a record with the field value"
           }
@@ -279,6 +286,13 @@
             "type": "object",
             "description": "Values for the parameters of the workflow, by name",
             "additionalProperties": {}
+          },
+          "allowedTargets": {
+            "type": "array",
+            "description": "Workflow files this action may call, with wildcards and relative to the project folder, e.g. workflows/import-*.workflow.yaml; for a workflow given by a variable or expression",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

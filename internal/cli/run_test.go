@@ -188,6 +188,12 @@ func TestRunSubWorkflowsExample(t *testing.T) {
 	if code != 1 || !strings.Contains(out, "[failed] Import failed: workflow workflows/import-region.workflow.yaml failed: 500 orders in region south") {
 		t.Errorf("too many orders: exit code %d:\n%s", code, out)
 	}
+
+	// allowedTargets: the workflow from the parameter must be one of the import workflows.
+	code, out, _ = run(t, "run", "--param", "IMPORT=workflows/nightly.workflow.yaml", "examples/sub-workflows/workflows/nightly.workflow.yaml")
+	if code != 1 || !strings.Contains(out, "[failed] Import failed: workflow workflows/nightly.workflow.yaml is not one of the allowed targets (workflows/import-*.workflow.yaml)") {
+		t.Errorf("not allowed: exit code %d:\n%s", code, out)
+	}
 }
 
 func TestRunPipelineExample(t *testing.T) {

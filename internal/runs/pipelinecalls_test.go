@@ -151,7 +151,9 @@ links:
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, `action "d"`) {
+	// A path with a variable is checked when the action runs; it only gets a warning.
+	if !strings.Contains(got, `warning: action "d": the pipeline is only known when the action runs; restrict it with allowedTargets`) ||
+		strings.Count(got, `action "d"`) != 1 {
 		t.Errorf("a path with a variable is checked when the action runs:\n%s", got)
 	}
 }
@@ -213,5 +215,43 @@ func TestRunPipelineCallWithInvalidRows(t *testing.T) {
 	}
 	if _, err := Records([]map[string]any{{"x": struct{}{}}}); err == nil || !strings.Contains(err.Error(), "rows[0].x") {
 		t.Errorf("invalid value: %v", err)
+	}
+}
+
+// A pipeline given by a variable stays in the project folder and in allowedTargets.
+func TestRunPipelineCallTargets(t *testing.T) {
+	dir := project(t, map[string]string{
+		"pipelines/numbers.pipeline.yaml": childPipeline,
+		"workflows/parent.workflow.yaml": `kind: Workflow
+apiVersion: runnel/v1
+name: parent
+parameters:
+  - { name: TARGET }
+actions:
+  - { id: start, type: core.start }
+  - id: run
+    type: core.run-pipeline
+    with:
+      pipeline: "${TARGET}"
+      allowedTargets: ["pipelines/*.pipeline.yaml", "../*.pipeline.yaml"]
+      params: { ROWS: "1" }
+links:
+  - { from: start, to: run }
+`,
+	})
+	for target, want := range map[string]string{
+		"pipelines/numbers.pipeline.yaml": "",
+		"pipelines/../../x.pipeline.yaml": "pipeline file ../x.pipeline.yaml lies outside the project folder",
+		"data/x.pipeline.yaml":            "pipeline data/x.pipeline.yaml is not one of the allowed targets",
+	} {
+		res, _, err := start(t, dir, map[string]string{"TARGET": target})
+		switch {
+		case err != nil:
+			t.Errorf("%s: %v", target, err)
+		case want == "" && res.Status != workflow.Succeeded:
+			t.Errorf("%s: %v", target, res.Err)
+		case want != "" && (res.Err == nil || !strings.Contains(res.Err.Error(), want)):
+			t.Errorf("%s: %v, want %q", target, res.Err, want)
+		}
 	}
 }

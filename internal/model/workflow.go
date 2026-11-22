@@ -403,6 +403,14 @@ func (w *Workflow) validate() error {
 	return errs.errOrNil()
 }
 
+// WarningAt creates a warning located at a YAML path of the workflow file.
+func (w *Workflow) WarningAt(path, format string, args ...any) *Error {
+	if w.src == nil {
+		return &Error{Severity: SeverityWarning, Msg: fmt.Sprintf(format, args...)}
+	}
+	return w.src.warnf(path, format, args...)
+}
+
 // ErrorAt creates an error located at a YAML path of the workflow file, e.g. "$.actions[2].type".
 // It is meant for checks outside this package, e.g. by the engine before a run.
 func (w *Workflow) ErrorAt(path, format string, args ...any) *Error {

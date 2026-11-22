@@ -68,6 +68,7 @@ Ausdrücke enthalten:
 - Ist das Ziel statisch, prüft der Validator es vollständig (existiert, Parameter passen).
 - Ist es dynamisch, gibt der Validator einen **Hinweis** aus; die Prüfung erfolgt beim Start der Action.
   Optional schränkt `allowedTargets: ["pipelines/import-*.pipeline.yaml"]` die erlaubten Ziele ein (Glob).
+  Präzisiert mit S25b (siehe Nachtrag): Ziele liegen immer im Projektordner, der Hinweis ist eine Warnung.
 
 ### 3. Ausführung pro Datensatz
 
@@ -200,3 +201,23 @@ Abstimmung mit dem Maintainer zur Umsetzung von 3c:
   `output.succeeded` und `output.failed`. `stopOnError` (Standard `true`) beendet beim ersten Fehler die übrigen
   Einträge; mit `false` scheitert die Action erst am Ende, wenn ein Eintrag fehlschlug (wie oben unter 3b).
 - `parallel` ist standardmäßig 1, höchstens 64.
+
+## Nachtrag 2026-11-22 (S25b): Dynamische Ziele absichern
+
+- **Nur Dateien des Projekts:** `core.run-workflow` und `core.run-pipeline` rufen nur Dateien im Projektordner auf, auch
+  über `..` oder einen absoluten Pfad nicht andere. Das gilt für feste Pfade (Fehler bei `runnel validate`) und für
+  Pfade, die erst beim Lauf feststehen (die Action scheitert). Ohne Projekt (einzelne Datei) bleibt es bei Pfaden
+  relativ zur aufrufenden Datei ohne Einschränkung.
+- **`allowedTargets`:** Liste von Mustern relativ zum Projektordner (`*`, `?`, `[abc]`; `*` überschreitet keine
+  Ordnergrenze; unter Windows ohne Unterscheidung der Groß- und Kleinschreibung). Ist sie gesetzt, muss das Ziel
+  (bereinigt, mit `/`) einem Muster entsprechen, sonst scheitert die Action mit „… is not one of the allowed targets“.
+  Ungültige feste Muster meldet schon `runnel validate`.
+- **Warnung statt Hinweis:** Ein Ziel mit `${…}` oder `{{ … }}` ohne `allowedTargets` meldet `runnel validate` (und
+  der Editor) als Warnung; der Lauf startet trotzdem.
+
+### Sicherheit
+
+Werte aus Parametern können von außen kommen, etwa aus Pfad, Query oder Body eines HTTP-Triggers. Ohne Einschränkung
+könnte ein Aufrufer mit `params.TYPE = "../../anderes-projekt/x"` beliebige Workflow- oder Pipeline-Dateien des
+Rechners starten. Die Grenze „nur Dateien des Projekts“ gilt deshalb immer; `allowedTargets` schränkt innerhalb des
+Projekts weiter ein. Ablehnungen sind getestet (`..`, absolute Pfade, Ziele außerhalb der Muster).

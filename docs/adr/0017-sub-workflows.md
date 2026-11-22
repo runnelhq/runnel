@@ -23,7 +23,7 @@ ADR 0012 beschreibt einen Workflow dagegen über seine `parameters` und `outputs
   `{{ results.import.output.ROWS }}`. Scheitert das Kind, scheitert die Action mit dessen Fehler; ein Abbruch des
   Aufrufers bricht das Kind ab.
 - **Pfade** sind relativ zum Projektordner (wie in ADR 0008 und in der Datei-API des Editors); ohne Projekt relativ zum
-  Ordner der aufrufenden Datei.
+  Ordner der aufrufenden Datei. Seit S25b nur Dateien im Projektordner (ADR 0008, Nachtrag S25b).
 - **Log:** Die Meldungen des Kinds erscheinen im Log der aufrufenden Action mit Präfix `<workflow>/<action>: ` und
   derselben Stufe; Start und Ende der Kind-Actions als Debug. Das Kind hat eine eigene Lauf-ID, erzeugt aber keine
   eigenen Ereignisse für Editor und Server (Lauf-Historie mit `parent_run_id` folgt mit S26).

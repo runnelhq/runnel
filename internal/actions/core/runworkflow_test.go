@@ -79,3 +79,33 @@ func TestRunWorkflowErrors(t *testing.T) {
 		t.Errorf("cancelled: %v", err)
 	}
 }
+
+func TestTargets(t *testing.T) {
+	if err := checkTargets([]string{"workflows/[a.yaml"}); err == nil || err.Error() != `allowedTargets: invalid pattern "workflows/[a.yaml"` {
+		t.Errorf("invalid: %v", err)
+	}
+	if err := checkTargets([]string{""}); err == nil {
+		t.Error("empty pattern accepted")
+	}
+	if err := checkTargets([]string{"${PATTERN}", "workflows/*.workflow.yaml"}); err != nil {
+		t.Error(err)
+	}
+	patterns := []string{"workflows/import-*.workflow.yaml", `jobs\daily.workflow.yaml`}
+	for target, ok := range map[string]bool{
+		"workflows/import-north.workflow.yaml":  true,
+		`workflows\import-north.workflow.yaml`:  true,
+		"./workflows/import-x.workflow.yaml":    true,
+		"jobs/daily.workflow.yaml":              true,
+		"workflows/sub/import-x.workflow.yaml":  false, // * does not cross folders
+		"workflows/export.workflow.yaml":        false,
+		"workflows/../import-x.workflow.yaml":   false,
+		"/abs/workflows/import-x.workflow.yaml": false,
+	} {
+		if err := allowed(target, patterns, "workflow"); (err == nil) != ok {
+			t.Errorf("%s: %v, want allowed %v", target, err, ok)
+		}
+	}
+	if err := allowed("anything", nil, "workflow"); err != nil {
+		t.Error(err)
+	}
+}

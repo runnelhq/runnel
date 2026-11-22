@@ -33,6 +33,9 @@ func (spec Spec) pipelines(envName string) action.PipelineRunner {
 	}
 	return func(ctx context.Context, call action.PipelineCall) (map[string]any, error) {
 		file, name := Resolve(spec.ProjectDir, spec.file(), call.Path)
+		if err := InProject(spec.ProjectDir, file, "pipeline", name); err != nil {
+			return nil, err
+		}
 		data, err := os.ReadFile(file)
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("pipeline file %s not found", name)
