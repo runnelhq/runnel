@@ -30,12 +30,12 @@ func TestParseHTTPTrigger(t *testing.T) {
 		t.Errorf("trigger %+v", tr)
 	}
 	t.Setenv("RUNNEL_TEST_TOKEN", "")
-	if _, ok := tr.Token(); ok {
-		t.Error("empty token")
+	if _, err := tr.Token(); err == nil || !strings.Contains(err.Error(), "environment variable RUNNEL_TEST_TOKEN with the token is not set") {
+		t.Errorf("empty token: %v", err)
 	}
 	t.Setenv("RUNNEL_TEST_TOKEN", "s3cret")
-	if tok, ok := tr.Token(); !ok || tok != "s3cret" {
-		t.Errorf("token %q", tok)
+	if tok, err := tr.Token(); err != nil || tok != "s3cret" {
+		t.Errorf("token %q, %v", tok, err)
 	}
 	tr, err = ParseTrigger("x.yaml", []byte(strings.Replace(httpSource, `{ token: "${env:RUNNEL_TEST_TOKEN}" }`, "none", 1)))
 	if err != nil || !tr.AuthNone() {

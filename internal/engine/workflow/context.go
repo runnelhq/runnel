@@ -8,6 +8,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/schema"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -185,14 +186,25 @@ func (r *Runner) evalWith(a *model.Action, scope *vars.Scope, values map[string]
 	if a.With == nil {
 		return nil, nil
 	}
-	text := map[string]bool{}
+	text, secret := map[string]bool{}, map[string]bool{}
 	if d, ok := r.opts.Registry.Descriptor(a.Type); ok && d.Schema != nil {
 		for _, p := range d.Schema.Properties {
 			text[p.Name] = p.Schema.Type == "string"
+			secret[p.Name] = p.Schema.Format == schema.FormatSecret
 		}
 	}
 	out := make(map[string]any, len(a.With))
 	for k, v := range a.With {
+		if s, ok := v.(string); ok && secret[k] {
+			// A secret (ADR 0022): ${…} only, no expressions, so that the value never
+			// becomes the source of an expression or part of its error messages.
+			e, err := expandSecret(s, scope)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", k, err)
+			}
+			out[k] = e
+			continue
+		}
 		e, err := r.evalValue(v, scope, values)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", k, err)
@@ -238,4 +250,12 @@ func requestValue(r map[string]any) any {
 		return nil
 	}
 	return r
+}
+
+// expandSecret resolves a field for a secret; without a scope it stays as it is.
+func expandSecret(text string, scope *vars.Scope) (string, error) {
+	if scope == nil {
+		return text, nil
+	}
+	return scope.ExpandSecret(text)
 }

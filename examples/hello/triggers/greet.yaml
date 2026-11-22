@@ -3,8 +3,8 @@
 #   curl -X POST -H "Content-Type: application/json" -d "{\"GREETING\": \"Hi\"}" http://127.0.0.1:7301/greet
 # The answer is 202 with the run id; follow the run in the editor or under the API:
 #   http://127.0.0.1:7300/api/v1/runs/<runId>
-# auth: none is meant for this computer and the internal network; elsewhere use
-# auth: { token: ${env:NAME} } and send "Authorization: Bearer <token>".
+# auth: none is meant for this computer and the internal network; elsewhere use a token,
+# auth: { token: ${secret:env/NAME} } (or ${env:NAME}), and send "Authorization: Bearer <token>".
 kind: Trigger
 apiVersion: runnel/v1
 name: greet

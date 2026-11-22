@@ -274,8 +274,8 @@ func match(segments []model.Segment, parts []string) (map[string]string, bool) {
 }
 
 func authorized(t *model.Trigger, r *http.Request) bool {
-	want, ok := t.Token()
-	if !ok {
+	want, err := t.Token()
+	if err != nil {
 		return false
 	}
 	got, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")

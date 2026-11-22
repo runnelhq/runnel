@@ -33,6 +33,15 @@
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "secretStore": {
+      "type": "string",
+      "description": "Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables) or local (the local secret store, not available yet)",
+      "enum": [
+        "local",
+        "shared",
+        "env"
+      ]
     }
   },
   "required": [

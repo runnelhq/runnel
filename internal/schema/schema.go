@@ -48,6 +48,11 @@ const FormatField = "runnel-field"
 // e.g. "to" of core.switch (E14b): the editor offers the targets of the links.
 const FormatTarget = "runnel-target"
 
+// FormatSecret marks a field that holds a secret, e.g. a password or token (ADR 0022):
+// only such fields may use ${secret:…}; their values are resolved without expressions
+// and never shown. The editor offers no value from the file.
+const FormatSecret = "runnel-secret"
+
 // OnlyKey is the schema keyword of the option only=: the field applies only when a
 // sibling field has one of the given values. The editor hides it otherwise (mockup E14).
 const OnlyKey = "x-runnel-only"

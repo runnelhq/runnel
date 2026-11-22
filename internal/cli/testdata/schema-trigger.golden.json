@@ -151,7 +151,7 @@
           ]
         },
         "auth": {
-          "description": "http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${env:IMPORT_TOKEN} }"
+          "description": "http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${secret:import-token} } or { token: ${env:IMPORT_TOKEN} }"
         },
         "response": {
           "type": "string",

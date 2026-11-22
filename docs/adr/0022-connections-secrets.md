@@ -334,3 +334,27 @@ zum Setzen.
   - Die Roadmap bekommt S39a (Secret-Quellen mit `local` und `env`, lokaler Store) vor S20, weitere Quellen als
     eigene Schritte bei Bedarf, ein Mockup für Connections und Secrets im Editor und die
     `transfer`-Actions als eigenen Schritt.
+
+## Nachtrag 2026-11-22 (S39a): Reihenfolge der Quellen, Format der Felder
+
+Abgestimmt mit dem Maintainer vor der Umsetzung.
+
+- **Reihenfolge:** S39a bringt nur die Quelle `env` und den Rahmen: Schreibweise `${secret:[QUELLE/]NAME}`,
+  Standardquelle über `secretStore:` (Environment, sonst `project.yaml`), die Regeln, wo Secrets stehen dürfen, und die
+  Maskierung. Der lokale Store (`local`) folgt mit S39d, `shared`, Export/Import, Ablaufdatum und Secret-Quellen als
+  Datei mit S39e. Workflows und Connections ändern sich dadurch später nicht.
+- **Standardquelle bleibt `local`:** Bis S39d meldet `${secret:NAME}` ohne `secretStore:` „the local secret store is not
+  available yet; set `secretStore: env` …“. Ein Standard `env`, der später auf `local` wechselt, würde bestehende Projekte
+  ihre Werte an anderer Stelle suchen lassen.
+- **Felder für Secrets:** Das Format heißt `runnel-secret` (Tag `schema:"format=runnel-secret"`, wie die übrigen
+  Formate von Runnel). Solche Felder werden nur mit `${…}` aufgelöst, ohne Ausdrücke `{{ … }}`; so wird ein Wert nie Teil
+  eines Ausdrucks oder seiner Fehlermeldung. Workflows lesen sie vor dem Start, ein fehlendes Secret verhindert den Lauf.
+- **Keine Secrets über Variablen:** `${secret:…}` muss direkt im Feld stehen. Eine Variable, deren Wert ein Secret
+  enthält, ist ein Fehler (in `project.yaml` und Environments schon beim Laden), sonst könnte das Secret über `${NAME}` in
+  beliebige Texte gelangen.
+- **Token der HTTP-Trigger:** `auth: { token: ${secret:[QUELLE/]NAME} }` ist neben `${env:NAME}` erlaubt; gelesen wird
+  über die Standardquelle des Environments des Triggers (sonst des Standard-Environments).
+- **Maskierung:** Jeder Lauf hat eine eigene Maske mit den Werten, die er gelesen hat. Die Engines ersetzen sie in
+  Ereignissen (Log, Fehler, Ausgaben), im Ergebnis eines Workflows und in der Datenvorschau. Die Datensätze einer Pipeline
+  bleiben unverändert: Sie sind Daten für den nächsten Schritt.
+

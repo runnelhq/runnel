@@ -23,6 +23,7 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
+	"github.com/runnelhq/runnel/internal/schema"
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/vars"
 )
@@ -63,6 +64,9 @@ type Options struct {
 	// SampleRows keeps the first records passed over each link in Result.Samples (data
 	// preview, S44); 0: none.
 	SampleRows int
+	// Mask hides the values of secrets in events, errors and samples (ADR 0022); nil:
+	// none. The result records (Rows) are data for the caller and stay as they are.
+	Mask *vars.Mask
 }
 
 // errInputLimit ends an input that has emitted Options.InputLimit records.
@@ -205,7 +209,7 @@ func build(p *model.Pipeline, opts Options) (*Runner, model.Errors) {
 				t.ID, t.Type, opts.Registry.Types()))
 			continue
 		}
-		with, err := expand(t.With, opts.Scope)
+		with, err := expandWith(t.With, opts.Scope, secretFields(opts.Registry, t.Type))
 		if err == nil {
 			r.transforms[i], err = def.New(asText(with, opts.Registry, t.Type))
 		}
@@ -465,6 +469,49 @@ func asText(with map[string]any, reg *transform.Registry, typ string) map[string
 	return out
 }
 
+// secretFields returns the fields of a transform type that hold a secret (ADR 0022).
+func secretFields(reg *transform.Registry, typ string) map[string]bool {
+	d, ok := reg.Descriptor(typ)
+	if !ok || d.Schema == nil {
+		return nil
+	}
+	var out map[string]bool
+	for _, p := range d.Schema.Properties {
+		if p.Schema.Format == schema.FormatSecret {
+			if out == nil {
+				out = map[string]bool{}
+			}
+			out[p.Name] = true
+		}
+	}
+	return out
+}
+
+// expandWith is expand with the fields for secrets resolved by ExpandSecret.
+func expandWith(v map[string]any, scope *vars.Scope, secret map[string]bool) (map[string]any, error) {
+	if scope == nil || len(secret) == 0 {
+		return expand(v, scope)
+	}
+	rest := maps.Clone(v)
+	resolved := map[string]any{}
+	for k := range secret {
+		if s, ok := v[k].(string); ok {
+			x, err := scope.ExpandSecret(s)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", k, err)
+			}
+			resolved[k] = x
+			delete(rest, k)
+		}
+	}
+	out, err := expand(rest, scope)
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(out, resolved)
+	return out, nil
+}
+
 // expand resolves ${…} references in the configuration; without a scope it stays as it is.
 func expand(v map[string]any, scope *vars.Scope) (map[string]any, error) {
 	if scope == nil || v == nil {
@@ -506,6 +553,9 @@ func expandValue(v any, scope *vars.Scope) (any, error) {
 }
 
 func (r *Runner) emit(e Event) {
+	if m := r.opts.Mask; m != nil {
+		e.Message, e.Err = m.String(e.Message), m.Error(e.Err)
+	}
 	if r.opts.Observer != nil {
 		r.emitMu.Lock()
 		defer r.emitMu.Unlock()
@@ -743,7 +793,7 @@ func (r *Runner) Run(parent context.Context) Result {
 	res := Result{RunID: runID, Status: Succeeded, Duration: now().Sub(started), Counts: map[string]Counts{}, Rows: results,
 		LinkRows: make([]int64, len(linkRows))}
 	if r.opts.SampleRows > 0 {
-		res.Samples = samples
+		res.Samples = maskSamples(r.opts.Mask, samples)
 	}
 	for i := range linkRows {
 		res.LinkRows[i] = linkRows[i].Load()
@@ -757,8 +807,26 @@ func (r *Runner) Run(parent context.Context) Result {
 	case parent.Err() != nil:
 		res.Status, res.Err = Cancelled, fmt.Errorf("run cancelled: %w", context.Cause(parent))
 	}
+	res.Err = r.opts.Mask.Error(res.Err)
 	r.emit(Event{Time: now(), Kind: RunFinished, RunID: runID, Status: res.Status, Err: res.Err, Duration: res.Duration})
 	return res
+}
+
+// maskSamples hides the values of secrets in the records of the data preview.
+func maskSamples(m *vars.Mask, samples [][]record.Record) [][]record.Record {
+	if m == nil {
+		return samples
+	}
+	for _, recs := range samples {
+		for i, rec := range recs {
+			fields := slices.Clone(rec.Fields())
+			for j, f := range fields {
+				fields[j].Value = m.Value(f.Value)
+			}
+			recs[i] = record.FromFields(fields)
+		}
+	}
+	return samples
 }
 
 // process runs a transform; a panic becomes an error instead of ending the program.

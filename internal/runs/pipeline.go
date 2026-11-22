@@ -88,11 +88,13 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		limit := min(max(spec.Preview.Limit, 1), MaxPreviewLimit)
 		opts.InputLimit, opts.SampleRows = limit, limit
 	}
+	scope, mask := secretScope(model.PipelineScope(pl, p.Project, p.Env, spec.Params))
 	p.Runner, err = pipeline.Prepare(run, pipeline.Options{
 		InputLimit:  opts.InputLimit,
 		SampleRows:  opts.SampleRows,
 		Registry:    spec.Registry,
-		Scope:       model.PipelineScope(pl, p.Project, p.Env, spec.Params),
+		Scope:       scope,
+		Mask:        mask,
 		Environment: envName,
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
