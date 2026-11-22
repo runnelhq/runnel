@@ -20,6 +20,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e12-organize.html`](e12-organize.html) | E12 – Projekt organisieren | `drag`, `moveto`, `refs`, `triggers` | freigegeben mit PR #99, umgesetzt mit E12 |
 | [`e13-icons.html`](e13-icons.html) | E13 – Icons aller Bausteine | `overview`, `sizes`, `canvas` | freigegeben vom Maintainer, umgesetzt mit E13 (im selben PR) |
 | [`e14-lists.html`](e14-lists.html) | E14 – Listen im Panel bearbeiten | `constant`, `convert`, `group`, `switch`, `help` | freigegeben mit PR #109; umgesetzt mit E14a (Listen-Editor) und E14b (Feldauswahl, Meldungen an der Zeile, Help) |
+| [`e16-copy-paste.html`](e16-copy-paste.html) | E16 – Kopieren und Einfügen im Canvas | `copy`, `paste`, `refs`, `wrongkind` | zur Freigabe |
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 
@@ -131,6 +132,7 @@ node design/mockups/screenshots.cjs e11-files new,name,rename,delete,folder
 node design/mockups/screenshots.cjs e12-organize drag,moveto,refs,triggers
 node design/mockups/screenshots.cjs e13-icons overview,sizes,canvas
 node design/mockups/screenshots.cjs e14-lists constant,convert,group,switch,help
+node design/mockups/screenshots.cjs e16-copy-paste copy,paste,refs,wrongkind
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
