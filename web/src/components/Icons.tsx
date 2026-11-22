@@ -326,6 +326,26 @@ const actionIcons: Record<string, ReactNode> = {
   "core.filter": <path d="M4 5h16l-6 7v6l-4 2v-8z" />,
   "core.select-fields": <path d="M5 6h14M5 12h9M5 18h5M17 15l2 2 3-4" />,
   "core.constant": <path d="M12 5v14M5 12h14" />,
+  // Mockup S16d (variant A): an expression {{ … }} that calculates; a record and its dropped copy; a list numbered from 1.
+  "core.calculate": (
+    <>
+      <path d="M9 4c-2 0-3 1-3 3v2.5C6 11 5 12 3.5 12 5 12 6 13 6 14.5V17c0 2 1 3 3 3M15 4c2 0 3 1 3 3v2.5c0 1.5 1 2.5 2.5 2.5-1.5 0-2.5 1-2.5 2.5V17c0 2-1 3-3 3" />
+      <path d="M10 12h4M12 10v4" />
+    </>
+  ),
+  "core.dedupe": (
+    <>
+      <rect x="3" y="3" width="11" height="11" rx="2" />
+      <path d="M10 17v2a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2" strokeDasharray="2.4 2.2" />
+    </>
+  ),
+  "core.sequence": (
+    <>
+      <path d="M5 4l1.5-1v6M4.5 9h3" />
+      <path d="M6 13v7M3.5 17.5L6 20l2.5-2.5" />
+      <path d="M11 6h9M11 12h9M11 18h9" />
+    </>
+  ),
   "core.switch": <path d="M4 12h6M10 12l8-6M10 12l8 6M10 12h8" />,
   "core.sort": <path d="M7 4v16M4 17l3 3 3-3M14 6h6M14 12h4M14 18h2" />,
   "core.group-by": (
