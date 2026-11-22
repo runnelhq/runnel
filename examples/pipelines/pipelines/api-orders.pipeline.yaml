@@ -1,0 +1,49 @@
+# Reads orders from the answer of a shop API and writes them as NDJSON (roadmap S19).
+# Relative paths refer to the project folder; for example:
+#   runnel run examples/pipelines/pipelines/api-orders.pipeline.yaml
+# - "read" takes the records from data.items of the JSON document; the city comes from
+#   the nested address (missing for Weber, Anna), the day is read as a date.
+# - "paid" keeps the paid orders.
+# - "write" writes one JSON object per line (NDJSON, by the file name), the day as text
+#   in German format.
+kind: Pipeline
+apiVersion: runnel/v1
+name: api-orders
+parameters:
+  - name: OUTPUT
+    description: NDJSON file to write
+    default: out/orders.ndjson
+transforms:
+  - id: read
+    type: json.input
+    with:
+      path: api/orders.json
+      records: data.items
+      fields:
+        - { name: id, type: int }
+        - { name: customer, from: customer.name }
+        - { name: city, from: customer.address.city }
+        - { name: amount, type: decimal }
+        - { name: day, type: date }
+        - { name: paid, type: bool }
+  - id: paid
+    type: core.filter
+    with:
+      condition: "{{ record.paid }}"
+  - id: write
+    type: json.output
+    with:
+      path: ${OUTPUT}
+      fields:
+        - { name: id }
+        - { name: customer }
+        - { name: city }
+        - { name: amount }
+        - { name: day, format: dd.MM.yyyy }
+links:
+  - { from: read, to: paid }
+  - { from: paid, to: write }
+layout:
+  read: { x: 0, y: 0 }
+  paid: { x: 240, y: 0 }
+  write: { x: 480, y: 0 }

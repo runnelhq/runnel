@@ -1459,6 +1459,179 @@
         "additionalProperties": false
       },
       "example": "status: 200\nsingle: true\n"
+    },
+    {
+      "type": "json.input",
+      "kind": "transform",
+      "category": "input",
+      "label": "JSON Input",
+      "description": "Reads the objects of a JSON or NDJSON file as records",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "JSON or NDJSON file to read, relative to the project folder or absolute",
+            "examples": [
+              "data/orders.json"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "description": "json: arrays and objects, also several one after another; ndjson: one object per line, a broken line goes to the error link; auto: ndjson for .ndjson and .jsonl, else json",
+            "enum": [
+              "auto",
+              "json",
+              "ndjson"
+            ],
+            "default": "auto"
+          },
+          "records": {
+            "type": "string",
+            "description": "Path to the array of records inside the document, with dots, e.g. data.items; empty: the document itself (json only)",
+            "examples": [
+              "data.items"
+            ]
+          },
+          "encoding": {
+            "type": "string",
+            "description": "Encoding of the file; auto recognizes UTF-8 and UTF-16 by their byte order mark and reads UTF-8 otherwise",
+            "enum": [
+              "auto",
+              "utf-8",
+              "windows-1252",
+              "utf-16"
+            ],
+            "default": "auto"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields to read, with path and type; empty: all keys of the objects as they are",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Where the value is in the object, with dots for nested objects, e.g. address.city; empty: the key of the same name"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type of the value; empty: as in the file (numbers, text, true/false, lists and objects)",
+                  "enum": [
+                    "string",
+                    "int",
+                    "decimal",
+                    "float",
+                    "bool",
+                    "date",
+                    "datetime",
+                    "json"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "For values given as text: number pattern like #.##0,00 or date pattern like dd.MM.yyyy",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "path: data/orders.json\nrecords: data.items\nfields:\n  - { name: id, type: int }\n  - { name: city, from: address.city }\n",
+      "recordErrors": true,
+      "detectFields": true
+    },
+    {
+      "type": "json.output",
+      "kind": "transform",
+      "category": "output",
+      "label": "JSON Output",
+      "description": "Writes records to a JSON or NDJSON file and passes them on",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "JSON or NDJSON file to write, relative to the project folder or absolute",
+            "examples": [
+              "out/orders.json"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "description": "json: an array with one record per line; ndjson: one object per line; auto: ndjson for .ndjson and .jsonl, else json",
+            "enum": [
+              "auto",
+              "json",
+              "ndjson"
+            ],
+            "default": "auto"
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "What happens if the file exists: replace it once all records are written, or fail",
+            "enum": [
+              "replace",
+              "fail"
+            ],
+            "default": "replace"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields to write, in this order; empty: all fields of the records",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field to write (and of the key)",
+                  "format": "runnel-field",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Writes the value as text with a number pattern like #.##0,00 or a date pattern like dd.MM.yyyy; empty: numbers as numbers, dates in ISO 8601",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "path: out/orders.json\nfields:\n  - { name: id }\n  - { name: day, format: dd.MM.yyyy }\n",
+      "recordErrors": true
     }
   ]
 }

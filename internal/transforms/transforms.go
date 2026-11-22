@@ -8,11 +8,13 @@ import (
 	"github.com/runnelhq/runnel/internal/transforms/core"
 	"github.com/runnelhq/runnel/internal/transforms/csv"
 	"github.com/runnelhq/runnel/internal/transforms/http"
+	"github.com/runnelhq/runnel/internal/transforms/json"
 )
 
 var namespaces = []func(*transform.Registry){
 	core.Register,
 	csv.Register,
+	json.Register,
 	http.Register,
 }
 

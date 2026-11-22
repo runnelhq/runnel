@@ -21,6 +21,7 @@ actions / network
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
   csv.input           CSV Input      Reads the rows of a CSV file as records
+  json.input          JSON Input     Reads the objects of a JSON or NDJSON file as records
 transforms / transform
   core.calculate      Calculate      Sets fields to the result of an expression for every record
   core.constant       Add Constants  Adds fields with the same value to every record
@@ -44,3 +45,4 @@ transforms / output
   core.log       Log            Writes records to the run log and passes them on
   csv.output     CSV Output     Writes records to a CSV file and passes them on
   http.response  HTTP Response  Answers the caller of an HTTP trigger with the records as JSON and passes them on
+  json.output    JSON Output    Writes records to a JSON or NDJSON file and passes them on

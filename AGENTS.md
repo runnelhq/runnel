@@ -47,6 +47,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |
 | `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, HTTP-Trigger mit eigenem Listener in `http.go` und Antworten in `respond.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt in `check.go` |
 | `internal/winsvc/` | Windows-Dienst: Installieren, Steuern, Ausführen, Ereignisanzeige (`*_windows.go`; sonst `ErrNotSupported`) |
+| `internal/textenc/` | Kodierung von Eingabedateien (UTF-8 mit/ohne BOM, UTF-16, Windows-1252) für `csv.input` und `json.input` |
 | `internal/logfile/` | Log-Datei mit Rotation nach Größe (Dienst) |
 | `internal/httpx/` | gemeinsame HTTP-Helfer von Server und Trigger-Listener (`IsLoopback`, JSON-Antworten) |
 | `internal/tlscert/` | Zertifikate des Trigger-Listeners: selbst erzeugt und wiederverwendet, eigene PEM-Dateien mit Neuladen |
