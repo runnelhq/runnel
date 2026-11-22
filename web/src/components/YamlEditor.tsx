@@ -197,7 +197,7 @@ export function YamlEditor(props: {
   markdown?: boolean;
   problems: Problem[];
   /** A line to show and put the cursor on; seq changes with every request. */
-  focus?: { line: number; seq: number } | null;
+  focus?: { line: number; seq: number; from?: number; to?: number } | null;
   onChange: (text: string) => void;
   /** Whether typed text waits for the typing pause (for "Checking…"). */
   onPending: (pending: boolean) => void;
@@ -299,7 +299,11 @@ export function YamlEditor(props: {
     if (!v || !props.focus) return;
     const line = v.state.doc.line(Math.min(Math.max(props.focus.line, 1), v.state.doc.lines));
     const indent = line.text.length - line.text.trimStart().length;
-    v.dispatch({ selection: { anchor: line.from + indent }, effects: EditorView.scrollIntoView(line.from, { y: "center" }) });
+    // A range of the line is selected, e.g. the value of an inserted field (E18b).
+    const { from, to } = props.focus;
+    const selection =
+      from !== undefined ? { anchor: line.from + Math.min(from, line.length), head: line.from + Math.min(to ?? from, line.length) } : { anchor: line.from + indent };
+    v.dispatch({ selection, effects: EditorView.scrollIntoView(line.from, { y: "center" }) });
     v.focus();
   }, [props.focus]);
 
