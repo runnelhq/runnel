@@ -508,7 +508,7 @@ func IsTriggerFile(rel string) bool {
 	if !strings.HasPrefix(rel, TriggersDir+"/") || !strings.HasSuffix(rel, ".yaml") {
 		return false
 	}
-	for _, part := range strings.Split(rel[len(TriggersDir)+1:], "/") {
+	for part := range strings.SplitSeq(rel[len(TriggersDir)+1:], "/") {
 		if part == "" || strings.HasPrefix(part, ".") {
 			return false
 		}

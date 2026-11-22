@@ -66,8 +66,7 @@ func newRunCommand() *cobra.Command {
 func runWorkflow(ctx context.Context, out, errOut io.Writer, file string, opts runOptions) error {
 	runner, err := prepareRun(out, errOut, file, opts)
 	if err != nil {
-		var exit errExitCode
-		if !errors.As(err, &exit) {
+		if _, ok := errors.AsType[errExitCode](err); !ok {
 			_, _ = fmt.Fprintln(errOut, "Error:", err)
 		}
 		return errExitCode(exitNotRun)
@@ -111,8 +110,7 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	})
 	printDiags(errOut, p.Warnings)
 	if err != nil {
-		var diags model.Errors
-		if errors.As(err, &diags) {
+		if diags, ok := errors.AsType[model.Errors](err); ok {
 			printDiags(errOut, diags)
 			return nil, errExitCode(exitNotRun)
 		}

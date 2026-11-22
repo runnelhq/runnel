@@ -48,8 +48,7 @@ func TestWorkflowGolden(t *testing.T) {
 					if err == nil {
 						t.Fatal("expected an error, got none")
 					}
-					var errs Errors
-					if !errors.As(err, &errs) {
+					if _, ok := errors.AsType[Errors](err); !ok {
 						t.Fatalf("error is %T, want Errors", err)
 					}
 					got = []byte(err.Error())

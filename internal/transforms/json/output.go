@@ -271,7 +271,7 @@ func writeString(b *bytes.Buffer, s string) {
 	const hex = "0123456789abcdef"
 	b.WriteByte('"')
 	start := 0
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c >= 0x20 && c != '"' && c != '\\' {
 			continue

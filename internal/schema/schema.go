@@ -206,10 +206,8 @@ func forType(t reflect.Type, path string, seen []reflect.Type, tag string) (*Sch
 		}
 		return &Schema{Type: "object", AdditionalProperties: values}, nil
 	case reflect.Struct:
-		for _, s := range seen {
-			if s == t {
-				return nil, fmt.Errorf("%s: recursive type %s", describe(path), t)
-			}
+		if slices.Contains(seen, t) {
+			return nil, fmt.Errorf("%s: recursive type %s", describe(path), t)
 		}
 		return forStruct(t, path, append(seen, t), tag)
 	default:
@@ -334,8 +332,7 @@ func fields(t reflect.Type) []field { return fieldsBy(t, "json") }
 // fieldsBy is fields with the names from the given tag (json or yaml).
 func fieldsBy(t reflect.Type, tag string) []field {
 	var out []field
-	for i := range t.NumField() {
-		f := t.Field(i)
+	for f := range t.Fields() {
 		name, _, _ := strings.Cut(f.Tag.Get(tag), ",")
 		if f.Anonymous && name == "" {
 			et := f.Type

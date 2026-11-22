@@ -4,7 +4,8 @@ BINARY  := runnel
 PKG     := github.com/runnelhq/runnel
 VERSION ?= $(shell git describe --tags --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse HEAD 2>/dev/null)
-DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+# The commit date (UTC), not the time of the build: the same commit gives the same binary.
+DATE    ?= $(shell TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LDFLAGS := -s -w \
 	-X $(PKG)/internal/version.Version=$(VERSION) \

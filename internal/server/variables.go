@@ -100,17 +100,19 @@ func (s *Server) handleVariables(w http.ResponseWriter, _ *http.Request) {
 			info.Truncated = true
 			return fs.SkipAll
 		}
+		// Files that cannot be read or parsed are skipped: the list shows what it finds,
+		// and validate reports broken files.
 		if fi, err := d.Info(); err != nil || fi.Size() > maxVariableFileSize {
 			info.Truncated = true
-			return nil
+			return nil //nolint:nilerr // skipped, see above
 		}
 		data, err := fs.ReadFile(s.root.FS(), p)
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // skipped, see above
 		}
 		uses, params, err := model.ScanVariables(p, data)
 		if err != nil {
-			return nil // a broken file has no uses; validate reports it
+			return nil //nolint:nilerr // a broken file has no uses
 		}
 		for _, u := range uses {
 			v := get(u.Name)

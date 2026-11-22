@@ -52,9 +52,7 @@ func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Acti
 	next := 0
 	var wg sync.WaitGroup
 	for range parallel {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				mu.Lock()
 				i := next
@@ -83,7 +81,7 @@ func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Acti
 					}
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

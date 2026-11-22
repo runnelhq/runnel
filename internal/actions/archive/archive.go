@@ -74,12 +74,10 @@ func plural(n int, word string) string {
 // plain returns the reason of a file system error without the operation and path,
 // which the messages name themselves.
 func plain(err error) error {
-	var pe *fs.PathError
-	if errors.As(err, &pe) {
+	if pe, ok := errors.AsType[*fs.PathError](err); ok {
 		return pe.Err
 	}
-	var le *os.LinkError
-	if errors.As(err, &le) {
+	if le, ok := errors.AsType[*os.LinkError](err); ok {
 		return le.Err
 	}
 	return err
@@ -96,8 +94,8 @@ func size(field, text string, fallback int64) (int64, error) {
 		suffix string
 		factor int64
 	}{{"KB", 1 << 10}, {"MB", 1 << 20}, {"GB", 1 << 30}, {"B", 1}} {
-		if strings.HasSuffix(s, u.suffix) {
-			s, unit = strings.TrimSpace(strings.TrimSuffix(s, u.suffix)), u.factor
+		if before, ok := strings.CutSuffix(s, u.suffix); ok {
+			s, unit = strings.TrimSpace(before), u.factor
 			break
 		}
 	}

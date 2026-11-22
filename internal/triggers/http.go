@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"mime"
 	"net"
 	"net/http"
@@ -57,7 +58,7 @@ func (h *httpTriggers) listen() {
 	if !want || h.srv != nil {
 		return
 	}
-	ln, err := net.Listen("tcp", s.opts.Listen)
+	ln, err := new(net.ListenConfig).Listen(context.Background(), "tcp", s.opts.Listen)
 	if err != nil {
 		msg := fmt.Sprintf("http triggers: cannot listen on %s (is the port taken? use --triggers): %v", s.opts.Listen, err)
 		if msg != h.problem {
@@ -205,9 +206,8 @@ func (h *httpTriggers) request(w http.ResponseWriter, r *http.Request) (*entry, 
 	if herr != nil {
 		return nil, StartRequest{}, herr
 	}
-	for k, v := range values { // path before query before body
-		inputs[k] = v
-	}
+	// path before query before body
+	maps.Copy(inputs, values)
 	params, herr := h.params(t, inputs)
 	if herr != nil {
 		return nil, StartRequest{}, herr

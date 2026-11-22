@@ -141,8 +141,7 @@ func (t *input) read(ctx context.Context, each func(item) (bool, error)) error {
 	if errors.Is(err, textenc.ErrNotUTF8) {
 		return fmt.Errorf("%s: %w", t.Path, err)
 	}
-	var stop stopError
-	if errors.As(err, &stop) {
+	if stop, ok := errors.AsType[stopError](err); ok {
 		return stop.err
 	}
 	return fmt.Errorf("%s: %s", t.where(file, dec.InputOffset()), syntaxMessage(err))

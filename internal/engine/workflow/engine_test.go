@@ -384,8 +384,7 @@ links:
   - { from: c, to: d }
 `)
 	_, err := Prepare(w, Options{Registry: testRegistry(t)})
-	var errs model.Errors
-	if !errors.As(err, &errs) {
+	if _, ok := errors.AsType[model.Errors](err); !ok {
 		t.Fatalf("want model.Errors, got %v", err)
 	}
 	for _, want := range []string{

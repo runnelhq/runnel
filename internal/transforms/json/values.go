@@ -151,8 +151,7 @@ func syntaxMessage(err error) string {
 	case errors.Is(err, io.ErrUnexpectedEOF), errors.Is(err, io.EOF):
 		return "the file ends in the middle of a value"
 	}
-	var ue *stdjson.UnmarshalTypeError
-	if errors.As(err, &ue) {
+	if ue, ok := errors.AsType[*stdjson.UnmarshalTypeError](err); ok {
 		return "unexpected " + ue.Value
 	}
 	return err.Error()

@@ -35,8 +35,7 @@ func TestLoadProject(t *testing.T) {
 
 func TestLoadProjectInvalid(t *testing.T) {
 	_, err := LoadProject(filepath.Join("testdata", "project", "invalid"))
-	var errs Errors
-	if !errors.As(err, &errs) {
+	if _, ok := errors.AsType[Errors](err); !ok {
 		t.Fatalf("want Errors, got %v", err)
 	}
 	compareGolden(t, filepath.Join("testdata", "project", "invalid.golden"), []byte(err.Error()+"\n"))

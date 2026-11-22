@@ -51,7 +51,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.Set("Cache-Control", "no-cache")
 	}
-	http.ServeFileFS(w, r, s.ui, name)
+	http.ServeFileFS(w, r, s.ui, name) //nolint:gosec // s.ui is the embedded build of the editor, not the file system
 }
 
 func handleVersion(w http.ResponseWriter, _ *http.Request) {

@@ -88,8 +88,7 @@ func parseWorkflow(name string, data []byte) (*model.Workflow, model.Errors, err
 		}
 		return checkedWorkflow{w: w, diags: diags}, nil
 	})
-	var e errorsOnly
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[errorsOnly](err); ok {
 		return c.w, e.diags, nil
 	}
 	return c.w, slices.Clone(c.diags), err
@@ -108,8 +107,7 @@ func parsePipeline(name string, data []byte) (*model.Pipeline, model.Errors, err
 		}
 		return checkedPipeline{p: p, diags: diags}, nil
 	})
-	var e errorsOnly
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[errorsOnly](err); ok {
 		return c.p, e.diags, nil
 	}
 	return c.p, slices.Clone(c.diags), err

@@ -104,8 +104,7 @@ func (spec Spec) workflows(envName string) action.WorkflowRunner {
 		}
 		p, err := Prepare(child)
 		if err != nil {
-			var diags model.Errors
-			if errors.As(err, &diags) {
+			if diags, ok := errors.AsType[model.Errors](err); ok {
 				return nil, fmt.Errorf("workflow %s cannot be started: %s", name, onlyErrors(diags))
 			}
 			return nil, fmt.Errorf("workflow %s cannot be started: %w", name, err)

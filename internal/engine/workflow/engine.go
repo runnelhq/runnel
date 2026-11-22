@@ -187,8 +187,7 @@ func Check(w *model.Workflow, opts Options) model.Errors {
 	if err == nil {
 		return nil
 	}
-	var diags model.Errors
-	if errors.As(err, &diags) {
+	if diags, ok := errors.AsType[model.Errors](err); ok {
 		return diags
 	}
 	return model.Errors{w.ErrorAt("$", "%v", err)}

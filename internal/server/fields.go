@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
@@ -119,10 +120,8 @@ func hasVariables(v any) bool {
 			}
 		}
 	case []any:
-		for _, e := range v {
-			if hasVariables(e) {
-				return true
-			}
+		if slices.ContainsFunc(v, hasVariables) {
+			return true
 		}
 	}
 	return false

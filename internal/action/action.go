@@ -268,8 +268,7 @@ func decodeConfig(with map[string]any, v any, useNumber bool) error {
 		dec.UseNumber()
 	}
 	if err := dec.Decode(v); err != nil {
-		var typeErr *json.UnmarshalTypeError
-		if errors.As(err, &typeErr) {
+		if typeErr, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
 			return fmt.Errorf("field %q: expected %s, got %s", typeErr.Field, typeErr.Type.Kind(), typeErr.Value)
 		}
 		if field, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {

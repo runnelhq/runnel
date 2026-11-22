@@ -148,7 +148,7 @@ func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
 	// and opened directly in the browser it runs no scripts (e.g. an SVG or HTML file).
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
-	_, _ = w.Write(data)
+	_, _ = w.Write(data) //nolint:gosec // project data with nosniff and a sandbox CSP (above), not a page of the editor
 }
 
 // handlePutFile creates or replaces a file. Replacing requires If-Match with the
@@ -162,8 +162,7 @@ func (s *Server) handlePutFile(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxFileSize))
 	if err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			writeError(w, http.StatusRequestEntityTooLarge, "file is larger than 10 MiB")
 			return
 		}
@@ -316,7 +315,7 @@ func filePath(p string) (string, error) {
 	if strings.Contains(p, `\`) {
 		return "", errorf(http.StatusBadRequest, `invalid path %q: use "/" as separator`, p)
 	}
-	for _, seg := range strings.Split(p, "/") {
+	for seg := range strings.SplitSeq(p, "/") {
 		if err := checkSegment(seg); err != "" {
 			return "", errorf(http.StatusBadRequest, "invalid path %q: %s", p, err)
 		}

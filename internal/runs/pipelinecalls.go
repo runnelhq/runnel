@@ -54,8 +54,7 @@ func (spec Spec) pipelines(envName string) action.PipelineRunner {
 			err = fmt.Errorf("parameter(s) %v not declared by pipeline %q (declared: %s)", p.Undeclared, p.Pipeline.Name, DeclaredOf(p.Pipeline.Parameters))
 		}
 		if err != nil {
-			var diags model.Errors
-			if errors.As(err, &diags) {
+			if diags, ok := errors.AsType[model.Errors](err); ok {
 				return nil, fmt.Errorf("pipeline %s cannot be started: %s", name, onlyErrors(diags))
 			}
 			return nil, fmt.Errorf("pipeline %s cannot be started: %w", name, err)

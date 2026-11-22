@@ -178,8 +178,7 @@ func (s *Server) validate(name string, data []byte) (*model.Workflow, model.Erro
 	diags = append(diags, wf.Validate()...)
 
 	p, err := model.LoadProject(s.dir)
-	var projectDiags model.Errors
-	if errors.As(err, &projectDiags) {
+	if projectDiags, ok := errors.AsType[model.Errors](err); ok {
 		diags = append(diags, projectDiags...)
 		if projectDiags.HasErrors() {
 			p = nil

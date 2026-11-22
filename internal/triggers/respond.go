@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -133,7 +134,8 @@ func writeResponse(w http.ResponseWriter, resp action.Response) {
 	switch b := resp.Body.(type) {
 	case nil:
 	case json.RawMessage:
-		body, contentType = append(b, '\n'), "application/json; charset=utf-8"
+		// A copy: b may be shared with the result of the run.
+		body, contentType = slices.Concat(b, json.RawMessage("\n")), "application/json; charset=utf-8"
 	case string:
 		body, contentType = []byte(b), "text/plain; charset=utf-8"
 	default:
@@ -142,7 +144,8 @@ func writeResponse(w http.ResponseWriter, resp action.Response) {
 			reply(w, http.StatusInternalServerError, httpx.ErrorBody{Error: "the body of http.respond cannot be written as JSON: " + err.Error()})
 			return
 		}
-		body, contentType = append(data, '\n'), "application/json; charset=utf-8"
+		data = append(data, '\n')
+		body, contentType = data, "application/json; charset=utf-8"
 	}
 	if contentType != "" {
 		w.Header().Set("Content-Type", contentType)

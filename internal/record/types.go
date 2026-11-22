@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -32,12 +33,7 @@ var Types = []Type{String, Int, Decimal, Float, Bool, DateType, DateTime, Binary
 
 // Valid reports whether t is one of Types (Unknown is not).
 func (t Type) Valid() bool {
-	for _, v := range Types {
-		if t == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(Types, t)
 }
 
 // TypeOf returns the type of a value in its Go representation; Unknown for nil and

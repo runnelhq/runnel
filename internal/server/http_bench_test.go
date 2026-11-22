@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -45,7 +46,7 @@ func BenchmarkHTTPTrigger(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			r := httptest.NewRequest("GET", "/w/7", strings.NewReader(""))
+			r := httptest.NewRequest(http.MethodGet, "/w/7", strings.NewReader(""))
 			r.Host = "127.0.0.1:7301"
 			w := httptest.NewRecorder()
 			s.triggers.ServeHTTP(w, r)

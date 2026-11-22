@@ -3,6 +3,7 @@ package csv
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,9 +168,7 @@ func TestInputErrors(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			with := map[string]any{"path": writeFile(t, tt.content)}
-			for k, v := range tt.with {
-				with[k] = v
-			}
+			maps.Copy(with, tt.with)
 			_, err := read(t, with)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Errorf("error %v, want %q", err, tt.want)

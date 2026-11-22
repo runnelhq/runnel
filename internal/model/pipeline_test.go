@@ -37,8 +37,7 @@ func TestPipelineGolden(t *testing.T) {
 						t.Errorf("expected no problems, got:\n%v", diags)
 					}
 				} else {
-					var errs Errors
-					if !errors.As(err, &errs) {
+					if _, ok := errors.AsType[Errors](err); !ok {
 						t.Fatalf("error is %T (%v), want Errors", err, err)
 					}
 					got = []byte(err.Error())

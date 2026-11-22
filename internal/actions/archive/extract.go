@@ -277,7 +277,7 @@ func walk(ctx context.Context, f *os.File, format string, fn func(m member, open
 			}
 			mode := zf.Mode()
 			m := member{name: clean(name), dir: mode.IsDir(), regular: mode.IsRegular(),
-				size: int64(zf.UncompressedSize64), modTime: zf.Modified}
+				size: int64(zf.UncompressedSize64), modTime: zf.Modified} //nolint:gosec // a size above MaxInt64 turns negative and is rejected as too large
 			if err := fn(m, zf.Open); err != nil {
 				return err
 			}
@@ -330,7 +330,7 @@ func clean(name string) string {
 }
 
 func isASCII(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] >= utf8.RuneSelf {
 			return false
 		}

@@ -29,8 +29,7 @@ func (s *Server) validateText(kind, name string, data []byte) (model.Errors, err
 			return s.checkTrigger(t, name), nil
 		}
 	}
-	var diags model.Errors
-	if errors.As(err, &diags) {
+	if diags, ok := errors.AsType[model.Errors](err); ok {
 		diags.Sort()
 		return diags, nil
 	}

@@ -153,7 +153,7 @@ func readEvents(t *testing.T, sc *bufio.Scanner, n int) []sseEvent {
 
 func openStream(t *testing.T, url string, header ...string) *bufio.Scanner {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), "GET", url, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestHTTPTrigger(t *testing.T) {
 	if p := s.triggers.Problems(); len(p) != 0 {
 		t.Fatal(p)
 	}
-	r := httptest.NewRequest("POST", "/hooks/wait", strings.NewReader(`{"DELAY": "1ms"}`))
+	r := httptest.NewRequest(http.MethodPost, "/hooks/wait", strings.NewReader(`{"DELAY": "1ms"}`))
 	r.Host, r.RemoteAddr = "127.0.0.1:7301", "127.0.0.1:50000"
 	w := httptest.NewRecorder()
 	s.triggers.ServeHTTP(w, r)
@@ -384,7 +384,7 @@ actions:
 		t.Fatal(p)
 	}
 	post := func(path, body string) *httptest.ResponseRecorder {
-		r := httptest.NewRequest("POST", path, strings.NewReader(body))
+		r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Host, r.RemoteAddr = "127.0.0.1:7301", "127.0.0.1:50000"
 		w := httptest.NewRecorder()
@@ -443,7 +443,7 @@ links:
 		t.Fatal(p)
 	}
 	post := func(path, body string) *httptest.ResponseRecorder {
-		r := httptest.NewRequest("POST", path, strings.NewReader(body))
+		r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		r.Host, r.RemoteAddr = "127.0.0.1:7301", "127.0.0.1:50000"
 		w := httptest.NewRecorder()

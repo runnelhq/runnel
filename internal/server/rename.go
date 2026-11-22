@@ -195,11 +195,11 @@ func replaceInLine(lines []string, line int, old, repl string) bool {
 		return false
 	}
 	l := lines[line-1]
-	i := strings.Index(l, old)
-	if i < 0 {
+	before, after, ok := strings.Cut(l, old)
+	if !ok {
 		return false
 	}
-	lines[line-1] = l[:i] + repl + l[i+len(old):]
+	lines[line-1] = before + repl + after
 	return true
 }
 
@@ -230,19 +230,20 @@ func (s *Server) references(name string) []reference {
 	_ = fs.WalkDir(s.root.FS(), ".", func(p string, d fs.DirEntry, err error) error {
 		switch {
 		case err != nil:
-			return nil
+			return nil //nolint:nilerr // folders that cannot be read are skipped
 		case d.IsDir() && p != "." && strings.HasPrefix(d.Name(), "."):
 			return fs.SkipDir
 		case d.IsDir() || !strings.HasSuffix(p, ".workflow.yaml"):
 			return nil
 		}
+		// Workflows that cannot be read or parsed have no references to update.
 		data, err := s.root.ReadFile(filepath.FromSlash(p))
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // skipped, see above
 		}
 		wf, err := model.ParseWorkflow(p, data)
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // skipped, see above
 		}
 		for i, a := range wf.Actions {
 			key := map[string]string{"core.run-workflow": "workflow", "core.run-pipeline": "pipeline"}[a.Type]

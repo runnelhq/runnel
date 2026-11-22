@@ -85,8 +85,7 @@ func unwrap(n ast.Node) ast.Node {
 // yamlFields returns the fields of a struct by their YAML name.
 func yamlFields(t reflect.Type) map[string]reflect.Type {
 	out := map[string]reflect.Type{}
-	for i := range t.NumField() {
-		f := t.Field(i)
+	for f := range t.Fields() {
 		if !f.IsExported() {
 			continue
 		}
