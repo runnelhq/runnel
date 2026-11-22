@@ -68,22 +68,22 @@ const (
 // Trigger is the content of a file in triggers/: it starts a workflow or a pipeline
 // automatically, e.g. on a schedule (KONZEPT, chapter 5.3).
 type Trigger struct {
-	Kind        string `yaml:"kind" json:"kind"`
-	APIVersion  string `yaml:"apiVersion" json:"apiVersion"`
-	Name        string `yaml:"name" json:"name"`
-	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Kind        string `yaml:"kind" json:"kind" doc:"Type of the file" schema:"required,enum=Trigger"`
+	APIVersion  string `yaml:"apiVersion" json:"apiVersion" doc:"Version of the file format" schema:"required,enum=runnel/v1"`
+	Name        string `yaml:"name" json:"name" doc:"Name of the trigger" schema:"required,example=nightly-import"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty" doc:"What the trigger starts and why"`
 	// Type is cron, interval, file or http.
-	Type string `yaml:"type" json:"type"`
+	Type string `yaml:"type" json:"type" doc:"When the trigger starts runs: cron (schedule), interval (fixed time between runs), file (new files in a folder) or http (a call to an address)" schema:"required,enum=cron|interval|file|http"`
 	// Target is the workflow or pipeline to start, relative to the project directory.
-	Target string `yaml:"target" json:"target"`
+	Target string `yaml:"target" json:"target" doc:"Workflow or pipeline to start, relative to the project folder" schema:"required,example=workflows/import.workflow.yaml"`
 	// Environment of the runs; empty: the project's default environment.
-	Environment string `yaml:"environment,omitempty" json:"environment,omitempty"`
+	Environment string `yaml:"environment,omitempty" json:"environment,omitempty" doc:"Environment of the runs; empty: the default environment of the project" schema:"example=prod"`
 	// Params are the parameter values given to the target.
-	Params map[string]any `yaml:"params,omitempty" json:"params,omitempty"`
+	Params map[string]any `yaml:"params,omitempty" json:"params,omitempty" doc:"Values for the parameters of the target, by name"`
 	// Enabled is false to keep the trigger in the project without running it.
-	Enabled *bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	Enabled *bool `yaml:"enabled,omitempty" json:"enabled,omitempty" doc:"false keeps the trigger in the project without starting runs" schema:"default=true"`
 	// With holds the settings of the type.
-	With TriggerSettings `yaml:"with,omitempty" json:"with,omitzero"`
+	With TriggerSettings `yaml:"with,omitempty" json:"with,omitzero" doc:"Settings of the trigger type"`
 
 	src      *source
 	schedule cron.Schedule
@@ -94,44 +94,44 @@ type Trigger struct {
 type TriggerSettings struct {
 	// Schedule is a cron expression (minute hour day-of-month month day-of-week), e.g.
 	// "0 2 * * 1-5", or @hourly, @daily, @weekly, @monthly, @yearly (cron).
-	Schedule string `yaml:"schedule,omitempty" json:"schedule,omitempty"`
+	Schedule string `yaml:"schedule,omitempty" json:"schedule,omitempty" doc:"cron: when to run, as minute hour day-of-month month day-of-week, e.g. 0 2 * * 1-5, or @hourly, @daily, @weekly, @monthly" schema:"example=0 2 * * 1-5"`
 	// Timezone of the schedule, e.g. Europe/Berlin; empty: the time zone of the computer.
-	Timezone string `yaml:"timezone,omitempty" json:"timezone,omitempty"`
+	Timezone string `yaml:"timezone,omitempty" json:"timezone,omitempty" doc:"cron: time zone of the schedule, e.g. Europe/Berlin; empty: the time zone of the computer" schema:"example=Europe/Berlin"`
 	// Overlap decides what happens while the previous run of the trigger still runs:
 	// skip (default) or allow.
-	Overlap string `yaml:"overlap,omitempty" json:"overlap,omitempty"`
+	Overlap string `yaml:"overlap,omitempty" json:"overlap,omitempty" doc:"cron, interval, file: what happens while the previous run still runs: skip it or allow another run" schema:"enum=skip|allow,default=skip"`
 
 	// Every is the time between two runs (interval), e.g. 15m.
-	Every Duration `yaml:"every,omitempty" json:"every,omitempty"`
+	Every Duration `yaml:"every,omitempty" json:"every,omitempty" doc:"interval: time between two runs, e.g. 15m" schema:"format=runnel-duration,example=15m"`
 
 	// Path is the folder to watch (file), relative to the project or absolute (also UNC).
-	Path string `yaml:"path,omitempty" json:"path,omitempty"`
+	Path string `yaml:"path,omitempty" json:"path,omitempty" doc:"file: folder to watch, relative to the project folder or absolute (also UNC); http: path of the address with placeholders, e.g. /api/customers/{id}" schema:"example=inbox"`
 	// Pattern selects files by name, e.g. "*.csv" (file; default "*"); case is ignored.
-	Pattern string `yaml:"pattern,omitempty" json:"pattern,omitempty"`
+	Pattern string `yaml:"pattern,omitempty" json:"pattern,omitempty" doc:"file: names of the files, e.g. *.csv; upper and lower case are ignored" schema:"default=*"`
 	// Interval is the time between two looks into the folder (file; default 10s).
-	Interval Duration `yaml:"interval,omitempty" json:"interval,omitempty"`
+	Interval Duration `yaml:"interval,omitempty" json:"interval,omitempty" doc:"file: time between two looks into the folder" schema:"format=runnel-duration,default=10s"`
 	// Param is the parameter of the target that receives the path of the file (each) or
 	// the paths of the files as a JSON list (batch).
-	Param string `yaml:"param,omitempty" json:"param,omitempty"`
+	Param string `yaml:"param,omitempty" json:"param,omitempty" doc:"file: parameter of the target that gets the path of the file (each) or the paths as a JSON list (batch)" schema:"example=FILE"`
 	// Mode is each (one run per file, default) or batch (one run for all new files).
-	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	Mode string `yaml:"mode,omitempty" json:"mode,omitempty" doc:"file: one run per new file (each) or one run for all new files of a look (batch)" schema:"enum=each|batch,default=each"`
 	// Existing is process (default) or ignore: files already there when the server starts.
-	Existing string `yaml:"existing,omitempty" json:"existing,omitempty"`
+	Existing string `yaml:"existing,omitempty" json:"existing,omitempty" doc:"file: what happens to files already in the folder when the server starts: process them or ignore them" schema:"enum=process|ignore,default=process"`
 
 	// Method is the HTTP method (http): GET, POST, PUT, PATCH or DELETE. Path (above) is
 	// the URL path with placeholders, e.g. /api/customers/{id}.
-	Method string `yaml:"method,omitempty" json:"method,omitempty"`
+	Method string `yaml:"method,omitempty" json:"method,omitempty" doc:"http: HTTP method of the calls (required for http)" schema:"enum=GET|POST|PUT|PATCH|DELETE"`
 	// Auth is none or { token: ${env:NAME} } (http).
-	Auth any `yaml:"auth,omitempty" json:"auth,omitempty"`
+	Auth any `yaml:"auth,omitempty" json:"auth,omitempty" doc:"http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${env:IMPORT_TOKEN} }"`
 	// Response is accepted (default: 202 with the run id at once) or run (the caller
 	// waits for the answer of the run, at most timeout).
-	Response string `yaml:"response,omitempty" json:"response,omitempty"`
+	Response string `yaml:"response,omitempty" json:"response,omitempty" doc:"http: answer at once with 202 and the run id (accepted), or wait for the answer of the run (run)" schema:"enum=accepted|run,default=accepted"`
 	// MaxConcurrent limits the running runs of the trigger (http; 0: no own limit).
-	MaxConcurrent int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty"`
+	MaxConcurrent int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty" doc:"http: most runs of this trigger at the same time; 0: no own limit" schema:"default=0"`
 	// Timeout is how long the caller waits with response: run (default 30s). History
 	// is all, errors or none: which runs are kept when they have ended.
-	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
-	History string   `yaml:"history,omitempty" json:"history,omitempty"`
+	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty" doc:"http with response: run: how long the caller waits for the answer" schema:"format=runnel-duration,default=30s"`
+	History string   `yaml:"history,omitempty" json:"history,omitempty" doc:"http: which ended runs are kept in the list of runs: all, errors or none; empty: all, with response: run only errors" schema:"enum=all|errors|none"`
 }
 
 // EveryValue returns the time between two runs of an interval trigger.

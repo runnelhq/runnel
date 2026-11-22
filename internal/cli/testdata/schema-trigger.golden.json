@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "Type of the file",
+      "enum": [
+        "Trigger"
+      ]
+    },
+    "apiVersion": {
+      "type": "string",
+      "description": "Version of the file format",
+      "enum": [
+        "runnel/v1"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the trigger",
+      "examples": [
+        "nightly-import"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What the trigger starts and why"
+    },
+    "type": {
+      "type": "string",
+      "description": "When the trigger starts runs: cron (schedule), interval (fixed time between runs), file (new files in a folder) or http (a call to an address)",
+      "enum": [
+        "cron",
+        "interval",
+        "file",
+        "http"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "description": "Workflow or pipeline to start, relative to the project folder",
+      "examples": [
+        "workflows/import.workflow.yaml"
+      ]
+    },
+    "environment": {
+      "type": "string",
+      "description": "Environment of the runs; empty: the default environment of the project",
+      "examples": [
+        "prod"
+      ]
+    },
+    "params": {
+      "type": "object",
+      "description": "Values for the parameters of the target, by name",
+      "additionalProperties": {}
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "false keeps the trigger in the project without starting runs",
+      "default": true
+    },
+    "with": {
+      "type": "object",
+      "description": "Settings of the trigger type",
+      "properties": {
+        "schedule": {
+          "type": "string",
+          "description": "cron: when to run, as minute hour day-of-month month day-of-week, e.g. 0 2 * * 1-5, or @hourly, @daily, @weekly, @monthly",
+          "examples": [
+            "0 2 * * 1-5"
+          ]
+        },
+        "timezone": {
+          "type": "string",
+          "description": "cron: time zone of the schedule, e.g. Europe/Berlin; empty: the time zone of the computer",
+          "examples": [
+            "Europe/Berlin"
+          ]
+        },
+        "overlap": {
+          "type": "string",
+          "description": "cron, interval, file: what happens while the previous run still runs: skip it or allow another run",
+          "enum": [
+            "skip",
+            "allow"
+          ],
+          "default": "skip"
+        },
+        "every": {
+          "type": "string",
+          "description": "interval: time between two runs, e.g. 15m",
+          "format": "runnel-duration",
+          "examples": [
+            "15m"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "file: folder to watch, relative to the project folder or absolute (also UNC); http: path of the address with placeholders, e.g. /api/customers/{id}",
+          "examples": [
+            "inbox"
+          ]
+        },
+        "pattern": {
+          "type": "string",
+          "description": "file: names of the files, e.g. *.csv; upper and lower case are ignored",
+          "default": "*"
+        },
+        "interval": {
+          "type": "string",
+          "description": "file: time between two looks into the folder",
+          "format": "runnel-duration",
+          "default": "10s"
+        },
+        "param": {
+          "type": "string",
+          "description": "file: parameter of the target that gets the path of the file (each) or the paths as a JSON list (batch)",
+          "examples": [
+            "FILE"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "description": "file: one run per new file (each) or one run for all new files of a look (batch)",
+          "enum": [
+            "each",
+            "batch"
+          ],
+          "default": "each"
+        },
+        "existing": {
+          "type": "string",
+          "description": "file: what happens to files already in the folder when the server starts: process them or ignore them",
+          "enum": [
+            "process",
+            "ignore"
+          ],
+          "default": "process"
+        },
+        "method": {
+          "type": "string",
+          "description": "http: HTTP method of the calls (required for http)",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "auth": {
+          "description": "http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${env:IMPORT_TOKEN} }"
+        },
+        "response": {
+          "type": "string",
+          "description": "http: answer at once with 202 and the run id (accepted), or wait for the answer of the run (run)",
+          "enum": [
+            "accepted",
+            "run"
+          ],
+          "default": "accepted"
+        },
+        "maxConcurrent": {
+          "type": "integer",
+          "description": "http: most runs of this trigger at the same time; 0: no own limit",
+          "default": 0
+        },
+        "timeout": {
+          "type": "string",
+          "description": "http with response: run: how long the caller waits for the answer",
+          "format": "runnel-duration",
+          "default": "30s"
+        },
+        "history": {
+          "type": "string",
+          "description": "http: which ended runs are kept in the list of runs: all, errors or none; empty: all, with response: run only errors",
+          "enum": [
+            "all",
+            "errors",
+            "none"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "kind",
+    "apiVersion",
+    "name",
+    "type",
+    "target"
+  ],
+  "additionalProperties": false
+}
