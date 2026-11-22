@@ -143,6 +143,17 @@ func (ps Properties) Lookup(name string) (*Schema, bool) {
 // pointer to one; nil stands for "no configuration" and yields an object schema
 // without properties.
 func For(config any) (*Schema, error) {
+	return build(config, "json")
+}
+
+// ForFile returns the schema of a file format (Project, Environment, Trigger …): like
+// For, but the field names come from the yaml tags, since the structs of package model
+// also carry json names for the API that are not part of the files (S58).
+func ForFile(format any) (*Schema, error) {
+	return build(format, "yaml")
+}
+
+func build(config any, tag string) (*Schema, error) {
 	s := &Schema{Type: "object", AdditionalProperties: false}
 	if config != nil {
 		t := reflect.TypeOf(config)
@@ -153,7 +164,7 @@ func For(config any) (*Schema, error) {
 			return nil, fmt.Errorf("configuration must be a struct, not %s", t)
 		}
 		var err error
-		if s, err = forType(t, "", nil); err != nil {
+		if s, err = forType(t, "", nil, tag); err != nil {
 			return nil, err
 		}
 	}
@@ -161,7 +172,7 @@ func For(config any) (*Schema, error) {
 	return s, nil
 }
 
-func forType(t reflect.Type, path string, seen []reflect.Type) (*Schema, error) {
+func forType(t reflect.Type, path string, seen []reflect.Type, tag string) (*Schema, error) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
@@ -180,7 +191,7 @@ func forType(t reflect.Type, path string, seen []reflect.Type) (*Schema, error) 
 	case reflect.Interface:
 		return &Schema{}, nil // any value
 	case reflect.Slice, reflect.Array:
-		items, err := forType(t.Elem(), path+"[]", seen)
+		items, err := forType(t.Elem(), path+"[]", seen, tag)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +200,7 @@ func forType(t reflect.Type, path string, seen []reflect.Type) (*Schema, error) 
 		if t.Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("%s: map keys must be strings", describe(path))
 		}
-		values, err := forType(t.Elem(), path+"{}", seen)
+		values, err := forType(t.Elem(), path+"{}", seen, tag)
 		if err != nil {
 			return nil, err
 		}
@@ -200,20 +211,20 @@ func forType(t reflect.Type, path string, seen []reflect.Type) (*Schema, error) 
 				return nil, fmt.Errorf("%s: recursive type %s", describe(path), t)
 			}
 		}
-		return forStruct(t, path, append(seen, t))
+		return forStruct(t, path, append(seen, t), tag)
 	default:
 		return nil, fmt.Errorf("%s: unsupported type %s", describe(path), t)
 	}
 }
 
-func forStruct(t reflect.Type, path string, seen []reflect.Type) (*Schema, error) {
+func forStruct(t reflect.Type, path string, seen []reflect.Type, tag string) (*Schema, error) {
 	s := &Schema{Type: "object", AdditionalProperties: false}
-	for _, f := range fields(t) {
+	for _, f := range fieldsBy(t, tag) {
 		fieldPath := join(path, f.name)
 		if f.options.err != nil {
 			return nil, fmt.Errorf("%s: %w", describe(fieldPath), f.options.err)
 		}
-		fs, err := forType(f.typ, fieldPath, seen)
+		fs, err := forType(f.typ, fieldPath, seen, tag)
 		if err != nil {
 			return nil, err
 		}
@@ -318,18 +329,21 @@ type options struct {
 
 // fields returns the configuration fields of a struct, including those of embedded
 // structs, in declaration order – the fields encoding/json decodes.
-func fields(t reflect.Type) []field {
+func fields(t reflect.Type) []field { return fieldsBy(t, "json") }
+
+// fieldsBy is fields with the names from the given tag (json or yaml).
+func fieldsBy(t reflect.Type, tag string) []field {
 	var out []field
 	for i := range t.NumField() {
 		f := t.Field(i)
-		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		name, _, _ := strings.Cut(f.Tag.Get(tag), ",")
 		if f.Anonymous && name == "" {
 			et := f.Type
 			if et.Kind() == reflect.Pointer {
 				et = et.Elem()
 			}
 			if et.Kind() == reflect.Struct {
-				out = append(out, fields(et)...)
+				out = append(out, fieldsBy(et, tag)...)
 				continue
 			}
 		}

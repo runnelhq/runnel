@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "Type of the file",
+      "enum": [
+        "Project"
+      ]
+    },
+    "apiVersion": {
+      "type": "string",
+      "description": "Version of the file format",
+      "enum": [
+        "runnel/v1"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the project",
+      "examples": [
+        "my-project"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What the project does; shown in the editor"
+    },
+    "defaultEnvironment": {
+      "type": "string",
+      "description": "Environment used when a run names none, e.g. dev; the name of a file in environments/",
+      "examples": [
+        "dev"
+      ]
+    },
+    "variables": {
+      "type": "object",
+      "description": "Variables for all environments, used as ${NAME}; an environment can override them. Values may use other variables, e.g. ${BASE}\\inbox",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "description": "Defaults for all workflows of the project",
+      "properties": {
+        "defaultJoin": {
+          "type": "string",
+          "description": "When an action with several incoming links starts, if it sets no join: all (every link decided), first or each",
+          "enum": [
+            "all",
+            "first",
+            "each"
+          ],
+          "default": "all"
+        }
+      },
+      "additionalProperties": false
+    },
+    "settings": {
+      "type": "object",
+      "description": "Limits for the runs of the project",
+      "properties": {
+        "maxConcurrentRuns": {
+          "type": "integer",
+          "description": "Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit",
+          "default": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "kind",
+    "apiVersion",
+    "name"
+  ],
+  "additionalProperties": false
+}

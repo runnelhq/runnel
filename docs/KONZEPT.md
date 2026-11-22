@@ -298,6 +298,7 @@ flowchart LR
 | Validierung | `runnel validate <datei/ordner>` (Workflows, Pipelines, Trigger) | Lint/Prüfung in CI |
 | Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
 | Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
+| Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments und Triggern (seit S58), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
@@ -999,6 +1000,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | POST | `/validate` | Definition prüfen (auch ungespeicherten Inhalt), Fehler mit Zeilen- und Knotenbezug (YAML-Pfad) |
 | POST | `/workflows/edit` · `/pipelines/edit` | Änderung vom Canvas zeilengenau auf den YAML-Text anwenden (verschieben, löschen, anlegen, umbenennen, Links), Kommentare bleiben erhalten (seit E6a/E6b, Pipelines seit S25a) |
 | GET | `/catalog` | Alle verfügbaren Actions/Transforms (Descriptors) |
+| GET | `/schemas/{kind}` | JSON Schema einer Dateiart: `project`, `environment`, `trigger` (seit S58) |
 | GET | `/expressions` · `/version` | Wurzeln, Funktionen und Variablen für den Ausdruckseditor · Version des Servers |
 | POST | `/runs` | Run starten `{ path, environment, params }`; später `runConfig`, `startAt`, `only`, `reuseResultsFrom` |
 | GET | `/runs?status=&path=` | Historie (seit E3 im Speicher, Filter folgen mit S26 – zurückgestellt) |

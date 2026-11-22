@@ -21,16 +21,16 @@ const (
 
 // Project is the content of project.yaml plus the environments of the project.
 type Project struct {
-	Kind               string            `yaml:"kind" json:"kind"`
-	APIVersion         string            `yaml:"apiVersion" json:"apiVersion"`
-	Name               string            `yaml:"name" json:"name"`
-	Description        string            `yaml:"description,omitempty" json:"description,omitempty"`
-	DefaultEnvironment string            `yaml:"defaultEnvironment,omitempty" json:"defaultEnvironment,omitempty"`
-	Variables          map[string]string `yaml:"variables,omitempty" json:"variables,omitempty"`
+	Kind               string            `yaml:"kind" json:"kind" doc:"Type of the file" schema:"required,enum=Project"`
+	APIVersion         string            `yaml:"apiVersion" json:"apiVersion" doc:"Version of the file format" schema:"required,enum=runnel/v1"`
+	Name               string            `yaml:"name" json:"name" doc:"Name of the project" schema:"required,example=my-project"`
+	Description        string            `yaml:"description,omitempty" json:"description,omitempty" doc:"What the project does; shown in the editor"`
+	DefaultEnvironment string            `yaml:"defaultEnvironment,omitempty" json:"defaultEnvironment,omitempty" doc:"Environment used when a run names none, e.g. dev; the name of a file in environments/" schema:"example=dev"`
+	Variables          map[string]string `yaml:"variables,omitempty" json:"variables,omitempty" doc:"Variables for all environments, used as ${NAME}; an environment can override them. Values may use other variables, e.g. ${BASE}\\inbox"`
 	// Workflow holds project-wide defaults for workflows.
-	Workflow ProjectWorkflowSettings `yaml:"workflow,omitempty" json:"workflow,omitzero"`
+	Workflow ProjectWorkflowSettings `yaml:"workflow,omitempty" json:"workflow,omitzero" doc:"Defaults for all workflows of the project"`
 	// Settings control the runs of the project as a whole (roadmap S37).
-	Settings ProjectSettings `yaml:"settings,omitempty" json:"settings,omitzero"`
+	Settings ProjectSettings `yaml:"settings,omitempty" json:"settings,omitzero" doc:"Limits for the runs of the project"`
 
 	// Dir is the project directory as passed to LoadProject.
 	Dir string `yaml:"-" json:"-"`
@@ -43,23 +43,23 @@ type Project struct {
 // ProjectWorkflowSettings are project-wide defaults for workflows.
 type ProjectWorkflowSettings struct {
 	// DefaultJoin applies to actions without "join" (ADR 0003); empty means all.
-	DefaultJoin JoinMode `yaml:"defaultJoin,omitempty" json:"defaultJoin,omitempty"`
+	DefaultJoin JoinMode `yaml:"defaultJoin,omitempty" json:"defaultJoin,omitempty" doc:"When an action with several incoming links starts, if it sets no join: all (every link decided), first or each" schema:"enum=all|first|each,default=all"`
 }
 
 // ProjectSettings control the runs of a project.
 type ProjectSettings struct {
 	// MaxConcurrentRuns limits the runs of the server that run at the same time; a
 	// start beyond it is rejected (KONZEPT, chapter 6.4). 0: no limit.
-	MaxConcurrentRuns int `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty"`
+	MaxConcurrentRuns int `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty" doc:"Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit" schema:"default=0"`
 }
 
 // Environment is the content of environments/<name>.yaml: variables for one target system.
 type Environment struct {
-	Kind        string            `yaml:"kind" json:"kind"`
-	APIVersion  string            `yaml:"apiVersion" json:"apiVersion"`
-	Name        string            `yaml:"name" json:"name"`
-	Description string            `yaml:"description,omitempty" json:"description,omitempty"`
-	Variables   map[string]string `yaml:"variables,omitempty" json:"variables,omitempty"`
+	Kind        string            `yaml:"kind" json:"kind" doc:"Type of the file" schema:"required,enum=Environment"`
+	APIVersion  string            `yaml:"apiVersion" json:"apiVersion" doc:"Version of the file format" schema:"required,enum=runnel/v1"`
+	Name        string            `yaml:"name" json:"name" doc:"Name of the environment; must match the file name" schema:"required,example=prod"`
+	Description string            `yaml:"description,omitempty" json:"description,omitempty" doc:"What the environment is for, e.g. the production system"`
+	Variables   map[string]string `yaml:"variables,omitempty" json:"variables,omitempty" doc:"Variables of this environment, used as ${NAME}; they override those of project.yaml"`
 
 	src *source
 }

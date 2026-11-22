@@ -196,3 +196,14 @@ func TestOnly(t *testing.T) {
 		t.Error("only without values must fail")
 	}
 }
+
+func TestSchemaForFileUsesYAMLNames(t *testing.T) {
+	type file struct {
+		Name     string `yaml:"name" json:"name" doc:"Name"`
+		Computed string `yaml:"-" json:"computed"`
+	}
+	sc, err := ForFile(file{})
+	if err != nil || len(sc.Properties) != 1 || sc.Properties[0].Name != "name" {
+		t.Fatalf("%+v, %v", sc, err)
+	}
+}

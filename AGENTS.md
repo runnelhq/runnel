@@ -22,7 +22,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Benchmarks | `make bench` |
 | Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – nur das betroffene Paket, nie `./... -update`; danach Diff prüfen (Pakete mit Golden-Dateien: `cli`, `model`, `schema`, `server`, `transforms/csv`) |
-| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel triggers examples/hello` · `bin/runnel serve examples/hello` |
+| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel schema trigger` · `bin/runnel triggers examples/hello` · `bin/runnel serve examples/hello` |
 
 **Vor jedem Push:** `make lint` und `make test` müssen grün sein. Bei Änderungen am Editor zusätzlich in `web/`
 `npm run typecheck` und die betroffenen Playwright-Tests (`npx playwright test e2e/<datei>`); vollständig prüft die CI.
@@ -35,13 +35,13 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | Pfad | Inhalt |
 |---|---|
 | `cmd/runnel/` | Einstiegspunkt, Signalbehandlung |
-| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `serve`, `triggers`, `service`) |
+| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `schema`, `serve`, `triggers`, `service`) |
 | `internal/model/` | Dateiformate (Workflow, Pipeline, Project, Environment, Trigger), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
 | `internal/paths/` | Relative Pfade von Actions und Transforms auflösen: Bezugsordner eines Laufs im Kontext (Projektordner, ADR 0020) |
 | `internal/expr/` | Ausdrücke `{{ … }}` (expr-lang), Funktionsbibliothek, Dokumentation für den Editor |
 | `internal/format/` | Zahlen- und Datumsformate (z. B. `#.##0,00`, `dd.MM.yyyy`), Typvorschlag für „Felder ermitteln“ (`propose.go`) |
-| `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) |
+| `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) und aus den Dateiformaten in `internal/model` (`ForFile`, Namen aus `yaml`; S58) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
 | `internal/engine/runid/` | Lauf-IDs (ULID) |
 | `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events; Doku in `docs/dev/API.md` |

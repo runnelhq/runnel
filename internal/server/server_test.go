@@ -384,3 +384,12 @@ func TestEditWorkflow(t *testing.T) {
 	expect(t, do(t, s, "POST", "/api/v1/workflows/edit", mustJSON(t, map[string]any{"path": "data/in.csv", "content": ""})),
 		http.StatusBadRequest, "only workflow files")
 }
+
+// The schemas of the file kinds (S58) for the help of the editor.
+func TestSchemas(t *testing.T) {
+	_, s := newProject(t)
+	expect(t, do(t, s, "GET", "/api/v1/schemas/trigger", ""), http.StatusOK, `"schedule"`)
+	expect(t, do(t, s, "GET", "/api/v1/schemas/environment", ""), http.StatusOK, `"variables"`)
+	expect(t, do(t, s, "GET", "/api/v1/schemas/workflow-x", ""), http.StatusNotFound, `no schema for \"workflow-x\" (kinds: environment, project, trigger)`)
+	expect(t, do(t, s, "GET", "/api/v1/schemas/project", "", "Origin", "http://evil.example"), http.StatusForbidden, "other origins")
+}

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/schema"
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
@@ -32,6 +34,22 @@ func NewCatalog(actions *action.Registry, transforms *transform.Registry) Catalo
 
 func (s *Server) handleCatalog(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, NewCatalog(s.registry, s.transforms))
+}
+
+// handleSchema returns the JSON Schema of a file kind (project, environment, trigger;
+// roadmap S58), for the help of the editor and for other editors.
+func (*Server) handleSchema(w http.ResponseWriter, r *http.Request) {
+	format, ok := model.FileFormat(r.PathValue("kind"))
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("no schema for %q (kinds: %s)", r.PathValue("kind"), strings.Join(model.FileFormats(), ", ")))
+		return
+	}
+	sc, err := schema.ForFile(format)
+	if err != nil { // a bug in the tags of package model; the tests prevent it
+		writeError(w, http.StatusInternalServerError, "cannot build the schema")
+		return
+	}
+	writeJSON(w, http.StatusOK, sc)
 }
 
 // validateRequest names the workflow to check. Content, if given, is checked instead

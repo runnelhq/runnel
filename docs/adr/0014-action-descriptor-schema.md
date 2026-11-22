@@ -154,3 +154,11 @@ der Form, in der `/catalog` (E2) sie ausliefert.
   (`Definition.Example`), angezeigt im Abschnitt „Help“ des Panels. Pflicht für jeden Baustein mit Konfiguration (seit
   dem Fix nach E14b; vorher nur für Transforms mit Listen); die Vertragstests lesen es wie eine Workflow- bzw.
   Pipeline-Datei und prüfen, dass `New` es annimmt. Bausteine ohne Konfiguration zeigen in „Help“ nur `id` und `type`.
+
+## Nachtrag 2026-11-22 (S58): Schemas der Dateiarten
+
+Derselbe Mechanismus beschreibt auch die Dateiarten `Project`, `Environment` und `Trigger`: Die Strukturen in
+`internal/model` tragen `doc`- und `schema`-Tags, `schema.ForFile` liest die Feldnamen aus den `yaml`-Tags (die
+`json`-Namen der Strukturen gehören zur API, z. B. die berechnete Liste `environments`). Abrufbar über
+`GET /api/v1/schemas/{kind}` und `runnel schema <art>`; Grundlage für die Hilfe im Editor (E18, E19) und für andere
+Editoren. Ein Test verlangt eine Beschreibung für jedes Feld.
