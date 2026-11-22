@@ -1131,9 +1131,9 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Kombination | Stream-Lookup, DB-Lookup, HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe, Insert/Update (Upsert), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
-Umgesetzt (Stand S38c): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
-`core.constant`, `core.convert`, `core.switch`, `core.sort`, `core.group-by`, `core.from-result`, `core.to-result`,
-`csv.input`, `csv.output` und `http.response`:
+Umgesetzt (Stand S16c): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
+`core.constant`, `core.convert`, `core.calculate`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
+`core.from-result`, `core.to-result`, `csv.input`, `csv.output` und `http.response`:
 
 - **`core.sort`** sortiert stabil nach `fields: [{ name, descending, ignoreCase }]`; leere Werte zuletzt (auch absteigend),
   Zahlen exakt über `int`, `decimal` und `float` hinweg, Text nach Unicode-Codepunkten (Großbuchstaben zuerst) oder mit
@@ -1146,6 +1146,11 @@ Umgesetzt (Stand S38c): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   bei ganzen Zahlen `int`, sonst exakt `decimal` (mit `float` dabei `float`); `avg` ganzer Zahlen ist `decimal`.
   Zahlen gruppieren über Typen hinweg (`1` = `1.0`). Ohne `groupBy` entsteht genau ein Datensatz, auch ohne Eingabe
   (`count` 0). Ein Wert, der nicht passt (Text in `sum`), geht auf den Fehler-Link und zählt in keiner Gruppe.
+- **`core.dedupe`** gibt den ersten Datensatz jeder Kombination von Werten in `fields` weiter und verwirft die
+  Wiederholungen (ohne `fields`: alle Felder, unabhängig von ihrer Reihenfolge); `ignoreCase` vergleicht Text ohne Groß-
+  und Kleinschreibung. Gleichheit wie bei `core.group-by` (`1` = `1.0`, leere Werte sind gleich). Die Datensätze gehen
+  sofort weiter; im Speicher bleiben nur die gesehenen Kombinationen (er wächst mit ihrer Zahl). Das Log nennt die
+  entfernten Duplikate.
 
 - **`core.switch`** gibt jeden Datensatz an genau einen Daten-Link weiter: `cases: [{ when: "{{ … }}", to: <id> }]` in
   Reihenfolge, der erste wahre Fall entscheidet, sonst `default`; ohne `default` werden die übrigen verworfen und im Log
@@ -1161,7 +1166,12 @@ Umgesetzt (Stand S38c): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   werden die genannten Felder entfernt und alle anderen behalten. Beides zusammen ist ein Fehler.
 - **`core.constant`** setzt Felder mit demselben Wert in jedem Datensatz (ein vorhandenes Feld behält seine Position).
   Werte dürfen `${…}` und `{{ … }}` enthalten; Ausdrücke werden einmal beim Start ausgewertet (`vars`, `params`, `env`,
-  `run`, ohne `record`) und behalten ihren Typ. Werte je Datensatz berechnet später `core.calculate`.
+  `run`, ohne `record`) und behalten ihren Typ. Werte je Datensatz berechnet `core.calculate`.
+- **`core.calculate`** setzt Felder je Datensatz auf das Ergebnis eines Ausdrucks: `fields: [{ name, value: "{{ … }}" }]`
+  mit `record`, `params`, `vars`, `env`, `run`, in Reihenfolge – ein späteres Feld kann ein früheres nutzen. Ein Ausdruck
+  allein behält den Typ seines Ergebnisses (Rechnen mit `decimal` bleibt exakt), Text um `{{ … }}` ergibt Text. Ein
+  vorhandenes Feld behält seine Position. Der Typ der Felder steht erst beim Lauf fest (im Schema unbekannt; bei Bedarf
+  danach `core.convert`). Lässt sich ein Ausdruck nicht auswerten, geht der Datensatz unverändert auf den Fehler-Link.
 - **`core.convert`** wandelt Felder in einen anderen Typ um: Text mit Format (`"1.234,56"` → `decimal`, `"20.11.2026"` →
   `date`), in Text mit Format (`decimal` → `"1.234,56"`), Zahlen ineinander und `date` ↔ `datetime`. Was nicht passt,
   geht unverändert auf den Fehler-Link oder bricht mit Datensatz und Feld ab (`1.5` ist kein `int`; es wird nicht
@@ -1282,7 +1292,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S10, S19–S21, S23, S25, S26, S29, S36, S45, S47, S48, `core.calculate`, `maxErrors`, `core.dedupe`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S10, S19–S21, S23, S25, S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Store (S39), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Mappings, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

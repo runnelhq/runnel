@@ -22,6 +22,7 @@ transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
   csv.input           CSV Input      Reads the rows of a CSV file as records
 transforms / transform
+  core.calculate      Calculate      Sets fields to the result of an expression for every record
   core.constant       Add Constants  Adds fields with the same value to every record
   core.convert        Convert Types  Converts fields to another type, with a number or date format
   core.filter         Filter         Passes on the records for which a condition is true
@@ -33,8 +34,9 @@ transforms / execution
   core.from-result  Records from Workflow  Passes on the records the calling workflow gave to the pipeline (rows)
   core.to-result    Records to Workflow    Returns the records to the calling workflow (output.rows) and passes them on
 transforms / combine
-  core.group-by  Group By  Combines records with the same values into one, with count, sum and other aggregates
-  core.sort      Sort      Sorts the records by fields; keeps all records in memory
+  core.dedupe    Remove Duplicates  Passes on the first record of each combination of values and drops repeated ones
+  core.group-by  Group By           Combines records with the same values into one, with count, sum and other aggregates
+  core.sort      Sort               Sorts the records by fields; keeps all records in memory
 transforms / output
   core.log       Log            Writes records to the run log and passes them on
   csv.output     CSV Output     Writes records to a CSV file and passes them on
