@@ -62,6 +62,10 @@ func TestExecute(t *testing.T) {
 	if err := db.QueryRow("SELECT count(*) FROM t WHERE name = 'X''); DROP TABLE T; --'").Scan(&n); err != nil || n != 1 {
 		t.Errorf("the value with SQL in it was stored as text: n=%d, %v", n, err)
 	}
+	// The file is not kept open between statements (Windows could not move or delete it).
+	if open := db.Stats().OpenConnections; open != 0 {
+		t.Errorf("%d connections still open", open)
+	}
 }
 
 func TestExecuteErrors(t *testing.T) {

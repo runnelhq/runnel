@@ -53,6 +53,11 @@ func Open(ctx context.Context, reg *connection.Registry, c connection.Resolved) 
 	}
 	db.SetMaxOpenConns(MaxOpen)
 	db.SetConnMaxIdleTime(5 * time.Minute)
+	if driver == "sqlite" {
+		// No idle connections: the file is free again after each statement, so that it
+		// can be moved or deleted while the server runs (Windows locks open files).
+		db.SetMaxIdleConns(0)
+	}
 	pools[key] = db
 	return db, nil
 }
