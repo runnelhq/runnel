@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import mark from "../../design/logo/runnel-mark.svg";
 import { fetchProject, fetchVersion, useConnection, type ProjectInfo } from "./api";
 import { Explorer } from "./components/Explorer";
@@ -77,10 +77,28 @@ export function App() {
     loadTree();
   }, [epoch, loadTree]);
 
-  const open = (path: string) => {
+  const open = useCallback((path: string) => {
     setTabs((t) => (t.includes(path) ? t : [...t, path]));
     setActive(path);
-  };
+  }, []);
+  // The files of the project, for the links of documents (E17).
+  const files = useMemo(() => {
+    const out = new Set<string>();
+    const walk = (e: Entry) => {
+      if (e.type === "file") out.add(e.path);
+      e.children?.forEach(walk);
+    };
+    if (tree) walk(tree);
+    return out;
+  }, [tree]);
+  // Without an open file, the editor starts with the README.md of the project (E17).
+  const started = useRef(false);
+  useEffect(() => {
+    if (!tree || started.current) return;
+    started.current = true;
+    const readme = tree.children?.find((e) => e.type === "file" && e.name.toLowerCase() === "readme.md");
+    if (readme && tabs.length === 0) open(readme.path);
+  }, [tree, tabs.length, open]);
   const closeNow = (path: string) => {
     const i = tabs.indexOf(path);
     const rest = tabs.filter((p) => p !== path);
@@ -161,6 +179,8 @@ export function App() {
                   onDirty={onDirty}
                   onRegister={onRegister}
                   onReloadExplorer={loadTree}
+                  files={files}
+                  onOpenFile={open}
                 />
               ))}
             </>

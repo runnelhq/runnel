@@ -452,3 +452,141 @@
   word-break: normal;
   overflow-wrap: normal;
 }
+
+/* Markdown documents (E17, mockup design/mockups/e17-markdown.html). */
+.ry-heading {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.ry-link {
+  color: var(--primary);
+}
+.runnel-md {
+  max-width: 760px;
+  margin: 0 auto;
+  font-size: var(--rn-text-sm);
+  line-height: 1.65;
+  color: var(--foreground);
+}
+.runnel-md h1,
+.runnel-md h2,
+.runnel-md h3,
+.runnel-md h4,
+.runnel-md h5,
+.runnel-md h6 {
+  font-weight: 700;
+}
+.runnel-md h1 {
+  font-size: var(--rn-text-xl);
+  line-height: 1.25;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.runnel-md h2 {
+  font-size: var(--rn-text-lg);
+  line-height: 1.3;
+  margin: 24px 0 8px;
+}
+.runnel-md h3,
+.runnel-md h4,
+.runnel-md h5,
+.runnel-md h6 {
+  font-size: var(--rn-text-base);
+  margin: 20px 0 6px;
+}
+.runnel-md p {
+  margin: 0 0 12px;
+}
+.runnel-md ul,
+.runnel-md ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.runnel-md ul {
+  list-style: disc;
+}
+.runnel-md ol {
+  list-style: decimal;
+}
+.runnel-md li {
+  margin: 2px 0;
+}
+.runnel-md code {
+  font: var(--rn-text-xs) var(--rn-font-mono);
+  padding: 1px 5px;
+  border-radius: var(--rn-radius-sm);
+  background: var(--muted);
+}
+.runnel-md pre {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--rn-radius-md);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  font: var(--rn-text-xs) / 1.6 var(--rn-font-mono);
+  white-space: pre;
+  overflow: auto;
+}
+.runnel-md pre code {
+  padding: 0;
+  background: none;
+}
+.runnel-md blockquote {
+  margin: 0 0 12px;
+  padding: 2px 12px;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.runnel-md table {
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: var(--rn-text-xs);
+}
+.runnel-md th,
+.runnel-md td {
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  text-align: left;
+}
+.runnel-md th {
+  background: var(--muted);
+  font-weight: 600;
+}
+.runnel-md hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+.runnel-md a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.runnel-md a [data-icon] svg {
+  display: inline;
+  vertical-align: -2px;
+  margin-right: 3px;
+}
+.runnel-md a.ext::after {
+  content: " ↗";
+  font-size: 11px;
+}
+.runnel-md a.missing {
+  color: var(--destructive);
+  text-decoration-style: dotted;
+}
+.runnel-md img {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--rn-radius-md);
+}
+.runnel-md .imgbox {
+  display: inline-flex;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--rn-radius-md);
+  color: var(--muted-foreground);
+  font-size: var(--rn-text-xs);
+}

@@ -10,7 +10,8 @@ export interface Entry {
   children?: Entry[];
 }
 
-export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "other";
+/** Kinds of files; documents (.md) and images since E17. */
+export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "document" | "image" | "other";
 
 /** Error of the file API with its HTTP status (404: file not found). */
 export class APIError extends Error {
@@ -83,6 +84,8 @@ export function kindOf(path: string): FileKind {
   if (/^environments\/[^/]+\.yaml$/.test(path)) return "environment";
   // Triggers also in subfolders of triggers/ (E12), not in hidden ones.
   if (/^triggers\/([^./][^/]*\/)*[^./][^/]*\.yaml$/.test(path)) return "trigger";
+  if (/\.md$/i.test(path)) return "document";
+  if (isImage(path)) return "image";
   return "other";
 }
 
@@ -92,8 +95,13 @@ export const kindLabel: Record<FileKind, string> = {
   project: "Project",
   environment: "Environment",
   trigger: "Trigger",
+  document: "Document",
+  image: "Image",
   other: "File",
 };
+
+/** Images a document can show (as the server serves them, E17). */
+export const isImage = (path: string) => /\.(png|jpe?g|gif|webp)$/i.test(path);
 
 export const isYAML = (path: string) => /\.ya?ml$/i.test(path);
 
@@ -180,13 +188,14 @@ export async function fetchReferences(path: string): Promise<Reference[]> {
 }
 
 /** What can be created in the explorer (mockup E11), with its folder and file name ending. */
-export type NewKind = "workflow" | "pipeline" | "trigger" | "environment" | "file" | "folder";
+export type NewKind = "workflow" | "pipeline" | "trigger" | "environment" | "document" | "file" | "folder";
 
 export const newKinds: Record<NewKind, { label: string; folder: string; suffix: string; name: string }> = {
   workflow: { label: "Workflow", folder: "workflows", suffix: ".workflow.yaml", name: "new-workflow" },
   pipeline: { label: "Pipeline", folder: "pipelines", suffix: ".pipeline.yaml", name: "new-pipeline" },
   trigger: { label: "Trigger", folder: "triggers", suffix: ".yaml", name: "new-trigger" },
   environment: { label: "Environment", folder: "environments", suffix: ".yaml", name: "new-environment" },
+  document: { label: "Document", folder: "docs", suffix: ".md", name: "new-document" },
   file: { label: "File", folder: "", suffix: "", name: "new-file.csv" },
   folder: { label: "Folder", folder: "", suffix: "", name: "new-folder" },
 };
@@ -209,6 +218,8 @@ export function template(kind: NewKind, name: string, firstWorkflow?: string): s
       );
     case "environment":
       return head("Environment") + "variables: {}\n";
+    case "document":
+      return `# ${name}\n`;
   }
   return "";
 }

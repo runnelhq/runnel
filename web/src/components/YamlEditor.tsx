@@ -19,7 +19,8 @@ import {
   type Tooltip,
   type ViewUpdate,
 } from "@codemirror/view";
-import { highlightLine, type TokenKind } from "../yaml";
+import { highlightLine, type Token, type TokenKind } from "../yaml";
+import { highlightMarkdownLine } from "../markdown";
 import type { Problem } from "../workflow";
 import { applyDelay } from "./PropertiesPanel";
 
@@ -30,10 +31,13 @@ const tokenClass: Partial<Record<TokenKind, string>> = {
   punct: "ry-punct",
   value: "ry-value",
   var: "ry-var",
+  heading: "ry-heading",
+  link: "ry-link",
+  code: "ry-value",
 };
 
-/** Highlights the visible lines with the tokenizer of the read-only view. */
-const highlight = ViewPlugin.fromClass(
+/** Highlights the visible lines with the tokenizer of the read-only view (YAML) or of Markdown. */
+const highlighter = (highlightLine: (line: string) => Token[]) => ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
     constructor(view: EditorView) {
@@ -189,6 +193,8 @@ const indentTwo = keymap.of([
  */
 export function YamlEditor(props: {
   text: string;
+  /** The text is a Markdown document (E17): its highlighting, no YAML rules. */
+  markdown?: boolean;
   problems: Problem[];
   /** A line to show and put the cursor on; seq changes with every request. */
   focus?: { line: number; seq: number } | null;
@@ -237,7 +243,7 @@ export function YamlEditor(props: {
           highlightActiveLineGutter(),
           highlightActiveLine(),
           drawSelection(),
-          highlight,
+          highlighter(props.markdown ? highlightMarkdownLine : highlightLine),
           cursorTooltip,
           hoverProblems,
           search({ top: true }),
@@ -249,7 +255,7 @@ export function YamlEditor(props: {
             ...searchKeymap,
             ...defaultKeymap,
           ]),
-          EditorView.contentAttributes.of({ "aria-label": "YAML", spellcheck: "false" }),
+          EditorView.contentAttributes.of({ "aria-label": props.markdown ? "Markdown" : "YAML", spellcheck: "false" }),
           EditorView.updateListener.of((u) => {
             if (u.selectionSet || u.docChanged) {
               const head = u.state.selection.main.head;
