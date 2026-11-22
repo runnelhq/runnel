@@ -1,6 +1,6 @@
 # ADR 0021: Unter-Pipelines in Pipelines – Mapping und Executor
 
-- **Status:** Entwurf (zur Abstimmung mit dem Maintainer)
+- **Status:** Angenommen
 - **Datum:** 2026-11-22
 - **Bezug:** [ADR 0008 – Ausführungsvarianten](0008-ausfuehrungsvarianten.md) (Executor-Transforms, Mappings,
   Ergebnis-Datensätze, Nachtrag S25b), [ADR 0017 – Sub-Workflows](0017-sub-workflows.md),
@@ -32,7 +32,7 @@ Stand heute:
   Transforms gibt es bisher nur bei `core.switch`: Felder mit `format: runnel-target` (`to:`) nennen die Transforms,
   zu denen ein Daten-Link führt.
 
-## Entscheidung (Vorschlag)
+## Entscheidung
 
 ### 1. Zwei Arten, ein Unterbau
 
@@ -124,24 +124,28 @@ Zielen `allowedTargets`. Neu ist, dass Parameter aus **Datensätzen** kommen kö
 Antworten von außen. Dynamische Ziele des Executors ohne `allowedTargets` meldet `validate` deshalb wie bei Actions als
 Warnung. Grenzen gegen unbeschränkte Läufe: Verschachtelungstiefe und `copies`.
 
-## Offene Fragen an den Maintainer
+## Betrachtete Alternativen
 
-1. **Name des Mappings:** Transform `core.run-pipeline` (Vorschlag, parallel zur Action) oder eigener Name
-   `core.mapping` (wie in Hop und ADR 0009)?
-2. **Ein- und Ausgang:** `core.from-result`/`core.to-result` wiederverwenden (Vorschlag) oder eigene Transforms
-   `core.mapping-input`/`core.mapping-output` mit fest deklarierten Feldern (wie Hop)? Eigene wären strenger, aber eine
-   Pipeline wäre dann nicht mehr zugleich aus Workflows aufrufbar.
-3. **Executor als Option des Mappings?** Statt eines eigenen `core.pipeline-executor` ginge auch
-   `core.run-pipeline` mit `per: all | record | group` (ein Transform, weniger Begriffe). ADR 0009 hatte die
-   Executor-Namen „bewusst beibehalten“. Vorschlag: getrennt lassen, weil sich Ausgänge und Parallelität deutlich
-   unterscheiden.
-4. **Reihenfolge:** Vorschlag:
-   1. Mapping (Engine und Prüfung)
-   2. Mockup für Mapping-Knoten und Executor-Ausgänge
-   3. Mapping im Editor
-   4. Executor je Datensatz
-   5. Gruppen und `results`
-   6. Workflow-Executor
+Abgestimmt mit dem Maintainer am 2026-11-22.
+
+- **Eigener Name `core.mapping`** (wie in Hop und ADR 0009): verworfen. `core.run-pipeline` als Transform passt zur
+  gleichnamigen Action und sagt, was geschieht. Im Text heißt der Baustein weiter „Mapping“.
+- **Eigene Ein- und Ausgänge `core.mapping-input`/`core.mapping-output`** mit fest deklarierten Feldern (wie Hop):
+  verworfen. Sie wären strenger, aber eine Pipeline wäre dann nicht mehr zugleich aus Workflows und vom Executor
+  aufrufbar.
+- **Executor als Option des Mappings** (`core.run-pipeline` mit `per: all | record | group`): verworfen. Ausgänge,
+  Parallelität und Parameter je Lauf unterscheiden sich deutlich. Die Executor-Namen bleiben wie in ADR 0009.
+
+## Reihenfolge der Umsetzung
+
+1. Mapping (Engine und Prüfung)
+2. Mockup für Mapping-Knoten und Executor-Ausgänge
+3. Mapping im Editor
+4. Executor je Datensatz
+5. Gruppen und `results`
+6. Workflow-Executor
+
+Die Schritte und ihre Nummern stehen in der Roadmap.
 
 ## Konsequenzen
 
