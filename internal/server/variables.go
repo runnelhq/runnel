@@ -67,7 +67,8 @@ func (s *Server) handleVariables(w http.ResponseWriter, _ *http.Request) {
 		return v
 	}
 	if p, _ := model.LoadProject(s.dir); p != nil {
-		info.Environments = p.EnvironmentNames()
+		// A project without environments lists none: [] in JSON, not null (the editor reads the list).
+		info.Environments = append(info.Environments, p.EnvironmentNames()...)
 		info.DefaultEnvironment = p.DefaultEnvironment
 		for name, value := range p.Variables {
 			get(name).Project = &variableValue{Value: value, File: model.ProjectFile, Line: p.VariablePos(name).Line}

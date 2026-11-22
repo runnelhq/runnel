@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -81,6 +82,27 @@ links:
 		t.Errorf("TARGET %+v", target)
 	}
 	expect(t, do(t, s, "GET", "/api/v1/variables", "", "Origin", "http://evil.example"), http.StatusForbidden, "other origins")
+}
+
+// A project without environments: the list of environments is empty, not null, so that
+// the editor can show project.yaml (examples/expressions).
+func TestVariablesWithoutEnvironments(t *testing.T) {
+	dir, s := newProject(t)
+	if err := os.RemoveAll(filepath.Join(dir, "environments")); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "project.yaml"), "kind: Project\napiVersion: runnel/v1\nname: demo\nvariables:\n  LIMIT: \"10\"\n")
+	rec := do(t, s, "GET", "/api/v1/variables", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(raw["environments"]); got != "[]" {
+		t.Errorf("environments = %s, want []", got)
+	}
 }
 
 func TestVariablesLimits(t *testing.T) {
