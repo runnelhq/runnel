@@ -211,10 +211,15 @@
   text-underline-offset: 3px;
 }
 
-/* Suggestions, signature help and hover of the expression editor. */
+/* Suggestions, signature help and hover of the expression editor. Hover tooltips come in
+   a container of CodeMirror with its own (light) colours, like in the YAML editor. */
+.runnel-expr .cm-tooltip.cm-tooltip-hover {
+  background: transparent;
+  border: none;
+}
 .runnel-expr .cm-tooltip.rx-complete,
 .runnel-expr .cm-tooltip.rx-signature,
-.runnel-expr .cm-tooltip.rx-hover {
+.runnel-expr .rx-hover {
   background: var(--popover);
   color: var(--popover-foreground);
   border: 1px solid var(--border);
@@ -393,7 +398,14 @@
   color: var(--warning);
   font-weight: 700;
 }
-.runnel-yaml .cm-tooltip.ry-tooltip {
+/* Hover tooltips come in a container of CodeMirror with its own (light) colours; the
+   message inside brings the colours of the theme, in light and dark mode. */
+.runnel-yaml .cm-tooltip.cm-tooltip-hover {
+  background: transparent;
+  border: none;
+  max-width: 420px;
+}
+.runnel-yaml .ry-tooltip {
   max-width: 420px;
   padding: 8px 10px;
   background: var(--popover);

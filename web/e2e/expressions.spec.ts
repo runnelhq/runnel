@@ -111,6 +111,8 @@ test("shows the signature of a function and common date patterns", async ({ page
   await message(page).locator(".rx-var").hover();
   await expect(page.locator(".rx-hover")).toContainText("${TARGET} = World");
   await expect(page.locator(".rx-hover")).toContainText("project.yaml");
+  // In the colours of the theme, not in the light container of CodeMirror.
+  expect(await page.locator(".rx-hover").evaluate((el) => getComputedStyle(el.closest(".cm-tooltip-hover")!).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
 });
 
 test("marks an unknown name and offers the correction", async ({ page }) => {

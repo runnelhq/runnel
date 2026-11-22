@@ -36,6 +36,30 @@ async function retype(page: Page, text: string, n: number, typed: string) {
 }
 
 
+// Fix: in dark mode the message on hovering a problem was light text on the light
+// background of CodeMirror's hover tooltip.
+test("shows the message on hover in the colours of the theme", async ({ page }) => {
+  await openYAML(page);
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await retype(page, "type: core.wait", 4, "wiat");
+  await expect(page.getByTestId("error-count")).toHaveText("✖ 1");
+  await line(page, "name: hello").click();
+  await expect(page.locator(".ry-tooltip")).toHaveCount(0);
+  await editor(page).locator(".rx-error").hover();
+  const tip = page.locator(".cm-tooltip-hover .ry-tooltip");
+  await expect(tip).toContainText('unknown action type "core.wiat"');
+  const colours = await tip.evaluate((el) => {
+    const own = getComputedStyle(el);
+    const box = getComputedStyle(el.closest(".cm-tooltip-hover")!);
+    return { bg: own.backgroundColor, fg: own.color, box: box.backgroundColor };
+  });
+  expect(colours.box).toBe("rgba(0, 0, 0, 0)");
+  expect(colours.bg).not.toBe(colours.fg);
+  // Dark background, light text.
+  const lum = (c: string) => c.match(/\d+/g)!.slice(0, 3).reduce((a, n) => a + Number(n), 0);
+  expect(lum(colours.bg)).toBeLessThan(lum(colours.fg));
+});
+
 test("checks while typing and shows the problem at the line", async ({ page, request }) => {
   await openYAML(page);
   await expect(page.getByText("Read-only")).toHaveCount(0);
