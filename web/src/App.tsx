@@ -3,6 +3,7 @@ import mark from "../../design/logo/runnel-mark.svg";
 import { fetchProject, fetchVersion, useConnection, type ProjectInfo } from "./api";
 import { Explorer } from "./components/Explorer";
 import { Dialog } from "./components/Dialog";
+import { ErrorBoundary, FileError, PanelError } from "./components/ErrorBoundary";
 import { FileView, type FileHandle } from "./components/FileView";
 import { Header } from "./components/Header";
 import { Palette, type PaletteTarget } from "./components/Palette";
@@ -188,8 +189,12 @@ export function App() {
             />
           </div>
           {sidePanel && <Splitter container={sidebar} explorer={explorer} height={explorerHeight} onHeight={setExplorerHeight} />}
-          {sidePanel === "palette" && <Palette target={active ? paletteTarget : null} />}
-          {sidePanel === "reference" && reference && <ReferencePanel target={reference} variables={variables} onAction={onReferenceAction} />}
+          {sidePanel && (
+            <ErrorBoundary key={sidePanel} fallback={(error, retry) => <PanelError error={error} onRetry={retry} />}>
+              {sidePanel === "palette" && <Palette target={active ? paletteTarget : null} />}
+              {sidePanel === "reference" && reference && <ReferencePanel target={reference} variables={variables} onAction={onReferenceAction} />}
+            </ErrorBoundary>
+          )}
         </aside>
         <main className="flex min-h-0 min-w-0 flex-col bg-background">
           {state === "disconnected" && (
@@ -207,25 +212,30 @@ export function App() {
             <>
               <Tabs paths={tabs} active={active} dirty={dirty} onSelect={setActive} onClose={close} />
               {tabs.map((path) => (
-                <FileView
+                // An error in a file stays in its tab; the message shows while the tab is active.
+                <ErrorBoundary
                   key={`${path}#${reloads[path] ?? 0}`}
-                  path={path}
-                  active={path === active}
-                  projectDir={project?.dir ?? null}
-                  project={project}
-                  onRun={setRun}
-                  epoch={epoch}
-                  onSummary={setSummary}
-                  onPalette={setPaletteTarget}
-                  onReference={setReference}
-                  request={request?.path === path ? request : null}
-                  variableWarning={variableWarning(path)}
-                  onDirty={onDirty}
-                  onRegister={onRegister}
-                  onReloadExplorer={loadTree}
-                  files={files}
-                  onOpenFile={open}
-                />
+                  fallback={(error, retry) => (path === active ? <FileError path={path} error={error} onRetry={retry} /> : null)}
+                >
+                  <FileView
+                    path={path}
+                    active={path === active}
+                    projectDir={project?.dir ?? null}
+                    project={project}
+                    onRun={setRun}
+                    epoch={epoch}
+                    onSummary={setSummary}
+                    onPalette={setPaletteTarget}
+                    onReference={setReference}
+                    request={request?.path === path ? request : null}
+                    variableWarning={variableWarning(path)}
+                    onDirty={onDirty}
+                    onRegister={onRegister}
+                    onReloadExplorer={loadTree}
+                    files={files}
+                    onOpenFile={open}
+                  />
+                </ErrorBoundary>
               ))}
             </>
           ) : (
