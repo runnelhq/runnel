@@ -9,13 +9,15 @@ actions / execution
   core.run-pipeline  Run Pipeline  Runs a pipeline with parameters; output: the counts of its transforms
   core.run-workflow  Run Workflow  Runs another workflow with parameters; output: its outputs
 actions / files
-  file.copy    Copy Files     Copies files or folders; output: the copied files
-  file.delete  Delete Files   Deletes files or folders; output: the deleted paths
-  file.exists  File Exists    Checks whether files or folders exist; output: the matching paths
-  file.list    List Files     Lists the files of a folder; output: path, name, size, modified and folder of each entry
-  file.mkdir   Create Folder  Creates a folder with its parent folders; output: the path
-  file.move    Move Files     Moves files or folders; output: the new paths
-  file.wait    Wait for File  Waits until files exist; output: the matching paths
+  archive.create   Create Archive   Packs files and folders into a ZIP, TAR or TAR.GZ archive; output: path, files and size
+  archive.extract  Extract Archive  Unpacks a ZIP, TAR or TAR.GZ archive into a folder; output: the unpacked files
+  file.copy        Copy Files       Copies files or folders; output: the copied files
+  file.delete      Delete Files     Deletes files or folders; output: the deleted paths
+  file.exists      File Exists      Checks whether files or folders exist; output: the matching paths
+  file.list        List Files       Lists the files of a folder; output: path, name, size, modified and folder of each entry
+  file.mkdir       Create Folder    Creates a folder with its parent folders; output: the path
+  file.move        Move Files       Moves files or folders; output: the new paths
+  file.wait        Wait for File    Waits until files exist; output: the matching paths
 actions / network
   http.respond  HTTP Response  Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
 transforms / input

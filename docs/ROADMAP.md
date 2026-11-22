@@ -154,6 +154,7 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 | S16e ✅ | Funktion `concat()` | `concat(trenner, a, b, …)` in der Ausdruckssprache: verbindet Werte als Text und lässt leere weg ([ADR 0006](adr/0006-ausdruckssprache.md), Nachtrag); statt eines eigenen Concat-Transforms | Unit-Tests; Beispiel in `contacts.pipeline.yaml` |
 | S16f ✅ | Wertzuordnung & Feld teilen | `core.map-values` (Tabelle `from`/`to`, `target`, `default`, `ignoreCase`) und `core.split-field` (in Felder mit `into` oder in Datensätze mit `rows`, `indexField`, `keepEmpty`, `trim`); Icons nach Vorschlag (Variante A, vom Maintainer ohne eigenes Mockup gewählt); Beispiel `people.pipeline.yaml` | Unit-Tests, Benchmarks; CLI-Test mit dem Beispiel |
 | S19 ✅ | JSON | `json.input` (JSON als Strom mit `records` für ein Array im Dokument, NDJSON je Zeile mit Fehler-Link, `fields` mit `from` und Typ, Kodierung wie CSV, „Detect fields“) und `json.output` (Array oder NDJSON, exakte Zahlen, ISO-Daten, `format`); Icons: Seite mit `{ }` (Variante A, vom Maintainer gewählt); Kodierung gemeinsam mit CSV in `internal/textenc`; Beispiel `api-orders.pipeline.yaml` | Unit-Tests, Fuzzing, Benchmarks; CLI-Test mit dem Beispiel |
+| S54 ✅ | Archive | `archive.create` und `archive.extract` für ZIP, TAR und TAR.GZ im neuen Namensraum `archive` statt des reservierten `zip` ([ADR 0013](adr/0013-typnamen-namensraeume.md), Nachtrag); Schutz beim Entpacken (Pfade außerhalb des Zielordners, Verknüpfungen, `maxSize`, `maxFiles`), Dateinamen in Codepage 437; Icons: Kiste mit Pfeil (Variante A, vom Maintainer gewählt); Beispiel `examples/files/workflows/bundle.workflow.yaml` | Unit-Tests, Fuzzing, Benchmarks; CLI-Test mit dem Beispiel |
 | S49 | Plugin-Protokoll | JSON-RPC über stdin/stdout ([ADR 0019](adr/0019-plugin-protokoll.md)): `kind: Plugin` unter `plugins/<name>/`, Handshake, Prozess je Lauf, `describe`, `action.execute` | Beispiel-Plugin in Go |
 | S50 | Plugin-Transforms | `transform.open/batch/end`, `emit`/`closed`, Kredite (Streaming, ADR 0019) | Beispiel-Plugin; Benchmark mit Echo-Plugin (Ziel ≥ 300.000 Records/s) |
 | S51 | Go-SDK | `pkg/sdk` mit Beispielen | Beispiel-Plugin baut nur mit SDK |
@@ -211,7 +212,7 @@ Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-
 | Kommunikation | `mail.send` (SMTP), Mail abrufen (IMAP) |
 | Skripte & Programme | `shell.powershell` (Action + Transform), Programm starten, JavaScript (`core.script` als Action und Transform, mit goja) |
 | Dateiformate | Excel (Ein-/Ausgabe), XML, Fixed-Width |
-| Dateitransfer | SFTP/FTP Upload/Download, ZIP/Entpacken |
+| Dateitransfer | SFTP/FTP Upload/Download (Packen und Entpacken: S54) |
 | Netzwerk-Transforms | REST-Eingabe mit Paging, HTTP-Lookup, REST-Ausgabe |
 | Datenbanken | Treiber MySQL/MariaDB, Oracle, ODBC |
 | Editor | Schmale Fenster (einklappbarer Explorer, Tablet/Laptop) – der Editor zielt zunächst auf Desktop-PCs; Einstellungsmenü, sobald es mehrere Einstellungen gibt |

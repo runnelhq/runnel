@@ -1031,12 +1031,13 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 |---|---|
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen, Log schreiben, Schleife (ForEach über Liste/Dateien) |
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell, Programm starten |
-| Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, ZIP/Entpacken, Dateiliste |
+| Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
 | Netzwerk | HTTP-Request, HTTP-Antwort (`http.respond`, seit S38b1), SFTP/FTP Upload/Download, Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen, Tabelle existiert, Zeilen zählen |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,
-`file.mkdir`, `file.list`; Umbenennen ist `file.move` mit neuem Dateinamen als Ziel, ZIP/Entpacken folgt später.
+`file.mkdir`, `file.list`; Umbenennen ist `file.move` mit neuem Dateinamen als Ziel. Packen und Entpacken übernehmen
+seit S54 die Archiv-Actions (siehe unten).
 
 - **Pfade:** Platzhalter `*`, `?` und `[abc]` sind im letzten Teil des Pfads erlaubt (`C:\in\*.csv`); unter Windows
   ohne Unterscheidung von Groß- und Kleinschreibung wie im Explorer. UNC-Pfade (`\\server\share\…`) funktionieren wie
@@ -1056,6 +1057,25 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
   `{{ sum(map(results.list.output, .size)) }}`.
 - **Warten:** `file.wait` prüft alle `interval` (Standard 5 s), gibt nach `maxWait` auf und wartet mit `stableFor`,
   bis sich die Größe nicht mehr ändert (Datei fertig geschrieben).
+
+**Archiv-Actions (umgesetzt mit S54):** `archive.create` packt Dateien und Ordner in ein Archiv, `archive.extract`
+entpackt eines. Formate: ZIP, TAR und TAR.GZ; `format: auto` wählt nach der Endung (`.zip`, `.tar`, `.tar.gz`, `.tgz`),
+beim Entpacken ohne bekannte Endung nach dem Inhalt. Der Namensraum heißt `archive` statt `zip`, damit weitere Formate
+ohne neue Typnamen hinzukommen können ([ADR 0013](adr/0013-typnamen-namensraeume.md), Nachtrag).
+
+- **Packen:** `source` wie bei den Datei-Actions (mit Platzhaltern); ein Ordner wird mit seinem Inhalt unter eigenem
+  Namen gepackt, leere Ordner bleiben erhalten, Verknüpfungen und Geräte nicht (Warnung im Log). Geschrieben wird über
+  eine temporäre Datei; ein vorhandenes Archiv wird erst ersetzt, wenn das neue fertig ist (`ifExists: replace`,
+  Standard) oder der Lauf schlägt fehl (`fail`). Ergebnis: `path`, `files` und `size`.
+- **Entpacken:** in den Ordner `target`, mit `pattern` nur passende Dateien (z. B. `*.csv`). Vorhandene Dateien:
+  `ifExists: fail` (Standard, geprüft bevor etwas geschrieben wird), `replace` oder `skip`. Ergebnis: die entpackten
+  Pfade als Liste. Änderungszeitpunkte bleiben erhalten. Dateinamen in ZIP-Archiven ohne UTF-8-Kennzeichen werden
+  wie vom Windows-Explorer geschrieben als Codepage 437 gelesen.
+- **Sicherheit beim Entpacken:** Archive kommen oft von außen. Einträge, die aus dem Zielordner hinausführen würden
+  (`..`, absolute Pfade, Laufwerksbuchstaben, reservierte Namen unter Windows), brechen die Action ab, **bevor** etwas
+  geschrieben wird („Zip Slip“). Verknüpfungen und besondere Dateien werden nicht entpackt. Grenzen: `maxSize`
+  (Gesamtgröße der entpackten Dateien, Standard 1 GB; gegen „Zip-Bomben“, beim Schreiben erneut gezählt, da ein
+  Archiv weniger angeben kann, als es enthält) und `maxFiles` (Einträge, Standard 10.000).
 
 **Sub-Workflows (umgesetzt mit S11, [ADR 0017](adr/0017-sub-workflows.md)):** `core.run-workflow` ruft einen anderen
 Workflow des Projekts auf und wartet auf sein Ende.

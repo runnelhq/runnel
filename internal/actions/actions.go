@@ -8,6 +8,7 @@ package actions
 
 import (
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/actions/archive"
 	"github.com/runnelhq/runnel/internal/actions/core"
 	"github.com/runnelhq/runnel/internal/actions/file"
 	"github.com/runnelhq/runnel/internal/actions/http"
@@ -16,6 +17,7 @@ import (
 // namespaces lists the Register functions of all built-in namespaces.
 // A new namespace is added here and nowhere else.
 var namespaces = []func(*action.Registry){
+	archive.Register,
 	core.Register,
 	file.Register,
 	http.Register,
