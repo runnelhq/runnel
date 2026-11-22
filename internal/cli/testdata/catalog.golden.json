@@ -487,6 +487,55 @@
   ],
   "transforms": [
     {
+      "type": "core.calculate",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Calculate",
+      "description": "Sets fields to the result of an expression for every record",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "description": "Fields to calculate, in this order: a later field can use an earlier one",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field; an existing field of the same name gets the new value",
+                  "examples": [
+                    "total"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Expression evaluated for every record, e.g. {{ record.price * record.quantity }}; text around {{ … }} makes the result a text",
+                  "format": "runnel-text",
+                  "examples": [
+                    "{{ record.price * record.quantity }}"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "example": "fields:\n  - { name: total, value: \"{{ record.price * record.quantity }}\" }\n  - { name: label, value: \"{{ upper(record.name) }}: {{ record.total }}\" }\n",
+      "recordErrors": true,
+      "parallel": true
+    },
+    {
       "type": "core.constant",
       "kind": "transform",
       "category": "transform",
@@ -590,6 +639,34 @@
       "example": "fields:\n  - { name: kdnr, type: int }\n  - { name: umsatz, type: decimal, format: \"#.##0,00\" }\n",
       "recordErrors": true,
       "parallel": true
+    },
+    {
+      "type": "core.dedupe",
+      "kind": "transform",
+      "category": "combine",
+      "label": "Remove Duplicates",
+      "description": "Passes on the first record of each combination of values and drops repeated ones",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "description": "Fields whose values together make a record a duplicate of an earlier one; empty: all fields",
+            "items": {
+              "type": "string",
+              "format": "runnel-field"
+            }
+          },
+          "ignoreCase": {
+            "type": "boolean",
+            "description": "Compare text regardless of upper and lower case",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "example": "fields: [email]\nignoreCase: true\n"
     },
     {
       "type": "core.dummy",

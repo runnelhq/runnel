@@ -1,0 +1,59 @@
+# Cleans up a list of contacts (roadmap S16c). Relative paths refer to the project folder; for example:
+#   runnel run examples/pipelines/pipelines/contacts.pipeline.yaml
+# - "read" reads the contacts; one of them is listed twice, with the e-mail address
+#   written differently.
+# - "calculate" writes the address in lower case without spaces and adds the gross
+#   amount (net plus VAT) and a label; "label" uses "brutto", calculated just before.
+# - "unique" keeps the first contact of each e-mail address.
+# - "write" writes the contacts with the new fields.
+kind: Pipeline
+apiVersion: runnel/v1
+name: contacts
+parameters:
+  - name: OUTPUT
+    description: CSV file to write
+    default: out/contacts.csv
+  - name: VAT
+    description: VAT rate
+    type: number
+    default: "0.19"
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: crm/contacts.csv
+      delimiter: ";"
+      fields:
+        - { name: kdnr, type: int }
+        - { name: name }
+        - { name: email }
+        - { name: netto, type: decimal, format: "#.##0,00" }
+  - id: calculate
+    type: core.calculate
+    with:
+      fields:
+        - { name: email, value: "{{ lower(trim(record.email)) }}" }
+        - { name: brutto, value: "{{ record.netto * (1 + params.VAT) }}" }
+        - { name: label, value: "{{ record.name }} <{{ record.email }}>" }
+  - id: unique
+    type: core.dedupe
+    with:
+      fields: [email]
+  - id: write
+    type: csv.output
+    with:
+      path: ${OUTPUT}
+      fields:
+        - { name: kdnr }
+        - { name: label }
+        - { name: netto, format: "0.00" }
+        - { name: brutto, format: "0.00" }
+links:
+  - { from: read, to: calculate }
+  - { from: calculate, to: unique }
+  - { from: unique, to: write }
+layout:
+  read: { x: 0, y: 0 }
+  calculate: { x: 240, y: 0 }
+  unique: { x: 480, y: 0 }
+  write: { x: 720, y: 0 }

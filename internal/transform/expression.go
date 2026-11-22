@@ -70,6 +70,15 @@ func (e *Expression) Bool(out *Output, r record.Record) (bool, error) {
 	return e.eval.EvalBool(e.context(out, r))
 }
 
+// Value evaluates the expression for a record and returns its result (e.g. a field of
+// core.calculate).
+func (e *Expression) Value(out *Output, r record.Record) (any, error) {
+	if e.tpl == nil {
+		return nil, errUnresolved
+	}
+	return e.eval.Eval(e.context(out, r))
+}
+
 var errUnresolved = errors.New("the expression contains a variable ${…} that was not resolved")
 
 // context returns the context for one record: the values of the run, built once, and
