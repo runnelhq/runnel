@@ -63,3 +63,20 @@ func FuzzParseTrigger(f *testing.F) {
 		_ = routesConflict(t, t)
 	})
 }
+
+// FuzzPaste: pasted text (E16) never makes the editor panic, and what it accepts leaves a
+// readable file.
+func FuzzPaste(f *testing.F) {
+	f.Add("transforms:\n  - id: a\n    type: core.dummy\nlinks:\n  - { from: a, to: a }\nlayout:\n  a: { x: 1, y: 2 }\n")
+	f.Add("actions:\n  - id: x\n    type: core.log\n")
+	f.Add("transforms:\n  - { id: a, type: core.switch, with: { cases: [ { to: a } ] } }\n")
+	pipeline := []byte("kind: Pipeline\napiVersion: runnel/v1\nname: p\ntransforms:\n  - id: a\n    type: core.dummy\n")
+	f.Fuzz(func(t *testing.T, text string) {
+		out, _, err := PastePipeline("p.pipeline.yaml", pipeline, Paste{Text: text})
+		if err == nil {
+			if p, _ := ReadPipeline("p.pipeline.yaml", out); p == nil {
+				t.Fatalf("accepted %q, but the result cannot be read:\n%s", text, out)
+			}
+		}
+	})
+}

@@ -40,6 +40,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | POST | `/validate` | Workflow oder Pipeline prüfen, siehe unten |
 | POST | `/workflows/edit` | Änderung vom Canvas auf den Text anwenden (nicht speichern), siehe unten |
 | POST | `/pipelines/edit` | dasselbe für Pipelines (S25a), siehe unten |
+| POST | `/copy` | Actions oder Transforms als YAML-Text für die Zwischenablage kopieren (E16), siehe unten |
 | POST | `/pipelines/fields` | Felder eines Eingabe-Transforms ermitteln (S46), siehe unten |
 | POST | `/preview` | Datenvorschau einer Pipeline bis zu einem Transform (S44), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
@@ -288,6 +289,46 @@ POST /api/v1/pipelines/edit
 | `setPipeline` | `name`, `description`, `settings.batchSize`, `settings.bufferSize`, `settings.strict` |
 | `entries` | nur `parameters` (Pipelines haben keine Outputs) |
 
+
+### Kopieren und Einfügen (`/copy`, `paste`)
+
+Kopieren und Einfügen auf dem Canvas (E16, Mockup `design/mockups/e16-copy-paste.html`). `/copy` gibt die gewählten
+Actions bzw. Transforms aus dem angezeigten Text zurück – so, wie sie in der Datei stehen, mit den Links zwischen
+ihnen und ihren Positionen. Der Editor legt den Text in die Zwischenablage; er funktioniert damit über Dateien, Tabs
+und Fenster hinweg und lässt sich auch in die YAML-Ansicht oder eine Mail einfügen.
+
+```json
+POST /api/v1/copy
+{ "path": "pipelines/customers.pipeline.yaml", "content": "kind: Pipeline\n…", "ids": ["types", "active"] }
+
+→ 200 { "text": "# Runnel: 2 transforms and 1 link from pipelines/customers.pipeline.yaml\ntransforms:\n  - id: types\n…",
+        "steps": 2, "links": 1, "omitted": 2 }
+```
+
+`omitted` zählt die Links zu Schritten, die nicht kopiert wurden; sie fehlen im Text. Kommentare vor einem Eintrag und
+Leerzeilen danach gehören nicht dazu. Eingefügt wird mit `paste` an `/workflows/edit` bzw. `/pipelines/edit`, allein
+(nicht zusammen mit anderen Änderungen):
+
+```json
+POST /api/v1/pipelines/edit
+{ "path": "pipelines/orders.pipeline.yaml", "content": "…",
+  "paste": { "text": "# Runnel: 2 transforms …\ntransforms:\n…", "at": { "x": 256, "y": 328 } } }
+
+→ 200 { "content": "…", "pasted": { "ids": ["types-2", "active"], "links": 1,
+        "renamed": { "types": "types-2" }, "references": 0 } }
+```
+
+- Die Schritte werden **wie geschrieben** angehängt (Kommentare, Stil, mehrzeilige Texte bleiben), die Links im
+  Flow-Stil. Links zu Schritten, die nicht im Text stehen, entfallen.
+- **IDs:** Freie IDs bleiben; belegte bekommen `-2`, `-3` … (`types-2` wird zu `types-3`). Verweise unter den
+  eingefügten Schritten folgen: in Workflows `results.<id>` und `results["<id>"]` in Ausdrücken `{{ … }}` (auch in
+  `when` der Links; eine ID mit `-` wird mit Klammern geschrieben, in den Anführungszeichen, die den YAML-Wert der Zeile
+  nicht beenden), in Pipelines die Ziele `to:` (z. B. von `core.switch`). `references` zählt die Änderungen.
+- **Position:** `at` ist die linke obere Ecke der eingefügten Schritte (der Editor schickt die Mausposition); ohne
+  `at` bleiben die Positionen, bei umbenannten IDs um 40 px versetzt.
+- **Ablehnungen (`400`):** Actions in einer Pipeline bzw. Transforms in einem Workflow („Actions can't be pasted into a
+  pipeline“), Text ohne Schritte („the clipboard holds no actions or transforms“), ein Eintrag ohne `id`, ein nicht
+  unterstützter Link, mehr als 1 MiB Text. `/copy` lehnt unbekannte IDs, eine leere Auswahl und andere Dateien ab.
 
 ## Felder ermitteln (`/pipelines/fields`)
 

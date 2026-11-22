@@ -240,6 +240,21 @@ export const MoveIcon = (p: P) => (
   </Icon>
 );
 
+export const CutIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="6" cy="18" r="2.5" />
+    <circle cx="18" cy="18" r="2.5" />
+    <path d="M8 16L18 4M16 16L6 4" />
+  </Icon>
+);
+
+export const PasteIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 4V3h6v1M9 10h6M9 14h6" />
+  </Icon>
+);
+
 export const TrashIcon = (p: P) => (
   <Icon {...p}>
     <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />

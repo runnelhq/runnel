@@ -99,20 +99,9 @@ type WorkflowField struct {
 // The workflow must be readable (no syntax errors, wrong types or unknown fields).
 func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 	return editText(name, data, func(text []byte) (*graphDoc, *graphEdit, error) {
-		// Field errors (e.g. an invalid duration) do not prevent editing; they are fixed by editing.
-		w, err := ReadWorkflow(name, text)
-		if w == nil {
+		d, w, err := workflowDoc(name, text)
+		if d == nil {
 			return nil, nil, err
-		}
-		d := &graphDoc{noun: "action", docNoun: "workflow", stepsKey: "actions", src: w.src,
-			stepFields: settableFields, docFields: workflowFields,
-			lists:  map[string]int{"parameters": len(w.Parameters), "outputs": len(w.Outputs)},
-			params: w.Parameters, outputs: w.Outputs}
-		for _, a := range w.Actions {
-			d.steps = append(d.steps, a.ID)
-		}
-		for _, l := range w.Links {
-			d.links = append(d.links, linkRef{l.From, l.To})
 		}
 		g := &graphEdit{Move: edit.Move, Delete: edit.Delete, Add: edit.Add, Rename: edit.Rename,
 			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetWorkflow, Entries: edit.Entries}
@@ -153,6 +142,26 @@ func EditWorkflow(name string, data []byte, edit WorkflowEdit) ([]byte, error) {
 	})
 }
 
+// workflowDoc reads a workflow for the line editor. Field errors (e.g. an invalid
+// duration) do not prevent editing; they are fixed by editing.
+func workflowDoc(name string, text []byte) (*graphDoc, *Workflow, error) {
+	w, err := ReadWorkflow(name, text)
+	if w == nil {
+		return nil, nil, err
+	}
+	d := &graphDoc{noun: "action", docNoun: "workflow", stepsKey: "actions", src: w.src,
+		stepFields: settableFields, docFields: workflowFields,
+		lists:  map[string]int{"parameters": len(w.Parameters), "outputs": len(w.Outputs)},
+		params: w.Parameters, outputs: w.Outputs}
+	for _, a := range w.Actions {
+		d.steps = append(d.steps, a.ID)
+	}
+	for _, l := range w.Links {
+		d.links = append(d.links, linkRef{l.From, l.To})
+	}
+	return d, w, nil
+}
+
 // workflowLinkItem writes a workflow link; "success" is the default and left out.
 func workflowLinkItem(l Link) linkItem {
 	item := linkItem{From: l.From, To: l.To}
@@ -189,6 +198,13 @@ type graphDoc struct {
 
 type linkRef struct{ From, To string }
 
+// rawStep is a step as written: its id and its lines without "- " and without the
+// indentation of the list.
+type rawStep struct {
+	ID    string
+	Lines []string
+}
+
 // linkItem is a link as written: from, to and further fields with their YAML values.
 type linkItem struct {
 	From, To string
@@ -197,9 +213,11 @@ type linkItem struct {
 
 // graphEdit is an edit of a workflow or pipeline, with links already in written form.
 type graphEdit struct {
-	Move        map[string]Point
-	Delete      []string
-	Add         []NewAction
+	Move   map[string]Point
+	Delete []string
+	Add    []NewAction
+	// Insert appends steps as written (pasted, E16).
+	Insert      []rawStep
 	Rename      map[string]string
 	AddLinks    []linkItem
 	DeleteLinks []int
@@ -270,7 +288,7 @@ type editor struct {
 
 func (e *editor) check() error {
 	edit, noun := e.edit, e.d.noun
-	if len(edit.Rename) > 0 && (len(edit.Move) > 0 || len(edit.Delete) > 0 || len(edit.Add) > 0 ||
+	if len(edit.Rename) > 0 && (len(edit.Move) > 0 || len(edit.Delete) > 0 || len(edit.Add) > 0 || len(edit.Insert) > 0 ||
 		len(edit.AddLinks) > 0 || len(edit.DeleteLinks) > 0 || len(edit.UpdateLinks) > 0 || len(edit.Set) > 0 || len(edit.SetDoc) > 0 ||
 		len(edit.Entries) > 0) {
 		return errors.New("renaming cannot be combined with other changes")
@@ -300,6 +318,15 @@ func (e *editor) check() error {
 			return fmt.Errorf("cannot add %s %q: invalid %s type %q", noun, a.ID, noun, a.Type)
 		}
 		e.ids[a.ID] = true
+	}
+	for _, r := range edit.Insert {
+		if err := checkID(noun, r.ID); err != nil {
+			return fmt.Errorf("cannot add %s: %w", noun, err)
+		}
+		if e.ids[r.ID] || e.deleted[r.ID] {
+			return fmt.Errorf("cannot add %s %q: the id is already used", noun, r.ID)
+		}
+		e.ids[r.ID] = true
 	}
 	for id := range edit.Move {
 		if !e.ids[id] {
@@ -459,10 +486,13 @@ func (e *editor) apply() error {
 			}
 		}
 	}
-	if len(edit.Add) > 0 {
+	if len(edit.Add) > 0 || len(edit.Insert) > 0 {
 		var items [][]string
 		for _, a := range edit.Add {
 			items = append(items, []string{"id: " + a.ID, "type: " + a.Type})
+		}
+		for _, r := range edit.Insert {
+			items = append(items, r.Lines)
 		}
 		if err := e.appendItems(d.stepsKey, items, "links", "layout"); err != nil {
 			return err
@@ -826,6 +856,9 @@ func (e *editor) layout() {
 	for _, a := range e.edit.Add {
 		order = append(order, a.ID)
 	}
+	for _, r := range e.edit.Insert {
+		order = append(order, r.ID)
+	}
 	for _, id := range order {
 		if p, moved := e.edit.Move[id]; moved && !present[id] && !e.deleted[id] {
 			added = append(added, layoutLine(id, p))
@@ -888,6 +921,10 @@ func itemLines(indent string, items [][]string) []string {
 	var out []string
 	for _, item := range items {
 		for i, l := range item {
+			if l == "" {
+				out = append(out, "")
+				continue
+			}
 			prefix := indent + "  "
 			if i == 0 {
 				prefix = indent + "- "
@@ -1151,18 +1188,9 @@ var (
 // changing only the lines concerned (see EditWorkflow).
 func EditPipeline(name string, data []byte, edit PipelineEdit) ([]byte, error) {
 	return editText(name, data, func(text []byte) (*graphDoc, *graphEdit, error) {
-		p, err := ReadPipeline(name, text)
-		if p == nil {
+		d, p, err := pipelineDoc(name, text)
+		if d == nil {
 			return nil, nil, err
-		}
-		d := &graphDoc{noun: "transform", docNoun: "pipeline", stepsKey: "transforms", src: p.src,
-			stepFields: transformFields, docFields: pipelineFields,
-			lists: map[string]int{"parameters": len(p.Parameters)}, params: p.Parameters}
-		for _, t := range p.Transforms {
-			d.steps = append(d.steps, t.ID)
-		}
-		for _, l := range p.Links {
-			d.links = append(d.links, linkRef{l.From, l.To})
 		}
 		g := &graphEdit{Move: edit.Move, Delete: edit.Delete, Add: edit.Add, Rename: edit.Rename,
 			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetPipeline, Entries: edit.Entries}
@@ -1190,6 +1218,24 @@ func EditPipeline(name string, data []byte, edit PipelineEdit) ([]byte, error) {
 		}
 		return d, g, nil
 	})
+}
+
+// pipelineDoc reads a pipeline for the line editor.
+func pipelineDoc(name string, text []byte) (*graphDoc, *Pipeline, error) {
+	p, err := ReadPipeline(name, text)
+	if p == nil {
+		return nil, nil, err
+	}
+	d := &graphDoc{noun: "transform", docNoun: "pipeline", stepsKey: "transforms", src: p.src,
+		stepFields: transformFields, docFields: pipelineFields,
+		lists: map[string]int{"parameters": len(p.Parameters)}, params: p.Parameters}
+	for _, t := range p.Transforms {
+		d.steps = append(d.steps, t.ID)
+	}
+	for _, l := range p.Links {
+		d.links = append(d.links, linkRef{l.From, l.To})
+	}
+	return d, p, nil
 }
 
 func checkLinkType(t LinkType) error {
