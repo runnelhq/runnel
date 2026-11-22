@@ -219,6 +219,29 @@ func TestRunCalculateDedupeExample(t *testing.T) {
 	}
 }
 
+// TestRunMapSplitExample: core.map-values and core.split-field (S16f) in
+// examples/pipelines/pipelines/people.pipeline.yaml.
+func TestRunMapSplitExample(t *testing.T) {
+	chdirRepoRoot(t)
+	target := filepath.Join(t.TempDir(), "people.csv")
+	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "examples/pipelines/pipelines/people.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One line per tag; Klein has no tags and is written once.
+	want := "\xEF\xBB\xBFkdnr,lastName,firstName,statusText,tagNo,tags\r\n" +
+		"4711,Weber,Anna,Active,1,b2b\r\n4711,Weber,Anna,Active,2,premium\r\n" +
+		"4712,Klein,Peter,Inactive,,\r\n" +
+		"4713,Schmidt,Eva,Unknown,1,b2c\r\n4713,Schmidt,Eva,Unknown,2,newsletter\r\n4713,Schmidt,Eva,Unknown,3,nrw\r\n"
+	if string(b) != want {
+		t.Errorf("written file %q, want %q", b, want)
+	}
+}
+
 func TestRunBasicTransformsExample(t *testing.T) {
 	chdirRepoRoot(t)
 	target := filepath.Join(t.TempDir(), "crm.csv")

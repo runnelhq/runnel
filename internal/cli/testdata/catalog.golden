@@ -26,8 +26,10 @@ transforms / transform
   core.constant       Add Constants  Adds fields with the same value to every record
   core.convert        Convert Types  Converts fields to another type, with a number or date format
   core.filter         Filter         Passes on the records for which a condition is true
+  core.map-values     Map Values     Replaces the values of a field by a table, e.g. codes by names
   core.select-fields  Select Fields  Keeps, orders and renames fields, or removes fields
   core.sequence       Sequence       Numbers the records in the order they arrive, also per group
+  core.split-field    Split Field    Splits the text of a field into several fields or into one record per part
 transforms / flow
   core.dummy   Dummy   Passes all records on unchanged
   core.switch  Switch  Passes each record to the link of the first case whose condition is true

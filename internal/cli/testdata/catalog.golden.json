@@ -893,6 +893,69 @@
       "parallel": true
     },
     {
+      "type": "core.map-values",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Map Values",
+      "description": "Replaces the values of a field by a table, e.g. codes by names",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Field whose values are replaced",
+            "format": "runnel-field",
+            "examples": [
+              "status"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Field for the result; empty: the field itself"
+          },
+          "values": {
+            "type": "array",
+            "description": "The table: a value and what it becomes",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "Value to replace, compared as text; empty: an empty value",
+                  "examples": [
+                    "A"
+                  ]
+                },
+                "to": {
+                  "description": "What it becomes: text, number or true/false; missing: an empty value"
+                }
+              },
+              "required": [
+                "from"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "default": {
+            "description": "Result for values that are not in the table, also for empty ones; missing: the value stays as it is"
+          },
+          "ignoreCase": {
+            "type": "boolean",
+            "description": "Compare text regardless of upper and lower case",
+            "default": false
+          }
+        },
+        "required": [
+          "field",
+          "values"
+        ],
+        "additionalProperties": false
+      },
+      "example": "field: status\ntarget: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
+      "parallel": true
+    },
+    {
       "type": "core.select-fields",
       "kind": "transform",
       "category": "transform",
@@ -1036,6 +1099,66 @@
       },
       "example": "fields:\n  - { name: total, descending: true }\n  - { name: name, ignoreCase: true }\n",
       "recordErrors": true
+    },
+    {
+      "type": "core.split-field",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Split Field",
+      "description": "Splits the text of a field into several fields or into one record per part",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Field whose text is split",
+            "format": "runnel-field",
+            "examples": [
+              "name"
+            ]
+          },
+          "separator": {
+            "type": "string",
+            "description": "Text between the parts, e.g. ; or , (with the space)",
+            "examples": [
+              ";"
+            ]
+          },
+          "into": {
+            "type": "array",
+            "description": "Fields for the parts, in order; more parts than fields stay together in the last one, missing parts are empty. Not with rows",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "boolean",
+            "description": "One record per part instead: the field holds the part, the other fields are copied"
+          },
+          "indexField": {
+            "type": "string",
+            "description": "With rows: field for the position of the part, starting at 1"
+          },
+          "keepEmpty": {
+            "type": "boolean",
+            "description": "With rows: also a record for empty parts (a;;b); a record whose field is empty is always passed on once",
+            "default": false
+          },
+          "trim": {
+            "type": "boolean",
+            "description": "Removes spaces around each part",
+            "default": false
+          }
+        },
+        "required": [
+          "field",
+          "separator"
+        ],
+        "additionalProperties": false
+      },
+      "example": "field: name\nseparator: \", \"\ninto: [lastName, firstName]\n",
+      "parallel": true
     },
     {
       "type": "core.switch",

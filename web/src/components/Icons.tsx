@@ -339,6 +339,21 @@ const actionIcons: Record<string, ReactNode> = {
       <path d="M10 17v2a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2" strokeDasharray="2.4 2.2" />
     </>
   ),
+  // Map values and split field (S16f, icons chosen by the maintainer from variant A of the proposal).
+  "core.map-values": (
+    <>
+      <path d="M3 6h5M3 12h5M3 18h5M10.5 6h3M10.5 12h3M10.5 18h3" />
+      <path d="M12 4l2 2-2 2M12 10l2 2-2 2M12 16l2 2-2 2" />
+      <path d="M16 6h5M16 12h5M16 18h5" />
+    </>
+  ),
+  "core.split-field": (
+    <>
+      <rect x="3" y="8" width="18" height="8" rx="2" />
+      <path d="M12 5v14" strokeDasharray="2 2" />
+      <path d="M8 3L6 5l2 2M16 3l2 2-2 2" />
+    </>
+  ),
   "core.sequence": (
     <>
       <path d="M5 4l1.5-1v6M4.5 9h3" />
