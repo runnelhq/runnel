@@ -126,3 +126,51 @@ func BenchmarkCalculate(b *testing.B) {
 		}
 	}
 }
+
+// TestCalculateFixedValues (S65): a value without {{ }} is fixed: numbers, true and false
+// with their type, everything else as text; a later expression can use it.
+func TestCalculateFixedValues(t *testing.T) {
+	tr := transformtest.New(t, calculateDefinition, map[string]any{"fields": []any{
+		map[string]any{"name": "route", "value": "unpaid"},
+		map[string]any{"name": "action", "value": "Needs a release"},
+		map[string]any{"name": "count", "value": "42"},
+		map[string]any{"name": "rate", "value": "0.19"},
+		map[string]any{"name": "zip", "value": "01067"},
+		map[string]any{"name": "ok", "value": "true"},
+		map[string]any{"name": "empty", "value": ""},
+		map[string]any{"name": "label", "value": "{{ record.route }}-{{ record.count + 1 }}"},
+	}})
+	out, _, err := transformtest.RunWithValues(context.Background(), tr, nil, item("pen", "1.10", 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(out[0].Fields()); got != "[{name pen} {price 1.1} {qty 3} {route unpaid} {action Needs a release} {count 42} {rate 0.19} {zip 01067} {ok true} {empty } {label unpaid-43}]" {
+		t.Errorf("got %s", got)
+	}
+	types := map[string]string{"count": "int64", "rate": "decimal.Decimal", "zip": "string", "ok": "bool", "empty": "string"}
+	for name, want := range types {
+		if v, _ := out[0].Get(name); fmt.Sprintf("%T", v) != want {
+			t.Errorf("%s is %T, want %s", name, v, want)
+		}
+	}
+}
+
+// A fixed text that looks like an expression was calculated before S65: a warning tells
+// how to write it now.
+func TestCalculateFixedLooksLikeExpression(t *testing.T) {
+	tr := transformtest.New(t, calculateDefinition, map[string]any{"fields": []any{
+		map[string]any{"name": "total", "value": "record.price * record.qty"},
+		map[string]any{"name": "name", "value": "upper(params.X)"},
+		map[string]any{"name": "route", "value": "unpaid"},
+		map[string]any{"name": "note", "value": "Send a reminder (soon)"},
+		map[string]any{"name": "n", "value": "7"},
+	}})
+	ic := transform.NewInitContext(record.Schema{}.With("price", record.Decimal).With("qty", record.Int))
+	if _, err := tr.(transform.Initializer).Init(ic); err != nil {
+		t.Fatal(err)
+	}
+	p := ic.Problems()
+	if len(p) != 2 || p[0].Path != "fields[0].value" || !p[0].Warning || !strings.Contains(p[0].Message, `write {{ record.price * record.qty }} to calculate it`) || p[1].Path != "fields[1].value" {
+		t.Errorf("problems %+v", p)
+	}
+}

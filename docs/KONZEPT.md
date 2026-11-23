@@ -1263,7 +1263,8 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   `run`, ohne `record`) und behalten ihren Typ. Werte je Datensatz berechnet `core.calculate`.
 - **`core.calculate`** setzt Felder je Datensatz auf das Ergebnis eines Ausdrucks: `fields: [{ name, value: "{{ … }}" }]`
   mit `record`, `params`, `vars`, `env`, `run`, in Reihenfolge – ein späteres Feld kann ein früheres nutzen. Ein Ausdruck
-  allein behält den Typ seines Ergebnisses (Rechnen mit `decimal` bleibt exakt), Text um `{{ … }}` ergibt Text. Ein
+  allein behält den Typ seines Ergebnisses (Rechnen mit `decimal` bleibt exakt), Text um `{{ … }}` ergibt Text. Ohne
+  `{{ … }}` ist der Wert fest (seit S65): Zahl, `true`/`false` oder Text, z. B. `{ name: route, value: unpaid }`. Ein
   vorhandenes Feld behält seine Position. Der Typ der Felder steht erst beim Lauf fest (im Schema unbekannt; bei Bedarf
   danach `core.convert`). Lässt sich ein Ausdruck nicht auswerten, geht der Datensatz unverändert auf den Fehler-Link.
 - **`core.sequence`** nummeriert die Datensätze in der Reihenfolge, in der sie ankommen: Feld `name` (`int`), ab `start`
