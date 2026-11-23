@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { categoryColor, type Schema } from "../catalog";
 import { useReference, type ExprContext } from "../expressions";
-import { editForm, useForm, useTriggers, type FieldChange, type TriggerData } from "../forms";
+import { useForm, useFormChange, useTriggers, type FieldChange, type TriggerData } from "../forms";
 import { useSchema, useVariables } from "../reference";
 import { graphOf, validate, type Parameter, type Problem } from "../workflow";
 import { ChevronIcon, CopyIcon, TriggerIcon, TriggerTypeIcon } from "./Icons";
@@ -48,15 +48,10 @@ export function TriggerForm(props: {
   const ref = useReference();
   const ctx = useMemo<ExprContext>(() => ({ ref, params: noParams, actions: [] }), [ref]);
 
+  const apply = useFormChange(path, text, props.onText, onError);
   const change = (c: FieldChange) => {
     const before = text;
-    editForm(path, text, c).then(
-      (r) => {
-        setRemoved(c.field === "type" && r.removed?.length ? { type: String(c.value), fields: r.removed, before } : null);
-        props.onText(r.content);
-      },
-      (e: Error) => onError(e.message),
-    );
+    void apply(c).then((r) => r && setRemoved(c.field === "type" && r.removed?.length ? { type: String(c.value), fields: r.removed, before } : null));
   };
 
   if (data === undefined || !schema) return <div className="flex-1" aria-busy="true" />;

@@ -23,11 +23,18 @@ type FileField struct {
 // inserted: a missing field goes after the last of the fields before it that exists.
 // Fields with "." take a name below them.
 var formFields = map[string][]string{
-	KindConnection: {"name", "description", "type", "with."},
-	KindTrigger:    {"name", "description", "type", "target", "environment", "params.", "enabled", "with."},
+	KindConnection:  {"name", "description", "type", "with."},
+	KindTrigger:     {"name", "description", "type", "target", "environment", "params.", "enabled", "with."},
+	KindEnvironment: {"name", "description", "variables.", "secretStore", "secrets."},
+	KindProject:     {"name", "description", "defaultEnvironment", "variables.", "secretStore", "secrets.", "workflow.", "settings."},
 }
 
-// EditFile sets a field in the text of a connection or trigger file and returns the new
+// fixedName are the kinds whose name the form does not change: it is the file name
+// (environments) or what other files refer to (connections, triggers).
+var fixedName = map[string]bool{KindConnection: true, KindTrigger: true, KindEnvironment: true}
+
+// EditFile sets a field in the text of a connection, trigger, environment or project
+// file (formFields) and returns the new
 // text. Like EditWorkflow, only the lines concerned change: comments, order and
 // formatting of the rest stay. The file must be readable YAML with a mapping at the top.
 //
@@ -36,10 +43,10 @@ var formFields = map[string][]string{
 func EditFile(kind, name string, data []byte, f FileField) (out []byte, removed []string, err error) {
 	order := formFields[kind]
 	field, sub, nested := strings.Cut(f.Field, ".")
-	if !nested && field == "name" || !slices.Contains(order, field+map[bool]string{true: "."}[nested]) || nested && !configKeyPattern.MatchString(sub) {
+	if !nested && field == "name" && fixedName[kind] || !slices.Contains(order, field+map[bool]string{true: "."}[nested]) || nested && !configKeyPattern.MatchString(sub) {
 		return nil, nil, fmt.Errorf("field %q cannot be set in the form", f.Field)
 	}
-	if f.Value == nil && len(f.Map) == 0 && (field == "type" || kind == KindTrigger && field == "target") {
+	if f.Value == nil && len(f.Map) == 0 && (field == "type" || field == "name" || kind == KindTrigger && field == "target") {
 		return nil, nil, fmt.Errorf("the %s of a %s cannot be removed", field, strings.ToLower(kind))
 	}
 	text := string(data)

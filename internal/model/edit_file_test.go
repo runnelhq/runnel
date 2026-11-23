@@ -155,3 +155,46 @@ func TestDescribeSchedule(t *testing.T) {
 		t.Error("invalid schedule accepted")
 	}
 }
+
+// The forms of environments and project.yaml (E20b): variables and secrets by name, the
+// fields of the project; the name of an environment stays.
+func TestEditFileEnvironmentAndProject(t *testing.T) {
+	env := "kind: Environment\napiVersion: runnel/v1\nname: prod\nvariables:\n  ERP_HOST: db01   # the server\nsecretStore: inline\nsecrets:\n  token: abc\n"
+	for _, c := range []struct {
+		f    FileField
+		want string
+	}{
+		{FileField{Field: "variables.ERP_HOST", Value: "db02"}, "  ERP_HOST: db02   # the server\n"},
+		{FileField{Field: "variables.INBOX", Value: `\\fs01\in`}, "  ERP_HOST: db01   # the server\n  INBOX: \\\\fs01\\in\n"},
+		{FileField{Field: "variables.ERP_HOST", Value: nil}, "name: prod\nsecretStore: inline\n"},
+		{FileField{Field: "description", Value: "Production"}, "name: prod\ndescription: Production\nvariables:\n"},
+		{FileField{Field: "secretStore", Value: "env"}, "secretStore: env\n"},
+		{FileField{Field: "secrets.api", Value: "s3cret"}, "  token: abc\n  api: s3cret\n"},
+	} {
+		out, _, err := EditFile(KindEnvironment, "environments/prod.yaml", []byte(env), c.f)
+		if err != nil || !strings.Contains(string(out), c.want) {
+			t.Errorf("%+v: %v\n%s\nwant containing %q", c.f, err, out, c.want)
+		}
+	}
+	if _, _, err := EditFile(KindEnvironment, "environments/prod.yaml", []byte(env), FileField{Field: "name", Value: "qa"}); err == nil {
+		t.Error("name of an environment set")
+	}
+	proj := "kind: Project\napiVersion: runnel/v1\nname: orders\nvariables:\n  BASE: C:\\data\n"
+	for _, c := range []struct {
+		f    FileField
+		want string
+	}{
+		{FileField{Field: "name", Value: "shop"}, "name: shop\n"},
+		{FileField{Field: "defaultEnvironment", Value: "dev"}, "name: orders\ndefaultEnvironment: dev\nvariables:\n"},
+		{FileField{Field: "settings.maxConcurrentRuns", Value: 4}, "  BASE: C:\\data\nsettings:\n  maxConcurrentRuns: 4\n"},
+		{FileField{Field: "workflow.defaultJoin", Value: "first"}, "workflow:\n  defaultJoin: first\n"},
+	} {
+		out, _, err := EditFile(KindProject, "project.yaml", []byte(proj), c.f)
+		if err != nil || !strings.Contains(string(out), c.want) {
+			t.Errorf("%+v: %v\n%s\nwant containing %q", c.f, err, out, c.want)
+		}
+	}
+	if _, _, err := EditFile(KindProject, "project.yaml", []byte(proj), FileField{Field: "name", Value: nil}); err == nil {
+		t.Error("name of the project removed")
+	}
+}

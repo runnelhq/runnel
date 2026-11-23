@@ -30,7 +30,7 @@ func TestEditConnectionForm(t *testing.T) {
 		t.Fatalf("%s %v", rec.Body, err)
 	}
 	expect(t, do(t, s, "POST", "/api/v1/forms/edit", body(`{"field":"name","value":"x"}`)), http.StatusBadRequest, "cannot be set")
-	expect(t, do(t, s, "POST", "/api/v1/forms/edit", `{"path":"workflows/a.workflow.yaml","content":""}`), http.StatusBadRequest, "only connection and trigger files")
+	expect(t, do(t, s, "POST", "/api/v1/forms/edit", `{"path":"workflows/a.workflow.yaml","content":""}`), http.StatusBadRequest, "only connection, trigger and environment files")
 	// A file that does not read has no connection for the form.
 	if rec := do(t, s, "POST", "/api/v1/forms/edit", `{"path":"connections/db.yaml","content":"kind: ["}`); rec.Code != 200 || strings.Contains(rec.Body.String(), `"connection"`) {
 		t.Errorf("%d %s", rec.Code, rec.Body)
@@ -116,4 +116,31 @@ func TestTypeText(t *testing.T) {
 			t.Errorf("%q for %s: %q, want %q", c[0], c[1], got, c[2])
 		}
 	}
+}
+
+// The forms of environments and project.yaml (E20b): variables as written, the secrets
+// of secretStore: inline only by name, never their values.
+func TestEditSettingsForm(t *testing.T) {
+	_, s := newProject(t)
+	env := "kind: Environment\napiVersion: runnel/v1\nname: prod\nvariables:\n  HOST: db01\n  PORT: 1433\nsecretStore: inline\nsecrets:\n  token: Pa55word\n"
+	b, _ := json.Marshal(map[string]any{"path": "environments/prod.yaml", "content": env, "set": map[string]any{"field": "secrets.api", "value": "an0ther"}})
+	rec := do(t, s, "POST", "/api/v1/forms/edit", string(b))
+	var res formEditResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || res.Environment == nil || res.Environment.Name != "prod" ||
+		res.Environment.Variables["HOST"] != "db01" || strings.Join(res.Environment.SecretNames, ",") != "api,token" || res.Environment.SecretStore != "inline" {
+		t.Fatalf("%s %v", rec.Body, err)
+	}
+	// The values are in the text the editor holds, but not in the fields of the form.
+	if form, _ := json.Marshal(res.Environment); strings.Contains(string(form), "Pa55word") || strings.Contains(string(form), "an0ther") {
+		t.Errorf("secret value in the form: %s", form)
+	}
+	b, _ = json.Marshal(map[string]any{"path": "project.yaml", "content": "kind: Project\napiVersion: runnel/v1\nname: demo\n", "set": map[string]any{"field": "defaultEnvironment", "value": "dev"}})
+	res = formEditResponse{}
+	if err := json.Unmarshal(do(t, s, "POST", "/api/v1/forms/edit", string(b)).Body.Bytes(), &res); err != nil || res.Project == nil ||
+		res.Project.DefaultEnvironment != "dev" || res.Content != "kind: Project\napiVersion: runnel/v1\nname: demo\ndefaultEnvironment: dev\n" {
+		t.Fatalf("%+v %v", res, err)
+	}
+	b, _ = json.Marshal(map[string]any{"path": "environments/prod.yaml", "content": env, "set": map[string]any{"field": "name", "value": "qa"}})
+	expect(t, do(t, s, "POST", "/api/v1/forms/edit", string(b)), http.StatusBadRequest, "cannot be set")
+	expect(t, do(t, s, "POST", "/api/v1/forms/edit", `{"path":"data/in.csv","content":""}`), http.StatusBadRequest, "only connection, trigger and environment files")
 }

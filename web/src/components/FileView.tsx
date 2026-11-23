@@ -30,6 +30,7 @@ import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRu
 import { CodeView } from "./CodeView";
 import { ConnectionForm, TestButton, type TestResult } from "./ConnectionForm";
 import { TriggerForm } from "./TriggerForm";
+import { SettingsForm } from "./SettingsForm";
 import { runTriggerTarget } from "../forms";
 import { MarkdownView } from "./MarkdownView";
 import { YamlEditor } from "./YamlEditor";
@@ -145,8 +146,10 @@ export function FileView(props: {
   const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger" || fileKind === "connection";
   const isConnection = fileKind === "connection";
   const isTrigger = fileKind === "trigger";
-  // Connections and triggers open as a form (mockups S39b, E20); "canvas" is the form there.
-  const isForm = isConnection || isTrigger;
+  const settingsKind = fileKind === "environment" || fileKind === "project" ? fileKind : null;
+  // Connections, triggers, environments and project.yaml open as a form (mockups S39b,
+  // E20); "canvas" is the form there.
+  const isForm = isConnection || isTrigger || settingsKind !== null;
   const [view, setView] = useState<View>(isGraph || isDoc || isForm ? "canvas" : "yaml");
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [focusLine, setFocusLine] = useState<number | null>(null);
@@ -990,6 +993,17 @@ export function FileView(props: {
             onText={(next) => setText(next, "push")}
             onError={setEditError}
             onOpenFile={props.onOpenFile}
+          />
+        ) : view === "canvas" && settingsKind ? (
+          <SettingsForm
+            kind={settingsKind}
+            path={path}
+            text={doc.text}
+            saved={!dirty}
+            projectDir={props.projectDir}
+            problems={validation?.problems ?? []}
+            onText={(next) => setText(next, "push")}
+            onError={setEditError}
           />
         ) : view === "canvas" && isDoc ? (
           <MarkdownView text={doc.text} path={path} files={props.files ?? noFiles} onOpen={(p) => props.onOpenFile?.(p)} />
