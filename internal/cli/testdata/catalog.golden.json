@@ -838,6 +838,75 @@
       "example": "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n"
     },
     {
+      "type": "shell.powershell",
+      "kind": "action",
+      "category": "execution",
+      "label": "PowerShell",
+      "description": "Runs a PowerShell script with named parameters; output: exitCode, stdout, stderr and optionally JSON",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "The script; no ${…} or {{ … }} – values come as params",
+            "format": "runnel-script"
+          },
+          "file": {
+            "type": "string",
+            "description": "A script file instead of script, relative to the project folder, e.g. scripts/cleanup.ps1",
+            "format": "runnel-script"
+          },
+          "params": {
+            "type": "object",
+            "description": "Named parameters of the script (param(...)); numbers, true/false, lists and objects keep their type; may use ${…} and {{ … }}",
+            "additionalProperties": {}
+          },
+          "json": {
+            "type": "boolean",
+            "description": "Read the last JSON value of stdout (e.g. of ConvertTo-Json) into output.json",
+            "default": false
+          },
+          "edition": {
+            "type": "string",
+            "description": "auto: PowerShell 7 (pwsh) if installed, else Windows PowerShell 5.1; pwsh or windows to choose one",
+            "enum": [
+              "auto",
+              "pwsh",
+              "windows"
+            ],
+            "default": "auto"
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Working folder, relative to the project folder; empty: the project folder"
+          },
+          "env": {
+            "type": "object",
+            "description": "Further environment variables, e.g. secrets ($env:NAME in the script)",
+            "format": "runnel-secret",
+            "additionalProperties": {
+              "type": "string",
+              "format": "runnel-secret"
+            }
+          },
+          "maxOutput": {
+            "type": "integer",
+            "description": "Most bytes of stdout and of stderr kept; more is dropped (truncated)",
+            "default": 1048576
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time the script may run; then it ends with all processes it started",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "additionalProperties": false
+      },
+      "example": "script: |\n  param([string]$Folder)\n  Get-ChildItem $Folder | Select-Object Name, Length | ConvertTo-Json\nparams:\n  Folder: data\njson: true\n"
+    },
+    {
       "type": "shell.run",
       "kind": "action",
       "category": "execution",

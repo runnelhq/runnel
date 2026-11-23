@@ -47,7 +47,7 @@ func TestContract(t *testing.T) {
 				t.Errorf("descriptor cannot be written as JSON: %v", err)
 			}
 			// Every field of the schema must be accepted by New: Config and New use the same struct.
-			if _, err := def.New(sample(desc.Schema)); err != nil {
+			if _, err := def.New(sampleOf(typ, desc.Schema)); err != nil {
 				t.Errorf("configuration built from the schema was rejected (Config and New must use the same struct): %v", err)
 			}
 			checkExample(t, def, desc.Schema)
@@ -94,6 +94,19 @@ func sample(s *schema.Schema) map[string]any {
 	return with
 }
 
+// leaveOut are fields the sample of a type must not set, because they exclude another
+// one: shell.powershell takes either script or file.
+var leaveOut = map[string][]string{"shell.powershell": {"file"}}
+
+// sampleOf is sample for an action type.
+func sampleOf(typ string, s *schema.Schema) map[string]any {
+	with := sample(s)
+	for _, name := range leaveOut[typ] {
+		delete(with, name)
+	}
+	return with
+}
+
 func sampleValue(s *schema.Schema) any {
 	switch {
 	case len(s.Examples) > 0:
@@ -126,7 +139,7 @@ func TestContractCancellation(t *testing.T) {
 	for _, typ := range r.Types() {
 		def, _ := r.Lookup(typ)
 		desc, _ := r.Descriptor(typ)
-		a, err := def.New(sample(desc.Schema))
+		a, err := def.New(sampleOf(typ, desc.Schema))
 		if err != nil {
 			t.Errorf("%s: configuration built from the schema was rejected: %v", typ, err)
 			continue

@@ -8,7 +8,7 @@
       "column": 23,
       "path": "$.actions[1].type",
       "severity": "error",
-      "message": "action \"copy\": unknown action type \"file.shred\" (available: [archive.create archive.extract core.abort core.check core.dummy core.log core.run-pipeline core.run-workflow core.start core.success core.wait db.execute db.query file.copy file.delete file.exists file.list file.mkdir file.move file.wait http.request http.response shell.run])"
+      "message": "action \"copy\": unknown action type \"file.shred\" (available: [archive.create archive.extract core.abort core.check core.dummy core.log core.run-pipeline core.run-workflow core.start core.success core.wait db.execute db.query file.copy file.delete file.exists file.list file.mkdir file.move file.wait http.request http.response shell.powershell shell.run])"
     },
     {
       "file": "workflows/import.workflow.yaml",

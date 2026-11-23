@@ -191,14 +191,14 @@ func (r *Runner) evalWith(a *model.Action, scope *vars.Scope, values map[string]
 		for _, p := range d.Schema.Properties {
 			text[p.Name] = p.Schema.Type == "string"
 			secret[p.Name] = p.Schema.Format == schema.FormatSecret
-			literal[p.Name] = p.Schema.Format == schema.FormatSQL
+			literal[p.Name] = p.Schema.Format == schema.FormatSQL || p.Schema.Format == schema.FormatScript
 			program[p.Name] = p.Schema.Format == schema.FormatProgram
 		}
 	}
 	out := make(map[string]any, len(a.With))
 	for k, v := range a.With {
 		if literal[k] {
-			// SQL as written: values come as parameters @name (ADR 0022).
+			// SQL and scripts as written: values come as parameters (ADR 0022, 0023).
 			out[k] = v
 			continue
 		}

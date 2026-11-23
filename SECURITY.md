@@ -21,7 +21,7 @@ Korrekturen.
   `--triggers-insecure`), je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`
   ([ADR 0018](docs/adr/0018-http-trigger.md)).
 - Tokens stehen nicht in Projektdateien, sondern in Umgebungsvariablen (`${env:…}`); ein Secret-Store folgt mit S39.
-- `shell.run` (und später `shell.powershell`) starten Programme mit dem Konto des Runnel-Prozesses, ohne Shell und
+- `shell.run` und `shell.powershell` starten Programme mit dem Konto des Runnel-Prozesses, ohne Shell und
   ohne Freigabe-Schalter: Wer Projektdateien schreiben darf, darf Programme starten. Für den Dienst ein eigenes Konto
   mit den nötigen Rechten statt `LocalSystem` verwenden ([ADR 0023](docs/adr/0023-programme-powershell.md)).
 - Regeln für Beiträge: [AGENTS.md, Abschnitt „Sicherheit“](AGENTS.md#sicherheit).

@@ -249,6 +249,12 @@ func ActionProgramField(reg *action.Registry) func(typ, field string) bool {
 	return formatField(workflowSteps(&model.Workflow{}, reg).schema, schema.FormatProgram)
 }
 
+// ActionScriptField tells whether a field of an action type is a script of
+// shell.powershell or its file (format runnel-script, ADR 0023).
+func ActionScriptField(reg *action.Registry) func(typ, field string) bool {
+	return formatField(workflowSteps(&model.Workflow{}, reg).schema, schema.FormatScript)
+}
+
 // TransformSQLField is ActionSQLField for transforms.
 func TransformSQLField(reg *transform.Registry) func(typ, field string) bool {
 	return formatField(pipelineSteps(&model.Pipeline{}, reg).schema, schema.FormatSQL)

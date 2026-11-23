@@ -51,3 +51,40 @@ func TestShellRunChecks(t *testing.T) {
 		}
 	}
 }
+
+// The script of shell.powershell is passed as written: ${…} and {{ … }} in it stop the
+// run; values come as params, which may use both (ADR 0023).
+func TestShellPowerShellChecks(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, "project.yaml"), "kind: Project\napiVersion: runnel/v1\nname: t\n")
+	wf := func(script string) string {
+		return `kind: Workflow
+apiVersion: runnel/v1
+name: ps
+parameters:
+  - name: FOLDER
+    default: data
+actions:
+  - id: start
+    type: core.start
+  - id: run
+    type: shell.powershell
+    with:
+      script: "` + script + `"
+      params:
+        Folder: ${FOLDER}
+        Upper: "{{ upper(params.FOLDER) }}"
+links:
+  - { from: start, to: run }
+`
+	}
+	if _, err := Prepare(Spec{Name: "workflows/ps.workflow.yaml", Data: []byte(wf("param($Folder, $Upper) Get-ChildItem $Folder")), ProjectDir: dir, Registry: actions.Builtin()}); err != nil {
+		t.Errorf("values in params: %v", err)
+	}
+	for _, script := range []string{"Get-ChildItem ${FOLDER}", "Get-ChildItem {{ params.FOLDER }}"} {
+		_, err := Prepare(Spec{Name: "workflows/ps.workflow.yaml", Data: []byte(wf(script)), ProjectDir: dir, Registry: actions.Builtin()})
+		if err == nil || !strings.Contains(err.Error(), "the script must not contain ${…} or {{ … }}") {
+			t.Errorf("%s: %v", script, err)
+		}
+	}
+}

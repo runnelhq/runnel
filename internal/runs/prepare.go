@@ -106,6 +106,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 	diags = append(diags, w.CheckSecrets(ActionSecretField(spec.Registry), nil)...)
 	diags = append(diags, w.CheckSQL(ActionSQLField(spec.Registry))...)
 	diags = append(diags, w.CheckProgram(ActionProgramField(spec.Registry))...)
+	diags = append(diags, w.CheckScript(ActionScriptField(spec.Registry))...)
 	if diags.HasErrors() {
 		diags.Sort()
 		return p, diags
