@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
@@ -49,7 +53,52 @@ func (*Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "cannot build the schema")
 		return
 	}
+	if r.PathValue("kind") == "connection" {
+		connectionVariants(sc)
+	}
 	writeJSON(w, http.StatusOK, sc)
+}
+
+// connectionVariants adds the connection types to the schema of connection files: the
+// allowed values of type and the fields under with: for each type.
+func connectionVariants(sc *schema.Schema) {
+	reg := connections.Builtin()
+	for _, p := range sc.Properties {
+		switch p.Name {
+		case "type":
+			for _, t := range reg.Types() {
+				p.Schema.Enum = append(p.Schema.Enum, t)
+			}
+		case "with":
+			p.Schema.Variants = map[string]*schema.Schema{}
+			for _, t := range reg.Types() {
+				d, _ := reg.Descriptor(t)
+				v := *d.Schema
+				v.Schema = ""
+				v.Description = d.Label + ": " + d.Description
+				p.Schema.Variants[t] = &v
+			}
+		}
+	}
+}
+
+// connectionInfo names a connection of the project for the editor (GET /connections).
+type connectionInfo struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+	File string `json:"file"`
+}
+
+// handleConnections lists the connections of the project with their types, e.g. for the
+// choice of connection: in the panel; files with errors are left out.
+func (s *Server) handleConnections(w http.ResponseWriter, _ *http.Request) {
+	list := []connectionInfo{}
+	if p, _ := model.LoadProject(s.dir); p != nil {
+		for _, name := range slices.Sorted(maps.Keys(p.Connections)) {
+			list = append(list, connectionInfo{Name: name, Type: p.Connections[name].Type, File: path.Join(model.ConnectionsDir, name+".yaml")})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"connections": list})
 }
 
 // validateRequest names the workflow to check. Content, if given, is checked instead

@@ -111,7 +111,16 @@ const unquote = (v: string) => v.replace(/^(["'])(.*)\1$/, "$2");
 
 /** The schema of the mapping at a path: from the schema of the file kind, or for with: of a step from the catalog. */
 function mappingSchema(ctx: AssistContext, lines: string[], path: string[], item: number): Schema | null {
-  if (ctx.schema) return schemaAt(ctx.schema, path);
+  if (ctx.schema) {
+    // with: of a connection: the fields of its type (x-runnel-variants).
+    let s: Schema | null = ctx.schema;
+    for (const p of path) {
+      s = (p === "[]" ? s?.items : s?.properties?.[p]) ?? null;
+      const variants: Record<string, Schema> | undefined = s?.["x-runnel-variants"];
+      if (variants) s = variants[topValue(lines, "type") ?? ""] ?? null;
+    }
+    return s;
+  }
   if (ctx.steps && path.length === 3 && path[0] === ctx.steps && path[1] === "[]" && path[2] === "with") {
     const t = stepType(lines, item);
     return t ? (ctx.catalog.get(t)?.schema ?? null) : null;

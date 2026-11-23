@@ -95,6 +95,7 @@ function Fields(props: { target: ReferenceTarget; onAction: (a: ReferenceAction)
   const search = useRef<HTMLInputElement>(null);
   const lines = useMemo(() => fieldLines(target.text), [target.text]);
   const triggerType = target.kind === "trigger" ? (/^type:\s*(\w+)/m.exec(target.text)?.[1] ?? "") : "";
+  const connectionType = target.kind === "connection" ? (/^type:\s*([\w-]+)/m.exec(target.text)?.[1] ?? "") : "";
 
   // "/" jumps into the search field, as in the palette.
   useEffect(() => {
@@ -124,21 +125,30 @@ function Fields(props: { target: ReferenceTarget; onAction: (a: ReferenceAction)
         }
         continue;
       }
+      // with: of a connection: the fields of its type (x-runnel-variants).
+      const variant = key === "with" ? s["x-runnel-variants"]?.[connectionType] : undefined;
+      if (variant) {
+        for (const [k, ws] of Object.entries(variant.properties ?? {})) typed.push({ key: k, parent: "with", schema: ws, required: variant.required?.includes(k) ?? false });
+        continue;
+      }
       top.push({ key, parent: "", schema: s, required: schema.required?.includes(key) ?? false });
     }
     const q = query.trim().toLowerCase();
     const match = (f: Field) => !q || f.key.toLowerCase().includes(q) || (f.schema.description ?? "").toLowerCase().includes(q);
-    const name = target.kind === "trigger" ? "All triggers" : target.kind === "project" ? "project.yaml" : "Environment";
+    const name =
+      target.kind === "trigger" ? "All triggers" : target.kind === "project" ? "project.yaml" : target.kind === "connection" ? "Connection" : "Environment";
     const out: { name: string; fields: Field[]; closed?: boolean }[] = [{ name, fields: top.filter(match) }];
     if (target.kind === "trigger") {
       if (triggerType) out.push({ name: `with: for ${triggerType}`, fields: typed.filter(match) });
       const otherTypes = triggerTypes(triggerType);
       out.push({ name: `Other types: ${otherTypes.join(", ")}`, fields: other.filter(match), closed: !others && !q });
     }
+    if (typed.length > 0 && target.kind === "connection") out.push({ name: `with: for ${connectionType}`, fields: typed.filter(match) });
     return out;
-  }, [schema, target.kind, triggerType, query, others]);
+  }, [schema, target.kind, triggerType, connectionType, query, others]);
 
-  const where = target.kind === "trigger" && triggerType ? `${target.path} · type ${triggerType}` : target.path;
+  const type = triggerType || connectionType;
+  const where = type ? `${target.path} · type ${type}` : target.path;
   return (
     <>
       <p className="mx-4 mt-[-4px] mb-2 shrink-0 text-2xs text-muted-foreground">

@@ -14,6 +14,10 @@ export interface Schema {
   items?: Schema;
   /** The property applies only when a sibling has one of these values (x-runnel-only, E14). */
   "x-runnel-only"?: Record<string, unknown[]>;
+  /** The connection types a field of format runnel-connection accepts (ADR 0022). */
+  "x-runnel-connection"?: string[];
+  /** The schema of this mapping by the value of the sibling field type, e.g. with: of a connection. */
+  "x-runnel-variants"?: Record<string, Schema>;
 }
 
 /** Descriptor of an action or transform type (GET /catalog, ADR 0014). */

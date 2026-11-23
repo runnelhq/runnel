@@ -128,6 +128,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+APIPrefix+"/catalog", s.handleCatalog)
 	mux.HandleFunc("GET "+APIPrefix+"/schemas/{kind}", s.handleSchema)
 	mux.HandleFunc("GET "+APIPrefix+"/variables", s.handleVariables)
+	mux.HandleFunc("GET "+APIPrefix+"/connections", s.handleConnections)
 	mux.HandleFunc("GET "+APIPrefix+"/expressions", s.handleExpressions)
 	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
 	mux.HandleFunc("POST "+APIPrefix+"/workflows/edit", s.handleEditWorkflow)
