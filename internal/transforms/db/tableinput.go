@@ -26,7 +26,7 @@ var tableInputDefinition = transform.Definition{
 }
 
 type tableInput struct {
-	Connection string            `json:"connection" doc:"Connection of the database (a file in connections/)" schema:"required,connection=sqlite,example=app-db"`
+	Connection string            `json:"connection" doc:"Connection of the database (a file in connections/)" schema:"required,connection=sqlite|sqlserver|postgres,example=app-db"`
 	SQL        string            `json:"sql" doc:"The query; values as @name with the value under params, never written into the query" schema:"required,format=runnel-sql,example=SELECT * FROM customers"`
 	Params     map[string]string `json:"params" doc:"Values of the parameters @name of the query; may use ${…}"`
 	Timeout    string            `json:"timeout" doc:"Longest time the query may take, reading all rows included" schema:"format=runnel-duration,default=5m"`
@@ -64,14 +64,14 @@ func (t *tableInput) Process(ctx context.Context, _ <-chan transform.Batch, out 
 	if err != nil {
 		return err
 	}
-	args, err := sqldb.Args(t.SQL, t.Params)
+	stmt, args, err := sqldb.Statement(conn, t.SQL, t.Params)
 	if err != nil {
 		return err
 	}
 	timeout, _ := sqldb.Timeout(t.Timeout)
 	qctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	err = t.read(qctx, db, args, out)
+	err = t.read(qctx, db, stmt, args, out)
 	switch {
 	case err == nil:
 		return nil
@@ -83,8 +83,8 @@ func (t *tableInput) Process(ctx context.Context, _ <-chan transform.Batch, out 
 	return err
 }
 
-func (t *tableInput) read(ctx context.Context, db *sql.DB, args []any, out *transform.Output) error {
-	rows, err := db.QueryContext(ctx, t.SQL, args...)
+func (t *tableInput) read(ctx context.Context, db *sql.DB, stmt string, args []any, out *transform.Output) error {
+	rows, err := db.QueryContext(ctx, stmt, args...)
 	if err != nil {
 		return fmt.Errorf("connection %s: %w", t.Connection, err)
 	}

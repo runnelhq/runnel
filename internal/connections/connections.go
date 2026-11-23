@@ -9,5 +9,7 @@ import "github.com/runnelhq/runnel/internal/connection"
 func Builtin() *connection.Registry {
 	r := connection.NewRegistry()
 	r.Register(sqliteDefinition)
+	r.Register(sqlServerDefinition)
+	r.Register(postgresDefinition)
 	return r
 }

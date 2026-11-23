@@ -3,6 +3,7 @@ package runs
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -97,6 +98,10 @@ func CheckConnection(c *model.Connection, p *model.Project, env string) model.Er
 		errs = append(errs, c.ErrorAt(path, "%s connection: %v", c.Type, err))
 	}
 	errs = append(errs, c.CheckSecrets(func(field string) bool { return connectionTypes.SecretField(c.Type, field) }, model.SecretStoresOf(p, env))...)
+	warnings := connectionTypes.Warnings(c.Type, c.With)
+	for _, field := range slices.Sorted(maps.Keys(warnings)) {
+		errs = append(errs, c.WarningAt("$.with."+field, "%s", warnings[field]))
+	}
 	if contexts, err := model.ConnectionContexts(p, env); err == nil {
 		errs = append(errs, c.CheckVariables(contexts)...)
 	}

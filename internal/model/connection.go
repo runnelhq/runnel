@@ -86,6 +86,11 @@ func (c *Connection) ErrorAt(path, format string, args ...any) *Error {
 	return c.src.errorf(path, format, args...)
 }
 
+// WarningAt returns a warning at a path of the connection file.
+func (c *Connection) WarningAt(path, format string, args ...any) *Error {
+	return c.src.warnf(path, format, args...)
+}
+
 // CheckSecrets reports ${secret:…} outside the fields for secrets of the connection type
 // (isSecret tells whether a field under with: holds a secret) and secrets whose store
 // cannot be read with the given default stores.

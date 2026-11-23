@@ -26,7 +26,7 @@ var executeDefinition = action.Definition{
 }
 
 type executeAction struct {
-	Connection string            `json:"connection" doc:"Connection of the database (a file in connections/)" schema:"required,connection=sqlite,example=app-db"`
+	Connection string            `json:"connection" doc:"Connection of the database (a file in connections/)" schema:"required,connection=sqlite|sqlserver|postgres,example=app-db"`
 	SQL        string            `json:"sql" doc:"The statement; values as @name with the value under params, never written into the statement" schema:"required,format=runnel-sql,example=DELETE FROM orders WHERE status = 'cancelled'"`
 	Params     map[string]string `json:"params" doc:"Values of the parameters @name of the statement; may use ${…} and {{ … }}"`
 	Timeout    string            `json:"timeout" doc:"Longest time the statement may take" schema:"format=runnel-duration,default=5m"`
@@ -63,14 +63,14 @@ func (a *executeAction) Execute(ctx context.Context, ec *action.ExecContext) (ac
 	if err != nil {
 		return action.Result{}, err
 	}
-	args, err := sqldb.Args(a.SQL, a.Params)
+	stmt, args, err := sqldb.Statement(conn, a.SQL, a.Params)
 	if err != nil {
 		return action.Result{}, err
 	}
 	timeout, _ := a.timeout()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	res, err := db.ExecContext(ctx, a.SQL, args...)
+	res, err := db.ExecContext(ctx, stmt, args...)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return action.Result{}, fmt.Errorf("the statement took longer than %s", timeout)

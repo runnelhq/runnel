@@ -27,6 +27,9 @@ type Definition struct {
 	// Config is the struct the fields under with: are decoded into; fields for secrets
 	// have the format runnel-secret.
 	Config any
+	// Warn returns warnings about the fields under with: by field, e.g. a switched off
+	// certificate check (ADR 0022); nil: none.
+	Warn func(with map[string]any) map[string]string
 }
 
 // Descriptor is the description of a connection type for checks and the editor.
@@ -98,7 +101,16 @@ func (r *Registry) Check(typ string, with map[string]any) error {
 	if with == nil {
 		with = map[string]any{}
 	}
-	return decode(with, newConfig(d.Config))
+	return decode(r.asText(typ, with), newConfig(d.Config))
+}
+
+// Warnings returns the warnings of the type about the fields under with:, by field.
+func (r *Registry) Warnings(typ string, with map[string]any) map[string]string {
+	d, ok := r.defs[typ]
+	if !ok || d.Warn == nil {
+		return nil
+	}
+	return d.Warn(with)
 }
 
 // Decode is Check for the resolved fields, filling the configuration struct of the type.
@@ -106,7 +118,27 @@ func (r *Registry) Decode(c Resolved, v any) error {
 	if err := r.Check(c.Type, c.With); err != nil {
 		return fmt.Errorf("connection %s: %w", c.Name, err)
 	}
-	return decode(c.With, v)
+	return decode(r.asText(c.Type, c.With), v)
+}
+
+// asText writes numbers and true/false as text where the type expects text, e.g.
+// "port: 1433" for a field that may also hold "${DB_PORT}" (like actions).
+func (r *Registry) asText(typ string, with map[string]any) map[string]any {
+	d, ok := r.desc[typ]
+	if !ok || d.Schema == nil {
+		return with
+	}
+	out := maps.Clone(with)
+	for _, p := range d.Schema.Properties {
+		switch v := out[p.Name].(type) {
+		case nil, string, map[string]any, []any:
+		default:
+			if p.Schema.Type == "string" {
+				out[p.Name] = fmt.Sprint(v)
+			}
+		}
+	}
+	return out
 }
 
 // Resolved is a connection ready for use: its type and its fields with variables and

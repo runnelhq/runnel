@@ -13,6 +13,23 @@ import (
 // (-- … and /* … */) does not count, nor does @@ (system variables of SQL Server).
 func Placeholders(stmt string) []string {
 	var names []string
+	for _, p := range placeholders(stmt) {
+		if !slices.Contains(names, p.name) {
+			names = append(names, p.name)
+		}
+	}
+	return names
+}
+
+// placeholder is a parameter @name in a statement: its name and where it stands.
+type placeholder struct {
+	name       string
+	start, end int
+}
+
+// placeholders returns every use of a parameter in a statement, see Placeholders.
+func placeholders(stmt string) []placeholder {
+	var out []placeholder
 	for i := 0; i < len(stmt); i++ {
 		switch c := stmt[i]; {
 		case c == '\'' || c == '"' || c == '`':
@@ -38,13 +55,13 @@ func Placeholders(stmt string) []string {
 			for j < len(stmt) && (isLetter(stmt[j]) || (j > i+1 && stmt[j] >= '0' && stmt[j] <= '9')) {
 				j++
 			}
-			if name := stmt[i+1 : j]; name != "" && !slices.Contains(names, name) {
-				names = append(names, name)
+			if j > i+1 {
+				out = append(out, placeholder{name: stmt[i+1 : j], start: i, end: j})
 			}
 			i = j - 1
 		}
 	}
-	return names
+	return out
 }
 
 func skipQuoted(s string, i int, end byte) int {

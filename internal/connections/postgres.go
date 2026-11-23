@@ -1,0 +1,33 @@
+package connections
+
+import "github.com/runnelhq/runnel/internal/connection"
+
+// TypePostgres is the connection type of a PostgreSQL database.
+const TypePostgres = "postgres"
+
+var postgresDefinition = connection.Definition{
+	Type:        TypePostgres,
+	Label:       "PostgreSQL",
+	Description: "A PostgreSQL database",
+	Config:      Postgres{},
+	Warn: func(with map[string]any) map[string]string {
+		switch v, _ := with["sslMode"].(string); v {
+		case "disable":
+			return map[string]string{"sslMode": "the connection is not encrypted; use it only in a trusted network"}
+		case "require":
+			return map[string]string{"sslMode": "the certificate of the server is not checked; anyone between Runnel and the server could read and change the data"}
+		}
+		return nil
+	},
+}
+
+// Postgres are the fields of a connection of type postgres.
+type Postgres struct {
+	Host           string `json:"host" doc:"Name or address of the server" schema:"required,example=db01.example.local"`
+	Port           string `json:"port" doc:"TCP port; empty: 5432" schema:"example=5432"`
+	Database       string `json:"database" doc:"Name of the database" schema:"required,example=shop"`
+	User           string `json:"user" doc:"User name" schema:"required,example=runnel"`
+	Password       string `json:"password" doc:"Password of the user; use ${secret:NAME}" schema:"format=runnel-secret"`
+	SSLMode        string `json:"sslMode" doc:"TLS: verify-full (encrypted, certificate and name checked), verify-ca, require (encrypted, not checked) or disable" schema:"enum=verify-full|verify-ca|require|disable,default=verify-full"`
+	ConnectTimeout string `json:"connectTimeout" doc:"Longest time to connect" schema:"format=runnel-duration,default=30s"`
+}

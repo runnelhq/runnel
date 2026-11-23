@@ -399,4 +399,11 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   Typ, den der Treiber liefert. Das Schema am Ausgang ist offen: Die Spalten stehen erst beim Lauf fest, und das Prüfen
   einer Pipeline öffnet keine Datenbank. Beim Umbenennen einer Connection passt der Editor `connection:` in Workflows und
   Pipelines und `name:` in der Datei an (wie E12).
+- **S20c, SQL Server und PostgreSQL:** Treiber `microsoft/go-mssqldb` (BSD-3, mit `golang-sql/civil`, Apache 2.0) und
+  `jackc/pgx/v5` (MIT), beide reines Go; die Binärdatei wird um etwa 5 MB größer. SQL Server ohne `user` meldet sich mit
+  dem Windows-Konto an, unter dem Runnel läuft (nur unter Windows); `encrypt` ist standardmäßig an. PostgreSQL prüft
+  das Zertifikat standardmäßig (`sslMode: verify-full`); pgx kennt keine benannten Parameter, daher übersetzt Runnel
+  `@name` in `$1, $2 …` (gleicher Name, gleiche Nummer). `validate` warnt bei abgeschalteter Prüfung oder
+  Verschlüsselung (`trustServerCertificate`, `encrypt: false`, `sslMode: require|disable`). Felder wie `port` sind Text
+  wie bei Actions, damit sowohl `port: 1433` als auch `port: ${DB_PORT}` gehen.
 

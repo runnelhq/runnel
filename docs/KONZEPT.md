@@ -349,8 +349,8 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | Cron | `robfig/cron/v3` |
 | Dateiüberwachung | keine Bibliothek: Polling des Ordners (S38), damit Netzlaufwerke und UNC-Pfade gleich funktionieren |
 | Windows-Dienst / DPAPI / EventLog | `golang.org/x/sys/windows`, `.../svc`, `.../svc/eventlog` |
-| SQL Server | `microsoft/go-mssqldb` (inkl. Windows-Authentifizierung) |
-| PostgreSQL | `jackc/pgx/v5` |
+| SQL Server (seit S20c) | `microsoft/go-mssqldb` (inkl. Windows-Authentifizierung) |
+| PostgreSQL (seit S20c) | `jackc/pgx/v5` |
 | Oracle | `sijms/go-ora` (pure Go) |
 | ODBC (optional, Access, Legacy; auch MySQL/MariaDB bis auf Weiteres) | `alexbrainman/odbc` |
 | Excel | `xuri/excelize/v2` |
