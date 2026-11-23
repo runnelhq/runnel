@@ -56,6 +56,9 @@ type answer struct {
 	header   http.Header
 	data     []byte
 	duration time.Duration
+	// file is the temporary file a successful answer was saved to (saveTo), size its length.
+	file string
+	size int64
 }
 
 // call is one request of the action with everything that stays the same between pages.
@@ -66,6 +69,9 @@ type call struct {
 	method  string
 	timeout time.Duration
 	maxSize int64
+	// saveIn is the folder of the file of saveTo: a successful answer is written to a
+	// temporary file there instead of being read into memory.
+	saveIn, saveName string
 }
 
 // where names a request in messages: only scheme, host and path, as the query may hold
@@ -125,11 +131,22 @@ func (c *call) once(ctx context.Context, u *url.URL, where string) (answer, erro
 		return answer{}, requestError(ctx, where, c.timeout, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, c.maxSize+1))
+	if c.saveIn != "" && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		file, size, err := c.save(resp.Body)
+		if err != nil {
+			return answer{}, requestError(ctx, where, c.timeout, err)
+		}
+		return answer{status: resp.StatusCode, text: resp.Status, header: resp.Header, file: file, size: size, duration: time.Since(start)}, nil
+	}
+	limit := c.maxSize
+	if c.saveIn != "" {
+		limit = min(limit, defaultMaxSize) // an error answer instead of the file
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return answer{}, requestError(ctx, where, c.timeout, err)
 	}
-	if int64(len(data)) > c.maxSize {
+	if int64(len(data)) > limit {
 		return answer{}, fmt.Errorf("%s: the answer is larger than %s; set maxSize if this is intended", where, sizeText(c.a.MaxSize))
 	}
 	return answer{status: resp.StatusCode, text: resp.Status, header: resp.Header, data: data, duration: time.Since(start)}, nil

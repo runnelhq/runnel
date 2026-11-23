@@ -5,6 +5,11 @@ name: http
 description: Read the latest release of a GitHub repository and check the answer
 variables:
   API_URL: https://api.github.com
+  # SharePoint Online over Microsoft Graph (connections/sharepoint.yaml): the tenant, the
+  # application (client) id and the site as host:/path (replace with your own).
+  GRAPH_TENANT: contoso.onmicrosoft.com
+  GRAPH_CLIENT_ID: 00000000-0000-0000-0000-000000000000
+  SHAREPOINT_SITE: "contoso.sharepoint.com:/sites/Finance:"
 # Secrets in plain text (S39a2) so that the example works as it is: ${secret:NAME} reads
 # them from here. runnel validate warns about them; for real systems set another
 # secretStore (e.g. env) and keep the values out of the project.
