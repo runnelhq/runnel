@@ -52,7 +52,8 @@ test("project.yaml shows its fields and inserts one", async ({ page }) => {
   await expect(settings).toContainText("Limits for the runs of the project");
   await settings.click();
   await settings.getByRole("button", { name: "+ Insert" }).click();
-  expect(await editorText(page)).toContain("\nsettings:\n  \n");
+  // Inserting goes through the file model: wait for it instead of reading once.
+  await expect.poll(() => editorText(page)).toContain("\nsettings:\n  \n");
   await expect(page.getByRole("tab", { name: /project\.yaml/ })).toContainText("●");
   // The field is in the file now: the open entry offers to go to its line.
   await expect(ref.getByTestId("field-settings").getByRole("button", { name: "Go to line 10" })).toBeVisible();
@@ -76,8 +77,7 @@ test("a trigger shows the fields of its type and inserts under with:", async ({ 
   await overlap.click();
   await expect(overlap).toContainText("Allowed");
   await overlap.getByRole("button", { name: "+ Insert" }).click();
-  const text = await editorText(page);
-  expect(text).toMatch(/timezone: Europe\/Berlin\n {2}overlap: skip\n/);
+  await expect.poll(() => editorText(page)).toMatch(/timezone: Europe\/Berlin\n {2}overlap: skip\n/);
   // The value is selected: typing replaces it.
   await page.keyboard.type("allow");
   await expect.poll(() => editorText(page)).toContain("  overlap: allow\n");
