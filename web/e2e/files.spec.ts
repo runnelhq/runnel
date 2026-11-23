@@ -106,3 +106,35 @@ test("works with files while the connection is lost", async ({ page }) => {
   await expect(page.getByTestId("node-greet")).toBeVisible();
   await expect(page.getByTestId("connection")).toHaveText("⚠ Disconnected");
 });
+
+// Many open files (fix of the tab bar): the tabs get narrower first, then the bar scrolls
+// without a visible scrollbar; the wheel scrolls it sideways, the active tab stays in view
+// and a fade shows the hidden tabs.
+test("keeps many tabs usable without a scrollbar", async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.goto("/");
+  const tree = page.getByRole("tree");
+  const names = ["dev.yaml", "prod.yaml", "answer.yaml", "greet.yaml", "hourly.yaml", "morning.yaml", "answer.workflow.yaml", "collector.workflow.yaml", "hello.workflow.yaml", "parallel.workflow.yaml", "project.yaml"];
+  for (const name of names) await tree.getByText(name, { exact: true }).click();
+  const bar = page.getByRole("tablist", { name: "Open files" });
+  await expect(bar.getByRole("tab")).toHaveCount(names.length);
+  const size = () => bar.evaluate((el: HTMLElement) => ({ scroll: el.scrollWidth, client: el.clientWidth, height: el.offsetHeight - el.clientHeight, left: el.scrollLeft }));
+  // More tabs than fit, but no scrollbar takes height from the bar.
+  const s = await size();
+  expect(s.scroll).toBeGreaterThan(s.client);
+  expect(s.height).toBe(0);
+  // The last opened (active) tab is in view; on the left more tabs are hidden.
+  const active = bar.getByRole("tab", { name: /project\.yaml/ });
+  await expect(active).toHaveAttribute("aria-selected", "true");
+  await expect(active).toBeInViewport({ ratio: 1 });
+  await expect(page.getByTestId("tabs-more-left")).toBeVisible();
+  // The wheel scrolls the bar sideways.
+  await bar.hover();
+  await page.mouse.wheel(0, -2000);
+  await expect.poll(async () => (await size()).left).toBe(0);
+  await expect(page.getByTestId("tabs-more-left")).toHaveCount(0);
+  await expect(page.getByTestId("tabs-more-right")).toBeVisible();
+  // Choosing a hidden file in the explorer brings its tab into view.
+  await tree.getByText("parallel.workflow.yaml", { exact: true }).click();
+  await expect(bar.getByRole("tab", { name: /parallel\.workflow\.yaml/ })).toBeInViewport({ ratio: 1 });
+});
