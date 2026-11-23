@@ -67,7 +67,7 @@ func TestServe(t *testing.T) {
 	cancel()
 	select {
 	case code := <-done:
-		if code != 0 || !strings.Contains(out.String(), "Server stopped") {
+		if code != 0 || !strings.Contains(out.String(), "Server stopped") || !strings.Contains(out.String(), "Starting runnel dev (") {
 			t.Errorf("exit code %d, output %q", code, out.String())
 		}
 	case <-time.After(10 * time.Second):

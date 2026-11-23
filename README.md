@@ -213,7 +213,8 @@ C:\Runnel\runnel.exe service start
 ```
 
 **4. Kontrollieren.** `C:\Runnel\runnel.exe version` zeigt die neue Version, `runnel service status` den Zustand
-`running`; im Log (`%ProgramData%\runnel\logs\<name>.log`) steht der neue Start. Im Browser den Editor neu laden
+`running`; im Log (`%ProgramData%\runnel\logs\<name>.log`) beginnt der neue Start mit der Version
+(`Starting runnel v0.2.0 (…)`). Im Browser den Editor neu laden
 (Strg+F5), damit er die neue Oberfläche holt; die Statusleiste unten rechts nennt die Version des Servers.
 
 **Gut zu wissen:**
