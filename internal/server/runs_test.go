@@ -325,7 +325,7 @@ func TestHTTPTrigger(t *testing.T) {
 	}
 }
 
-// With response: run the workflow answers the caller with http.respond, also from a
+// With response: run the workflow answers the caller with http.response, also from a
 // called workflow; without it the outputs are the answer (S38b1).
 func TestHTTPTriggerResponse(t *testing.T) {
 	dir, s := newRunProject(t)
@@ -338,7 +338,7 @@ parameters:
 actions:
   - { id: start, type: core.start }
   - id: reply
-    type: http.respond
+    type: http.response
     with:
       status: "{{ params.ID > 100 ? 404 : 200 }}"
       headers: { X-Method: "{{ request.method }}" }

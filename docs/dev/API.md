@@ -192,8 +192,8 @@ HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem 
 | Antwort | Bedeutung |
 |---|---|
 | `202` + `{"runId", "status"}`, Header `Location` | `response: accepted`: Lauf gestartet; `status` ist der Pfad des Laufs in dieser API |
-| Status, Header und Body von `http.respond` | `response: run` (seit S38b1): die erste Antwort des Laufs |
-| `200` + `outputs` / `500` + `{"error", "runId"}` | `response: run` ohne `http.respond`: Lauf erfolgreich bzw. gescheitert |
+| Status, Header und Body von `http.response` | `response: run` (seit S38b1): die erste Antwort des Laufs |
+| `200` + `outputs` / `500` + `{"error", "runId"}` | `response: run` ohne `http.response`: Lauf erfolgreich bzw. gescheitert |
 | `504` + `{"error", "runId"}` | `response: run`: keine Antwort innerhalb von `timeout`; der Lauf läuft weiter |
 | `400` | Pflichtparameter fehlt, Wert passt nicht zum Typ, Body ist kein JSON-Objekt (bei Pipelines auch: keine Liste von Objekten) |
 | `401` | Token fehlt oder falsch (`Authorization: Bearer <token>`) |

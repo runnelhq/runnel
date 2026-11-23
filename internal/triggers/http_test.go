@@ -304,7 +304,7 @@ func TestHTTPResponseRun(t *testing.T) {
 		return call{method: "POST", path: "/svc/7?q=1", token: "s3cret", contentType: "application/json", body: body}.do(s)
 	}
 
-	// The first http.respond answers; a second one is refused.
+	// The first http.response answers; a second one is refused.
 	second := make(chan bool, 1)
 	behave = func(_ string, r StartRequest) {
 		r.Respond(action.Response{Status: 201, Headers: map[string]string{"X-Item": "7"}, Body: map[string]any{"created": true}})
@@ -333,7 +333,7 @@ func TestHTTPResponseRun(t *testing.T) {
 		t.Errorf("text: %d %v %q", w.Code, w.Header(), w.Body)
 	}
 
-	// Without http.respond: the outputs when the run has succeeded, 500 when it failed.
+	// Without http.response: the outputs when the run has succeeded, 500 when it failed.
 	behave = func(string, StartRequest) {}
 	f.mu.Lock()
 	outcomes["run-3"] = Outcome{Status: "succeeded", Body: map[string]any{"MESSAGE": "hi"}}
@@ -420,7 +420,7 @@ func TestHTTPWorkflowList(t *testing.T) {
 	}
 }
 
-// The JSON body of http.respond belongs to the result of the run: writing the answer adds
+// The JSON body of http.response belongs to the result of the run: writing the answer adds
 // the line break to a copy, never into spare room of the caller's slice.
 func TestWriteResponseKeepsBody(t *testing.T) {
 	buf := make([]byte, 0, 32)

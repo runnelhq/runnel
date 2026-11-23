@@ -74,7 +74,7 @@ Bei `response: run` antwortet der Lauf auf zwei Wegen – **beide** sind vorgese
   JSON-Objekt (Pipelines: den Zählern wie bei `core.run-pipeline`). Scheitert er, mit `500` und einer kurzen Meldung
   ohne interne Details (Lauf-ID zum Nachsehen); die vollständige Meldung steht im Log.
 - **Selbst bestimmt:**
-  - **Workflow:** Action **`http.respond`** mit `status`, `headers` und `body` (jeweils mit Ausdrücken). Die erste
+  - **Workflow:** Action **`http.respond`** (heute `http.response`, siehe Nachtrag 2026-11-23) mit `status`, `headers` und `body` (jeweils mit Ausdrücken). Die erste
     ausgeführte `http.respond` antwortet; spätere schreiben eine Warnung ins Log. So können Zweige verschieden antworten
     (Erfolgszweig `200`, Fehlerzweig `422`), und der Workflow darf nach der Antwort weiterarbeiten. Ohne wartenden
     Aufrufer (Start aus Editor, CLI oder Cron) tut die Action nichts und schreibt eine Debug-Zeile – jeder Workflow
@@ -161,3 +161,10 @@ und S38c):
 - Umsetzung in Schritten (Roadmap Phase 0.5): **S38a** HTTP-Trigger asynchron (`accepted`, lokal), **S40a** Listener
   und TLS, **S38b** Antwort aus dem Workflow (`run`, `http.respond`, `request`), **S38c** Antwort aus der Pipeline
   (`http.response`, Datensätze aus dem Body). Voraussetzung für alle: die Trigger-Grundlage aus S37.
+
+## Nachtrag 2026-11-23: `http.respond` heißt `http.response`
+
+Abgestimmt mit dem Maintainer. Die Action heißt wie der Transform `http.response`: Beide beantworten den Aufrufer eines
+HTTP-Triggers, und ADR 0013 erlaubt denselben Namen für Action und Transform (wie `core.log`, `http.request`). Einen
+Alias für `http.respond` gibt es nicht, da noch kein Release erschienen ist; Workflows mit `http.respond` meldet
+`validate` als unbekannten Typ.

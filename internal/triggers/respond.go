@@ -13,7 +13,7 @@ import (
 	"github.com/runnelhq/runnel/internal/httpx"
 )
 
-// answerBox takes the answers a run gives its waiting caller (http.respond): the
+// answerBox takes the answers a run gives its waiting caller (http.response): the
 // first one counts; a fallback (http.response with whenEmpty) only if no other comes.
 // Once closed, it takes no more answers.
 type answerBox struct {
@@ -66,7 +66,7 @@ func (b *answerBox) fallbackAnswer() (action.Response, bool) {
 }
 
 // answer starts the run of a request with response: run and answers the caller with
-// the first http.respond of the run, or with the default answer when the run has ended
+// the first http.response of the run, or with the default answer when the run has ended
 // (outputs: 200, failed: 500), or with 504 after the timeout (S38b1). The run goes on
 // after the answer and after the timeout.
 func (h *httpTriggers) answer(w http.ResponseWriter, r *http.Request, e *entry, start StartRequest) {
@@ -126,7 +126,7 @@ func (h *httpTriggers) answer(w http.ResponseWriter, r *http.Request, e *entry, 
 	}
 }
 
-// writeResponse sends the answer of http.respond: a text as text, other values as
+// writeResponse sends the answer of http.response: a text as text, other values as
 // JSON; headers of the action win.
 func writeResponse(w http.ResponseWriter, resp action.Response) {
 	var body []byte
@@ -141,7 +141,7 @@ func writeResponse(w http.ResponseWriter, resp action.Response) {
 	default:
 		data, err := json.Marshal(b)
 		if err != nil {
-			reply(w, http.StatusInternalServerError, httpx.ErrorBody{Error: "the body of http.respond cannot be written as JSON: " + err.Error()})
+			reply(w, http.StatusInternalServerError, httpx.ErrorBody{Error: "the body of http.response cannot be written as JSON: " + err.Error()})
 			return
 		}
 		data = append(data, '\n')

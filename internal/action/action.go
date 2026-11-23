@@ -42,7 +42,7 @@ type ExecContext struct {
 	// result (the counts of its transforms and its result records); nil where it is
 	// not supported. rows are passed to core.from-result.
 	RunPipeline func(ctx context.Context, path string, params map[string]string, rows []map[string]any) (map[string]any, error)
-	// Respond answers the waiting caller of an http trigger (http.respond, S38b1); nil
+	// Respond answers the waiting caller of an http trigger (http.response, S38b1); nil
 	// if the run has no waiting caller.
 	Respond Responder
 }
@@ -58,7 +58,7 @@ type Response struct {
 	Fallback bool
 }
 
-// ParseStatus reads the HTTP status of an answer (http.respond, http.response): a
+// ParseStatus reads the HTTP status of an answer (http.response as action and transform): a
 // number from 200 to 599; empty is 200.
 func ParseStatus(s string) (int, error) {
 	s = strings.TrimSpace(s)

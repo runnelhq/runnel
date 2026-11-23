@@ -45,7 +45,7 @@ type Spec struct {
 	// Client is the address of the caller of an http trigger.
 	Client string
 	// Request is the request of the caller of an http trigger (request in
-	// expressions) and Respond answers it (http.respond); both are passed on to
+	// expressions) and Respond answers it (http.response); both are passed on to
 	// called workflows (S38b1).
 	Request map[string]any
 	Respond action.Responder

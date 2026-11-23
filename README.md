@@ -25,7 +25,7 @@ Noch vor Version 1.0 (Stand: Phase 0.5 abgeschlossen, siehe [Roadmap](docs/ROADM
 - **Workflows** mit den Basis-Actions (`core.start`, `core.log`, `core.wait`, `core.success`, `core.abort`,
   `core.dummy`), Sub-Workflows und Pipelines als Schritt (`core.run-workflow`, `core.run-pipeline`), Datei-Actions
   (`file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list`) und der Antwort an
-  HTTP-Aufrufer (`http.respond`); Ausdrücke `{{ … }}`, `forEach`, Retry und Timeouts.
+  HTTP-Aufrufer (`http.response`); Ausdrücke `{{ … }}`, `forEach`, Retry und Timeouts.
 - **Pipelines** mit CSV (`csv.input`, `csv.output`), Filtern, Umwandeln, Verteilen, Sortieren und Gruppieren,
   Datensätzen von und zu Workflows sowie der Antwort an HTTP-Aufrufer (`http.response`).
 - **Editor** im Browser für Workflows und Pipelines, **Trigger** (Zeitplan, Intervall, Ordner, HTTP) und der Betrieb
@@ -81,7 +81,7 @@ Zeitzone), in einem festen Abstand (`interval`), für neue Dateien in einem Ordn
 `curl -X POST http://127.0.0.1:7301/greet/Moin` bei `runnel serve examples/hello`); das Server-Log zeigt jeden Start.
 Aus dem Netz erreichbar werden HTTP-Trigger mit HTTPS, z. B. `runnel serve --triggers 0.0.0.0:7301 --triggers-tls auto`
 (selbst erzeugtes Zertifikat, Fingerabdruck im Log) oder mit eigenem Zertifikat (`--triggers-cert`, `--triggers-key`).
-Mit `response: run` wartet der Aufrufer auf die Antwort des Workflows (Action `http.respond` oder die `outputs`), z. B.
+Mit `response: run` wartet der Aufrufer auf die Antwort des Workflows (Action `http.response` oder die `outputs`), z. B.
 `curl http://127.0.0.1:7301/answer/Anna` bei `runnel serve examples/hello`. Pipelines antworten mit Datensätzen
 (Transform `http.response`), z. B. `curl http://127.0.0.1:7301/api/customers/4711` bei `runnel serve examples/pipelines`.
 

@@ -7,36 +7,36 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 )
 
-// http.respond answers the waiting caller of an http trigger with response: run
-// (ADR 0018). The first http.respond of a run answers, later ones only log a warning;
+// http.response answers the waiting caller of an http trigger with response: run
+// (ADR 0018). The first http.response of a run answers, later ones only log a warning;
 // the workflow goes on after it. Without a waiting caller (started from the editor,
 // the command line or another trigger) it does nothing, so that the workflow can be
 // started any way. Output: sent (whether this was the answer) and status.
-var respondDefinition = action.Definition{
-	Type:        "http.respond",
+var responseDefinition = action.Definition{
+	Type:        "http.response",
 	Category:    action.CategoryNetwork,
 	Label:       "HTTP Response",
 	Description: "Answers the caller of an HTTP trigger with status, headers and body; output: sent and status",
 	Example:     "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n",
-	Config:      respondAction{},
-	New:         newRespond,
+	Config:      responseAction{},
+	New:         newResponse,
 }
 
-type respondAction struct {
+type responseAction struct {
 	Status  string            `json:"status" doc:"HTTP status code, e.g. 200, 404 or 422" schema:"default=200,example=200"`
 	Headers map[string]string `json:"headers" doc:"Headers of the answer, e.g. Content-Type"`
 	Body    any               `json:"body" doc:"Body: a text is sent as text, other values (maps, lists, numbers) as JSON"`
 }
 
-func newRespond(with map[string]any) (action.Action, error) {
-	a := &respondAction{}
+func newResponse(with map[string]any) (action.Action, error) {
+	a := &responseAction{}
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
 	return a, nil
 }
 
-func (a *respondAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
+func (a *responseAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
 	status, err := action.ParseStatus(a.Status)
 	if err != nil {
 		return action.Result{}, err
