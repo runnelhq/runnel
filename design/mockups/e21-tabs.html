@@ -291,7 +291,7 @@
   /* New in E21: tab bar with many files, list of the open files, menu of a tab */
   .tabs { position: relative; }
   .tabs .tabrow { display: flex; flex: 1; min-width: 0; overflow: hidden; }
-  .tab { min-width: 112px; max-width: 224px; flex: 0 1 auto; padding: 0 10px 0 14px; }
+  .tab { min-width: 160px; max-width: 240px; flex: 0 1 auto; padding: 0 10px 0 14px; }
   .tab .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tab .x { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: var(--rn-radius-sm); color: var(--muted-foreground); flex: none; }
   .tab .dot { font-size: 10px; color: var(--foreground); }
@@ -418,7 +418,7 @@
 
   // The tab bar: the tabs are as narrow as allowed, the bar is scrolled to the active tab
   // (fix A); "▾ 14" at the right end lists all open files (B).
-  const visible = open.slice(7);
+  const visible = open.slice(8);
   const ctxTab = state === "menu" ? "environments/dev.yaml" : null;
   const tab = ([k, p, dirty]) => `<div class="tab ${p === active ? "active" : ""} ${p === ctxTab ? "menu-on" : ""}" title="${p}">${icon(I[k], 15)}<span class="nm">${name(p)}</span>
     <span class="x">${dirty ? '<span class="dot">●</span>' : icon(I.x, 12)}</span></div>`;
