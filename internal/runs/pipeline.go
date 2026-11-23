@@ -88,13 +88,21 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		limit := min(max(spec.Preview.Limit, 1), MaxPreviewLimit)
 		opts.InputLimit, opts.SampleRows = limit, limit
 	}
+	if errs := pl.CheckSQL(TransformSQLField(spec.Registry)); len(errs) > 0 {
+		return p, errs
+	}
 	scope, mask := secretScope(model.PipelineScope(pl, p.Project, p.Env, spec.Params))
+	conns := connectionResolver(p.Project, p.Env, mask)
+	if errs := resolveConnections(pipelineSteps(pl, spec.Registry), conns); len(errs) > 0 {
+		return p, errs
+	}
 	p.Runner, err = pipeline.Prepare(run, pipeline.Options{
 		InputLimit:  opts.InputLimit,
 		SampleRows:  opts.SampleRows,
 		Registry:    spec.Registry,
 		Scope:       scope,
 		Mask:        mask,
+		Connections: conns,
 		Environment: envName,
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,

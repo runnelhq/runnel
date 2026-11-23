@@ -1215,7 +1215,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 
 | Kategorie | Transforms |
 |---|---|
-| Eingabe | CSV, Excel, JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
+| Eingabe | CSV, Excel, JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL, `db.table-input` seit S20b), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
 | Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/engine/runid"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
@@ -67,6 +68,8 @@ type Options struct {
 	// Mask hides the values of secrets in events, errors and samples (ADR 0022); nil:
 	// none. The result records (Rows) are data for the caller and stay as they are.
 	Mask *vars.Mask
+	// Connections resolves the connections named by transforms (ADR 0022); nil: none.
+	Connections connection.Resolver
 }
 
 // errInputLimit ends an input that has emitted Options.InputLimit records.
@@ -209,7 +212,7 @@ func build(p *model.Pipeline, opts Options) (*Runner, model.Errors) {
 				t.ID, t.Type, opts.Registry.Types()))
 			continue
 		}
-		with, err := expandWith(t.With, opts.Scope, secretFields(opts.Registry, t.Type))
+		with, err := expandWith(t.With, opts.Scope, fieldsWith(opts.Registry, t.Type, schema.FormatSecret), fieldsWith(opts.Registry, t.Type, schema.FormatSQL))
 		if err == nil {
 			r.transforms[i], err = def.New(asText(with, opts.Registry, t.Type))
 		}
@@ -469,15 +472,16 @@ func asText(with map[string]any, reg *transform.Registry, typ string) map[string
 	return out
 }
 
-// secretFields returns the fields of a transform type that hold a secret (ADR 0022).
-func secretFields(reg *transform.Registry, typ string) map[string]bool {
+// fieldsWith returns the fields of a transform type with a format, e.g. the fields for
+// secrets or SQL statements (ADR 0022).
+func fieldsWith(reg *transform.Registry, typ, format string) map[string]bool {
 	d, ok := reg.Descriptor(typ)
 	if !ok || d.Schema == nil {
 		return nil
 	}
 	var out map[string]bool
 	for _, p := range d.Schema.Properties {
-		if p.Schema.Format == schema.FormatSecret {
+		if p.Schema.Format == format {
 			if out == nil {
 				out = map[string]bool{}
 			}
@@ -487,13 +491,20 @@ func secretFields(reg *transform.Registry, typ string) map[string]bool {
 	return out
 }
 
-// expandWith is expand with the fields for secrets resolved by ExpandSecret.
-func expandWith(v map[string]any, scope *vars.Scope, secret map[string]bool) (map[string]any, error) {
-	if scope == nil || len(secret) == 0 {
+// expandWith is expand with the fields for secrets resolved by ExpandSecret and the SQL
+// statements (literal) passed as written: their values come as parameters @name.
+func expandWith(v map[string]any, scope *vars.Scope, secret, literal map[string]bool) (map[string]any, error) {
+	if scope == nil || (len(secret) == 0 && len(literal) == 0) {
 		return expand(v, scope)
 	}
 	rest := maps.Clone(v)
 	resolved := map[string]any{}
+	for k := range literal {
+		if x, ok := v[k]; ok {
+			resolved[k] = x
+			delete(rest, k)
+		}
+	}
 	for k := range secret {
 		if s, ok := v[k].(string); ok {
 			x, err := scope.ExpandSecret(s)
@@ -719,7 +730,7 @@ func (r *Runner) Run(parent context.Context) Result {
 						return add(p, rec)
 					}
 					return add(all, rec)
-				}, log).WithValues(values).WithResults(r.opts.Rows, addResult).WithRespond(r.opts.Respond)
+				}, log).WithValues(values).WithResults(r.opts.Rows, addResult).WithRespond(r.opts.Respond).WithConnections(r.opts.Connections)
 				if len(errLinks) > 0 {
 					out.WithErrorLinks(func(rec record.Record) error {
 						counts[i].errors.Add(1)

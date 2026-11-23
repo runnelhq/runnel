@@ -11,18 +11,22 @@ import (
 
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/schema"
 )
 
 // Renaming and moving files and folders (E11, E12) and the references other files make
 // to them: trigger targets and calls with a fixed path (core.run-workflow,
-// core.run-pipeline). On request, the references are changed to the new path.
+// core.run-pipeline), and the names of connections (connection: in actions and
+// transforms, name: in the connection file; S20b). On request, the references are
+// changed to the new path or name.
 
 // reference is a place in a file of the project that refers to another file.
 type reference struct {
 	File string `json:"file"`
 	// What tells how, e.g. "target" or "action call (core.run-workflow)".
 	What string `json:"what"`
-	// Field is the field with the path: "target", "workflow" or "pipeline".
+	// Field is the field with the path ("target", "workflow" or "pipeline") or with the
+	// name of a connection ("connection", "name").
 	Field string `json:"field"`
 	// Target is the file referred to, relative to the project; for a folder one of its files.
 	Target string `json:"target"`
@@ -160,7 +164,13 @@ func (s *Server) updateReferences(res *renameResponse, refs []reference, chosen 
 		if err == nil {
 			lines = strings.Split(string(data), "\n")
 			for _, ref := range byFile[file] {
-				if !replaceInLine(lines, ref.Line, ref.Value, moved(ref.Target, from, to)) {
+				ok := false
+				if ref.Field == "connection" || ref.Field == "name" {
+					ok = replaceAfterField(lines, ref.Line, ref.Field, ref.Value, connectionName(moved(ref.Target, from, to)))
+				} else {
+					ok = replaceInLine(lines, ref.Line, ref.Value, moved(ref.Target, from, to))
+				}
+				if !ok {
 					err = fmt.Errorf("%s was not found in line %d", ref.Value, ref.Line)
 					break
 				}
@@ -203,6 +213,31 @@ func replaceInLine(lines []string, line int, old, repl string) bool {
 	return true
 }
 
+// replaceAfterField replaces the name old by repl after "field:" in a line, so that the
+// same word elsewhere in the line (e.g. an id) stays as it is.
+func replaceAfterField(lines []string, line int, field, old, repl string) bool {
+	if line < 1 || line > len(lines) || old == "" {
+		return false
+	}
+	l := lines[line-1]
+	i := strings.Index(l, field+":")
+	if i < 0 {
+		return false
+	}
+	head, tail := l[:i+len(field)+1], l[i+len(field)+1:]
+	before, after, ok := strings.Cut(tail, old)
+	if !ok || strings.TrimLeft(strings.TrimSpace(before), `"'`) != "" {
+		return false
+	}
+	lines[line-1] = head + before + repl + after
+	return true
+}
+
+// connectionName is the name of a connection file: its base name without .yaml.
+func connectionName(file string) string {
+	return strings.TrimSuffix(path.Base(file), ".yaml")
+}
+
 // handleReferences lists the saved files that refer to a file, or to a file in a folder.
 // Used before deleting, renaming and moving (E11, E12).
 func (s *Server) handleReferences(w http.ResponseWriter, r *http.Request) {
@@ -220,6 +255,17 @@ func (s *Server) handleReferences(w http.ResponseWriter, r *http.Request) {
 func (s *Server) references(name string) []reference {
 	refs := []reference{}
 	within := func(target string) bool { return target == name || strings.HasPrefix(target, name+"/") }
+	// A connection file: its name in the file and connection: in workflows and pipelines.
+	conn := ""
+	if path.Dir(name) == model.ConnectionsDir && strings.HasSuffix(name, ".yaml") {
+		conn = connectionName(name)
+		if data, err := s.root.ReadFile(filepath.FromSlash(name)); err == nil {
+			if c, err := model.ReadConnection(name, data); c != nil && (err == nil || c.Name == conn) {
+				refs = append(refs, reference{File: name, What: "name of the connection", Field: "name", Target: name, Value: conn,
+					Line: c.ErrorAt("$.name", "").Pos.Line})
+			}
+		}
+	}
 	triggers, _ := model.LoadTriggers(s.dir) // files with problems are left out
 	for _, t := range triggers {
 		if target := path.Clean(filepath.ToSlash(t.Target)); within(target) {
@@ -233,7 +279,12 @@ func (s *Server) references(name string) []reference {
 			return nil //nolint:nilerr // folders that cannot be read are skipped
 		case d.IsDir() && p != "." && strings.HasPrefix(d.Name(), "."):
 			return fs.SkipDir
-		case d.IsDir() || !strings.HasSuffix(p, ".workflow.yaml"):
+		case d.IsDir():
+			return nil
+		case strings.HasSuffix(p, ".pipeline.yaml") && conn != "":
+			refs = append(refs, s.pipelineConnectionRefs(p, name, conn)...)
+			return nil
+		case !strings.HasSuffix(p, ".workflow.yaml"):
 			return nil
 		}
 		// Workflows that cannot be read or parsed have no references to update.
@@ -244,6 +295,13 @@ func (s *Server) references(name string) []reference {
 		wf, err := model.ParseWorkflow(p, data)
 		if err != nil {
 			return nil //nolint:nilerr // skipped, see above
+		}
+		if conn != "" {
+			refs = append(refs, connectionRefs(p, name, conn, wf.ErrorAt, "actions", "action", s.actionSchema, func(yield func(id, typ string, with map[string]any)) {
+				for _, a := range wf.Actions {
+					yield(a.ID, a.Type, a.With)
+				}
+			})...)
 		}
 		for i, a := range wf.Actions {
 			key := map[string]string{"core.run-workflow": "workflow", "core.run-pipeline": "pipeline"}[a.Type]
@@ -261,6 +319,63 @@ func (s *Server) references(name string) []reference {
 			}
 		}
 		return nil
+	})
+	return refs
+}
+
+// actionSchema and transformSchema return the schema of a step type (nil if unknown).
+func (s *Server) actionSchema(typ string) *schema.Schema {
+	if s.registry == nil {
+		return nil
+	}
+	d, _ := s.registry.Descriptor(typ)
+	return d.Schema
+}
+
+func (s *Server) transformSchema(typ string) *schema.Schema {
+	if s.transforms == nil {
+		return nil
+	}
+	d, _ := s.transforms.Descriptor(typ)
+	return d.Schema
+}
+
+// pipelineConnectionRefs returns the transforms of a pipeline file that name the connection.
+func (s *Server) pipelineConnectionRefs(p, name, conn string) []reference {
+	data, err := s.root.ReadFile(filepath.FromSlash(p))
+	if err != nil {
+		return nil
+	}
+	pl, err := model.ParsePipeline(p, data)
+	if err != nil {
+		return nil
+	}
+	return connectionRefs(p, name, conn, pl.ErrorAt, "transforms", "transform", s.transformSchema, func(yield func(id, typ string, with map[string]any)) {
+		for _, t := range pl.Transforms {
+			yield(t.ID, t.Type, t.With)
+		}
+	})
+}
+
+// connectionRefs returns the steps of a file whose fields of format runnel-connection
+// name the connection conn (the file name) with a fixed name.
+func connectionRefs(file, name, conn string, errorAt func(path, format string, args ...any) *model.Error, list, noun string,
+	schemaOf func(typ string) *schema.Schema, steps func(yield func(id, typ string, with map[string]any))) []reference {
+	var refs []reference
+	i := 0
+	steps(func(id, typ string, with map[string]any) {
+		defer func() { i++ }()
+		sc := schemaOf(typ)
+		if sc == nil {
+			return
+		}
+		for _, p := range sc.Properties {
+			if v, ok := with[p.Name].(string); ok && p.Schema.Format == schema.FormatConnection && v == conn {
+				at := fmt.Sprintf("$.%s[%d].with.%s", list, i, p.Name)
+				refs = append(refs, reference{File: file, What: fmt.Sprintf("%s %s (%s)", noun, id, typ), Field: "connection", Target: name, Value: conn,
+					Line: errorAt(at, "").Pos.Line})
+			}
+		}
 	})
 	return refs
 }

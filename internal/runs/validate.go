@@ -46,7 +46,7 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 	diags = append(diags, w.CheckSecrets(ActionSecretField(c.Registry), stores)...)
 	diags = append(diags, w.CheckSQL(ActionSQLField(c.Registry))...)
 	if c.Variables && c.Project != nil {
-		diags = append(diags, checkConnectionRefs(w, c.Project, c.Registry)...)
+		diags = append(diags, checkConnectionRefs(workflowSteps(w, c.Registry), c.Project)...)
 	}
 	if !diags.HasErrors() {
 		diags = append(diags, workflow.Check(w, workflow.Options{Registry: c.Registry})...)
@@ -59,8 +59,12 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 // CheckPipeline checks a pipeline beyond its fields and graph, like before a run: the
 // types, configurations and fields of its transforms (ADR 0007), only if diags (the
 // problems found so far) has no errors and registry is set. The result is sorted.
-func CheckPipeline(p *model.Pipeline, diags model.Errors, registry *transform.Registry) model.Errors {
+func CheckPipeline(p *model.Pipeline, diags model.Errors, registry *transform.Registry, project *model.Project) model.Errors {
 	diags = append(diags, p.CheckSecrets(TransformSecretField(registry), nil)...)
+	diags = append(diags, p.CheckSQL(TransformSQLField(registry))...)
+	if project != nil {
+		diags = append(diags, checkConnectionRefs(pipelineSteps(p, registry), project)...)
+	}
 	if !diags.HasErrors() && registry != nil {
 		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: registry})...)
 	}

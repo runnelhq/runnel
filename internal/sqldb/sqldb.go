@@ -89,3 +89,15 @@ func source(ctx context.Context, reg *connection.Registry, c connection.Resolved
 	}
 	return "sqlite", "file:" + filepath.ToSlash(path) + "?" + q.Encode(), nil
 }
+
+// Timeout reads the timeout of a statement; empty is DefaultTimeout.
+func Timeout(s string) (time.Duration, error) {
+	if s == "" {
+		return DefaultTimeout, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return 0, fmt.Errorf("invalid timeout %q (examples: 30s, 5m)", s)
+	}
+	return d, nil
+}

@@ -1709,6 +1709,57 @@
       "recordErrors": true
     },
     {
+      "type": "db.table-input",
+      "kind": "transform",
+      "category": "input",
+      "label": "Table Input",
+      "description": "Reads the rows of an SQL query as records, one field per column",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the database (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "app-db"
+            ],
+            "x-runnel-connection": [
+              "sqlite"
+            ]
+          },
+          "sql": {
+            "type": "string",
+            "description": "The query; values as @name with the value under params, never written into the query",
+            "format": "runnel-sql",
+            "examples": [
+              "SELECT * FROM customers"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "description": "Values of the parameters @name of the query; may use ${…}",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time the query may take, reading all rows included",
+            "format": "runnel-duration",
+            "default": "5m"
+          }
+        },
+        "required": [
+          "connection",
+          "sql"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: app-db\nsql: SELECT id, name, amount FROM orders WHERE status = @status\nparams:\n  status: open\n"
+    },
+    {
       "type": "file.list",
       "kind": "transform",
       "category": "input",

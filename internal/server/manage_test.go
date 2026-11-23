@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/runnelhq/runnel/internal/transforms"
 )
 
 // TestFolders creates and deletes folders (E11); only empty ones can be deleted.
@@ -167,4 +169,59 @@ func readFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+// TestRenameConnection renames a connection file (S20b): connection: in workflows and
+// pipelines and name: in the file change to the new name; an id with the same word in
+// the same line stays.
+func TestRenameConnection(t *testing.T) {
+	dir, s := newProject(t)
+	s.transforms = transforms.Builtin()
+	conn := "kind: Connection\napiVersion: runnel/v1\nname: app\ntype: sqlite\nwith: { path: out/app.db }\n"
+	writeFile(t, filepath.Join(dir, "connections", "app.yaml"), conn)
+	wf := `kind: Workflow
+apiVersion: runnel/v1
+name: db
+actions:
+  - { id: start, type: core.start }
+  - { id: app, type: db.execute, with: { connection: app, sql: "DELETE FROM t" } }
+links:
+  - { from: start, to: app }
+`
+	writeFile(t, filepath.Join(dir, "workflows", "db.workflow.yaml"), wf)
+	pl := "kind: Pipeline\napiVersion: runnel/v1\nname: read\ntransforms:\n  - id: in\n    type: db.table-input\n    with:\n      connection: \"app\"\n      sql: SELECT * FROM t\n"
+	writeFile(t, filepath.Join(dir, "pipelines", "read.pipeline.yaml"), pl)
+
+	var refs struct{ References []reference }
+	rec := do(t, s, "GET", "/api/v1/references/connections/app.yaml", "")
+	if err := json.Unmarshal(rec.Body.Bytes(), &refs); err != nil || len(refs.References) != 3 {
+		t.Fatalf("references: %s %v", rec.Body, err)
+	}
+	want := []reference{
+		{File: "connections/app.yaml", What: "name of the connection", Field: "name", Target: "connections/app.yaml", Value: "app", Line: 3},
+		{File: "pipelines/read.pipeline.yaml", What: "transform in (db.table-input)", Field: "connection", Target: "connections/app.yaml", Value: "app", Line: 8},
+		{File: "workflows/db.workflow.yaml", What: "action app (db.execute)", Field: "connection", Target: "connections/app.yaml", Value: "app", Line: 6},
+	}
+	for i, r := range refs.References {
+		if r != want[i] {
+			t.Errorf("reference %d = %+v, want %+v", i, r, want[i])
+		}
+	}
+
+	body := `{"from": "connections/app.yaml", "to": "connections/shop.yaml", "references": [
+		{"file": "connections/app.yaml", "line": 3}, {"file": "workflows/db.workflow.yaml", "line": 6}, {"file": "pipelines/read.pipeline.yaml", "line": 8}]}`
+	rec = do(t, s, "POST", "/api/v1/rename", body)
+	var res renameResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != http.StatusOK || len(res.Updated) != 3 || len(res.NotUpdated) != 0 {
+		t.Fatalf("%d %s %v", rec.Code, rec.Body, err)
+	}
+	for file, want := range map[string]string{
+		"connections/shop.yaml":        strings.Replace(conn, "name: app", "name: shop", 1),
+		"workflows/db.workflow.yaml":   strings.Replace(wf, "connection: app", "connection: shop", 1),
+		"pipelines/read.pipeline.yaml": strings.Replace(pl, `connection: "app"`, `connection: "shop"`, 1),
+	} {
+		if got := readFile(t, filepath.Join(dir, filepath.FromSlash(file))); got != want {
+			t.Errorf("%s:\n%s", file, got)
+		}
+	}
 }

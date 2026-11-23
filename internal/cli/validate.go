@@ -179,7 +179,11 @@ func (v *validator) pipeline(file string) error {
 		v.report(diags)
 		return nil
 	}
-	v.report(runs.CheckPipeline(p, p.Validate(), v.transforms))
+	project, _, err := v.project(filepath.Dir(file))
+	if err != nil {
+		return err
+	}
+	v.report(runs.CheckPipeline(p, p.Validate(), v.transforms, project))
 	return nil
 }
 

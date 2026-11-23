@@ -27,6 +27,7 @@ actions / database
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
   csv.input           CSV Input      Reads the rows of a CSV file as records
+  db.table-input      Table Input    Reads the rows of an SQL query as records, one field per column
   file.list           List Files     Reads the files of a folder as records: path, name, extension, size, modified and folder
   json.input          JSON Input     Reads the objects of a JSON or NDJSON file as records
 transforms / transform
