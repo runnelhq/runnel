@@ -1,0 +1,569 @@
+<!doctype html>
+<!--
+  Mockup E20 – Forms for triggers, environments and project.yaml.
+  The form of the connections (S39b, S39c2) for the other files with metadata: they open as a
+  form built from their schema (S58) with "Form | YAML"; a change writes only its line.
+  Triggers: the type as a choice of cards, only the fields of the type (x-runnel-variants),
+  the target and environment as a choice, the parameters of the target as a table, the
+  schedule in words with the next runs, the address of an HTTP trigger, the state from
+  GET /triggers. Environments and project.yaml: variables as a table with the value of the
+  other level, the secret store as a choice, inline secrets only by name.
+  Builds on the approved mockups E4 (shell), E7/E7c (fields, parameters), E9 (YAML view),
+  E11 (new files), E18 (reference, variables) and S39b/S39f (connection form, secret field).
+  Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                                       (default light)
+    state = cron | http | type | environment | project | new                    (default cron)
+    controls = 0                                           hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>forms – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5; color: var(--foreground);
+         background: var(--background); -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  .mono, code { font-family: var(--rn-font-mono); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; position: relative; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 3px 8px;
+                      border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); cursor: pointer; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); color: var(--sidebar-foreground);
+          border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 8px 0 16px; flex: none; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; flex: none; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .kind { color: var(--muted-foreground); display: inline-flex; }
+  .row.selected .kind { color: var(--accent-foreground); }
+  .row .tag { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .icon-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: var(--rn-radius-sm);
+              background: transparent; color: var(--muted-foreground); }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); flex: none; }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; white-space: nowrap; }
+  .btn.small { height: 24px; padding: 0 8px; font-size: var(--rn-text-2xs); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn.danger { color: var(--destructive); }
+  .btn.split { border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md); }
+  .btn.split + .btn { border-radius: 0 var(--rn-radius-md) var(--rn-radius-md) 0; margin-left: -1px; padding: 0 6px; }
+  .btn svg.i { width: 13px; height: 13px; }
+  .btn kbd { font: 10px var(--rn-font-mono); opacity: .75; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+
+  /* Form (from S39b) */
+  .formwrap { flex: 1; overflow: auto; background: var(--background); }
+  .form { max-width: 680px; margin: 0 auto; padding: 16px 28px 40px; }
+  .conn-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-datenbank); color: var(--rn-tiefe-0); flex: none; }
+  .tile.net { background: var(--rn-kategorie-netzwerk); }
+  .tile svg.i { width: 20px; height: 20px; }
+  .conn-head h2 { margin: 0; font-size: var(--rn-text-lg); font-weight: 600; }
+  .conn-head .sub { font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .lead { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 12px 48px; }
+  .sec { border-top: 1px solid var(--border); padding: 10px 0 4px; }
+  .sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: var(--rn-text-sm); font-weight: 600; }
+  .sec h3 .count { font-weight: 400; margin-left: 4px; }
+  .sec.closed h3 { color: var(--muted-foreground); font-weight: 500; margin-bottom: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 140px; gap: 0 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 120px 160px; gap: 0 14px; }
+  .fld { margin-bottom: 10px; position: relative; }
+  .fld .lab { display: flex; align-items: baseline; gap: 6px; font-size: var(--rn-text-xs); font-weight: 500; margin-bottom: 4px; }
+  .fld .lab .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .fld .lab .req { color: var(--destructive); font-weight: 700; }
+  .inp { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border: 1px solid var(--input); border-radius: var(--rn-radius-md);
+         background: var(--background); font-size: var(--rn-text-xs); min-width: 0; }
+  .inp.mono { font-family: var(--rn-font-mono); }
+  .inp.ph { color: var(--muted-foreground); }
+  .inp.focus { border-color: var(--ring); outline: 3px solid color-mix(in srgb, var(--ring) 22%, transparent); }
+  .inp.warn { border-color: var(--warning); }
+  .inp .caret-d { margin-left: auto; color: var(--muted-foreground); }
+  .inp .v { color: var(--expression); background: var(--expression-soft); border-radius: 3px; padding: 0 3px; font-family: var(--rn-font-mono); }
+  .help { font-size: var(--rn-text-2xs); color: var(--muted-foreground); margin-top: 3px; }
+  .note { display: flex; gap: 6px; align-items: flex-start; font-size: var(--rn-text-2xs); margin-top: 4px; padding: 5px 8px; border-radius: var(--rn-radius-sm); }
+  .note.warn { background: var(--warning-soft); color: var(--warning); }
+  .note.warn b { color: var(--foreground); font-weight: 600; }
+  .note .act { margin-left: auto; }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--rn-text-xs); }
+  .box { width: 14px; height: 14px; border: 1px solid var(--input); border-radius: 3px; display: inline-grid; place-items: center; background: var(--background); }
+  .box.on { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .box svg.i { width: 11px; height: 11px; stroke-width: 2.4; }
+  .wavy { text-decoration: underline wavy var(--warning); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+
+  /* Secret field (new in S39f): only the reference, the state per environment */
+  .secret { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 3px 4px 3px 9px; border: 1px solid var(--input);
+            border-radius: var(--rn-radius-md); background: var(--muted); font-size: var(--rn-text-xs); }
+  .secret.focus { border-color: var(--ring); outline: 3px solid color-mix(in srgb, var(--ring) 22%, transparent); background: var(--background); }
+  .secret .lock { color: var(--muted-foreground); display: inline-flex; }
+  .secret .ref { font-family: var(--rn-font-mono); color: var(--expression); }
+  .secret .ref i { font-style: normal; color: var(--muted-foreground); }
+  .secret .envs { display: inline-flex; gap: 4px; margin-left: auto; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: var(--rn-radius-full);
+          font-size: 10px; font-weight: 600; background: var(--success-soft); color: var(--success); white-space: nowrap; }
+  .pill.miss { background: var(--warning-soft); color: var(--warning); }
+  .pill.soon { background: var(--warning-soft); color: var(--warning); }
+  .pill.plain { background: var(--danger-soft); color: var(--destructive); }
+  .pill .src { font-weight: 400; opacity: .85; }
+  .menu { position: absolute; left: 0; right: 0; top: 58px; z-index: 4; background: var(--popover); color: var(--popover-foreground);
+          border: 1px solid var(--border); border-radius: var(--rn-radius-md); box-shadow: var(--rn-shadow-lg); padding: 4px; font-size: var(--rn-text-xs); }
+  .menu .mh { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); padding: 6px 8px 2px; }
+  .menu .mi { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--rn-radius-sm); }
+  .menu .mi.hl { background: var(--accent); color: var(--accent-foreground); }
+  .menu .mi .n { font-family: var(--rn-font-mono); }
+  .menu .mi .n b { background: color-mix(in srgb, var(--ring) 22%, transparent); font-weight: 600; border-radius: 2px; }
+  .menu .mi .d { margin-left: auto; display: inline-flex; gap: 4px; }
+  .menu .sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .menu .new { color: var(--primary); font-weight: 500; }
+
+  /* Test result bar */
+  .result { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border-radius: var(--rn-radius-md);
+            border: 1px solid var(--border); font-size: var(--rn-text-xs); }
+  .result.ok { background: var(--success-soft); border-color: transparent; }
+  .result.ok .sym { color: var(--success); font-weight: 700; }
+  .result.fail { background: var(--danger-soft); border-color: transparent; }
+  .result.fail .sym { color: var(--destructive); font-weight: 700; }
+  .result .t { font-weight: 600; }
+  .result .m { color: var(--muted-foreground); font-size: var(--rn-text-2xs); margin-top: 2px; }
+  .result ul { margin: 6px 0 0; padding-left: 16px; }
+  .result .close { margin-left: auto; }
+  .spin { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; display: inline-block; }
+
+  /* Reference / Variables / Secrets in the sidebar (E18, "Secrets" new in S39f) */
+  .ctx { margin-top: 8px; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  .ctx-head { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 16px; flex: none; }
+  .ctx-head .segmented { margin-left: auto; }
+  .ctx-head .segmented button { padding: 2px 6px; font-size: var(--rn-text-2xs); }
+  .ctx-sub { margin: -4px 16px 8px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); flex: none; }
+  .scroll { overflow: auto; flex: 1; padding-bottom: 12px; }
+  .grp { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 16px; font-size: var(--rn-text-xs); font-weight: 600; }
+  .grp .count { font-weight: 400; }
+  .fl { list-style: none; margin: 0 0 4px; padding: 0 8px; }
+  .f { padding: 4px 8px; border-radius: var(--rn-radius-md); }
+  .f .top { display: flex; align-items: center; gap: 6px; }
+  .f .name { font: 500 var(--rn-text-xs) var(--rn-font-mono); }
+  .f .type { margin-left: auto; font-size: 10px; color: var(--muted-foreground); padding: 0 5px; border: 1px solid var(--border); border-radius: var(--rn-radius-sm); }
+  .f .there { font-size: 10px; color: var(--success); }
+  .f .short { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .vt { width: calc(100% - 16px); margin: 0 8px; border-collapse: collapse; font-size: var(--rn-text-xs); }
+  .vt th { font-size: 10px; font-weight: 600; color: var(--muted-foreground); text-align: center; padding: 2px 2px 4px; }
+  .vt th:first-child { text-align: left; padding-left: 8px; }
+  .vt th.cur { color: var(--foreground); }
+  .vt td { text-align: center; padding: 4px 2px; border-top: 1px solid var(--sidebar-border); }
+  .vt td:first-child { text-align: left; padding-left: 8px; font: 500 var(--rn-text-xs) var(--rn-font-mono); }
+  .vt td small { display: block; font: 10px var(--rn-font-sans); color: var(--muted-foreground); }
+  .vt td.cur { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+  .vt .set { color: var(--success); font-weight: 700; }
+  .vt .miss { color: var(--warning); font-weight: 700; }
+  .vt .plain { color: var(--destructive); font-weight: 700; }
+  .vt .src { display: block; font: 9px var(--rn-font-mono); color: var(--muted-foreground); }
+  .vt tr.open td { background: var(--card); }
+  .vdetail { margin: 0 8px 8px; padding: 8px 10px; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--rn-radius-md) var(--rn-radius-md);
+             background: var(--card); font-size: var(--rn-text-2xs); }
+  .vdetail .lvl { display: grid; grid-template-columns: 52px 1fr; gap: 2px 8px; margin-bottom: 8px; }
+  .vdetail .lvl span:nth-child(odd) { color: var(--muted-foreground); }
+  .vdetail .uses { margin: 0 0 8px; padding: 0; list-style: none; }
+  .vdetail .uses a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; font-family: var(--rn-font-mono); font-size: 10px; }
+  .vdetail .warnline { color: var(--warning); margin-bottom: 6px; }
+  .vdetail .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .legend { margin: 8px 16px 0; font-size: 10px; color: var(--muted-foreground); line-height: 1.6; }
+
+  /* YAML of the environment (E9) */
+  .code { flex: 1; overflow: auto; padding: 8px 0 24px; font-family: var(--rn-font-mono); font-size: var(--rn-text-sm); line-height: 1.7; }
+  .line { display: grid; grid-template-columns: 20px 40px 1fr; }
+  .ln { text-align: right; padding-right: 16px; color: var(--rn-tiefe-400); }
+  [data-theme="dark"] .ln { color: var(--rn-tiefe-600); }
+  .src2 { white-space: pre; }
+  .k { font-weight: var(--rn-font-weight-medium); }
+  .s { color: var(--rn-tiefe-700); }
+  [data-theme="dark"] .s { color: var(--rn-tiefe-300); }
+
+  /* Dialogs */
+  .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--rn-tiefe-950) 40%, transparent); display: grid; place-items: center; z-index: 10; }
+  .dialog { width: 520px; background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--rn-radius-lg);
+            box-shadow: var(--rn-shadow-lg); padding: 18px 20px 16px; }
+  .dialog.wide { width: 620px; }
+  .dialog h2 { margin: 0 0 4px; font-size: var(--rn-text-md); font-weight: 600; }
+  .dialog .intro { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 14px; }
+  .dialog .foot { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .dialog .foot small { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .type { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--background); }
+  .type.sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .type .tile { width: 28px; height: 28px; }
+  .type .tile svg.i { width: 16px; height: 16px; }
+  .type b { display: block; font-size: var(--rn-text-xs); }
+  .type div span { font-size: 10px; color: var(--muted-foreground); line-height: 1.35; display: block; }
+  .where { display: grid; grid-template-columns: 96px 1fr; gap: 6px 10px; font-size: var(--rn-text-xs); align-items: center; margin-bottom: 12px; }
+  .where span:nth-child(odd) { color: var(--muted-foreground); }
+  .dots { letter-spacing: 2px; }
+  .info { display: flex; gap: 8px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); background: var(--muted); border-radius: var(--rn-radius-sm); padding: 7px 9px; margin-top: 10px; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+
+  /* New in E20: forms of triggers, environments and project.yaml */
+  .tile.trig { background: var(--rn-kategorie-ausfuehrung); }
+  .tile.env { background: var(--rn-kategorie-allgemein); }
+  .tile.proj { background: var(--rn-kategorie-fluss); }
+  .conn-head .head-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .sw { display: inline-flex; align-items: center; gap: 8px; font-size: var(--rn-text-xs); font-weight: 500; }
+  .sw .track { width: 30px; height: 17px; border-radius: var(--rn-radius-full); background: var(--input); position: relative; flex: none; }
+  .sw .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--background); box-shadow: var(--rn-shadow-sm); }
+  .sw.on .track { background: var(--primary); }
+  .sw.on .track::after { left: 15px; }
+  .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 0 0 12px 48px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .strip b { color: var(--foreground); font-weight: 600; }
+  .strip .ok { color: var(--success); font-weight: 700; }
+  .strip a { color: var(--primary); font-family: var(--rn-font-mono); }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .cards .type { padding: 8px; gap: 8px; }
+  .cards .tile { width: 24px; height: 24px; background: var(--muted); color: var(--muted-foreground); }
+  .cards .type.sel .tile { background: var(--rn-kategorie-ausfuehrung); color: var(--rn-tiefe-0); }
+  .cards .tile svg.i { width: 14px; height: 14px; }
+  .reading { margin-top: 4px; padding: 7px 9px; border-radius: var(--rn-radius-sm); background: var(--muted); font-size: var(--rn-text-2xs); }
+  .reading b { font-weight: 600; }
+  .reading ol { margin: 4px 0 0; padding-left: 16px; font-family: var(--rn-font-mono); color: var(--muted-foreground); }
+  .addr { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 9px; border: 1px solid var(--border); border-radius: var(--rn-radius-md);
+          background: var(--muted); font: var(--rn-text-xs) var(--rn-font-mono); margin-bottom: 4px; }
+  .addr .m { font-weight: 700; color: var(--primary); }
+  .addr .btn { margin-left: auto; }
+  .kv { width: 100%; border-collapse: collapse; font-size: var(--rn-text-xs); margin-bottom: 6px; }
+  .kv th { font-size: 10px; font-weight: 600; color: var(--muted-foreground); text-align: left; padding: 0 6px 4px; }
+  .kv td { padding: 3px 6px; border-top: 1px solid var(--border); vertical-align: middle; }
+  .kv td.name { font: 500 var(--rn-text-xs) var(--rn-font-mono); white-space: nowrap; }
+  .kv td.name small { display: block; font: 10px var(--rn-font-sans); color: var(--muted-foreground); }
+  .kv td .inp { height: 26px; }
+  .kv td.other { color: var(--muted-foreground); font-family: var(--rn-font-mono); font-size: 11px; }
+  .kv td.other s { text-decoration-color: var(--muted-foreground); }
+  .kv td.act { width: 28px; text-align: right; }
+  .kv tr.miss td { background: var(--warning-soft); }
+  .kv tr.miss td.name { color: var(--warning); }
+  .kv .tagx { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--rn-radius-full); font: 600 10px var(--rn-font-sans);
+              background: var(--secondary); color: var(--secondary-foreground); white-space: nowrap; }
+  .kv .tagx.over { background: var(--expression-soft); color: var(--expression); }
+  .addrow { display: inline-flex; align-items: center; gap: 6px; font-size: var(--rn-text-xs); color: var(--primary); font-weight: 500; border: 0; background: none; padding: 4px 0; }
+  .note.info { background: var(--muted); color: var(--muted-foreground); }
+  .note.danger { background: var(--danger-soft); color: var(--destructive); }
+  .note.danger b, .note.info b { color: var(--foreground); font-weight: 600; }
+  .ro { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border: 1px dashed var(--border); border-radius: var(--rn-radius-md);
+        font: var(--rn-text-xs) var(--rn-font-mono); color: var(--muted-foreground); }
+           background: var(--rn-tiefe-900); color: var(--rn-tiefe-0); border-radius: var(--rn-radius-md); box-shadow: var(--rn-shadow-lg); font-size: var(--rn-text-xs); z-index: 5; }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E20</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="cron" href="#">cron</a> <a data-state="http" href="#">http</a> <a data-state="type" href="#">type</a>
+  <a data-state="environment" href="#">environment</a> <a data-state="project" href="#">project</a> <a data-state="new" href="#">new</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>orders</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\orders</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="panel-title"><span class="label">Explorer</span><span id="tree-actions"></span></div>
+      <ul class="tree" id="tree"></ul>
+      <section class="ctx" id="ctx" aria-label="Reference"></section>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div style="display:flex;flex:1;min-height:0" id="view"></div>
+    </main>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "cron";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const I = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    env: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    trig: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',
+    db: '<ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/>',
+    http: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+    // Kinds of triggers: calendar (cron), circular arrow (interval), folder with arrow (file), arrow into a box (http).
+    cal: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+    every: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/>',
+    inbox: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9.5 13.5L12 16l2.5-2.5"/>',
+    call: '<path d="M4 12h11M11 8l4 4-4 4"/><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    form: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+    code: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    open: '<path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>',
+    play: '<path d="M7 5l12 7-12 7z"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    reload: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+  };
+
+  // Which file is open in which state.
+  const files = { cron: "triggers/nightly-import.yaml", http: "triggers/import-hook.yaml", type: "triggers/nightly-import.yaml",
+    environment: "environments/prod.yaml", project: "project.yaml", new: "triggers/nightly-import.yaml" };
+  const file = files[state] || files.cron;
+  const name = file.split("/").pop();
+  const isTrigger = file.startsWith("triggers/");
+  const kindIcon = isTrigger ? I.trig : state === "environment" ? I.env : I.proj;
+  const kindLabel = isTrigger ? "Trigger" : state === "environment" ? "Environment" : "Project";
+
+  // Explorer as today (E11, S39c2b).
+  document.getElementById("tree-actions").innerHTML =
+    `<button class="icon-btn" aria-label="New">${icon(I.plus, 15)}</button><button class="icon-btn" aria-label="Reload explorer">${icon(I.reload, 14)}</button>`;
+  const rows = [["folder", "connections", 0, "2"], ["db", "erp-sql.yaml", 1, "", "sqlserver"], ["http", "crm-api.yaml", 1, "", "http"],
+    ["folder", "environments", 0, "2"], ["env", "dev.yaml", 1], ["env", "prod.yaml", 1],
+    ["folder", "triggers", 0, "2"], ["trig", "import-hook.yaml", 1, "", "http"], ["trig", "nightly-import.yaml", 1, "", state === "type" ? "interval" : "cron"],
+    ["folder", "workflows", 0, "2"], ["wf", "import.workflow.yaml", 1], ["wf", "report.workflow.yaml", 1],
+    ["proj", "project.yaml", 0]];
+  document.getElementById("tree").innerHTML = rows.map(([k, n, d, c, t]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === name ? "selected" : ""}">` +
+    (k === "folder" ? chev : `<span style="width:12px"></span>`) +
+    `<span class="kind">${icon(I[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}${t ? `<span class="tag">${t}</span>` : ""}</div></li>`).join("");
+
+  // Tabs and file bar: Form | YAML like connections; triggers get "Run now" (starts the target like the trigger would).
+  const dirty = state === "type" || state === "environment";
+  document.getElementById("tabs").innerHTML = `<div class="tab active">${icon(kindIcon)} ${name} ${dirty ? "●" : "×"}</div>`;
+  const warnBadge = state === "environment" ? '<span class="badge warn">⚠ 1</span>' : state === "project" ? '<span class="badge warn">⚠ 1</span>' : "";
+  document.getElementById("filebar").innerHTML = `<span class="crumbs"><b>${file}</b></span><span class="badge">${kindLabel}</span>${warnBadge}<div class="spacer"></div>
+    ${isTrigger ? `<button class="btn">${icon(I.play, 13)}Run target now</button>` : ""}
+    <button class="btn ${dirty ? "primary" : ""}" ${dirty ? "" : 'style="opacity:.5"'}>Save <kbd>Ctrl+S</kbd></button>
+    <div class="segmented"><button aria-pressed="true">${icon(I.form, 14)}Form</button><button>${icon(I.code, 14)}YAML</button></div>`;
+
+  // Building blocks of the form, as in S39b.
+  const fld = (label, key, inner, o = {}) => `<div class="fld"><div class="lab">${label}${o.req ? '<span class="req">*</span>' : ""}<span class="key">${key}</span></div>${inner}${o.help ? `<div class="help">${o.help}</div>` : ""}${o.after || ""}</div>`;
+  const inp = (v, o = {}) => `<div class="inp ${o.mono ? "mono" : ""} ${o.ph ? "ph" : ""} ${o.cls || ""}">${v}${o.select ? `<span class="caret-d">${icon(I.down, 13)}</span>` : ""}</div>`;
+  const pills = (list) => list.map(([env, s, src]) => `<span class="pill ${s}">${s === "miss" ? "⚠" : "●"} ${env}${src ? ` <span class="src">${src}</span>` : ""}</span>`).join("");
+  const secret = (ref, envs) => `<div class="secret"><span class="lock">${icon(I.lock, 14)}</span><span class="ref"><i>\${secret:</i>${ref}<i>}</i></span>
+      <span class="envs">${pills(envs)}</span><button class="btn small">Change…</button></div>`;
+  const sec = (title, body, o = {}) => o.closed
+    ? `<div class="sec closed"><h3>${chevRight}${title}<span class="count">${o.closed}</span></h3></div>`
+    : `<div class="sec"><h3>${chev}${title}${o.count ? `<span class="count">${o.count}</span>` : ""}</h3>${body}</div>`;
+  const head = (tile, title, sub, right = "") => `<div class="conn-head"><span class="tile ${tile}">${icon(kindIcon)}</span><div><h2>${title}</h2><div class="sub">${sub}</div></div>${right ? `<div class="head-right">${right}</div>` : ""}</div>`;
+  const sw = (on, label) => `<span class="sw ${on ? "on" : ""}"><span class="track"></span>${label}<span class="mono" style="color:var(--muted-foreground);font-size:10px;font-weight:400">enabled</span></span>`;
+
+  // Type of a trigger as cards; the fields below follow the chosen type (x-runnel-variants of the trigger schema).
+  const types = [["cron", "cal", "Schedule", "At set times"], ["interval", "every", "Interval", "Every few minutes"],
+    ["file", "inbox", "Folder", "New files in a folder"], ["http", "call", "HTTP call", "A call to an address"]];
+  const typeCards = (sel) => `<div class="cards" role="radiogroup" aria-label="Type">${types.map(([t, ic, n, d]) =>
+    `<div class="type ${t === sel ? "sel" : ""}" role="radio"><span class="tile">${icon(I[ic])}</span><div><b>${n}</b><span>${d}</span></div></div>`).join("")}</div>`;
+
+  // Target, environment and the parameters of the target (from its parameters:, E7c).
+  const target = (paramRows) => sec("Target", `
+      <div class="grid2" style="grid-template-columns:1fr 180px">
+        ${fld("Workflow or pipeline", "target", inp(`${icon(I.wf, 14)}<span class="mono">workflows/import.workflow.yaml</span><button class="btn small" style="margin-left:auto">${icon(I.open, 12)}Open</button>`, { select: 1 }), { req: 1 })}
+        ${fld("Environment", "environment", inp("prod", { select: 1, mono: 1 }), { help: "Empty: the default environment (dev)" })}
+      </div>
+      <div class="fld"><div class="lab">Parameters<span class="key">params</span></div>
+        <table class="kv"><thead><tr><th style="width:160px">Parameter of the target</th><th>Value</th><th style="width:28px"></th></tr></thead><tbody>${paramRows}</tbody></table>
+        <div class="help">The parameters of <span class="mono">import.workflow.yaml</span>; empty: its default</div></div>`);
+  const prow = (n, sub, v, o = {}) => `<tr class="${o.miss ? "miss" : ""}"><td class="name">${n}<small>${sub}</small></td><td>${inp(v, { mono: 1, ph: o.ph })}</td><td class="act">${o.miss ? "⚠" : ""}</td></tr>`;
+
+  const view = document.getElementById("view");
+  let body = "";
+  if (state === "cron" || state === "new") {
+    body = head("trig", "nightly-import", "Schedule · starts <span class=mono>workflows/import.workflow.yaml</span>", sw(true, "Enabled")) +
+      `<p class="lead">Imports the orders of the night <span class="mono" style="font-size:10px">description</span></p>
+      <div class="strip"><span>Next run <b>Tue 24 Nov, 02:00</b> (Europe/Berlin)</span><span>Last run <span class="ok">✓</span> Mon 23 Nov, 02:00 · <a href="#">01JD8…Q4</a></span></div>
+      ${sec("When", typeCards("cron") + `
+        <div class="grid2" style="grid-template-columns:1fr 200px">
+          ${fld("Schedule", "with.schedule", inp("0 2 * * 1-5", { mono: 1 }), { req: 1, after: `<div class="reading"><b>At 02:00, Monday to Friday</b><ol><li>Tue 24 Nov 2026, 02:00</li><li>Wed 25 Nov 2026, 02:00</li><li>Thu 26 Nov 2026, 02:00</li></ol></div>` })}
+          ${fld("Time zone", "with.timezone", inp("Europe/Berlin", { select: 1, mono: 1 }), { help: "Empty: the time zone of the computer" })}
+        </div>`)}
+      ${target(prow("DAY", "date · required", '<span class="v">{{ formatDate(today(), "yyyy-MM-dd") }}</span>') + prow("MODE", "text · default full", "full", { ph: 1 }))}
+      ${sec("More", "", { closed: "overlap" })}`;
+  } else if (state === "type") {
+    // The type changed from cron to interval: the fields of cron go away, with Undo.
+    body = head("trig", "nightly-import", "Interval · starts <span class=mono>workflows/import.workflow.yaml</span>", sw(true, "Enabled")) +
+      `<p class="lead">Imports the orders of the night <span class="mono" style="font-size:10px">description</span></p>
+      <div class="strip"><span>Next run after saving</span></div>
+      ${sec("When", typeCards("interval") + `
+        <div class="note info" style="margin:-4px 0 10px"><span>ⓘ</span><span>Type changed to <b>interval</b>: <span class="mono">schedule</span> and <span class="mono">timezone</span> were removed; <span class="mono">overlap</span> stays.</span><button class="btn small act">Undo</button></div>
+        <div class="grid2" style="grid-template-columns:200px 1fr">
+          ${fld("Every", "with.every", inp('15m<span style="display:inline-block;width:1px;height:14px;background:var(--foreground)"></span>', { mono: 1, cls: "focus" }), { req: 1, help: "e.g. 30s, 15m, 2h" })}
+          <div></div>
+        </div>`)}
+      ${target(prow("DAY", "date · required", '<span class="v">{{ formatDate(today(), "yyyy-MM-dd") }}</span>') + prow("MODE", "text · default full", "full", { ph: 1 }))}
+      ${sec("More", "", { closed: "overlap" })}`;
+  } else if (state === "http") {
+    body = head("trig", "import-hook", "HTTP call · starts <span class=mono>workflows/import.workflow.yaml</span>", sw(true, "Enabled")) +
+      `<p class="lead">The shop reports new orders <span class="mono" style="font-size:10px">description</span></p>
+      <div class="strip"><span>Listener <b>https://runnel01.example.local:7301</b></span><span>Last call <span class="ok">✓</span> 14:02 · <a href="#">01JD9…7K</a></span></div>
+      ${sec("When", typeCards("http") + `
+        <div class="grid2" style="grid-template-columns:130px 1fr">
+          ${fld("Method", "with.method", inp("POST", { select: 1, mono: 1 }), { req: 1 })}
+          ${fld("Path", "with.path", inp("/hooks/orders/{SHOP}", { mono: 1 }), { req: 1, help: "<span class=mono>{SHOP}</span> fills the parameter SHOP of the target" })}
+        </div>
+        <div class="addr"><span class="m">POST</span><span>https://runnel01.example.local:7301/hooks/orders/{SHOP}</span><button class="btn small">${icon(I.copy, 12)}Copy</button></div>
+        <div class="help" style="margin-bottom:10px">The address callers use; the listener is set when the server starts (<span class="mono">--triggers</span>)</div>`)}
+      ${sec("Sign-in", `
+        ${fld("Caller signs in with", "with.auth", inp("Token (Authorization: Bearer)", { select: 1 }))}
+        ${fld("Token", "with.auth.token", secret("shop-hook-token", [["dev", "", "env"], ["prod", "miss"]]), {
+          after: `<div class="note warn"><span>⚠</span><span><b>Not set for prod:</b> calls with the environment prod are refused with 401 until the secret is set.</span></div>` })}`)}
+      ${target(prow("SHOP", "text · from the path", '<span class="ph" style="color:var(--muted-foreground)">from the path</span>') + prow("ORDERS", "list · from the body", '<span style="color:var(--muted-foreground)">from the body (JSON)</span>'))}
+      ${sec("Answer", `
+        <div class="grid2" style="grid-template-columns:1fr 160px">
+          ${fld("Answer", "with.response", inp("At once: 202 with the run id", { select: 1 }), { help: "Or wait for the run and answer with its outputs (run)" })}
+          ${fld("Runs at the same time", "with.maxConcurrent", inp("4", { mono: 1 }), { help: "More: 429" })}
+        </div>`)}
+      ${sec("More", "", { closed: "history, timeout" })}`;
+  } else if (state === "environment") {
+    const vrow = (n, sub, v, other, o = {}) => `<tr class="${o.miss ? "miss" : ""}"><td class="name">${n}<small>${sub}</small></td><td>${o.miss ? `<button class="btn small">${icon(I.plus, 12)}Set for prod</button>` : inp(v, { mono: 1, cls: o.focus ? "focus" : "" })}</td>
+      <td class="other">${other}</td><td class="act">${o.miss ? "" : `<button class="icon-btn" aria-label="Remove">${icon(I.trash, 13)}</button>`}</td></tr>`;
+    body = head("env", "prod", "Environment · the values of a run with <span class=mono>prod</span>") +
+      `<p class="lead">Production server <span class="mono" style="font-size:10px">description</span> · used by 2 triggers</p>
+      ${sec("Environment", `
+        <div class="grid2" style="grid-template-columns:200px 1fr">
+          ${fld("Name", "name", `<div class="ro">prod</div>`, { help: "The name of the file; rename it in the explorer" })}
+          ${fld("Description", "description", inp("Production server"))}
+        </div>`)}
+      ${sec("Variables", `
+        <table class="kv"><thead><tr><th style="width:150px">Name</th><th>Value in prod</th><th style="width:190px">project.yaml</th><th></th></tr></thead><tbody>
+          ${vrow("ERP_HOST", "3 uses", "db01.example.local", '<s>localhost</s> <span class="tagx over">overridden</span>')}
+          ${vrow("CRM_URL", "1 use", "https://crm.example.com/api/", "–")}
+          ${vrow("INBOX", "2 uses", '\\\\fs01\\orders\\inbox<span style="display:inline-block;width:1px;height:14px;background:var(--foreground)"></span>', '<s>${BASE}\\inbox</s> <span class="tagx over">overridden</span>', { focus: 1 })}
+          ${vrow("ARCHIVE", "1 use · not set", "", "–", { miss: 1 })}
+        </tbody></table>
+        <button class="addrow">${icon(I.plus, 13)}Add variable</button>
+        <div class="help">Variables of project.yaml that prod does not set apply unchanged: <span class="mono">BASE</span>, <span class="mono">BATCH_SIZE</span></div>`, { count: "3" })}
+      ${sec("Secrets", `
+        ${fld("Secret store", "secretStore", inp("env – environment variables of the computer", { select: 1 }), { help: "Where <span class=mono>${secret:NAME}</span> is read from in prod; empty: that of project.yaml (inline)" })}`)}`;
+  } else if (state === "project") {
+    const vrow = (n, sub, v, over) => `<tr><td class="name">${n}<small>${sub}</small></td><td>${inp(v, { mono: 1 })}</td><td class="other">${over}</td><td class="act"><button class="icon-btn" aria-label="Remove">${icon(I.trash, 13)}</button></td></tr>`;
+    const srow = (n, sub) => `<tr><td class="name">${n}<small>${sub}</small></td><td><div class="inp mono" style="background:var(--muted)"><span class="dots" style="color:var(--muted-foreground)">••••••••</span><span style="margin-left:auto;font:10px var(--rn-font-sans);color:var(--muted-foreground)">hidden in the form</span></div></td><td class="other"></td><td class="act"><button class="icon-btn" aria-label="Remove">${icon(I.trash, 13)}</button></td></tr>`;
+    body = head("proj", "orders", "Project · <span class=mono>C:\\Runnel\\projects\\orders</span>") +
+      `<p class="lead">Imports orders from the shop into the ERP <span class="mono" style="font-size:10px">description</span></p>
+      ${sec("Project", `
+        <div class="grid2" style="grid-template-columns:200px 1fr">
+          ${fld("Name", "name", inp("orders", { mono: 1 }), { req: 1 })}
+          ${fld("Description", "description", inp("Imports orders from the shop into the ERP"))}
+        </div>
+        ${fld("Default environment", "defaultEnvironment", inp("dev", { select: 1, mono: 1 }), { help: "Used when a run names none; the environments of <span class=mono>environments/</span>" })}`)}
+      ${sec("Variables", `
+        <table class="kv"><thead><tr><th style="width:150px">Name</th><th>Value</th><th style="width:150px">Overridden in</th><th></th></tr></thead><tbody>
+          ${vrow("BASE", "2 uses", "C:\\Runnel\\data", "–")}
+          ${vrow("ERP_HOST", "3 uses", "localhost", '<span class="tagx over">prod</span>')}
+          ${vrow("INBOX", "2 uses", "${BASE}\\inbox", '<span class="tagx over">prod</span>')}
+          ${vrow("BATCH_SIZE", "1 use", "500", "–")}
+        </tbody></table>
+        <button class="addrow">${icon(I.plus, 13)}Add variable</button>`, { count: "4" })}
+      ${sec("Secrets", `
+        ${fld("Secret store", "secretStore", inp("inline – secrets: in this file, plain text", { select: 1 }), { help: "For all environments that set none; prod: env" })}
+        <div class="fld"><div class="lab">Secrets in this file<span class="key">secrets</span></div>
+          <table class="kv"><tbody>${srow("crm-api-token", "1 use")}</tbody></table>
+          <div class="note danger"><span>⚠</span><span><b>Plain text in project.yaml.</b> The value is in the file and in Git; use it only for development. The form shows names only.</span></div>
+          <button class="addrow">${icon(I.plus, 13)}Add secret</button></div>`, { count: "1" })}
+      ${sec("Defaults and limits", "", { closed: "workflow.defaultJoin, settings.maxConcurrentRuns" })}`;
+  }
+  view.innerHTML = `<div class="formwrap"><div class="form">${body}</div></div>`;
+
+  const st = { cron: "Trigger · cron", new: "Trigger · cron", type: "Trigger · interval", http: "Trigger · http", environment: "Environment", project: "Project" };
+  document.getElementById("status").innerHTML = `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>` +
+    `<span>${st[state]}</span>${dirty ? '<span style="color:var(--foreground)">● Unsaved changes</span>' : ""}<span class="spacer"></span><span>Runnel v0.2.0</span>`;
+
+  // Lower part of the sidebar: Reference as today (E18b); with the form it lists the fields of the type.
+  const ctx = document.getElementById("ctx");
+  const f = (n, type, short, inside) => `<li class="f"><div class="top"><span class="name">${n}</span>${inside ? `<span class="there">✓ line ${inside}</span>` : ""}<span class="type">${type}</span></div>${inside ? "" : `<div class="short">${short}</div>`}</li>`;
+  if (isTrigger) {
+    const t = state === "http" ? "http" : state === "type" ? "interval" : "cron";
+    const list = t === "http"
+      ? f("method", "choice", "", 9) + f("path", "text", "", 10) + f("auth", "object", "", 11) + f("response", "choice", "", 13) + f("maxConcurrent", "number", "", 14) + f("timeout", "duration", "With response: run, how long the caller waits") + f("history", "choice", "Which ended runs are kept")
+      : t === "interval" ? f("every", "duration", "", 9) + f("overlap", "choice", "skip or allow while the previous run runs")
+      : f("schedule", "text", "", 9) + f("timezone", "text", "", 10) + f("overlap", "choice", "skip or allow while the previous run runs");
+    ctx.innerHTML = `<div class="ctx-head"><span class="label">Reference</span></div>
+      <div class="ctx-sub">Fields of <span class="mono">${name}</span> · type ${t}</div>
+      <div class="scroll"><div class="grp">${chev}with: for <span class="mono">${t}</span></div><ul class="fl">${list}</ul></div>`;
+  } else {
+    ctx.innerHTML = `<div class="ctx-head"><span class="label">Reference</span><div class="segmented" role="tablist" aria-label="Help">
+        <button aria-pressed="true">Fields</button><button aria-pressed="false">Variables</button></div></div>
+      <div class="ctx-sub">Fields of <span class="mono">${name}</span></div>
+      <div class="scroll"><ul class="fl">` + (state === "environment"
+        ? f("name", "text", "", 3) + f("description", "text", "", 4) + f("variables", "map", "", 5) + f("secretStore", "choice", "", 10) + f("secrets", "map", "Secrets in plain text for inline")
+        : f("name", "text", "", 3) + f("description", "text", "", 4) + f("defaultEnvironment", "text", "", 5) + f("variables", "map", "", 6) + f("secretStore", "choice", "", 11) + f("secrets", "map", "", 12) + f("workflow", "object", "Defaults for all workflows") + f("settings", "object", "Limits for the runs")) + `</ul></div>`;
+  }
+
+  // New → Trigger: name, type and target; the form follows.
+  const app = document.getElementById("app");
+  if (state === "new") {
+    app.insertAdjacentHTML("beforeend", `<div class="scrim"><div class="dialog wide" role="dialog" aria-label="New trigger">
+      <h2>New trigger</h2><p class="intro">A trigger starts a workflow or pipeline while <span class="mono">runnel serve</span> or the service runs.</p>
+      ${fld("Name", "name", inp('weekly-report<span style="display:inline-block;width:1px;height:14px;background:var(--foreground)"></span>', { mono: 1, cls: "focus" }), { help: "Creates <span class=mono>triggers/weekly-report.yaml</span>" })}
+      <div class="lab" style="font-size:var(--rn-text-xs);font-weight:500;margin:4px 0">Type</div>
+      ${typeCards("cron")}
+      ${fld("Target", "target", inp(`${icon(I.wf, 14)}<span class="mono">workflows/report.workflow.yaml</span>`, { select: 1 }))}
+      <div class="foot"><small>Starts disabled; enable it in the form when the schedule fits.</small><span class="spacer"></span><button class="btn">Cancel</button><button class="btn primary">Create</button></div>
+    </div></div>`);
+  }
+</script>
+</body>
+</html>
