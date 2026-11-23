@@ -56,19 +56,6 @@ func checkInfoLinks(p *model.Pipeline, reg *transform.Registry) model.Errors {
 		}
 		infoOf[l.To] = i
 	}
-	// Transforms before each transform (over all links), to find shared sources.
-	before := func(id string) map[string]bool {
-		seen := map[string]bool{id: true}
-		for changed := true; changed; {
-			changed = false
-			for _, l := range p.Links {
-				if seen[l.To] && !seen[l.From] {
-					seen[l.From], changed = true, true
-				}
-			}
-		}
-		return seen
-	}
 	for i, t := range p.Transforms {
 		d, ok := reg.Lookup(t.Type)
 		if !ok || !d.InfoInput {
@@ -79,17 +66,68 @@ func checkInfoLinks(p *model.Pipeline, reg *transform.Registry) model.Errors {
 			errs = append(errs, p.ErrorAt(fmt.Sprintf("$.transforms[%d]", i), "transform %q: %s needs an info link with the lookup data", t.ID, t.Type))
 			continue
 		}
-		info := before(p.Links[li].From)
+		info := before(p, p.Links[li].From)
 		for k, l := range p.Links {
 			if l.To != t.ID || k == li {
 				continue
 			}
 			for _, x := range p.Transforms { // in file order, for a stable message
-				if info[x.ID] && before(l.From)[x.ID] {
+				if info[x.ID] && before(p, l.From)[x.ID] {
 					errs = append(errs, p.ErrorAt(fmt.Sprintf("$.links[%d]", li),
 						"link #%d (%s → %s): the lookup data and the records of link #%d both come from %q; %s reads the lookup data completely first, so they must come from separate transforms",
 						li+1, p.Links[li].From, t.ID, k+1, x.ID, t.ID))
 					break
+				}
+			}
+		}
+	}
+	return errs
+}
+
+// before returns a transform and all transforms before it (over all links), to find
+// shared sources.
+func before(p *model.Pipeline, id string) map[string]bool {
+	seen := map[string]bool{id: true}
+	for changed := true; changed; {
+		changed = false
+		for _, l := range p.Links {
+			if seen[l.To] && !seen[l.From] {
+				seen[l.From], changed = true, true
+			}
+		}
+	}
+	return seen
+}
+
+// checkNamedInputs checks the inputs of transforms that read them in step (NamedInputs,
+// S23c, e.g. core.merge-join): two inputs must not come from the same transform, directly
+// or further back. The transform may read one input for a long time while the other waits;
+// the transform before both would stop at a full buffer (deadlock).
+func checkNamedInputs(p *model.Pipeline, reg *transform.Registry) model.Errors {
+	var errs model.Errors
+	for _, t := range p.Transforms {
+		d, ok := reg.Lookup(t.Type)
+		if !ok || !d.NamedInputs {
+			continue
+		}
+		var in []int
+		for i, l := range p.Links {
+			if l.To == t.ID && l.Type != model.InfoLink {
+				in = append(in, i)
+			}
+		}
+	pairs:
+		for a := range in {
+			for b := a + 1; b < len(in); b++ {
+				la, lb := p.Links[in[a]], p.Links[in[b]]
+				first, second := before(p, la.From), before(p, lb.From)
+				for _, x := range p.Transforms {
+					if first[x.ID] && second[x.ID] {
+						errs = append(errs, p.ErrorAt(fmt.Sprintf("$.links[%d]", in[b]),
+							"link #%d (%s → %s): its records and those of link #%d both come from %q; %s reads its inputs in step, so they must come from separate transforms",
+							in[b]+1, lb.From, t.ID, in[a]+1, x.ID, t.ID))
+						continue pairs
+					}
 				}
 			}
 		}

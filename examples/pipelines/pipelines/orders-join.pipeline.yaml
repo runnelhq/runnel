@@ -1,0 +1,46 @@
+# Joins the orders with the customers by name with core.merge-join (S23c): both inputs are
+# sorted by the key first (core.sort); the join reads them in step and holds only the
+# records of one name at a time. join: left keeps orders without a customer.
+#   runnel run -v examples/pipelines/pipelines/orders-join.pipeline.yaml
+kind: Pipeline
+apiVersion: runnel/v1
+name: orders-join
+transforms:
+  - id: orders
+    type: csv.input
+    with:
+      path: data/orders.csv
+      delimiter: ";"
+  - id: customers
+    type: csv.input
+    with:
+      path: data/customers.csv
+      delimiter: ";"
+  - id: sortOrders
+    type: core.sort
+    with:
+      fields:
+        - { name: Kunde }
+  - id: sortCustomers
+    type: core.sort
+    with:
+      fields:
+        - { name: name }
+  - id: join
+    type: core.merge-join
+    with:
+      left: sortOrders
+      right: sortCustomers
+      keys:
+        - { left: Kunde, right: name }
+      join: left
+  - id: write
+    type: csv.output
+    with:
+      path: out/orders-joined.csv
+links:
+  - { from: orders, to: sortOrders }
+  - { from: customers, to: sortCustomers }
+  - { from: sortOrders, to: join }
+  - { from: sortCustomers, to: join }
+  - { from: join, to: write }

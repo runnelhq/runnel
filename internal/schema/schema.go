@@ -50,6 +50,10 @@ const FormatField = "runnel-field"
 // S23b): the editor offers the fields known on the info link.
 const FormatInfoField = "runnel-info-field"
 
+// FormatSource marks the id of a transform that a data link to this transform comes from,
+// e.g. left and right of core.merge-join (S23c): the editor offers the sources of the links.
+const FormatSource = "runnel-source"
+
 // FormatTarget marks the id of a transform that a data link of this transform leads to,
 // e.g. "to" of core.switch (E14b): the editor offers the targets of the links.
 const FormatTarget = "runnel-target"

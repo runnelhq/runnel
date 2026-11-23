@@ -120,3 +120,25 @@ func RunWithInfo(ctx context.Context, tr transform.Transform, info []record.Reco
 	err = tr.Process(ctx, in, o)
 	return out, failed, logs, err
 }
+
+// RunWithInputs runs a transform with NamedInputs (S23c): inputs are the records of each
+// incoming data link by the transform they come from.
+func RunWithInputs(ctx context.Context, tr transform.Transform, inputs map[string][]record.Record) (out []record.Record, logs []Logged, err error) {
+	in := make(chan transform.Batch)
+	close(in)
+	named := map[string]<-chan transform.Batch{}
+	for from, recs := range inputs {
+		ch := make(chan transform.Batch, len(recs))
+		for _, r := range recs {
+			ch <- transform.Batch{r}
+		}
+		close(ch)
+		named[from] = ch
+	}
+	o := transform.NewOutput("t", func(r record.Record) error {
+		out = append(out, r)
+		return ctx.Err()
+	}, func(l slog.Level, m string) { logs = append(logs, Logged{l, m}) }).WithInputs(named)
+	err = tr.Process(ctx, in, o)
+	return out, logs, err
+}

@@ -28,7 +28,10 @@ type InitContext struct {
 	// known is an error also in an open schema.
 	Strict bool
 	// Info is the schema of the records on the info link (S23b); nil without one.
-	Info     *record.Schema
+	Info *record.Schema
+	// Inputs are the schemas of the incoming data and error links by the id of the
+	// transform they come from (S23c), for transforms with NamedInputs.
+	Inputs   map[string]record.Schema
 	problems []Problem
 }
 

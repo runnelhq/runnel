@@ -178,3 +178,17 @@ Abgestimmt mit dem Maintainer (Mockup S23b).
   `Counts.Info` („lookup N“ im Log); am Link selbst stehen sie wie bei jedem Link.
 - **Grenze:** `core.stream-lookup` hält die Nachschlagedaten im Speicher, höchstens `maxRecords` (Standard 100.000);
   mehr hält die Pipeline an. Für größere Tabellen ist `db.lookup` gedacht.
+
+## Nachtrag 2026-11-23 (S23c): Getrennte Eingänge
+
+- **Bedeutung:** Transforms mit `NamedInputs` (z. B. `core.merge-join`) lesen jeden eingehenden Daten-Link für sich,
+  nach der ID des Transforms, von dem er kommt (`Output.Input(from)`), statt alle als einen Strom. Die Konfiguration
+  nennt diese Transforms in Feldern mit dem Format `runnel-source` (bei `core.merge-join` `left` und `right`); `Init`
+  erhält die Schemas der Eingänge einzeln (`InitContext.Inputs`).
+- **Ausführung:** Der Transform liest die Eingänge im Gleichschritt. Kommen zwei Eingänge aus demselben Transform, auch
+  weiter vorn im Graph, könnte er an vollen Puffern stehen bleiben; das ist wie bei Info-Links ein Fehler bei `validate`
+  und vor dem Lauf.
+- **`core.merge-join`:** Beide Eingänge müssen nach den Schlüsseln aufsteigend sortiert sein (wie mit `core.sort`,
+  leere Werte zuletzt); sonst hält die Pipeline mit einer Meldung an. Join-Arten `inner`, `left` und `full`; `right`
+  gibt es bewusst nicht – dafür die Eingänge tauschen. Gleiche Schlüssel auf beiden Seiten ergeben alle Kombinationen.
+  Felder gleichen Namens behalten den Wert des linken Datensatzes.
