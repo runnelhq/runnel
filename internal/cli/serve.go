@@ -15,6 +15,7 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/server"
 	"github.com/runnelhq/runnel/internal/transforms"
+	"github.com/runnelhq/runnel/internal/version"
 )
 
 // DefaultPort is the port of "runnel serve" unless --port is given.
@@ -138,6 +139,8 @@ func runServer(ctx context.Context, c serveConfig) error {
 		_ = hs.Shutdown(shutdown)
 	}()
 
+	// The version first: after an update, the log shows which runnel.exe serves.
+	c.Print("Starting " + version.Get().String())
 	c.Print(fmt.Sprintf("Serving project %s", root))
 	c.Print(fmt.Sprintf("Listening on http://%s (API under %s)%s", ln.Addr(), server.APIPrefix, c.StopHint))
 	srv.StartTriggers(ctx)
