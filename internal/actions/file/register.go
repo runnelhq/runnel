@@ -11,4 +11,6 @@ func Register(r *action.Registry) {
 	r.Register(deleteDefinition)
 	r.Register(mkdirDefinition)
 	r.Register(listDefinition)
+	r.Register(readDefinition)
+	r.Register(writeDefinition)
 }

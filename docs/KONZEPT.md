@@ -1090,7 +1090,9 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Abfrage in den Workflow (`db.query`, seit S59: Zeilen, Anzahl, erster Wert – deckt auch „Tabelle existiert“ und „Zeilen zählen“ ab) |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,
-`file.mkdir`, `file.list`; Umbenennen ist `file.move` mit neuem Dateinamen als Ziel. Packen und Entpacken übernehmen
+`file.mkdir`, `file.list`, seit S66 `file.read` (kleine Textdatei als Text, Zeilen oder JSON-Wert in den Workflow,
+`maxSize` 10 MB, Kodierung wie `csv.input`) und `file.write` (Text oder Wert als JSON; `replace` über eine temporäre
+Datei, `append`, `fail`; Kodierung mit oder ohne BOM, Windows-1252, UTF-16; Zeilenenden); Umbenennen ist `file.move` mit neuem Dateinamen als Ziel. Packen und Entpacken übernehmen
 seit S54 die Archiv-Actions (siehe unten).
 
 - **Pfade:** Platzhalter `*`, `?` und `[abc]` sind im letzten Teil des Pfads erlaubt (`C:\in\*.csv`); unter Windows

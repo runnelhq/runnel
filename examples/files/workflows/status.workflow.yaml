@@ -1,0 +1,41 @@
+# Reads a small configuration and writes a status file (S66):
+#   runnel run -v examples/files/workflows/status.workflow.yaml
+# - "settings" reads config/settings.json as a value (as: json); later actions use its
+#   fields, e.g. {{ results.settings.output.value.customers }}.
+# - "status" writes out/status.json as formatted JSON, replacing the file only once it is
+#   complete, so that another system never reads half of it.
+# - "log" appends one line per run to out/runs.log (ifExists: append, Windows line ends).
+kind: Workflow
+apiVersion: runnel/v1
+name: status
+actions:
+  - id: start
+    type: core.start
+  - id: settings
+    type: file.read
+    with:
+      path: config/settings.json
+      as: json
+  - id: files
+    type: file.list
+    with:
+      folder: inbox
+      pattern: "*.csv"
+  - id: status
+    type: file.write
+    with:
+      path: out/status.json
+      as: json
+      content: "{{ {'run': run.id, 'customers': results.settings.output.value.customers, 'files': len(results.files.output)} }}"
+  - id: log
+    type: file.write
+    with:
+      path: out/runs.log
+      content: "{{ formatDate(now(), 'yyyy-MM-dd HH:mm') }} {{ len(results.files.output) }} files\n"
+      lineEnds: crlf
+      ifExists: append
+links:
+  - { from: start, to: settings }
+  - { from: settings, to: files }
+  - { from: files, to: status }
+  - { from: status, to: log }
