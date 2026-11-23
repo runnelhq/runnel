@@ -18,6 +18,8 @@ export interface Schema {
   "x-runnel-connection"?: string[];
   /** The schema of this mapping by the value of the sibling field type, e.g. with: of a connection. */
   "x-runnel-variants"?: Record<string, Schema>;
+  /** The section of a form the field belongs to (x-runnel-group, S39c2a). */
+  "x-runnel-group"?: string;
 }
 
 /** Descriptor of an action or transform type (GET /catalog, ADR 0014). */

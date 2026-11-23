@@ -24,13 +24,13 @@ var sqlServerDefinition = connection.Definition{
 
 // SQLServer are the fields of a connection of type sqlserver.
 type SQLServer struct {
-	Host                   string `json:"host" doc:"Name or address of the server" schema:"required,example=db01.example.local"`
-	Port                   string `json:"port" doc:"TCP port; empty: 1433, or the port of the instance" schema:"example=1433"`
-	Instance               string `json:"instance" doc:"Named instance, e.g. SQLEXPRESS (needs the SQL Server Browser service); instead of a port"`
-	Database               string `json:"database" doc:"Name of the database" schema:"required,example=ERP"`
-	User                   string `json:"user" doc:"SQL Server login; empty: the Windows account Runnel runs as (Windows only)"`
-	Password               string `json:"password" doc:"Password of the login; use ${secret:NAME}" schema:"format=runnel-secret"`
-	Encrypt                string `json:"encrypt" doc:"Encryption of the connection: true, strict (TDS 8) or false (only the login)" schema:"enum=true|strict|false,default=true"`
-	TrustServerCertificate bool   `json:"trustServerCertificate" doc:"Accept any certificate of the server, e.g. a self-signed one; validate warns" schema:"default=false"`
-	ConnectTimeout         string `json:"connectTimeout" doc:"Longest time to connect" schema:"format=runnel-duration,default=30s"`
+	Host                   string `json:"host" doc:"Name or address of the server" schema:"required,example=db01.example.local,group=Server"`
+	Port                   string `json:"port" doc:"TCP port; empty: 1433, or the port of the instance" schema:"example=1433,group=Server"`
+	Instance               string `json:"instance" doc:"Named instance, e.g. SQLEXPRESS (needs the SQL Server Browser service); instead of a port" schema:"group=More"`
+	Database               string `json:"database" doc:"Name of the database" schema:"required,example=ERP,group=Server"`
+	User                   string `json:"user" doc:"SQL Server login; empty: the Windows account Runnel runs as (Windows only)" schema:"group=Sign-in"`
+	Password               string `json:"password" doc:"Password of the login; use ${secret:NAME}" schema:"format=runnel-secret,group=Sign-in"`
+	Encrypt                string `json:"encrypt" doc:"Encryption of the connection: true, strict (TDS 8) or false (only the login)" schema:"enum=true|strict|false,default=true,group=Security"`
+	TrustServerCertificate bool   `json:"trustServerCertificate" doc:"Accept any certificate of the server, e.g. a self-signed one; validate warns" schema:"default=false,group=Security"`
+	ConnectTimeout         string `json:"connectTimeout" doc:"Longest time to connect" schema:"format=runnel-duration,default=30s,group=More"`
 }

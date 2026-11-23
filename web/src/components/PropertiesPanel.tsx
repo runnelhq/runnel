@@ -582,7 +582,7 @@ function IdField(props: { id: string; taken: Set<string>; problems: Problem[]; o
 }
 
 /** A field of the configuration, rendered from its JSON Schema. */
-function SchemaField(props: {
+export function SchemaField(props: {
   name: string;
   schema: Schema;
   required: boolean;

@@ -518,3 +518,52 @@ export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
       return <FileIcon {...p} />;
   }
 }
+
+/** The sign of a connection type (mockup S39b): cylinder for databases, a page for SQLite, globe for http, envelope for smtp. */
+export function ConnectionIcon({ type, ...p }: P & { type: string }) {
+  switch (type) {
+    case "sqlite":
+      return (
+        <Icon {...p}>
+          <path d="M6 3h8l4 4v14H6zM14 3v4h4" />
+          <ellipse cx="12" cy="12" rx="3.5" ry="1.4" />
+          <path d="M8.5 12v4c0 .8 1.6 1.4 3.5 1.4s3.5-.6 3.5-1.4v-4" />
+        </Icon>
+      );
+    case "http":
+      return (
+        <Icon {...p}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+        </Icon>
+      );
+    case "smtp":
+      return (
+        <Icon {...p}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 7l9 6 9-6" />
+        </Icon>
+      );
+  }
+  return (
+    <Icon {...p}>
+      <ellipse cx="12" cy="6" rx="7" ry="2.8" />
+      <path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8" />
+    </Icon>
+  );
+}
+
+/** Test connection (mockup S39b): a plug. */
+export const PlugIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0zM12 17v4" />
+  </Icon>
+);
+
+/** The form view of a connection (mockup S39b). */
+export const FormIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <path d="M8 9h8M8 13h8M8 17h5" />
+  </Icon>
+);

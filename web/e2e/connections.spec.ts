@@ -75,6 +75,7 @@ test("a connection that is missing or of another type stays selectable and is ma
 test("a connection file suggests the fields of its type", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tree").getByText("e2e-api.yaml", { exact: true }).click();
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
   await expect(page.getByTestId("yaml-editor")).toBeVisible();
   // The Reference lists the fields of http under with:.
   const ref = page.getByRole("region", { name: "Reference" });
@@ -97,4 +98,50 @@ test("a connection file suggests the fields of its type", async ({ page }) => {
   // Hover describes a field of the type.
   await page.getByTestId("yaml-editor").getByText("baseUrl", { exact: true }).hover();
   await expect(page.getByTestId("yaml-hover")).toContainText("Base address of the API");
+});
+
+// The form of a connection (mockup S39b, S39c2a): fields of the type in sections, only
+// those of the chosen sign-in; a change writes only its line; Test connection with the
+// environment shows the result above the form.
+test("edits a connection in the form and tests it", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tree").getByText("e2e-api.yaml", { exact: true }).click();
+  const form = page.getByTestId("connection-form");
+  await expect(form.getByRole("heading", { name: "e2e-api" })).toBeVisible();
+  await expect(form).toContainText("HTTP API");
+  await expect(form.getByRole("region", { name: "API" }).locator('[data-field="with.baseUrl"]').getByRole("textbox")).toHaveText("https://api.example.com/");
+  // Only the fields of the chosen sign-in: none shows no token.
+  const signIn = form.getByRole("region", { name: "Sign-in" });
+  await expect(signIn.locator('[data-field="with.token"]')).toHaveCount(0);
+  await signIn.locator('[data-field="with.auth"]').getByRole("combobox").selectOption("bearer");
+  await expect(signIn.locator('[data-field="with.token"]')).toBeVisible();
+  // "More" is folded.
+  const more = form.getByRole("region", { name: "More" });
+  await expect(more).toContainText("headers");
+  await expect(more.locator('[data-field="with.headers"]')).toHaveCount(0);
+  // The change went into the text: one new line, the rest as it was.
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  await expect.poll(() => editorText(page)).toBe(files["connections/e2e-api.yaml"] + "  auth: bearer\n");
+  await page.getByRole("button", { name: "Form", exact: true }).click();
+
+  // Test connection: the saved file, with the environment chosen beside the button.
+  await page.route("**/api/v1/connections/e2e-api/test", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ environment: "prod" });
+    await route.fulfill({ json: { ok: false, message: "GET https://api.example.com/: the API refused the sign-in (401 Unauthorized)", environment: "prod", durationMs: 120 } });
+  });
+  await page.getByRole("combobox", { name: "Environment of the test" }).selectOption("prod");
+  await page.getByRole("button", { name: "Test connection" }).click();
+  const result = page.getByTestId("test-result");
+  await expect(result).toContainText("✕");
+  await expect(result).toContainText("The test failed");
+  await expect(result).toContainText("Environment prod · GET https://api.example.com/: the API refused the sign-in (401 Unauthorized)");
+});
+
+test("tests a database connection for real", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tree").getByText("e2e-shop.yaml", { exact: true }).click();
+  await page.getByRole("button", { name: "Test connection" }).click();
+  // The file does not exist: the test says a run creates it, and creates nothing.
+  await expect(page.getByTestId("test-result")).toContainText("✓");
+  await expect(page.getByTestId("test-result")).toContainText("does not exist yet; a run creates it");
 });
