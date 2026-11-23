@@ -78,6 +78,10 @@ func sample(s *schema.Schema) map[string]any {
 		if p.Schema.Type == "array" && slices.Contains(s.Required, p.Name) && p.Schema.Items != nil && p.Schema.Items.Type == "object" {
 			with[p.Name] = []any{sample(p.Schema.Items)}
 		}
+		// A required list of texts gets one sample entry too (e.g. the keys of db.upsert).
+		if p.Schema.Type == "array" && slices.Contains(s.Required, p.Name) && p.Schema.Items != nil && p.Schema.Items.Type == "string" {
+			with[p.Name] = []any{sampleValue(p.Schema.Items)}
+		}
 	}
 	return with
 }

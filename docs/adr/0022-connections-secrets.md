@@ -406,4 +406,15 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   `@name` in `$1, $2 …` (gleicher Name, gleiche Nummer). `validate` warnt bei abgeschalteter Prüfung oder
   Verschlüsselung (`trustServerCertificate`, `encrypt: false`, `sslMode: require|disable`). Felder wie `port` sind Text
   wie bei Actions, damit sowohl `port: 1433` als auch `port: ${DB_PORT}` gehen.
+- **S21, `db.table-output` und `db.upsert`:** Tabellen- und Spaltennamen werden nie als Parameter übergeben, daher nur
+  `tabelle` oder `schema.tabelle` aus Buchstaben, Ziffern und `_`; Runnel setzt sie in Anführungszeichen (`"x"`, bei
+  SQL Server `[x]`). Ohne `fields` schreibt der Transform alle Felder des Records außer denen mit `_` am Anfang
+  (z. B. `_error`). Je `commitSize` Records eine Transaktion (Standard 1000); `timeout` gilt je
+  Transaktion. Scheitert eine Transaktion, wird sie zurückgerollt; ohne Fehler-Link hält die Pipeline an, frühere
+  Transaktionen bleiben. Mit Fehler-Link wiederholt der Transform die Records einzeln, jeder in eigener Transaktion, und
+  gibt nur die fehlerhaften an den Link. Records gehen erst nach dem Commit weiter. Upsert: SQLite und PostgreSQL mit
+  `INSERT … ON CONFLICT (keys)`, das einen eindeutigen Index auf den Schlüsseln braucht (sonst Fehler der Datenbank);
+  SQL Server kennt das nicht, dort `UPDATE … WITH (UPDLOCK, SERIALIZABLE)` und, wenn keine Zeile betroffen war,
+  `INSERT` – `MERGE` ist bei parallelen Läufen fehleranfällig. Ohne `update` werden vorhandene Zeilen nicht geändert.
+  Datumswerte gehen als Zeitpunkt, Listen und Objekte als JSON-Text an den Treiber.
 

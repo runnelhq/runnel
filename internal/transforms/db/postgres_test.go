@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -69,5 +70,48 @@ func TestPostgres(t *testing.T) {
 	}
 	if v, _ := r.Get("ref"); v != "6f1c1d3e-6b0e-4d5e-9a3c-2b1f0e9d8c7b" {
 		t.Errorf("ref = %#v", v)
+	}
+}
+
+// TestPostgresUpsert writes with db.upsert (S21) on PostgreSQL: $n placeholders, ON
+// CONFLICT, dates and JSON; like TestPostgres only with RUNNEL_TEST_POSTGRES.
+func TestPostgresUpsert(t *testing.T) {
+	spec := os.Getenv("RUNNEL_TEST_POSTGRES")
+	if spec == "" {
+		t.Skip("RUNNEL_TEST_POSTGRES is not set (host:port:database:user:password)")
+	}
+	f := strings.SplitN(spec, ":", 5)
+	conn := connection.Resolved{Name: "pg", Type: connections.TypePostgres, With: map[string]any{
+		"host": f[0], "port": f[1], "database": f[2], "user": f[3], "password": f[4], "sslMode": "disable",
+	}}
+	ctx := context.Background()
+	db, err := sqldb.Open(ctx, connections.Builtin(), conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS runnel_upsert; CREATE TABLE runnel_upsert (id INT PRIMARY KEY, customer TEXT, amount NUMERIC(10,2), day DATE, tags JSONB)"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.ExecContext(ctx, "DROP TABLE IF EXISTS runnel_upsert") })
+	rec := func(customer, amount string) record.Record {
+		r := order(1, customer, amount)
+		r.Set("day", record.DateOf(time.Date(2026, 11, 23, 0, 0, 0, 0, time.UTC)))
+		r.Set("tags", []any{"a"})
+		return r
+	}
+	for _, r := range []record.Record{rec("Ada", "1.50"), rec("Grace", "2.50")} {
+		if _, _, _, err := write(t, upsertDefinition, conn, map[string]any{"table": "runnel_upsert", "keys": []any{"id"}}, false, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	recs, err := readResolved(ctx, conn, map[string]any{"sql": "SELECT customer, amount, day, tags FROM runnel_upsert"})
+	if err != nil || len(recs) != 1 {
+		t.Fatalf("%v, %v", recs, err)
+	}
+	if v, _ := recs[0].Get("customer"); v != "Grace" {
+		t.Errorf("customer = %#v", v)
+	}
+	if v, _ := recs[0].Get("amount"); !v.(decimal.Decimal).Equal(decimal.RequireFromString("2.5")) {
+		t.Errorf("amount = %#v", v)
 	}
 }

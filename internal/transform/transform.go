@@ -137,6 +137,10 @@ func (o *Output) WithErrorLinks(send func(record.Record) error) *Output {
 	return o
 }
 
+// HasErrorLinks reports whether Fail sends records to error links (else it returns the
+// error and the pipeline stops).
+func (o *Output) HasErrorLinks() bool { return o.fail != nil }
+
 // Fail reports a record that could not be processed, e.g. a value that cannot be
 // converted. err is the message as it would stop the pipeline ("record 3, field
 // "amount": …"). With an error link, the record goes there with ErrorField,
