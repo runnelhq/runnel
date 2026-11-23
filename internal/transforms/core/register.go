@@ -24,6 +24,7 @@ func Register(r *transform.Registry) {
 	r.Register(groupByDefinition)
 	r.Register(dedupeDefinition)
 	r.Register(streamLookupDefinition)
+	r.Register(mergeJoinDefinition)
 	r.Register(fromResultDefinition)
 	r.Register(toResultDefinition)
 	r.Register(logDefinition)

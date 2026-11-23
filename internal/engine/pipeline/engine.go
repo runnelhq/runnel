@@ -176,6 +176,7 @@ func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
 	}
 	diags := r.deriveSchemas()
 	diags = append(diags, checkInfoLinks(p, opts.Registry)...)
+	diags = append(diags, checkNamedInputs(p, opts.Registry)...)
 	for i, l := range p.Links {
 		if l.Type != model.ErrorLink {
 			continue
@@ -413,6 +414,16 @@ func (r *Runner) deriveSchemas() model.Errors {
 				With(transform.ErrorFieldField, record.String).
 				With(transform.ErrorTransformField, record.String)
 		}
+		named := map[string]record.Schema{}
+		for _, x := range inputs[i] {
+			switch {
+			case x.info:
+			case x.error:
+				named[p.Transforms[x.from].ID] = errSchemas[x.from]
+			default:
+				named[p.Transforms[x.from].ID] = r.schemas[x.from]
+			}
+		}
 		t := p.Transforms[i]
 		r.schemas[i] = record.OpenSchema()
 		if init, ok := r.transforms[i].(transform.Initializer); ok {
@@ -420,12 +431,13 @@ func (r *Runner) deriveSchemas() model.Errors {
 			ic.Targets = targets[i]
 			ic.Strict = p.Settings.Strict
 			ic.Info = r.infos[i]
+			ic.Inputs = named
 			out, err := init.Init(ic)
 			// The copies get the same Init; their problems are those of the first one.
 			for _, c := range r.copies[i] {
 				if ci, ok := c.(transform.Initializer); ok {
 					cic := transform.NewInitContext(record.Merge(in...))
-					cic.Targets, cic.Strict, cic.Info = targets[i], ic.Strict, ic.Info
+					cic.Targets, cic.Strict, cic.Info, cic.Inputs = targets[i], ic.Strict, ic.Info, named
 					_, _ = ci.Init(cic)
 				}
 			}
@@ -662,7 +674,18 @@ func (r *Runner) Run(parent context.Context) Result {
 
 	var wg sync.WaitGroup
 	for i, t := range r.p.Transforms {
-		in := r.input(ctx, links, ins[i], &wg)
+		// A transform with NamedInputs reads each incoming link on its own (S23c).
+		var named map[string]<-chan transform.Batch
+		var in <-chan transform.Batch
+		if def, _ := r.opts.Registry.Lookup(t.Type); def.NamedInputs {
+			named = make(map[string]<-chan transform.Batch, len(ins[i]))
+			for _, li := range ins[i] {
+				named[r.p.Links[li].From] = links[li]
+			}
+			in = r.input(ctx, links, nil, &wg)
+		} else {
+			in = r.input(ctx, links, ins[i], &wg)
+		}
 		// The outgoing links of the transform: data links and error links.
 		var dataLinks, errLinks []outLink
 		for _, li := range outs[i] {
@@ -762,6 +785,9 @@ func (r *Runner) Run(parent context.Context) Result {
 				if li, ok := info[i]; ok {
 					out.WithInfo(r.p.Links[li].From, links[li])
 				}
+				if named != nil {
+					out.WithInputs(named)
+				}
 				if len(errLinks) > 0 {
 					out.WithErrorLinks(func(rec record.Record) error {
 						counts[i].errors.Add(1)
@@ -822,6 +848,10 @@ func (r *Runner) Run(parent context.Context) Result {
 			}
 			if li, ok := info[i]; ok {
 				for range links[li] {
+				}
+			}
+			for _, ch := range named {
+				for range ch {
 				}
 			}
 			c := Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load(), Info: counts[i].info.Load()}

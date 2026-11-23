@@ -116,3 +116,30 @@ test("runs with the lookup data and shows its count", async ({ page, request }) 
   await page.getByTestId("node-lookup").click();
   await expect(panel(page).getByTestId("run-counts")).toHaveText("3lookup records4read4written");
 });
+
+// core.merge-join (S23c): left and right offer the transforms of the incoming data links.
+test("offers the incoming transforms as left and right of a merge join", async ({ page, request }) => {
+  const join = `kind: Pipeline
+apiVersion: runnel/v1
+name: lookup
+transforms:
+  - { id: orders, type: core.generate-rows, with: { rows: 2, rowNumberField: id } }
+  - { id: customers, type: core.generate-rows, with: { rows: 2, rowNumberField: id } }
+  - id: join
+    type: core.merge-join
+    with:
+      left: orders
+      keys:
+        - { left: id }
+links:
+  - { from: orders, to: join }
+  - { from: customers, to: join }
+`;
+  await open(page, request, join.replace("id: join", "id: lookup").replaceAll("to: join", "to: lookup"));
+  await page.getByTestId("node-lookup").click();
+  const right = panel(page).locator('[data-field="with.right"] select');
+  await expect(right.locator("option")).toHaveText(["Not set", "orders", "customers"]);
+  await right.selectOption("customers");
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  await expect(page.locator(".cm-content")).toContainText("right: customers");
+});

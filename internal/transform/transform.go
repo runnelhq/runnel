@@ -45,6 +45,7 @@ type Output struct {
 	conns   connection.Resolver
 	info    <-chan Batch
 	infoSrc string
+	inputs  map[string]<-chan Batch
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
@@ -79,6 +80,18 @@ func (o *Output) WithInfo(from string, batches <-chan Batch) *Output {
 // the transform they come from; nil without an info link. The transform reads it to the
 // end before it reads its data links: records on the data links wait until then.
 func (o *Output) Info() (batches <-chan Batch, from string) { return o.info, o.infoSrc }
+
+// WithInputs sets the incoming links of a transform with NamedInputs, by the id of the
+// transform they come from (S23c); the engine sets it.
+func (o *Output) WithInputs(inputs map[string]<-chan Batch) *Output {
+	o.inputs = inputs
+	return o
+}
+
+// Input returns the batches of the data link from the transform with the id from, for
+// transforms with NamedInputs (e.g. core.merge-join, which reads its two inputs in step);
+// nil if no data link comes from there. The channel passed to Process is then empty.
+func (o *Output) Input(from string) <-chan Batch { return o.inputs[from] }
 
 // WithTargets sets how EmitTo reaches a single outgoing data link; the engine sets it.
 func (o *Output) WithTargets(emitTo func(target string, r record.Record) error) *Output {
@@ -231,6 +244,10 @@ type Definition struct {
 	// because each record is handled on its own; not for inputs and outputs, which would
 	// read or write twice.
 	Parallel bool
+	// NamedInputs is set for transforms that read each incoming data link on its own,
+	// by the transform it comes from (Output.Input), instead of as one stream (S23c), e.g.
+	// core.merge-join.
+	NamedInputs bool
 	// InfoInput is set for transforms that take lookup data over exactly one info link
 	// (S23b), e.g. core.stream-lookup; they read it with Output.Info.
 	InfoInput bool

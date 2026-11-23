@@ -188,6 +188,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
   const listEnv = {
     fields: props.schemas?.[action.id]?.input?.fields ?? null,
     infoFields: props.schemas?.[action.id]?.info?.fields ?? null,
+    sources: [...new Set((workflow.links ?? []).filter((l) => l.to === action.id && l.type !== "info" && !l.disabled).map((l) => l.from))],
     targets: (workflow.links ?? []).filter((l) => l.from === action.id && (l.type ?? "data") === "data" && !l.disabled).map((l) => l.to),
   };
   const field = ([name, s]: [string, Schema]) => (
@@ -598,7 +599,13 @@ function SchemaField(props: {
   onChangeList?: (list: KeyValue[][] | null) => void;
   onChangeTexts?: (texts: string[] | null) => void;
   /** Fields of the incoming records and targets of the data links, offered in lists (E14b). */
-  listEnv?: { fields: { name: string; type?: string }[] | null; targets: string[]; infoFields?: { name: string; type?: string }[] | null };
+  listEnv?: {
+    fields: { name: string; type?: string }[] | null;
+    targets: string[];
+    infoFields?: { name: string; type?: string }[] | null;
+    /** Ids of the transforms the data links to this one come from (runnel-source, S23c). */
+    sources?: string[];
+  };
 }) {
   const { name, schema: s, value } = props;
   const [localError, setLocalError] = useState<string | null>(null);
@@ -665,6 +672,32 @@ function SchemaField(props: {
         problems={props.problems}
         onChange={(on) => props.onChange(on ? true : null)}
       />
+    );
+  }
+  // The transform a data link to this one comes from, e.g. left and right of core.merge-join (S23c).
+  if (s.format === "runnel-source" && props.listEnv?.sources) {
+    const current = value === undefined || value === null ? "" : String(value);
+    const sources = props.listEnv.sources;
+    const options = current === "" || sources.includes(current) ? sources : [...sources, current];
+    return (
+      <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={props.problems}>
+        {(p) => (
+          <select
+            id={p.id}
+            value={current}
+            aria-invalid={p.invalid}
+            onChange={(e) => props.onChange(e.target.value === "" ? null : e.target.value)}
+            className={inputClass(p.invalid) + " font-mono" + (current === "" ? " text-muted-foreground" : "")}
+          >
+            <option value="">Not set</option>
+            {options.map((id) => (
+              <option key={id} value={id}>
+                {sources.includes(id) ? id : `${id} (no data link)`}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
     );
   }
   if (s.enum && s.enum.length > 0) {
