@@ -1,0 +1,95 @@
+# Branches in a pipeline, the usual way (best practice):
+#   runnel run examples/pipelines/pipelines/routing.pipeline.yaml
+# 1. Errors as a branch: a row whose amount is not a number ("k. A.") goes over the error
+#    link to out/orders-rejected.csv instead of stopping the pipeline.
+# 2. Split by condition with core.switch: every record goes to exactly one branch, the
+#    first case that is true decides (unpaid before large). A default catches the rest,
+#    so no record is dropped without notice.
+# 3. Each branch sets the same fields (route, action), so that the branches can be joined.
+# 4. Join: several data links into one transform are read as one stream; the order
+#    between the branches is not fixed, so core.sort sets it again.
+# 5. Copy to two targets: "sorted" has two outgoing links; each gets every record
+#    (distribution: copy, the default) – the file and the counts per route.
+kind: Pipeline
+apiVersion: runnel/v1
+name: routing
+parameters:
+  - name: LARGE
+    description: Amount from which an order needs a release
+    type: number
+    default: "10000"
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: sales/orders.csv
+      delimiter: ";"
+      fields:
+        - { name: Nr, type: int }
+        - { name: Kunde }
+        - { name: Betrag, type: decimal, format: "#.##0,00" }
+        - { name: Datum, type: date, format: dd.MM.yyyy }
+        - { name: Bezahlt }
+  - id: rejected
+    type: csv.output
+    with:
+      path: out/orders-rejected.csv
+      delimiter: ";"
+  - id: route
+    type: core.switch
+    with:
+      cases:
+        - { when: "{{ record.Bezahlt == 'nein' }}", to: unpaid }
+        - { when: "{{ record.Betrag >= params.LARGE }}", to: large }
+      default: normal
+  - id: unpaid
+    type: core.calculate
+    with:
+      fields:
+        - { name: route, value: "{{ 'unpaid' }}" }
+        - { name: action, value: "Send a reminder for {{ record.Betrag }}" }
+  - id: large
+    type: core.calculate
+    with:
+      fields:
+        - { name: route, value: "{{ 'large' }}" }
+        - { name: action, value: "{{ 'Needs a release' }}" }
+  - id: normal
+    type: core.calculate
+    with:
+      fields:
+        - { name: route, value: "{{ 'normal' }}" }
+        - { name: action, value: "{{ '' }}" }
+  - id: sorted
+    type: core.sort
+    with:
+      fields:
+        - { name: Nr }
+  - id: write
+    type: csv.output
+    with:
+      path: out/orders-routed.csv
+      delimiter: ";"
+  - id: per-route
+    type: core.group-by
+    with:
+      groupBy: [route]
+      aggregates:
+        - { name: orders, function: count }
+        - { name: amount, function: sum, field: Betrag }
+  - id: show
+    type: core.log
+    with:
+      fields: [route, orders, amount]
+links:
+  - { from: read, to: route }
+  - { from: read, to: rejected, type: error }
+  - { from: route, to: unpaid }
+  - { from: route, to: large }
+  - { from: route, to: normal }
+  - { from: unpaid, to: sorted }
+  - { from: large, to: sorted }
+  - { from: normal, to: sorted }
+  - { from: sorted, to: write }
+  - { from: sorted, to: per-route }
+  - { from: per-route, to: show }

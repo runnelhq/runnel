@@ -11,6 +11,7 @@ pipeline from this list, or run it with `runnel run` (paths are relative to this
 | [orders](pipelines/orders.pipeline.yaml) | reads a CSV file in German format and keeps large orders |
 | [customers](pipelines/customers.pipeline.yaml) | prepares customers for a CRM import; invalid ones go to an error link |
 | [segments](pipelines/segments.pipeline.yaml) | splits customers by revenue with `core.switch` |
+| [routing](pipelines/routing.pipeline.yaml) | branches the usual way: errors to their own file, `core.switch` with a default, the same fields in every branch, joined again and sorted, copied to a file and to counts per route |
 | [daily](pipelines/daily.pipeline.yaml) | groups orders by day and sorts them |
 
 The workflow [import](workflows/import.workflow.yaml) runs `customers` and evaluates its counts.
