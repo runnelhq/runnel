@@ -1,0 +1,40 @@
+# Adds the totals of the customer (table totals, see the pipeline totals) to some
+# generated orders with db.lookup (S23a). Customers without a row keep the defaults.
+# Run the workflow orders and the pipeline totals first, then:
+#   runnel run -v examples/database/pipelines/enrich.pipeline.yaml
+kind: Pipeline
+apiVersion: runnel/v1
+name: enrich
+transforms:
+  - id: orders
+    type: core.generate-rows
+    with:
+      rows: 3
+      fields:
+        - { name: customer, value: Grace }
+  - id: number
+    type: core.sequence
+    with:
+      name: line
+  - id: who
+    type: core.calculate
+    with:
+      fields:
+        - { name: customer, value: "{{ record.line == 2 ? 'Ada' : record.line == 3 ? 'Nobody' : record.customer }}" }
+  - id: lookup
+    type: db.lookup
+    with:
+      connection: shop
+      table: totals
+      keys:
+        - { field: customer }
+      return:
+        - { column: orders, as: customerOrders, default: 0 }
+        - { column: total, as: customerTotal }
+  - id: log
+    type: core.log
+links:
+  - { from: orders, to: number }
+  - { from: number, to: who }
+  - { from: who, to: lookup }
+  - { from: lookup, to: log }

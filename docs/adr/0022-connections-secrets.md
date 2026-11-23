@@ -417,4 +417,10 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   SQL Server kennt das nicht, dort `UPDATE … WITH (UPDLOCK, SERIALIZABLE)` und, wenn keine Zeile betroffen war,
   `INSERT` – `MERGE` ist bei parallelen Läufen fehleranfällig. Ohne `update` werden vorhandene Zeilen nicht geändert.
   Datumswerte gehen als Zeitpunkt, Listen und Objekte als JSON-Text an den Treiber.
+- **S23a, `db.lookup`:** Eine vorbereitete Abfrage `SELECT … FROM tabelle WHERE spalte = @p …` je Schlüssel, mit
+  denselben Regeln für Namen wie S21. Die Ergebnisse (auch „keine Zeile“) hält ein LRU-Cache je Kopie des Transforms
+  (`cache`, Standard 1000 Schlüssel, `0` = ohne); Änderungen an der Tabelle während des Laufs sieht der Transform daher
+  erst, wenn der Schlüssel aus dem Cache fällt. Ein leerer Schlüssel passt wie in SQL zu keiner Zeile und fragt nicht.
+  Bei mehreren Treffern nimmt `multiple: first` die erste Zeile, die die Datenbank liefert (ohne feste Reihenfolge).
+  Datenbankfehler halten die Pipeline an; nur „keine Zeile“ und „mehrere Zeilen“ gehen an den Fehler-Link.
 
