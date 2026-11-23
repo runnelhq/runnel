@@ -38,6 +38,8 @@ type Project struct {
 	Dir string `yaml:"-" json:"-"`
 	// Environments by name (file name without extension).
 	Environments map[string]*Environment `yaml:"-" json:"environments,omitempty"`
+	// Connections by name (files in connections/, ADR 0022); those without errors.
+	Connections map[string]*Connection `yaml:"-" json:"-"`
 
 	src *source
 }
@@ -135,9 +137,15 @@ func LoadProject(dir string) (*Project, error) {
 		envs[env.Name] = env
 	}
 
+	conns, err := LoadConnections(dir)
+	if err := collect(err); err != nil {
+		return nil, err
+	}
+
 	if p != nil {
 		p.Dir = dir
 		p.Environments = envs
+		p.Connections = conns
 		if d := p.DefaultEnvironment; d != "" && envs[d] == nil && !hasFileErrors(errs, environmentFile(dir, d)) {
 			errs = append(errs, p.src.errorf("$.defaultEnvironment", "default environment %q not found (expected %s)",
 				d, environmentFile(dir, d)))

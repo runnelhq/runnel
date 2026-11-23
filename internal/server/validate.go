@@ -103,7 +103,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 	kind := fileKind(name)
 	if kind == "other" {
-		writeError(w, http.StatusBadRequest, "only workflows, pipelines, project.yaml, environments and triggers can be validated")
+		writeError(w, http.StatusBadRequest, "only workflows, pipelines, project.yaml, environments, triggers and connections can be validated")
 		return
 	}
 	var data []byte
@@ -113,7 +113,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if kind == "project" || kind == "environment" || kind == "trigger" {
+	if kind == "project" || kind == "environment" || kind == "trigger" || kind == "connection" {
 		diags, err := s.validateText(kind, name, data)
 		if err != nil {
 			writeErr(w, err)

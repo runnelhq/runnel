@@ -11,7 +11,7 @@ export interface Entry {
 }
 
 /** Kinds of files; documents (.md) and images since E17. */
-export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "document" | "image" | "other";
+export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "connection" | "document" | "image" | "other";
 
 /** Error of the file API with its HTTP status (404: file not found). */
 export class APIError extends Error {
@@ -84,6 +84,8 @@ export function kindOf(path: string): FileKind {
   if (/^environments\/[^/]+\.yaml$/.test(path)) return "environment";
   // Triggers also in subfolders of triggers/ (E12), not in hidden ones.
   if (/^triggers\/([^./][^/]*\/)*[^./][^/]*\.yaml$/.test(path)) return "trigger";
+  // Connections (S20a, ADR 0022): connections/<name>.yaml.
+  if (/^connections\/[^/]+\.yaml$/.test(path)) return "connection";
   if (/\.md$/i.test(path)) return "document";
   if (isImage(path)) return "image";
   return "other";
@@ -95,6 +97,7 @@ export const kindLabel: Record<FileKind, string> = {
   project: "Project",
   environment: "Environment",
   trigger: "Trigger",
+  connection: "Connection",
   document: "Document",
   image: "Image",
   other: "File",

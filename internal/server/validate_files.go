@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/triggers"
 )
 
@@ -28,6 +29,14 @@ func (s *Server) validateText(kind, name string, data []byte) (model.Errors, err
 		var env *model.Environment
 		if env, err = model.ReadEnvironment(name, data); err == nil {
 			return env.InlineSecretWarnings(), nil
+		}
+	case "connection":
+		var c *model.Connection
+		if c, err = model.ReadConnection(name, data); err == nil {
+			p, _ := model.LoadProject(s.dir)
+			diags := runs.CheckConnection(c, p, "")
+			diags.Sort()
+			return diags, nil
 		}
 	case "trigger":
 		var t *model.Trigger

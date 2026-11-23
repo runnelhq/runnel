@@ -22,6 +22,8 @@ actions / files
 actions / network
   http.request  HTTP Request   Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer
   http.respond  HTTP Response  Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
+actions / database
+  db.execute  Execute SQL  Runs an SQL statement on a database, e.g. to insert, update or delete rows
 transforms / input
   core.generate-rows  Generate Rows  Creates records with constant fields
   csv.input           CSV Input      Reads the rows of a CSV file as records

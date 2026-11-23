@@ -101,8 +101,10 @@ func Prepare(spec Spec) (*Prepared, error) {
 	}
 	p.Workflow = w
 	diags = append(diags, CheckCalls(w, spec.ProjectDir, spec.file())...)
-	// ${secret:…} outside the fields for secrets stops the run before it starts (ADR 0022).
+	// ${secret:…} outside the fields for secrets and ${…} in SQL stop the run before it
+	// starts (ADR 0022).
 	diags = append(diags, w.CheckSecrets(ActionSecretField(spec.Registry), nil)...)
+	diags = append(diags, w.CheckSQL(ActionSQLField(spec.Registry))...)
 	if diags.HasErrors() {
 		diags.Sort()
 		return p, diags
@@ -132,11 +134,16 @@ func Prepare(spec Spec) (*Prepared, error) {
 	if errs := resolveSecrets(w, scope, spec.Registry); len(errs) > 0 {
 		return p, errs
 	}
+	conns := connectionResolver(p.Project, p.Env, mask)
+	if errs := resolveConnections(w, conns, spec.Registry); len(errs) > 0 {
+		return p, errs
+	}
 	p.Runner, err = workflow.Prepare(w, workflow.Options{
 		Registry:    spec.Registry,
 		DefaultJoin: defaultJoin,
 		Scope:       scope,
 		Mask:        mask,
+		Connections: conns,
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
 		Environment: envName,

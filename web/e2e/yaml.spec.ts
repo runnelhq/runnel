@@ -179,6 +179,27 @@ test.describe("other files of the project", () => {
     await expect(page.locator(".ry-tooltip")).toContainText("nope.workflow.yaml");
   });
 
+  // Connections (S20a): edited like the other files, checked against their type.
+  test("edits a connection and checks its fields", async ({ page, request }) => {
+    const url = "/api/v1/files/connections/e2e-db.yaml";
+    await request.put(url, {
+      headers: { "If-Match": "*" },
+      data: "kind: Connection\napiVersion: runnel/v1\nname: e2e-db\ntype: sqlite\nwith:\n  path: out/e2e.db\n",
+    });
+    try {
+      await page.goto("/");
+      await page.getByRole("tree").getByText("e2e-db.yaml", { exact: true }).click();
+      await expect(page.getByTestId("kind")).toHaveText("Connection");
+      await expect(page.getByText("Read-only")).toHaveCount(0);
+      await expect(page.getByRole("region", { name: "Reference" }).getByTestId("field-type")).toContainText("✓ line 4");
+      await retype(page, "path: out/e2e.db", "path".length + ": out/e2e.db".length, "file: x.db");
+      await expect(page.getByTestId("error-count")).toHaveText("✖ 1");
+      await expect(page.locator(".ry-tooltip")).toContainText('sqlite connection: unknown field "file"');
+    } finally {
+      await request.delete(url);
+    }
+  });
+
   test("other files stay read-only", async ({ page, request }) => {
     await request.put("/api/v1/files/notes.txt", { headers: { "If-Match": "*" }, data: "notes\n" });
     await page.goto("/");

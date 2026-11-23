@@ -1,0 +1,7 @@
+# Example for connections and SQL (S20a). Run it with:
+#   runnel run -v examples/database/workflows/orders.workflow.yaml
+#   runnel run -v --param CUSTOMER=Ada --param AMOUNT=99.90 examples/database/workflows/orders.workflow.yaml
+kind: Project
+apiVersion: runnel/v1
+name: database
+description: Writes orders into an SQLite database through a connection

@@ -9,7 +9,7 @@ import type { Schema } from "./catalog";
  */
 
 /** File kinds with a reference: their schemas come from GET /schemas/{kind}. */
-export type ReferenceKind = "project" | "environment" | "trigger";
+export type ReferenceKind = "project" | "environment" | "trigger" | "connection";
 
 const schemas = new Map<ReferenceKind, Promise<Schema>>();
 

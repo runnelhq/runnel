@@ -9,9 +9,10 @@ var fileFormats = map[string]any{
 	"project":     Project{},
 	"environment": Environment{},
 	"trigger":     Trigger{},
+	"connection":  Connection{},
 }
 
-// FileFormat returns the struct of a file kind (project, environment, trigger) for its
+// FileFormat returns the struct of a file kind (project, environment, trigger, connection) for its
 // schema; false if the kind has none.
 func FileFormat(kind string) (any, bool) {
 	f, ok := fileFormats[kind]

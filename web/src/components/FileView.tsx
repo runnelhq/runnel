@@ -138,7 +138,7 @@ export function FileView(props: {
   // Files edited as text in the YAML view (E9, E10): graphs and the other files of a project.
   // Documents (E17) show "canvas" as the formatted view ("Preview") and "yaml" as the text.
   const isDoc = fileKind === "document";
-  const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger";
+  const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger" || fileKind === "connection";
   const [view, setView] = useState<View>(isGraph || isDoc ? "canvas" : "yaml");
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
@@ -682,7 +682,8 @@ export function FileView(props: {
 
   // The reference (E18b): which file it helps with, and its requests to this file.
   const { onReference } = props;
-  const refKind = fileKind === "project" || fileKind === "environment" || fileKind === "trigger" ? fileKind : null;
+  const refKind =
+    fileKind === "project" || fileKind === "environment" || fileKind === "trigger" || fileKind === "connection" ? fileKind : null;
   // Suggestions and hover in the YAML editor (E19): the schema of the file kind or the catalog.
   const refSchema = useSchema(refKind);
   const catalog = useCatalog(graphKind ?? "workflow");
