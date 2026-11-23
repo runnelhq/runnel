@@ -171,6 +171,66 @@ Prüfen mit der [GitHub CLI](https://cli.github.com/):
 gh attestation verify runnel_0.1.0_windows_amd64.zip --repo runnelhq/runnel
 ```
 
+### Aktualisieren
+
+Ein Update tauscht nur die `runnel.exe`; der Editor steckt in ihr. Projektordner, Logs und Zertifikate bleiben, wo sie
+sind. Ein `runnel update` ist geplant (Backlog), bis dahin geht es so:
+
+**1. Laden und prüfen.** Das ZIP der neuen Version und `SHA256SUMS` aus den
+[Releases](https://github.com/runnelhq/runnel/releases) laden. Die Prüfsumme muss mit der Zeile in `SHA256SUMS`
+übereinstimmen; die Herkunft prüft `gh attestation verify` (siehe oben).
+
+```powershell
+Get-FileHash .\runnel_0.2.0_windows_amd64.zip -Algorithm SHA256
+```
+
+**2. Vorher testen.** Das ZIP in einen eigenen Ordner entpacken und das Projekt mit der neuen Version prüfen, während
+die alte noch läuft. Neue Meldungen zeigen, was vor dem Wechsel anzupassen ist; die Release-Notizen nennen die
+Änderungen.
+
+```powershell
+.\runnel_0.2.0_windows_amd64\runnel.exe validate D:\flows
+```
+
+**3. Tauschen (Konsole „als Administrator“).** Der Dienst startet immer die `runnel.exe`, mit der er installiert wurde
+– `runnel service status` zeigt sie unter `Command`. Genau diese Datei wird ersetzt; die alte bleibt als
+`runnel-old.exe` für den Rückweg.
+
+```powershell
+runnel service stop
+```
+
+```powershell
+Rename-Item C:\Runnel\runnel.exe runnel-old.exe
+```
+
+```powershell
+Copy-Item .\runnel_0.2.0_windows_amd64\runnel.exe C:\Runnel\runnel.exe
+```
+
+```powershell
+C:\Runnel\runnel.exe service start
+```
+
+**4. Kontrollieren.** `C:\Runnel\runnel.exe version` zeigt die neue Version, `runnel service status` den Zustand
+`running`; im Log (`%ProgramData%\runnel\logs\<name>.log`) steht der neue Start. Im Browser den Editor neu laden
+(Strg+F5), damit er die neue Oberfläche holt; die Statusleiste unten rechts nennt die Version des Servers.
+
+**Gut zu wissen:**
+
+- **Stopp:** `service stop` wartet bis zu 30 s (`--stop-timeout` beim Installieren) auf laufende Runs und bricht sie
+  danach ab. Am besten außerhalb der Zeitpläne wechseln.
+- **Während des Wechsels:** Zeitpunkte von Cron- und Interval-Triggern entfallen (Nachholen steht im Backlog); neue
+  Dateien in überwachten Ordnern verarbeitet der Dienst nach dem Start (`existing: process`); Aufrufe von HTTP-Triggern
+  scheitern, bis er wieder läuft.
+- **Läufe:** Die Liste der Läufe liegt nur im Speicher und beginnt nach dem Neustart leer (Run-Historie: S26).
+- **Mehrere Dienste** (`--name`), die dieselbe `runnel.exe` starten, vorher alle stoppen – Windows sperrt die Datei,
+  solange einer läuft.
+- **Ohne Dienst:** `runnel serve` mit Strg+C beenden, die Datei ersetzen, neu starten.
+- **Zurück:** Dienst stoppen, `runnel-old.exe` wieder in `runnel.exe` umbenennen, Dienst starten.
+- **Anderer Ordner:** Liegt die neue Version woanders, den Dienst mit ihr neu einrichten (`service uninstall`, dann
+  `service install` mit denselben Optionen); er startet sonst weiter die alte Datei.
+
 ## Lizenz
 
 [MIT](LICENSE)
