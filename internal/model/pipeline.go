@@ -82,7 +82,8 @@ const (
 	DataLink LinkType = "data"
 	// ErrorLink receives the records a transform could not process (roadmap S17).
 	ErrorLink LinkType = "error"
-	// InfoLink is a side input, e.g. the data of a lookup (roadmap S23).
+	// InfoLink is a side input, e.g. the data of a lookup (roadmap S23b): the transform
+	// reads it completely before its data links.
 	InfoLink LinkType = "info"
 )
 
@@ -90,7 +91,8 @@ const (
 type PipelineLink struct {
 	From string `yaml:"from" json:"from"`
 	To   string `yaml:"to" json:"to"`
-	// Type is data (default) or error; info is reserved for a later step.
+	// Type is data (default), error or info (lookup data for transforms that take it,
+	// S23b).
 	Type LinkType `yaml:"type,omitempty" json:"type,omitempty"`
 }
 
@@ -192,11 +194,9 @@ func (p *Pipeline) validate() error {
 			add(path, `%s: missing required field "to"`, label)
 		}
 		switch l.Type {
-		case "", DataLink, ErrorLink:
-		case InfoLink:
-			add(path+".type", "%s: info links are not supported yet (roadmap S23)", label)
+		case "", DataLink, ErrorLink, InfoLink:
 		default:
-			add(path+".type", "%s: invalid link type %q (expected data or error)", label, l.Type)
+			add(path+".type", "%s: invalid link type %q (expected data, error or info)", label, l.Type)
 		}
 	}
 	return errs.errOrNil()

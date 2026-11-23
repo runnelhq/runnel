@@ -28,7 +28,7 @@ Stand heute:
 - **Ziele:** Sie liegen immer im Projektordner und lassen sich mit `allowedTargets` einschränken (ADR 0008, Nachtrag
   S25b).
 - **Pipeline-Engine:** eine Goroutine je Transform, gepufferte Kanäle mit Batches und Backpressure.
-- **Links:** Es gibt Daten- und Fehler-Links. `info` ist für Lookups (S23) reserviert. Verschiedene Ausgänge eines
+- **Links:** Es gibt Daten- und Fehler-Links. `info` ist für Lookups (S23) reserviert (umgesetzt mit S23b1, siehe Nachtrag). Verschiedene Ausgänge eines
   Transforms gibt es bisher nur bei `core.switch`: Felder mit `format: runnel-target` (`to:`) nennen die Transforms,
   zu denen ein Daten-Link führt.
 
@@ -160,3 +160,21 @@ Die Schritte und ihre Nummern stehen in der Roadmap.
 - Verschachtelte Läufe machen Log und Zähler tiefer. Bis S26 (Lauf-Historie mit `parent_run_id`) sieht man die
   Unter-Pipeline nur über das Log.
 - Mapping und Executor im Canvas brauchen ein Mockup, bevor Editor-Teile umgesetzt werden.
+
+## Nachtrag 2026-11-23 (S23b1): Info-Links
+
+Abgestimmt mit dem Maintainer (Mockup S23b).
+
+- **Bedeutung:** Ein Info-Link (`type: info`) bringt Nachschlagedaten zu einem Transform, der sie annimmt
+  (`InfoInput` in der Definition, z. B. `core.stream-lookup`). Je Transform genau einer; ein Info-Link zu einem anderen
+  Transform, ein zweiter oder ein fehlender ist ein Fehler bei `validate` und vor dem Lauf. Der Quell-Transform gibt
+  die Datensätze wie über jeden Daten-Link weiter.
+- **Ausführung:** Der Info-Link wird nicht mit den Daten-Links zusammengeführt. Der Transform liest ihn über
+  `Output.Info()` bis zum Ende, bevor er seine Daten-Links liest; bis dahin warten diese (Backpressure). Kommen
+  Nachschlagedaten und Daten-Links aus demselben Transform, auch weiter vorn im Graph, würde der gemeinsame Vorgänger
+  bei vollen Puffern stehen bleiben; das ist deshalb ein Fehler. Transforms mit Info-Link laufen nur in einer Kopie.
+- **Schema und Zähler:** `Init` erhält das Schema des Info-Links getrennt (`InitContext.Info`, Prüfung mit `UseInfo`);
+  `/validate` liefert es als `schemas.<id>.info`. Datensätze über den Info-Link zählen nicht als „read“, sondern als
+  `Counts.Info` („lookup N“ im Log); am Link selbst stehen sie wie bei jedem Link.
+- **Grenze:** `core.stream-lookup` hält die Nachschlagedaten im Speicher, höchstens `maxRecords` (Standard 100.000);
+  mehr hält die Pipeline an. Für größere Tabellen ist `db.lookup` gedacht.

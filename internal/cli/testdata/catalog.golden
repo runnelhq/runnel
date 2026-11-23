@@ -46,10 +46,11 @@ transforms / execution
   core.from-result  Records from Workflow  Passes on the records the calling workflow gave to the pipeline (rows)
   core.to-result    Records to Workflow    Returns the records to the calling workflow (output.rows) and passes them on
 transforms / combine
-  core.dedupe    Remove Duplicates  Passes on the first record of each combination of values and drops repeated ones
-  core.group-by  Group By           Combines records with the same values into one, with count, sum and other aggregates
-  core.sort      Sort               Sorts the records by fields; keeps all records in memory
-  db.lookup      Database Lookup    Adds the columns of the matching row of a database table to each record
+  core.dedupe         Remove Duplicates  Passes on the first record of each combination of values and drops repeated ones
+  core.group-by       Group By           Combines records with the same values into one, with count, sum and other aggregates
+  core.sort           Sort               Sorts the records by fields; keeps all records in memory
+  core.stream-lookup  Stream Lookup      Adds the fields of the matching lookup record to each record; the lookup data comes over an info link
+  db.lookup           Database Lookup    Adds the columns of the matching row of a database table to each record
 transforms / output
   core.log         Log               Writes records to the run log and passes them on
   csv.output       CSV Output        Writes records to a CSV file and passes them on

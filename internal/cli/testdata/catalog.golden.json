@@ -1456,6 +1456,106 @@
       "parallel": true
     },
     {
+      "type": "core.stream-lookup",
+      "kind": "transform",
+      "category": "combine",
+      "label": "Stream Lookup",
+      "description": "Adds the fields of the matching lookup record to each record; the lookup data comes over an info link",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "description": "Fields of the record and the fields of the lookup data they must be equal to, compared as text",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Field of the record",
+                  "format": "runnel-field",
+                  "examples": [
+                    "customerId"
+                  ]
+                },
+                "lookupField": {
+                  "type": "string",
+                  "description": "Field of the lookup data; empty: the same name",
+                  "examples": [
+                    "id"
+                  ]
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "return": {
+            "type": "array",
+            "description": "Fields of the matching lookup record added to the record",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lookupField": {
+                  "type": "string",
+                  "description": "Field of the lookup data",
+                  "examples": [
+                    "name"
+                  ]
+                },
+                "as": {
+                  "type": "string",
+                  "description": "Field for the value; empty: the name of the lookup field"
+                },
+                "default": {
+                  "description": "Value when no lookup record matches; missing: an empty value"
+                }
+              },
+              "required": [
+                "lookupField"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "notFound": {
+            "type": "string",
+            "description": "Records without a matching lookup record: keep them with the defaults, drop them, or treat them as errors (error link)",
+            "enum": [
+              "keep",
+              "drop",
+              "error"
+            ],
+            "default": "keep"
+          },
+          "multiple": {
+            "type": "string",
+            "description": "Several matching lookup records: take the first in the order they arrived, or treat the record as an error",
+            "enum": [
+              "first",
+              "error"
+            ],
+            "default": "first"
+          },
+          "maxRecords": {
+            "type": "integer",
+            "description": "Most records of the lookup data held in memory; more stop the pipeline (for larger tables use db.lookup)",
+            "default": 100000
+          }
+        },
+        "required": [
+          "keys",
+          "return"
+        ],
+        "additionalProperties": false
+      },
+      "example": "keys:\n  - { field: customerId, lookupField: id }\nreturn:\n  - { lookupField: name, as: customerName }\n",
+      "recordErrors": true,
+      "infoInput": true
+    },
+    {
       "type": "core.switch",
       "kind": "transform",
       "category": "flow",

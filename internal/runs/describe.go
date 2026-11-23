@@ -69,6 +69,9 @@ func DescribePipeline(name, env string, e pipeline.Event) (Line, bool) {
 		if e.Counts.Errors > 0 {
 			counts += fmt.Sprintf(", errors %d", e.Counts.Errors)
 		}
+		if e.Counts.Info > 0 {
+			counts += fmt.Sprintf(", lookup %d", e.Counts.Info)
+		}
 		l.Level, l.Msg = ending(string(e.Status), e.Duration, counts, e.Err)
 		if l.Level < slog.LevelWarn {
 			l.Msg = fmt.Sprintf("%s in %s", counts, Round(e.Duration))

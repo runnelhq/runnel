@@ -50,6 +50,8 @@ func TestDescribePipeline(t *testing.T) {
 		{pipeline.Event{Kind: pipeline.RunStarted, RunID: "R1"}, Line{Level: slog.LevelInfo, Msg: `pipeline "p" started, run R1`}},
 		{pipeline.Event{Kind: pipeline.TransformFinished, TransformID: "t", Status: pipeline.Succeeded, Counts: pipeline.Counts{Read: 3, Written: 2}, Duration: time.Second},
 			Line{Level: slog.LevelInfo, Step: "t", Msg: "read 3, written 2 in 1s"}},
+		{pipeline.Event{Kind: pipeline.TransformFinished, TransformID: "t", Status: pipeline.Succeeded, Counts: pipeline.Counts{Read: 3, Written: 2, Info: 50}, Duration: time.Second},
+			Line{Level: slog.LevelInfo, Step: "t", Msg: "read 3, written 2, lookup 50 in 1s"}},
 		{pipeline.Event{Kind: pipeline.TransformFinished, TransformID: "t", Status: pipeline.Failed, Err: errors.New("boom"), Counts: pipeline.Counts{Read: 3, Written: 2, Errors: 1}, Duration: time.Second},
 			Line{Level: slog.LevelError, Step: "t", Msg: "failed after 1s (read 3, written 2, errors 1): boom"}},
 		{pipeline.Event{Kind: pipeline.RunFinished, Status: pipeline.Cancelled, Duration: time.Second}, Line{Level: slog.LevelWarn, Msg: `pipeline "p" cancelled after 1s`}},

@@ -126,7 +126,7 @@ my-project/
 - Links in Pipelines:
   - Normaler **Daten-Link**
   - **Fehler-Link**: fehlerhafte Records werden mit Fehlerinfos (`_error`, `_errorField`, `_errorTransform`) umgeleitet statt die Pipeline abzubrechen
-  - **Info-Link**: Nebeneingang (z. B. Lookup-Daten für „Stream Lookup“)
+  - **Info-Link**: Nebeneingang (z. B. Lookup-Daten für „Stream Lookup“, seit S23b1), wird vor den Daten-Links vollständig gelesen
 - Verteilungsmodus bei mehreren Ausgängen: `copy` (jeder Ausgang bekommt jeden Record) oder `distribute` (Round-Robin), wie in Apache Hop.
 - Transforms können mit **mehreren Kopien** (Parallelität) laufen, z. B. für teure HTTP-Lookups.
 
@@ -551,8 +551,10 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
   (ID) über alle Fehler-Links des Transforms (ab dem zweiten als Kopie); ohne Fehler-Link bricht die Pipeline ab. Der
   Datensatz ist der eingehende, unverändert (bei `csv.input` die Werte der Zeile als Text). Fehler-Links nutzen
   `csv.input`, `csv.output`, `core.convert` und `core.filter`; an anderen Transforms warnt `runnel validate`, dass der
-  Link nie genutzt wird. Das Schema eines Fehler-Links ist das eingehende mit den drei Feldern. `type: info` folgt mit S23b
-  (Backlog); bis dahin meldet `runnel validate` ihn als „noch nicht unterstützt“.
+  Link nie genutzt wird. Das Schema eines Fehler-Links ist das eingehende mit den drei Feldern. Info-Links (`type: info`,
+  seit S23b1) bringen Nachschlagedaten zu Transforms, die sie annehmen (`core.stream-lookup`): je einer, Pflicht; der
+  Transform liest sie vollständig, bevor er seine Daten-Links liest. Sie dürfen nicht aus demselben Transform stammen
+  wie die Daten-Links (auch nicht weiter vorn), sonst würde die Pipeline blockieren – `runnel validate` meldet das.
 - Graph: mindestens ein Transform, eindeutige IDs, Links nur zwischen vorhandenen Transforms, keine Links auf sich
   selbst und **keine Zyklen** (Datensätze fließen nur vorwärts). Warnungen: doppelte Links, Transforms ohne Verbindung.
 - Je Transform `copies: n` (1–64 parallele Instanzen, die sich die eingehenden Datensätze teilen; nur für Transforms,
@@ -1219,7 +1221,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
-| Kombination | Stream-Lookup, DB-Lookup (`db.lookup`, seit S23a), HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
+| Kombination | Stream-Lookup (`core.stream-lookup`, seit S23b1), DB-Lookup (`db.lookup`, seit S23a), HTTP-Lookup, Merge-Join (inner/left/full), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
 | Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe (`db.table-output`, seit S21), Insert/Update (`db.upsert`, seit S21), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
 Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,

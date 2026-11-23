@@ -26,7 +26,9 @@ type InitContext struct {
 	Targets []string
 	// Strict is set in the strict mode of a pipeline (ADR 0007): a field that is not
 	// known is an error also in an open schema.
-	Strict   bool
+	Strict bool
+	// Info is the schema of the records on the info link (S23b); nil without one.
+	Info     *record.Schema
 	problems []Problem
 }
 
@@ -71,6 +73,24 @@ func (ic *InitContext) Use(name, path string) {
 	}
 	ic.problems = append(ic.problems, Problem{Path: path, Warning: true,
 		Message: fmt.Sprintf("field %q is not known in the incoming records%s; it is checked when the pipeline runs", name, hint)})
+}
+
+// UseInfo reports that the transform reads a field of the records on its info link,
+// configured at path; like Use, with a warning while there is no info link.
+func (ic *InitContext) UseInfo(name, path string) {
+	if ic.Info == nil {
+		ic.problems = append(ic.problems, Problem{Path: path, Warning: true,
+			Message: fmt.Sprintf("field %q of the lookup data is not known: there is no info link yet", name)})
+		return
+	}
+	in := ic.In
+	ic.In = *ic.Info
+	defer func() { ic.In = in }()
+	n := len(ic.problems)
+	ic.Use(name, path)
+	for i := n; i < len(ic.problems); i++ {
+		ic.problems[i].Message = strings.Replace(ic.problems[i].Message, "in the incoming records", "in the lookup data", 1)
+	}
 }
 
 // Error reports an error in the configuration at path (within "with").
