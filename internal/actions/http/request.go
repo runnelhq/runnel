@@ -19,6 +19,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/pagination"
 )
 
 // http.request sends an HTTP request, e.g. to a REST API (roadmap S10). A text body is
@@ -38,15 +39,17 @@ var requestDefinition = action.Definition{
 }
 
 type requestAction struct {
-	Method      string            `json:"method" doc:"HTTP method" schema:"enum=GET|POST|PUT|PATCH|DELETE|HEAD,default=GET"`
-	Connection  string            `json:"connection" doc:"Connection of the API (a file in connections/) with base address and sign-in; empty: url is a full address" schema:"connection=http,example=shop-api"`
-	URL         string            `json:"url" doc:"Address with http:// or https://, e.g. https://api.example.com/orders; with connection relative to its baseUrl, e.g. orders" schema:"example=https://api.example.com/orders"`
-	Query       map[string]string `json:"query" doc:"Query parameters, added to the address with encoding, e.g. status: open"`
-	Headers     map[string]string `json:"headers" doc:"Headers of the request, e.g. Accept; tokens belong into a connection, never into the file"`
-	Body        any               `json:"body" doc:"Body: a text is sent as text, other values (maps, lists, numbers) as JSON"`
-	Timeout     string            `json:"timeout" doc:"Longest time for the request and its answer, e.g. 30s or 5m; the timeout of the action limits all attempts together" schema:"format=runnel-duration,default=60s"`
-	FailOnError *bool             `json:"failOnError" doc:"Fail the action if the answer has status 400 or above; false: the status is only in the output" schema:"default=true"`
-	MaxSize     string            `json:"maxSize" doc:"Largest answer to read, e.g. 10MB or 500KB" schema:"default=10MB"`
+	Method      string             `json:"method" doc:"HTTP method" schema:"enum=GET|POST|PUT|PATCH|DELETE|HEAD,default=GET"`
+	Connection  string             `json:"connection" doc:"Connection of the API (a file in connections/) with base address and sign-in; empty: url is a full address" schema:"connection=http,example=shop-api"`
+	URL         string             `json:"url" doc:"Address with http:// or https://, e.g. https://api.example.com/orders; with connection relative to its baseUrl, e.g. orders" schema:"example=https://api.example.com/orders"`
+	Query       map[string]string  `json:"query" doc:"Query parameters, added to the address with encoding, e.g. status: open"`
+	Headers     map[string]string  `json:"headers" doc:"Headers of the request, e.g. Accept; tokens belong into a connection, never into the file"`
+	Body        any                `json:"body" doc:"Body: a text is sent as text, other values (maps, lists, numbers) as JSON"`
+	Timeout     string             `json:"timeout" doc:"Longest time for one request and its answer (with paginate: per page), e.g. 30s or 5m; the timeout of the action limits all together" schema:"format=runnel-duration,default=60s"`
+	FailOnError *bool              `json:"failOnError" doc:"Fail the action if the answer has status 400 or above; false: the status is only in the output" schema:"default=true"`
+	MaxSize     string             `json:"maxSize" doc:"Largest answer to read, e.g. 10MB or 500KB; with paginate per page" schema:"default=10MB"`
+	RetryAfter  *retryAfterConfig  `json:"retryAfter" doc:"Asking again when the API answers 429 or 503 with Retry-After (wait in seconds or a date); on by default"`
+	Paginate    *pagination.Config `json:"paginate" doc:"Reading all pages of a paged API; output: items (all items), count and pages instead of body"`
 }
 
 const (
@@ -79,6 +82,16 @@ func newRequest(with map[string]any) (action.Action, error) {
 	if !dynamic(a.Timeout) && a.Timeout != "" {
 		if _, err := model.Duration(a.Timeout).Value(); err != nil {
 			return nil, fmt.Errorf("timeout: %w", err)
+		}
+	}
+	if a.RetryAfter != nil && !dynamic(a.RetryAfter.MaxWait) {
+		if _, _, err := a.RetryAfter.limits(); err != nil {
+			return nil, err
+		}
+	}
+	if a.Paginate != nil {
+		if err := a.Paginate.Check(); err != nil {
+			return nil, err
 		}
 	}
 	if !dynamic(a.MaxSize) {
@@ -167,37 +180,29 @@ func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (ac
 		return action.Result{}, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	// Only scheme, host and path go into messages: the query may hold keys.
-	where := method + " " + u.Scheme + "://" + u.Host + u.Path
-	start := time.Now()
-	resp, err := a.send(ctx, api, method, u)
+	c := &call{a: a, ec: ec, api: api, method: method, timeout: timeout, maxSize: maxSize}
+	if a.Paginate != nil {
+		return c.pages(ctx, u)
+	}
+	ans, err := c.fetch(ctx, u)
 	if err != nil {
-		return action.Result{}, requestError(ctx, where, timeout, err)
+		return action.Result{}, err
 	}
-	if api.refused(resp.StatusCode) {
-		// The token may have been revoked or expired early: once more with a new one.
-		_ = resp.Body.Close()
-		ec.Logf(slog.LevelDebug, "%s: 401 with the token of connection %s, getting a new one", where, api.name)
-		if resp, err = a.send(ctx, api, method, u); err != nil {
-			return action.Result{}, requestError(ctx, where, timeout, err)
-		}
-	}
-	defer func() { _ = resp.Body.Close() }()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxSize+1))
-	if err != nil {
-		return action.Result{}, requestError(ctx, where, timeout, err)
-	}
-	if int64(len(data)) > maxSize {
-		return action.Result{}, fmt.Errorf("%s: the answer is larger than %s; set maxSize if this is intended", where, sizeText(a.MaxSize))
-	}
-	out := map[string]any{"status": int64(resp.StatusCode), "headers": headers(resp.Header), "body": decodeBody(resp.Header.Get("Content-Type"), data)}
-	ec.Logf(slog.LevelInfo, "%s: %s (%d bytes in %s)", where, resp.Status, len(data), time.Since(start).Round(time.Millisecond))
-	if resp.StatusCode >= 400 && (a.FailOnError == nil || *a.FailOnError) {
-		return action.Result{Output: out}, fmt.Errorf("%s answered with status %s%s (set failOnError: false to go on)", where, resp.Status, excerpt(data))
+	out := map[string]any{"status": int64(ans.status), "headers": headers(ans.header), "body": decodeBody(ans.header.Get("Content-Type"), ans.data)}
+	ec.Logf(slog.LevelInfo, "%s: %s (%d bytes in %s)", c.where(u), ans.text, len(ans.data), ans.duration.Round(time.Millisecond))
+	if err := a.failed(c.where(u), ans); err != nil {
+		return action.Result{Output: out}, err
 	}
 	return action.Result{Output: out}, nil
+}
+
+// failed returns the error of an answer with status 400 or above, unless failOnError
+// is false.
+func (a *requestAction) failed(where string, ans answer) error {
+	if ans.status >= 400 && (a.FailOnError == nil || *a.FailOnError) {
+		return fmt.Errorf("%s answered with status %s%s (set failOnError: false to go on)", where, ans.text, excerpt(ans.data))
+	}
+	return nil
 }
 
 // send sends one request: headers of the connection, of the action, then the sign-in.

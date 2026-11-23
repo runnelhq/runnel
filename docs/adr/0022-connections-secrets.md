@@ -487,3 +487,16 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
 - **Sicherheit:** Mit Anmeldung ist `http://` nur zum eigenen Rechner erlaubt; `validate` warnt bei einer `baseUrl`
   mit `http://` zu einem anderen Rechner. Meldungen nennen nur Schema, Host und Pfad, nie die Query (`apiKeyIn:
   query`) oder Header.
+
+## Nachtrag 2026-11-23 (S63b, S63c): `Retry-After` und Paginierung
+
+- **Folgeseiten auf demselben Host:** Eine Adresse für die nächste Seite aus der Antwort (`Link`-Header oder Body) wird
+  nur angefragt, wenn Schema und Host der ersten Anfrage gleich sind; sonst bricht die Action ab. Das gilt auch ohne
+  Connection und verhindert, dass eine manipulierte Antwort die Anmeldung an einen fremden Host lenkt. Eine Adresse oder
+  ein Cursor, der schon einmal vorkam, ist ein Fehler statt einer Endlosschleife.
+- **Grenzen:** `maxPages` (100) und `maxItems` (10000); mehr ist ein Fehler, denn alle Einträge liegen im Speicher und
+  im Ergebnis des Laufs. `maxSize` und `timeout` gelten je Seite. Große Mengen gehören in den späteren Transform
+  `http.input`, der dasselbe Paket `internal/pagination` nutzt.
+- **`Retry-After`:** bei `429` und `503` mit dem Header; höchstens `retryAfter.maxRetries` Wiederholungen (3) und je
+  höchstens `retryAfter.maxWait` (1 Minute). Ohne Header wird nicht wiederholt; dafür bleibt `retry:` der Action. Die
+  Wiederholung gilt je Anfrage, bei Paginierung also je Seite.

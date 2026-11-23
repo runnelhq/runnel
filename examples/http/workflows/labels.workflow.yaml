@@ -1,0 +1,36 @@
+# Reads all labels of a repository through the connection github, page by page
+# (paginate, S63c): GitHub names the next page in the header Link. If GitHub answers
+# 429 or 503 with Retry-After, the request waits and asks again (S63b).
+#   runnel run -v examples/http/workflows/labels.workflow.yaml
+#   runnel run -v --param REPO=cli/cli examples/http/workflows/labels.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: labels
+parameters:
+  - name: REPO
+    description: Repository as owner/name
+    default: golangci/golangci-lint
+outputs:
+  - name: COUNT
+    value: "{{ results.fetch.output?.count ?? 0 }}"
+actions:
+  - id: start
+    type: core.start
+  - id: fetch
+    type: http.request
+    with:
+      connection: github
+      url: repos/${REPO}/labels
+      paginate:
+        style: link
+        size: 30
+        sizeParam: per_page
+        maxPages: 20
+      timeout: 30s
+  - id: report
+    type: core.log
+    with:
+      message: "${REPO} has {{ results.fetch.output.count }} labels on {{ results.fetch.output.pages }} pages: {{ join(map(results.fetch.output.items, #.name), ', ') }}"
+links:
+  - { from: start, to: fetch }
+  - { from: fetch, to: report }
