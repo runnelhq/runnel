@@ -10,4 +10,5 @@ import "github.com/runnelhq/runnel/internal/action"
 // Register adds all actions of the namespace "db" to a registry.
 func Register(r *action.Registry) {
 	r.Register(executeDefinition)
+	r.Register(queryDefinition)
 }

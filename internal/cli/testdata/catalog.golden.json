@@ -413,6 +413,64 @@
       "example": "connection: app-db\nsql: DELETE FROM orders WHERE created \u003c @before\nparams:\n  before: ${CUTOFF_DATE}\n"
     },
     {
+      "type": "db.query",
+      "kind": "action",
+      "category": "database",
+      "label": "Query SQL",
+      "description": "Reads the rows of an SQL query into the workflow; output: rows, count, first and value",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the database (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "app-db"
+            ],
+            "x-runnel-connection": [
+              "sqlite",
+              "sqlserver",
+              "postgres"
+            ]
+          },
+          "sql": {
+            "type": "string",
+            "description": "The query; values as @name with the value under params, never written into the query",
+            "format": "runnel-sql",
+            "examples": [
+              "SELECT COUNT(*) FROM orders"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "description": "Values of the parameters @name of the query; may use ${…} and {{ … }}",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "maxRows": {
+            "type": "string",
+            "description": "Most rows the query may return; more fail the action (for large results use a pipeline with db.table-input)",
+            "default": "1000"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time the query may take",
+            "format": "runnel-duration",
+            "default": "1m"
+          }
+        },
+        "required": [
+          "connection",
+          "sql"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: app-db\nsql: SELECT COUNT(*) AS open FROM orders WHERE status = @status\nparams:\n  status: open\n"
+    },
+    {
       "type": "file.copy",
       "kind": "action",
       "category": "files",
