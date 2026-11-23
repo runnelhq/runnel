@@ -409,7 +409,7 @@ function Section(props: {
 let nextFieldId = 0;
 
 /** A labelled field with help text and the problems reported for it. */
-function Field(props: {
+export function Field(props: {
   label: string;
   fieldKey: string;
   /** The key shown next to the label, if it differs from fieldKey. */
@@ -465,7 +465,7 @@ function Field(props: {
   );
 }
 
-const inputClass = (invalid: boolean, mono?: boolean, variable?: boolean) =>
+export const inputClass = (invalid: boolean, mono?: boolean, variable?: boolean) =>
   "block w-full min-h-[30px] rounded-md border bg-background px-2 outline-none focus:outline-2 " +
   (variable ? "text-expression " : "text-foreground ") +
   (mono ? "font-mono text-xs " : "text-sm ") +
@@ -476,7 +476,7 @@ const inputClass = (invalid: boolean, mono?: boolean, variable?: boolean) =>
  * While it has the focus, changes from outside (e.g. after a reload) do not replace
  * what is being typed.
  */
-function TextInput(props: {
+export function TextInput(props: {
   id: string;
   labelId?: string;
   invalid: boolean;

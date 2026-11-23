@@ -17,6 +17,8 @@ import {
   type Reference,
 } from "../files";
 import { NewConnectionDialog } from "./NewConnection";
+import { NewTriggerDialog } from "./NewTrigger";
+import { useTriggers } from "../forms";
 import { useConnections } from "../reference";
 import { Dialog } from "./Dialog";
 import { ChevronIcon, ConnectionIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
@@ -70,14 +72,18 @@ export function Explorer(props: {
   const [moving, setMoving] = useState<Moving | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [newConnection, setNewConnection] = useState(false);
+  const [newTrigger, setNewTrigger] = useState<string | null>(null);
   const { changes } = props;
   const connections = useConnections(props.tree);
-  const connectionTypes = new Map((connections ?? []).map((c) => [c.file, c.type]));
+  const triggers = useTriggers(props.tree);
+  // Connections and triggers show their type (mockups S39b, E20).
+  const connectionTypes = new Map([...(connections ?? []).map((c) => [c.file, c.type] as const), ...(triggers?.triggers ?? []).map((t) => [t.file, t.type] as const)]);
 
   const all = flatten(props.tree);
   const exists = (path: string) => all.some((e) => e.path.toLowerCase() === path.toLowerCase());
   const startCreate = (create: NewKind, dir?: string) => {
     setMenu(null);
+    if (create === "trigger") return setNewTrigger(dir ?? newKinds.trigger.folder);
     setEditing({ create, dir: dir ?? newKinds[create].folder });
   };
   const submit = async (name: string): Promise<string | null> => {
@@ -359,6 +365,25 @@ export function Explorer(props: {
           }}
         />
       )}
+      {newTrigger !== null && changes && (
+        <NewTriggerDialog
+          dir={newTrigger}
+          targets={[...all.filter((e) => e.kind === "workflow"), ...all.filter((e) => e.kind === "pipeline")].map((e) => e.path)}
+          exists={exists}
+          onCancel={() => setNewTrigger(null)}
+          onCreate={async (path, text) => {
+            try {
+              await createFile(path, text);
+            } catch (err) {
+              return err instanceof Error ? err.message : String(err);
+            }
+            setNewTrigger(null);
+            props.onReload();
+            changes.onCreated(path);
+            return null;
+          }}
+        />
+      )}
       {drag?.over != null && (
         <div
           aria-hidden="true"
@@ -455,11 +480,12 @@ function Node(props: {
   nameRow: React.ReactNode;
   onSubmit: (name: string) => Promise<string | null>;
   onCancel: () => void;
-  /** Types of the connection files by path, for their sign (mockup S39b). */
+  /** Types of the connection and trigger files by path, for their sign and tag (mockups S39b, E20). */
   connectionTypes: Map<string, string>;
 }) {
   const { entry, depth, editing } = props;
   const connectionType = entry.kind === "connection" ? props.connectionTypes.get(entry.path) : undefined;
+  const typeTag = entry.kind === "connection" || entry.kind === "trigger" ? props.connectionTypes.get(entry.path) : undefined;
   const [open, setOpen] = useState(true);
   const isDir = entry.type === "dir";
   const selected = !isDir && entry.path === props.selected;
@@ -521,7 +547,7 @@ function Node(props: {
         </span>
         <span className="truncate">{entry.name}</span>
         <span className="ml-auto inline-flex items-center gap-1">
-          {connectionType && <span className="font-mono text-[10px] text-muted-foreground">{connectionType}</span>}
+          {typeTag && <span className="font-mono text-[10px] text-muted-foreground">{typeTag}</span>}
           {isDir && <span className="text-2xs text-muted-foreground">{entry.children?.length ?? 0}</span>}
           <button
             type="button"

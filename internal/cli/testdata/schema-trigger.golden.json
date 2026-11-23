@@ -70,14 +70,16 @@
           "description": "cron: when to run, as minute hour day-of-month month day-of-week, e.g. 0 2 * * 1-5, or @hourly, @daily, @weekly, @monthly",
           "examples": [
             "0 2 * * 1-5"
-          ]
+          ],
+          "x-runnel-group": "When"
         },
         "timezone": {
           "type": "string",
           "description": "cron: time zone of the schedule, e.g. Europe/Berlin; empty: the time zone of the computer",
           "examples": [
             "Europe/Berlin"
-          ]
+          ],
+          "x-runnel-group": "When"
         },
         "overlap": {
           "type": "string",
@@ -86,7 +88,8 @@
             "skip",
             "allow"
           ],
-          "default": "skip"
+          "default": "skip",
+          "x-runnel-group": "More"
         },
         "every": {
           "type": "string",
@@ -94,32 +97,37 @@
           "format": "runnel-duration",
           "examples": [
             "15m"
-          ]
+          ],
+          "x-runnel-group": "When"
         },
         "path": {
           "type": "string",
           "description": "file: folder to watch, relative to the project folder or absolute (also UNC); http: path of the address with placeholders, e.g. /api/customers/{id}",
           "examples": [
             "inbox"
-          ]
+          ],
+          "x-runnel-group": "When"
         },
         "pattern": {
           "type": "string",
           "description": "file: names of the files, e.g. *.csv; upper and lower case are ignored",
-          "default": "*"
+          "default": "*",
+          "x-runnel-group": "When"
         },
         "interval": {
           "type": "string",
           "description": "file: time between two looks into the folder",
           "format": "runnel-duration",
-          "default": "10s"
+          "default": "10s",
+          "x-runnel-group": "When"
         },
         "param": {
           "type": "string",
           "description": "file: parameter of the target that gets the path of the file (each) or the paths as a JSON list (batch)",
           "examples": [
             "FILE"
-          ]
+          ],
+          "x-runnel-group": "Files"
         },
         "mode": {
           "type": "string",
@@ -128,7 +136,8 @@
             "each",
             "batch"
           ],
-          "default": "each"
+          "default": "each",
+          "x-runnel-group": "Files"
         },
         "existing": {
           "type": "string",
@@ -137,7 +146,8 @@
             "process",
             "ignore"
           ],
-          "default": "process"
+          "default": "process",
+          "x-runnel-group": "Files"
         },
         "method": {
           "type": "string",
@@ -148,10 +158,12 @@
             "PUT",
             "PATCH",
             "DELETE"
-          ]
+          ],
+          "x-runnel-group": "When"
         },
         "auth": {
-          "description": "http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${secret:import-token} } or { token: ${env:IMPORT_TOKEN} }"
+          "description": "http: none, or a token the caller sends as Authorization: Bearer, e.g. { token: ${secret:import-token} } or { token: ${env:IMPORT_TOKEN} }",
+          "x-runnel-group": "Sign-in"
         },
         "response": {
           "type": "string",
@@ -160,18 +172,21 @@
             "accepted",
             "run"
           ],
-          "default": "accepted"
+          "default": "accepted",
+          "x-runnel-group": "Answer"
         },
         "maxConcurrent": {
           "type": "integer",
           "description": "http: most runs of this trigger at the same time; 0: no own limit",
-          "default": 0
+          "default": 0,
+          "x-runnel-group": "Answer"
         },
         "timeout": {
           "type": "string",
-          "description": "http with response: run: how long the caller waits for the answer",
+          "description": "http: how long the caller waits for the answer with response: run",
           "format": "runnel-duration",
-          "default": "30s"
+          "default": "30s",
+          "x-runnel-group": "More"
         },
         "history": {
           "type": "string",
@@ -180,7 +195,8 @@
             "all",
             "errors",
             "none"
-          ]
+          ],
+          "x-runnel-group": "More"
         }
       },
       "additionalProperties": false

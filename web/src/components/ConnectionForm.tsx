@@ -1,26 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { apiBase } from "../api";
 import { categoryColor, type Schema } from "../catalog";
 import { useReference, type ExprContext } from "../expressions";
 import { useSchema, useVariables } from "../reference";
 import type { Problem } from "../workflow";
 import { ChevronIcon, ConnectionIcon, PlugIcon } from "./Icons";
-import { SchemaField, type FieldValue } from "./PropertiesPanel";
+import { editForm, useForm, type FieldChange } from "../forms";
+import { SchemaField } from "./PropertiesPanel";
 
 /**
  * A connection file as a form (mockup S39b, design/mockups/s39-connections.html): the
  * fields of its type from the schema (x-runnel-variants), in sections (x-runnel-group),
  * only those of the chosen sign-in (x-runnel-only); each change goes through
- * POST /connections/edit, which changes only the line concerned.
+ * POST /forms/edit, which changes only the line concerned.
  */
-
-/** What the form reads from the text (POST /connections/edit without a change). */
-interface ConnectionData {
-  name: string;
-  type: string;
-  description?: string;
-  with: Record<string, unknown>;
-}
 
 /** The answer of POST /connections/{name}/test (S39c1). */
 export interface TestResult {
@@ -28,24 +21,6 @@ export interface TestResult {
   message: string;
   environment?: string;
   durationMs: number;
-}
-
-/** A change of one field: field is description, type or with.<name>. */
-interface FieldChange {
-  field: string;
-  value?: FieldValue;
-  map?: { key: string; value: string }[];
-}
-
-async function editConnection(path: string, content: string, set?: FieldChange): Promise<{ content: string; connection?: ConnectionData }> {
-  const res = await fetch(`${apiBase}/connections/edit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path, content, set }),
-  });
-  const body = await res.json();
-  if (!res.ok) throw new Error(body.error ?? res.statusText);
-  return body;
 }
 
 const noParams: ExprContext["params"] = [];
@@ -59,29 +34,15 @@ export function ConnectionForm(props: {
   onError: (message: string) => void;
 }) {
   const { path, text, onError } = props;
-  const [data, setData] = useState<ConnectionData | null | undefined>(undefined);
+  const form = useForm(path, text);
+  const data = form === undefined ? undefined : (form?.connection ?? null);
   const [more, setMore] = useState(false);
   const schema = useSchema("connection");
   const ref = useReference();
   const ctx = useMemo<ExprContext>(() => ({ ref, params: noParams, actions: [] }), [ref]);
 
-  // The form follows the text, also after undo or changes in the YAML view.
-  useEffect(() => {
-    let live = true;
-    const t = setTimeout(() => {
-      editConnection(path, text).then(
-        (r) => live && setData(r.connection ?? null),
-        () => live && setData(null),
-      );
-    }, 150);
-    return () => {
-      live = false;
-      clearTimeout(t);
-    };
-  }, [path, text]);
-
   const change = (c: FieldChange) => {
-    editConnection(path, text, c).then(
+    editForm(path, text, c).then(
       (r) => props.onText(r.content),
       (e: Error) => onError(e.message),
     );

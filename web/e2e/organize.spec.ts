@@ -88,6 +88,7 @@ test("reads triggers in subfolders and renames their target", async ({ page }) =
   await expect(row(page, "start.workflow.yaml")).toBeVisible();
   expect(await text(page, `triggers/${dir}/main.yaml`)).toContain(`target: ${dir}/start.workflow.yaml\n`);
   // The open tab of the trigger shows the new text.
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
   await expect.poll(() => editorText(page)).toContain(`target: ${dir}/start.workflow.yaml`);
 });
 

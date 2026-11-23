@@ -567,3 +567,18 @@ export const FormIcon = (p: P) => (
     <path d="M8 9h8M8 13h8M8 17h5" />
   </Icon>
 );
+
+/** Kinds of triggers (mockup E20): calendar (cron), circular arrow (interval), folder with arrow (file), arrow into a box (http). */
+export const TriggerTypeIcon = ({ type, ...p }: P & { type: string }) => (
+  <Icon {...p}>
+    {type === "cron" ? (
+      <path d="M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM4 10h16M9 3v4M15 3v4" />
+    ) : type === "interval" ? (
+      <path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" />
+    ) : type === "file" ? (
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9.5 13.5L12 16l2.5-2.5" />
+    ) : (
+      <path d="M4 12h11M11 8l4 4-4 4M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+    )}
+  </Icon>
+);

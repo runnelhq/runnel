@@ -132,7 +132,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+APIPrefix+"/variables", s.handleVariables)
 	mux.HandleFunc("GET "+APIPrefix+"/connections", s.handleConnections)
 	mux.HandleFunc("POST "+APIPrefix+"/connections/{name}/test", s.handleTestConnection)
-	mux.HandleFunc("POST "+APIPrefix+"/connections/edit", s.handleEditConnection)
+	mux.HandleFunc("POST "+APIPrefix+"/forms/edit", s.handleEditForm)
 	mux.HandleFunc("GET "+APIPrefix+"/secrets", s.handleSecrets)
 	mux.HandleFunc("GET "+APIPrefix+"/expressions", s.handleExpressions)
 	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
