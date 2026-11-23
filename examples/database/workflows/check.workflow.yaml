@@ -1,0 +1,31 @@
+# Reads values from the database into the workflow with db.query: the number of orders
+# as value of a COUNT(*), and the last three orders as rows, logged once per row
+# (forEach). Run the workflow orders first, then:
+#   runnel run -v examples/database/workflows/check.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: check
+actions:
+  - id: start
+    type: core.start
+  - id: count
+    type: db.query
+    with:
+      connection: shop
+      sql: SELECT COUNT(*) FROM orders
+  - id: recent
+    type: db.query
+    with:
+      connection: shop
+      sql: SELECT customer, amount FROM orders ORDER BY id DESC LIMIT @n
+      params:
+        n: "3"
+  - id: report
+    type: core.log
+    forEach: "{{ results.recent.output.rows }}"
+    with:
+      message: "{{ row.customer }} ordered {{ row.amount }} ({{ results.count.output.value }} orders in all)"
+links:
+  - { from: start, to: count }
+  - { from: count, to: recent }
+  - { from: recent, to: report }

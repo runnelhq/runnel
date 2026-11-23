@@ -417,6 +417,10 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   SQL Server kennt das nicht, dort `UPDATE … WITH (UPDLOCK, SERIALIZABLE)` und, wenn keine Zeile betroffen war,
   `INSERT` – `MERGE` ist bei parallelen Läufen fehleranfällig. Ohne `update` werden vorhandene Zeilen nicht geändert.
   Datumswerte gehen als Zeitpunkt, Listen und Objekte als JSON-Text an den Treiber.
+- **S59, `db.query`:** Liest die Zeilen einer Abfrage als Output der Action: `rows` (je Zeile ein Objekt), `count`,
+  `first` und `value` (erste Spalte der ersten Zeile). Alles liegt im Speicher und im Ergebnis des Laufs, daher
+  `maxRows` (Standard 1000); mehr Zeilen sind ein Fehler statt still abgeschnitten. Größere Mengen gehören in eine
+  Pipeline mit `db.table-input`.
 - **S23a, `db.lookup`:** Eine vorbereitete Abfrage `SELECT … FROM tabelle WHERE spalte = @p …` je Schlüssel, mit
   denselben Regeln für Namen wie S21. Die Ergebnisse (auch „keine Zeile“) hält ein LRU-Cache je Kopie des Transforms
   (`cache`, Standard 1000 Schlüssel, `0` = ohne); Änderungen an der Tabelle während des Laufs sieht der Transform daher
