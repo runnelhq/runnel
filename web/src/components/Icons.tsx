@@ -303,6 +303,9 @@ const actionIcons: Record<string, ReactNode> = {
   "file.copy": <path d="M9 7V3h6l4 4v10h-4M5 7h6l4 4v10H5z" />,
   "file.delete": <path d={`${filePage}M15.5 15.5l5 5M20.5 15.5l-5 5`} />,
   "file.exists": <path d={`${filePage}M14.5 18l2.5 2.5 4.5-5`} />,
+  // Reading and writing a file (S66, variant A chosen by the maintainer): an arrow out of the page, a pencil on it.
+  "file.read": <path d={`${filePage}M14 17.5h6.5M18 15l2.5 2.5L18 20`} />,
+  "file.write": <path d={`${filePage}M14.5 21l.5-2.5 4.5-4.5 2 2-4.5 4.5zM18.5 15l2 2`} />,
   "file.wait": (
     <>
       <path d={filePage} />
