@@ -13,6 +13,7 @@
 //	  - doc: description of the field for editor and tools (English, one sentence).
 //	  - schema: comma-separated options:
 //	    required, default=<value>, enum=<a>|<b>|…, example=<value>, format=<name>,
+//	    group=<name> (section of a form, "x-runnel-group", S39c2a).
 //	    only=<field>:<a>|<b>|… (the field applies only when the sibling field has one of
 //	    these values, e.g. only=function:concat; "x-runnel-only" in the schema, E14).
 //	    connection=<type>|<type>|… (the name of a connection of one of these types, e.g.
@@ -110,6 +111,9 @@ type Schema struct {
 	// Connection: see ConnectionKey; the connection types a field of format
 	// runnel-connection accepts.
 	Connection []string `json:"x-runnel-connection,omitempty"`
+	// Group names the section a form shows the field in, e.g. Sign-in (option group=,
+	// connection forms of S39c2a); fields without one belong to the first section.
+	Group string `json:"x-runnel-group,omitempty"`
 	// Variants: see VariantsKey; the schema of this mapping by the value of the sibling
 	// field type, e.g. with: of a connection file.
 	Variants map[string]*Schema `json:"x-runnel-variants,omitempty"`
@@ -295,6 +299,7 @@ func forStruct(t reflect.Type, path string, seen []reflect.Type, tag string) (*S
 }
 
 func applyOptions(s *Schema, o options, path string) error {
+	s.Group = o.group
 	if o.only != "" {
 		field, values, ok := strings.Cut(o.only, ":")
 		if !ok || field == "" || values == "" {
@@ -379,6 +384,7 @@ type options struct {
 	enum         []string
 	format       string
 	only         string
+	group        string
 	connection   []string
 	err          error
 }
@@ -435,6 +441,8 @@ func parseOptions(tag string) options {
 			o.format = value
 		case key == "only" && hasValue:
 			o.only = value
+		case key == "group" && hasValue:
+			o.group = value
 		case key == "connection" && hasValue:
 			o.connection = strings.Split(value, "|")
 		default:

@@ -118,3 +118,34 @@ func TestSecretsList(t *testing.T) {
 		t.Errorf("%+v", info.Secrets[0])
 	}
 }
+
+// POST /connections/edit (S39c2a): reads a connection for the form and sets one field
+// in its text, keeping the rest.
+func TestEditConnectionForm(t *testing.T) {
+	_, s := newProject(t)
+	text := "kind: Connection\napiVersion: runnel/v1\nname: db\ntype: sqlite\nwith:\n  path: out/app.db  # the file\n"
+	body := func(set string) string {
+		b, _ := json.Marshal(map[string]any{"path": "connections/db.yaml", "content": text})
+		if set == "" {
+			return string(b)
+		}
+		return strings.TrimSuffix(string(b), "}") + `,"set":` + set + "}"
+	}
+	var res connectionEditResponse
+	rec := do(t, s, "POST", "/api/v1/connections/edit", body(""))
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || res.Connection == nil || res.Connection.Type != "sqlite" || res.Connection.With["path"] != "out/app.db" || res.Content != text {
+		t.Fatalf("%s %v", rec.Body, err)
+	}
+	rec = do(t, s, "POST", "/api/v1/connections/edit", body(`{"field":"with.readOnly","value":true}`))
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || !strings.HasSuffix(res.Content, "  path: out/app.db  # the file\n  readOnly: true\n") || res.Connection.With["readOnly"] != true {
+		t.Fatalf("%s %v", rec.Body, err)
+	}
+	expect(t, do(t, s, "POST", "/api/v1/connections/edit", body(`{"field":"name","value":"x"}`)), http.StatusBadRequest, "cannot be set")
+	expect(t, do(t, s, "POST", "/api/v1/connections/edit", `{"path":"workflows/a.workflow.yaml","content":""}`), http.StatusBadRequest, "only connection files")
+	// A file that does not read has no connection for the form.
+	if rec := do(t, s, "POST", "/api/v1/connections/edit", `{"path":"connections/db.yaml","content":"kind: ["}`); rec.Code != 200 || strings.Contains(rec.Body.String(), `"connection"`) {
+		t.Errorf("%d %s", rec.Code, rec.Body)
+	}
+	expect(t, do(t, s, "POST", "/api/v1/connections/edit", `{"path":"../x.yaml","content":""}`), http.StatusBadRequest, "")
+	expect(t, do(t, s, "POST", "/api/v1/connections/edit", body(""), "Origin", "http://evil.example"), http.StatusForbidden, "other origins")
+}

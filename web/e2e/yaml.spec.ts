@@ -190,6 +190,8 @@ test.describe("other files of the project", () => {
       await page.goto("/");
       await page.getByRole("tree").getByText("e2e-db.yaml", { exact: true }).click();
       await expect(page.getByTestId("kind")).toHaveText("Connection");
+      // Connections open as a form (S39c2a); the YAML view is one click away.
+      await page.getByRole("button", { name: "YAML", exact: true }).click();
       await expect(page.getByText("Read-only")).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Reference" }).getByTestId("field-type")).toContainText("✓ line 4");
       await retype(page, "path: out/e2e.db", "path".length + ": out/e2e.db".length, "file: x.db");

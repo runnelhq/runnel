@@ -28,6 +28,7 @@ import { previewRun, runPreview, type PreviewResult } from "../preview";
 import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
+import { ConnectionForm, TestButton, type TestResult } from "./ConnectionForm";
 import { MarkdownView } from "./MarkdownView";
 import { YamlEditor } from "./YamlEditor";
 import { Dialog } from "./Dialog";
@@ -43,6 +44,7 @@ import {
   CodeIcon,
   CopyIcon,
   EyeIcon,
+  FormIcon,
   LinesIcon,
   LockIcon,
   PanelIcon,
@@ -139,7 +141,10 @@ export function FileView(props: {
   // Documents (E17) show "canvas" as the formatted view ("Preview") and "yaml" as the text.
   const isDoc = fileKind === "document";
   const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger" || fileKind === "connection";
-  const [view, setView] = useState<View>(isGraph || isDoc ? "canvas" : "yaml");
+  const isConnection = fileKind === "connection";
+  // Connections open as a form (mockup S39b); "canvas" is the form there.
+  const [view, setView] = useState<View>(isGraph || isDoc || isConnection ? "canvas" : "yaml");
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [undo, setUndo] = useState<string[]>([]);
@@ -884,6 +889,7 @@ export function FileView(props: {
               </button>
             </span>
           ))}
+        {isConnection && <TestButton name={path.split("/").pop()!.replace(/\.yaml$/, "")} onResult={setTestResult} />}
         {editsText && (
           <>
             <div className="inline-flex gap-1">
@@ -907,6 +913,7 @@ export function FileView(props: {
           </>
         )}
         {isDoc && <ViewSwitch view={view} onView={switchView} document />}
+        {isConnection && <ViewSwitch view={view} onView={switchView} form />}
         {isGraph && (
           <>
             <ViewSwitch view={view} onView={switchView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
@@ -942,6 +949,15 @@ export function FileView(props: {
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {!doc ? (
           <div className="flex-1" aria-busy="true" />
+        ) : view === "canvas" && isConnection ? (
+          <ConnectionForm
+            path={path}
+            text={doc.text}
+            problems={validation?.problems ?? []}
+            result={testResult}
+            onText={(next) => setText(next, "push")}
+            onError={setEditError}
+          />
         ) : view === "canvas" && isDoc ? (
           <MarkdownView text={doc.text} path={path} files={props.files ?? noFiles} onOpen={(p) => props.onOpenFile?.(p)} />
         ) : view === "yaml" && editsText ? (
@@ -1205,13 +1221,18 @@ const problemList = (v: Validation, severity: "error" | "warning") =>
 
 const noFiles = new Set<string>();
 
-function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean; notAGraph?: boolean; document?: boolean }) {
+function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean; notAGraph?: boolean; document?: boolean; form?: boolean }) {
   const views: [View, string, typeof CodeIcon][] = props.document
     ? [
         ["canvas", "Preview", EyeIcon],
         ["yaml", "Text", LinesIcon],
       ]
-    : [
+    : props.form
+      ? [
+          ["canvas", "Form", FormIcon],
+          ["yaml", "YAML", CodeIcon],
+        ]
+      : [
         ["canvas", "Canvas", props.pipeline ? PipelineIcon : WorkflowIcon],
         ["yaml", "YAML", CodeIcon],
       ];
