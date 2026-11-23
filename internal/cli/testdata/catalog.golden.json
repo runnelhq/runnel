@@ -838,6 +838,93 @@
       "example": "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n"
     },
     {
+      "type": "mail.send",
+      "kind": "action",
+      "category": "network",
+      "label": "Send Mail",
+      "description": "Sends a mail through a mail server, with text or HTML and attachments",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the mail server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "mail"
+            ],
+            "x-runnel-connection": [
+              "smtp"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "description": "Sender, e.g. Runnel \u003crunnel@example.com\u003e; empty: from of the connection",
+            "examples": [
+              "runnel@example.com"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "description": "Recipients, separated by commas, e.g. ops@example.com, Ada \u003cada@example.com\u003e",
+            "examples": [
+              "ops@example.com"
+            ]
+          },
+          "cc": {
+            "type": "string",
+            "description": "Recipients of a copy, separated by commas",
+            "examples": [
+              "team@example.com"
+            ]
+          },
+          "bcc": {
+            "type": "string",
+            "description": "Recipients of a blind copy, separated by commas; they do not appear in the mail",
+            "examples": [
+              "audit@example.com"
+            ]
+          },
+          "replyTo": {
+            "type": "string",
+            "description": "Address for replies, if not the sender",
+            "examples": [
+              "support@example.com"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "Subject; line breaks become spaces",
+            "examples": [
+              "Import finished"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "Text of the mail"
+          },
+          "html": {
+            "type": "string",
+            "description": "Text of the mail as HTML; with body, mail programs show the HTML and keep the text as an alternative"
+          },
+          "attachments": {
+            "type": "array",
+            "description": "Files to attach, relative to the project folder; at most 25 MB together",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "connection",
+          "subject"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: mail\nto: ${ADMIN_MAIL}\nsubject: \"Import failed: {{ run.id }}\"\nbody: \"{{ run.lastError }}\"\n"
+    },
+    {
       "type": "shell.powershell",
       "kind": "action",
       "category": "execution",

@@ -1,0 +1,11 @@
+# Example for sending mails (S62a). It sends to a mail server for tests on this computer,
+# e.g. Mailpit (https://mailpit.axllent.org): start it, then
+#   runnel run -v examples/mail/workflows/report.workflow.yaml
+# and look at the mail at http://localhost:8025.
+kind: Project
+apiVersion: runnel/v1
+name: mail
+description: Sends a report with an attachment through an smtp connection
+variables:
+  SMTP_PORT: "1025"
+  ADMIN_MAIL: ops@example.com

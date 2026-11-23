@@ -1,0 +1,15 @@
+# The mail server of the example: a test server on this computer without encryption and
+# sign-in. For a real server use tls: starttls (port 587), user and
+# password: ${secret:smtp-password}.
+kind: Connection
+apiVersion: runnel/v1
+name: mail
+description: Mail server for tests on this computer
+type: smtp
+with:
+  host: localhost
+  port: ${SMTP_PORT}
+  tls: none
+  auth: none
+  from: Runnel <runnel@example.com>
+  timeout: 10s

@@ -428,3 +428,26 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   Bei mehreren Treffern nimmt `multiple: first` die erste Zeile, die die Datenbank liefert (ohne feste Reihenfolge).
   Datenbankfehler halten die Pipeline an; nur „keine Zeile“ und „mehrere Zeilen“ gehen an den Fehler-Link.
 
+## Nachtrag 2026-11-23 (S62a): Mail senden mit `smtp`
+
+- **Teilung:** S62a bringt den Typ `smtp` mit Anmeldung per Passwort oder ohne Anmeldung und die Action `mail.send`;
+  S62b ergänzt `auth: oauth2` für Office 365.
+- **Keine neue Abhängigkeit:** Statt `wneessen/go-mail` (KONZEPT 4.2) genügt die Go-Standardbibliothek: `net/smtp` für
+  den Dialog, `mime`, `mime/multipart` und `mime/quotedprintable` für die Nachricht. Die Anmeldung `LOGIN` (Exchange,
+  Office 365 bieten oft kein `PLAIN`) ist in Runnel umgesetzt.
+- **Felder der Connection:** `host`, `port` (leer: 587 bei `starttls`, 465 bei `tls`, 25 bei `none`), `tls`
+  (`starttls` Standard, `tls` von Anfang an, `none`), `auth` (`password`, `none`; leer: `password`, wenn `user`
+  gesetzt ist), `user`, `password` (Secret), `from` (Absender, wenn die Action keinen nennt), `timeout` (Standard 1m für
+  Verbinden und Senden einer Mail).
+- **Sicherheit:** Das Zertifikat des Servers wird immer geprüft (Zertifikate des Systems); einen Schalter zum Abschalten
+  gibt es nicht. Bietet der Server bei `starttls` kein `STARTTLS`, bricht Runnel ab, statt unverschlüsselt zu senden.
+  Ein Passwort geht nie unverschlüsselt über das Netz: `tls: none` mit Anmeldung ist nur zum eigenen Rechner erlaubt.
+  `validate` warnt bei `tls: none` zu einem anderen Rechner (Relay im vertrauenswürdigen Netz).
+- **Nachricht:** Betreff, Text und HTML in UTF-8; Zeilenumbrüche im Betreff werden zu Leerzeichen, damit ein Ausdruck
+  (z. B. eine Fehlermeldung) keine Kopfzeilen einschleusen kann. Adressen werden mit `net/mail` gelesen und
+  geschrieben. `Bcc` steht nur im Umschlag, nicht in der Mail. Jede Mail hat `Auto-Submitted: auto-generated`
+  (RFC 3834), damit Abwesenheitsnotizen nicht antworten.
+- **Grenzen:** Anhänge zusammen höchstens 25 MB (die Nachricht entsteht im Speicher); nennt der Server mit `SIZE` eine
+  kleinere Grenze, bricht Runnel vor dem Senden mit einer Meldung ab.
+- **Output:** `messageId`, `recipients` (Anzahl) und `size` (Bytes). Das Log nennt nur die Anzahl der Empfänger, die
+  Adressen erst auf Stufe Debug.
