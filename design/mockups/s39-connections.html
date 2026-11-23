@@ -1,0 +1,497 @@
+<!doctype html>
+<!--
+  Mockup S39b/S39f – Connections and secrets in the editor.
+  S39b: connection files (connections/*.yaml) open as a form built from the schema of their
+  type (x-runnel-variants): fields grouped, only those of the chosen sign-in (x-runnel-only),
+  warnings at the field; "Form | YAML" like "Canvas | YAML"; "Test connection" with the
+  environment; "New → Connection" with the choice of the type.
+  S39f: fields of format runnel-secret show only the reference ${secret:…} and where the
+  secret is set per environment, suggest names, warn about plain text and offer to store it
+  as a secret; "Secrets" beside "Variables" lists the secrets per environment (set, missing,
+  expires soon) and sets or deletes them – values are never shown.
+  Builds on the approved mockups E4 (shell), E7 (properties), E9 (YAML view), E11 (new
+  files) and E18 (reference, variables). Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                                      (default light)
+    state = form | test | new | field | plaintext | secrets | set                (default form)
+    controls = 0                                          hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>connections – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5; color: var(--foreground);
+         background: var(--background); -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  .mono, code { font-family: var(--rn-font-mono); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; position: relative; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 3px 8px;
+                      border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); cursor: pointer; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); color: var(--sidebar-foreground);
+          border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 8px 0 16px; flex: none; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; flex: none; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .kind { color: var(--muted-foreground); display: inline-flex; }
+  .row.selected .kind { color: var(--accent-foreground); }
+  .row .tag { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .icon-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: var(--rn-radius-sm);
+              background: transparent; color: var(--muted-foreground); }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); flex: none; }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; white-space: nowrap; }
+  .btn.small { height: 24px; padding: 0 8px; font-size: var(--rn-text-2xs); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn.danger { color: var(--destructive); }
+  .btn.split { border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md); }
+  .btn.split + .btn { border-radius: 0 var(--rn-radius-md) var(--rn-radius-md) 0; margin-left: -1px; padding: 0 6px; }
+  .btn svg.i { width: 13px; height: 13px; }
+  .btn kbd { font: 10px var(--rn-font-mono); opacity: .75; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+
+  /* Connection form (new in S39b) */
+  .formwrap { flex: 1; overflow: auto; background: var(--background); }
+  .form { max-width: 680px; margin: 0 auto; padding: 16px 28px 40px; }
+  .conn-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-datenbank); color: var(--rn-tiefe-0); flex: none; }
+  .tile.net { background: var(--rn-kategorie-netzwerk); }
+  .tile svg.i { width: 20px; height: 20px; }
+  .conn-head h2 { margin: 0; font-size: var(--rn-text-lg); font-weight: 600; }
+  .conn-head .sub { font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .lead { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 12px 48px; }
+  .sec { border-top: 1px solid var(--border); padding: 10px 0 4px; }
+  .sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: var(--rn-text-sm); font-weight: 600; }
+  .sec h3 .count { font-weight: 400; margin-left: 4px; }
+  .sec.closed h3 { color: var(--muted-foreground); font-weight: 500; margin-bottom: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 140px; gap: 0 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 120px 160px; gap: 0 14px; }
+  .fld { margin-bottom: 10px; position: relative; }
+  .fld .lab { display: flex; align-items: baseline; gap: 6px; font-size: var(--rn-text-xs); font-weight: 500; margin-bottom: 4px; }
+  .fld .lab .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .fld .lab .req { color: var(--destructive); font-weight: 700; }
+  .inp { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border: 1px solid var(--input); border-radius: var(--rn-radius-md);
+         background: var(--background); font-size: var(--rn-text-xs); min-width: 0; }
+  .inp.mono { font-family: var(--rn-font-mono); }
+  .inp.ph { color: var(--muted-foreground); }
+  .inp.focus { border-color: var(--ring); outline: 3px solid color-mix(in srgb, var(--ring) 22%, transparent); }
+  .inp.warn { border-color: var(--warning); }
+  .inp .caret-d { margin-left: auto; color: var(--muted-foreground); }
+  .inp .v { color: var(--expression); background: var(--expression-soft); border-radius: 3px; padding: 0 3px; font-family: var(--rn-font-mono); }
+  .help { font-size: var(--rn-text-2xs); color: var(--muted-foreground); margin-top: 3px; }
+  .note { display: flex; gap: 6px; align-items: flex-start; font-size: var(--rn-text-2xs); margin-top: 4px; padding: 5px 8px; border-radius: var(--rn-radius-sm); }
+  .note.warn { background: var(--warning-soft); color: var(--warning); }
+  .note.warn b { color: var(--foreground); font-weight: 600; }
+  .note .act { margin-left: auto; }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--rn-text-xs); }
+  .box { width: 14px; height: 14px; border: 1px solid var(--input); border-radius: 3px; display: inline-grid; place-items: center; background: var(--background); }
+  .box.on { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .box svg.i { width: 11px; height: 11px; stroke-width: 2.4; }
+  .wavy { text-decoration: underline wavy var(--warning); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+
+  /* Secret field (new in S39f): only the reference, the state per environment */
+  .secret { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 3px 4px 3px 9px; border: 1px solid var(--input);
+            border-radius: var(--rn-radius-md); background: var(--muted); font-size: var(--rn-text-xs); }
+  .secret.focus { border-color: var(--ring); outline: 3px solid color-mix(in srgb, var(--ring) 22%, transparent); background: var(--background); }
+  .secret .lock { color: var(--muted-foreground); display: inline-flex; }
+  .secret .ref { font-family: var(--rn-font-mono); color: var(--expression); }
+  .secret .ref i { font-style: normal; color: var(--muted-foreground); }
+  .secret .envs { display: inline-flex; gap: 4px; margin-left: auto; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: var(--rn-radius-full);
+          font-size: 10px; font-weight: 600; background: var(--success-soft); color: var(--success); white-space: nowrap; }
+  .pill.miss { background: var(--warning-soft); color: var(--warning); }
+  .pill.soon { background: var(--warning-soft); color: var(--warning); }
+  .pill.plain { background: var(--danger-soft); color: var(--destructive); }
+  .pill .src { font-weight: 400; opacity: .85; }
+  .menu { position: absolute; left: 0; right: 0; top: 58px; z-index: 4; background: var(--popover); color: var(--popover-foreground);
+          border: 1px solid var(--border); border-radius: var(--rn-radius-md); box-shadow: var(--rn-shadow-lg); padding: 4px; font-size: var(--rn-text-xs); }
+  .menu .mh { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); padding: 6px 8px 2px; }
+  .menu .mi { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--rn-radius-sm); }
+  .menu .mi.hl { background: var(--accent); color: var(--accent-foreground); }
+  .menu .mi .n { font-family: var(--rn-font-mono); }
+  .menu .mi .n b { background: color-mix(in srgb, var(--ring) 22%, transparent); font-weight: 600; border-radius: 2px; }
+  .menu .mi .d { margin-left: auto; display: inline-flex; gap: 4px; }
+  .menu .sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .menu .new { color: var(--primary); font-weight: 500; }
+
+  /* Test result bar */
+  .result { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border-radius: var(--rn-radius-md);
+            border: 1px solid var(--border); font-size: var(--rn-text-xs); }
+  .result.ok { background: var(--success-soft); border-color: transparent; }
+  .result.ok .sym { color: var(--success); font-weight: 700; }
+  .result.fail { background: var(--danger-soft); border-color: transparent; }
+  .result.fail .sym { color: var(--destructive); font-weight: 700; }
+  .result .t { font-weight: 600; }
+  .result .m { color: var(--muted-foreground); font-size: var(--rn-text-2xs); margin-top: 2px; }
+  .result ul { margin: 6px 0 0; padding-left: 16px; }
+  .result .close { margin-left: auto; }
+  .spin { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; display: inline-block; }
+
+  /* Reference / Variables / Secrets in the sidebar (E18, "Secrets" new in S39f) */
+  .ctx { margin-top: 8px; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  .ctx-head { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 16px; flex: none; }
+  .ctx-head .segmented { margin-left: auto; }
+  .ctx-head .segmented button { padding: 2px 6px; font-size: var(--rn-text-2xs); }
+  .ctx-sub { margin: -4px 16px 8px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); flex: none; }
+  .scroll { overflow: auto; flex: 1; padding-bottom: 12px; }
+  .grp { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 16px; font-size: var(--rn-text-xs); font-weight: 600; }
+  .grp .count { font-weight: 400; }
+  .fl { list-style: none; margin: 0 0 4px; padding: 0 8px; }
+  .f { padding: 4px 8px; border-radius: var(--rn-radius-md); }
+  .f .top { display: flex; align-items: center; gap: 6px; }
+  .f .name { font: 500 var(--rn-text-xs) var(--rn-font-mono); }
+  .f .type { margin-left: auto; font-size: 10px; color: var(--muted-foreground); padding: 0 5px; border: 1px solid var(--border); border-radius: var(--rn-radius-sm); }
+  .f .there { font-size: 10px; color: var(--success); }
+  .f .short { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .vt { width: calc(100% - 16px); margin: 0 8px; border-collapse: collapse; font-size: var(--rn-text-xs); }
+  .vt th { font-size: 10px; font-weight: 600; color: var(--muted-foreground); text-align: center; padding: 2px 2px 4px; }
+  .vt th:first-child { text-align: left; padding-left: 8px; }
+  .vt th.cur { color: var(--foreground); }
+  .vt td { text-align: center; padding: 4px 2px; border-top: 1px solid var(--sidebar-border); }
+  .vt td:first-child { text-align: left; padding-left: 8px; font: 500 var(--rn-text-xs) var(--rn-font-mono); }
+  .vt td small { display: block; font: 10px var(--rn-font-sans); color: var(--muted-foreground); }
+  .vt td.cur { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+  .vt .set { color: var(--success); font-weight: 700; }
+  .vt .miss { color: var(--warning); font-weight: 700; }
+  .vt .plain { color: var(--destructive); font-weight: 700; }
+  .vt .src { display: block; font: 9px var(--rn-font-mono); color: var(--muted-foreground); }
+  .vt tr.open td { background: var(--card); }
+  .vdetail { margin: 0 8px 8px; padding: 8px 10px; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--rn-radius-md) var(--rn-radius-md);
+             background: var(--card); font-size: var(--rn-text-2xs); }
+  .vdetail .lvl { display: grid; grid-template-columns: 52px 1fr; gap: 2px 8px; margin-bottom: 8px; }
+  .vdetail .lvl span:nth-child(odd) { color: var(--muted-foreground); }
+  .vdetail .uses { margin: 0 0 8px; padding: 0; list-style: none; }
+  .vdetail .uses a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; font-family: var(--rn-font-mono); font-size: 10px; }
+  .vdetail .warnline { color: var(--warning); margin-bottom: 6px; }
+  .vdetail .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .legend { margin: 8px 16px 0; font-size: 10px; color: var(--muted-foreground); line-height: 1.6; }
+
+  /* YAML of the environment (E9) */
+  .code { flex: 1; overflow: auto; padding: 8px 0 24px; font-family: var(--rn-font-mono); font-size: var(--rn-text-sm); line-height: 1.7; }
+  .line { display: grid; grid-template-columns: 20px 40px 1fr; }
+  .ln { text-align: right; padding-right: 16px; color: var(--rn-tiefe-400); }
+  [data-theme="dark"] .ln { color: var(--rn-tiefe-600); }
+  .src2 { white-space: pre; }
+  .k { font-weight: var(--rn-font-weight-medium); }
+  .s { color: var(--rn-tiefe-700); }
+  [data-theme="dark"] .s { color: var(--rn-tiefe-300); }
+
+  /* Dialogs */
+  .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--rn-tiefe-950) 40%, transparent); display: grid; place-items: center; z-index: 10; }
+  .dialog { width: 520px; background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--rn-radius-lg);
+            box-shadow: var(--rn-shadow-lg); padding: 18px 20px 16px; }
+  .dialog.wide { width: 620px; }
+  .dialog h2 { margin: 0 0 4px; font-size: var(--rn-text-md); font-weight: 600; }
+  .dialog .intro { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 14px; }
+  .dialog .foot { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .dialog .foot small { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .type { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--background); }
+  .type.sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .type .tile { width: 28px; height: 28px; }
+  .type .tile svg.i { width: 16px; height: 16px; }
+  .type b { display: block; font-size: var(--rn-text-xs); }
+  .type div span { font-size: 10px; color: var(--muted-foreground); line-height: 1.35; display: block; }
+  .where { display: grid; grid-template-columns: 96px 1fr; gap: 6px 10px; font-size: var(--rn-text-xs); align-items: center; margin-bottom: 12px; }
+  .where span:nth-child(odd) { color: var(--muted-foreground); }
+  .dots { letter-spacing: 2px; }
+  .info { display: flex; gap: 8px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); background: var(--muted); border-radius: var(--rn-radius-sm); padding: 7px 9px; margin-top: 10px; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup S39b/S39f</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="form" href="#">form</a> <a data-state="test" href="#">test</a> <a data-state="new" href="#">new</a>
+  <a data-state="field" href="#">field</a> <a data-state="plaintext" href="#">plaintext</a>
+  <a data-state="secrets" href="#">secrets</a> <a data-state="set" href="#">set</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>orders</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\orders</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="panel-title"><span class="label">Explorer</span><span id="tree-actions"></span></div>
+      <ul class="tree" id="tree"></ul>
+      <section class="ctx" id="ctx" aria-label="Reference"></section>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div style="display:flex;flex:1;min-height:0" id="view"></div>
+    </main>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "form";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const I = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    env: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    // Connections: the sign of their type – cylinder for databases (as db.*), globe for http, envelope for smtp.
+    db: '<ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/>',
+    http: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+    smtp: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+    sqlite: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><ellipse cx="12" cy="12" rx="3.5" ry="1.4"/><path d="M8.5 12v4c0 .8 1.6 1.4 3.5 1.4s3.5-.6 3.5-1.4v-4"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    plug: '<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0zM12 17v4"/>',
+    form: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+    code: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
+    check: '<path d="M5 12l5 5 9-10"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    reload: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/>',
+    search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+  };
+
+  // Which file is open in which state.
+  const envState = state === "secrets" || state === "set";
+  const file = envState ? "environments/prod.yaml" : "connections/erp-sql.yaml";
+  const name = file.split("/").pop();
+
+  // Explorer: connections with the sign of their type.
+  document.getElementById("tree-actions").innerHTML =
+    `<button class="icon-btn" aria-label="New">${icon(I.plus, 15)}</button><button class="icon-btn" aria-label="Reload explorer">${icon(I.reload, 14)}</button>`;
+  const rows = [["folder", "connections", 0, "4"], ["db", "erp-sql.yaml", 1, "", "sqlserver"], ["http", "crm-api.yaml", 1, "", "http"],
+    ["smtp", "mail.yaml", 1, "", "smtp"], ["sqlite", "local.yaml", 1, "", "sqlite"],
+    ["folder", "environments", 0, "2"], ["env", "dev.yaml", 1], ["env", "prod.yaml", 1],
+    ["folder", "workflows", 0, "2"], ["wf", "import.workflow.yaml", 1], ["wf", "report.workflow.yaml", 1],
+    ["proj", "project.yaml", 0]];
+  document.getElementById("tree").innerHTML = rows.map(([k, n, d, c, t, fresh]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === name ? "selected" : ""}">` +
+    (k === "folder" ? chev : `<span style="width:12px"></span>`) +
+    `<span class="kind">${icon(I[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}${t ? `<span class="tag">${t}</span>` : ""}</div></li>`).join("");
+
+  // Tabs and file bar.
+  const dirty = state === "plaintext";
+  document.getElementById("tabs").innerHTML = `<div class="tab active">${icon(envState ? I.env : I.db)} ${name} ${dirty ? "●" : "×"}</div>`;
+  const fb = document.getElementById("filebar");
+  if (envState) {
+    fb.innerHTML = `<span class="crumbs"><b>${file}</b></span><span class="badge">Environment</span><span class="badge warn">⚠ 2</span><div class="spacer"></div>
+      <button class="btn" style="opacity:.5">Save <kbd>Ctrl+S</kbd></button>`;
+  } else {
+    // Form | YAML like Canvas | YAML; "Test connection" with the environment, like Run.
+    fb.innerHTML = `<span class="crumbs"><b>${file}</b></span><span class="badge">Connection</span>${dirty ? '<span class="badge warn">⚠ 1</span>' : ""}<div class="spacer"></div>
+      <span style="display:inline-flex"><button class="btn split">${state === "test" ? '<span class="spin"></span>' : icon(I.plug, 13)}Test connection</button><button class="btn" aria-label="Environment">prod ${icon(I.down, 12)}</button></span>
+      <button class="btn ${dirty ? "primary" : ""}" ${dirty ? "" : 'style="opacity:.5"'}>Save <kbd>Ctrl+S</kbd></button>
+      <div class="segmented"><button aria-pressed="true">${icon(I.form, 14)}Form</button><button>${icon(I.code, 14)}YAML</button></div>`;
+    if (state === "test") fb.querySelector(".btn.split").innerHTML = `${icon(I.plug, 13)}Test connection`;
+  }
+
+  // The connection form: fields from the schema of sqlserver, grouped; the sign-in shows only its fields.
+  const fld = (label, key, inner, o = {}) => `<div class="fld"><div class="lab">${label}${o.req ? '<span class="req">*</span>' : ""}<span class="key">${key}</span></div>${inner}${o.help ? `<div class="help">${o.help}</div>` : ""}${o.after || ""}</div>`;
+  const inp = (v, o = {}) => `<div class="inp ${o.mono ? "mono" : ""} ${o.ph ? "ph" : ""} ${o.cls || ""}">${v}${o.select ? `<span class="caret-d">${icon(I.down, 13)}</span>` : ""}</div>`;
+  const pills = (list) => list.map(([env, s, src]) => `<span class="pill ${s}">${s === "miss" ? "⚠" : s === "soon" ? "⏱" : s === "plain" ? "⚠" : "●"} ${env}${src ? ` <span class="src">${src}</span>` : ""}</span>`).join("");
+  const secret = (ref, envs, o = {}) => `<div class="secret ${o.focus ? "focus" : ""}"><span class="lock">${icon(I.lock, 14)}</span><span class="ref"><i>\${secret:</i>${ref}<i>}</i></span>
+      <span class="envs">${pills(envs)}</span><button class="btn small">${o.focus ? "Cancel" : "Change…"}</button></div>`;
+
+  let menu = "";
+  if (state === "field") {
+    // Suggestions: secrets of the project and other sources; the value is never shown.
+    menu = `<div class="menu" style="top:62px">
+      <div class="inp focus" style="margin:2px 2px 4px">${icon(I.search, 13)}<span>erp</span><span style="display:inline-block;width:1px;height:14px;background:var(--foreground)"></span></div>
+      <div class="mh">Secrets of the project</div>
+      <div class="mi hl"><span class="n"><b>erp</b>-sql-password</span><span class="d">${pills([["dev", "", "local"], ["prod", "", "local"]])}</span></div>
+      <div class="mi"><span class="n"><b>erp</b>-sql-readonly</span><span class="d">${pills([["dev", "", "local"], ["prod", "miss"]])}</span></div>
+      <div class="mi"><span class="n"><b>erp</b>-api-token</span><span class="d">${pills([["dev", "soon", "6 d"], ["prod", "", "local"]])}</span></div>
+      <div class="mh">Environment variables</div>
+      <div class="mi"><span class="n">env/<b>ERP</b>_PASSWORD</span><span class="d" style="color:var(--muted-foreground);font-size:10px">set on this computer</span></div>
+      <div class="sep"></div>
+      <div class="mi new">${icon(I.plus, 13)}New secret <span class="mono">“erp-sql-pw”</span>…<span class="d" style="color:var(--muted-foreground);font-weight:400">set its value next</span></div>
+    </div>`;
+  }
+
+  let password;
+  if (state === "plaintext") {
+    password = fld("Password", "password", inp('<span class="wavy">Sommer2026!</span>', { mono: 1, cls: "warn focus" }), {
+      after: `<div class="note warn"><span>⚠</span><span><b>Plain text in a secret field.</b> The password ends up in the file and in Git, and every
+        environment uses the same value.</span><button class="btn small act primary">${icon(I.key, 12)}Store as secret…</button></div>` });
+  } else {
+    password = fld("Password", "password", secret("erp-sql-password", state === "field" ? [] : [["dev", "", "local"], ["prod", "", "local"]], { focus: state === "field" }),
+      { help: state === "field" ? "" : "Stored outside the project; the editor never shows the value", after: menu });
+  }
+  const form = () => {
+    const result = state === "test"
+      ? `<div class="result fail"><span class="sym">✕</span><div><div class="t">Sign-in failed for user runnel_read</div>
+          <div class="m">Environment prod · db01.example.local:1433 · 1.2 s · SQL Server error 18456</div>
+          <ul><li>Check <span class="mono">user</span> and the value of <span class="mono">\${secret:erp-sql-password}</span> for prod (set 3 days ago, local).</li>
+          <li>The server was reached and its certificate is valid; only the sign-in failed.</li></ul></div>
+          <button class="btn small close">Set password for prod…</button></div>`
+      : state === "form" ? `<div class="result ok"><span class="sym">✓</span><div><div class="t">Connected in 84 ms</div>
+          <div class="m">Environment dev · Microsoft SQL Server 16.0 · checked 2 min ago</div></div></div>` : "";
+    return `<div class="formwrap"><div class="form">
+      <div class="conn-head"><span class="tile">${icon(I.db)}</span><div><h2>erp-sql</h2><div class="sub">SQL Server · a Microsoft SQL Server database</div></div></div>
+      <p class="lead">ERP database, read only <span class="mono" style="font-size:10px">description</span> · used by 3 steps in <a href="#" class="mono" style="color:var(--primary)">import.workflow.yaml</a>, <a href="#" class="mono" style="color:var(--primary)">report.workflow.yaml</a></p>
+      ${result}
+      <div class="sec"><h3>${chev}Server</h3>
+        <div class="grid3">${fld("Host", "host", inp('<span class="v">${ERP_HOST}</span>', {}), { req: 1, help: "dev: <span class=mono>localhost</span> · prod: <span class=mono>db01.example.local</span>" })}
+        ${fld("Port", "port", inp("1433 (default)", { ph: 1 }))}
+        ${fld("Database", "database", inp("ERP", {}), { req: 1 })}</div>
+      </div>
+      <div class="sec"><h3>${chev}Sign-in</h3>
+        ${fld("User", "user", inp("runnel_read", { mono: 1 }), { help: "Empty: the Windows account of the Runnel process signs in" })}
+        ${password}
+      </div>
+      <div class="sec"><h3>${chev}Security</h3>
+        <div class="fld"><span class="check"><span class="box on">${icon(I.check)}</span>Encrypt the connection <span class="mono" style="color:var(--muted-foreground);font-size:10px">encrypt</span></span></div>
+        <div class="fld"><span class="check"><span class="box"></span>Trust the server certificate without checking <span class="mono" style="color:var(--muted-foreground);font-size:10px">trustServerCertificate</span></span>
+          <div class="help">Only for test servers: anyone between Runnel and the server could read and change the data</div></div>
+      </div>
+      <div class="sec closed"><h3>${chevRight}More<span class="count">instance, connectTimeout, applicationIntent</span></h3></div>
+    </div></div>`;
+  };
+
+  const view = document.getElementById("view");
+  if (envState) {
+    const lines = ["kind: Environment", "apiVersion: runnel/v1", "name: prod", "description: Production server",
+      "secretStore: local", "variables:", "  ERP_HOST: db01.example.local", "  CRM_URL: https://crm.example.com/api/"];
+    view.innerHTML = `<div class="code">` + lines.map((l, i) => {
+      const m = l.match(/^(\s*)([\w]+)(:)(.*)$/);
+      return `<div class="line"><span></span><span class="ln">${i + 1}</span><span class="src2">${m ? `${m[1]}<span class="k">${m[2]}</span>:<span class="s">${m[4]}</span>` : l}</span></div>`;
+    }).join("") + `</div>`;
+  } else {
+    view.innerHTML = form();
+
+  }
+
+  document.getElementById("status").innerHTML = `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>` +
+    `<span>${envState ? "YAML · UTF-8 · 8 lines" : "Connection · sqlserver"}</span>${dirty ? '<span style="color:var(--foreground)">● Unsaved changes</span>' : ""}<span class="spacer"></span><span>Runnel v0.2.0</span>`;
+
+  // Lower part of the sidebar: Reference with the fields of the type, or Secrets beside Variables.
+  const ctx = document.getElementById("ctx");
+  if (envState) {
+    const S = (src) => `<span class="set">●</span><span class="src">${src}</span>`, M = '<span class="miss">⚠</span><span class="src">missing</span>',
+      E = (d) => `<span class="miss">⏱</span><span class="src">${d}</span>`, P = '<span class="plain">⚠</span><span class="src">inline</span>';
+    const tr = (n, uses, dev, prod, open) => `<tr class="${open ? "open" : ""}"><td>${n}<small>${uses}</small></td><td>${dev}</td><td class="cur">${prod}</td></tr>`;
+    ctx.innerHTML = `<div class="ctx-head"><span class="label">Secrets</span><div class="segmented" role="tablist" aria-label="Help">
+        <button aria-pressed="false">Fields</button><button aria-pressed="false">Variables</button><button aria-pressed="true">Secrets</button></div></div>
+      <div class="ctx-sub">Column <b>prod</b> is this file · source <span class="mono">local</span></div>
+      <div class="scroll"><table class="vt"><thead><tr><th>Secret</th><th>dev</th><th class="cur">prod</th></tr></thead><tbody>` +
+      tr("erp-sql-password", "1 use", S("local"), S("local")) +
+      tr("crm-api-token", "2 uses", S("local"), E("6 days")) +
+      tr("smtp-client-secret", "1 use", S("env"), M, true) +
+      `</tbody></table>
+      <div class="vdetail"><div class="warnline">⚠ Not set for <b>prod</b>: runs with prod do not start.</div>
+        <div class="lvl"><span>dev</span><span>env · variable <span class="mono">SMTP_CLIENT_SECRET</span></span><span>prod</span><span>local · missing</span></div>
+        <div style="color:var(--muted-foreground);margin-bottom:2px">Used in</div><ul class="uses"><li><a href="#">connections/mail.yaml:12</a></li></ul>
+        <div class="acts"><button class="btn small primary">${icon(I.key, 12)}Set for prod…</button></div></div>
+      <table class="vt" style="margin-top:4px"><tbody>` + tr("release-token", "1 use", P, P) + `</tbody></table>
+      <div class="legend">● set · ⚠ used, but missing · ⏱ expires soon · <span style="color:var(--destructive)">⚠</span> plain text in the project (inline) – values are never shown</div></div>`;
+  } else {
+    const f = (n, type, short, inside) => `<li class="f"><div class="top"><span class="name">${n}</span>${inside ? `<span class="there">✓ line ${inside}</span>` : ""}<span class="type">${type}</span></div>${inside ? "" : `<div class="short">${short}</div>`}</li>`;
+    ctx.innerHTML = `<div class="ctx-head"><span class="label">Reference</span></div>
+      <div class="ctx-sub">Fields of <span class="mono">${file}</span> · type sqlserver</div>
+      <div class="scroll"><div class="grp">${chev}with: for <span class="mono">sqlserver</span><span class="count">10</span></div><ul class="fl">` +
+      f("host", "text", "", 7) + f("database", "text", "", 8) + f("user", "text", "", 9) + f("password", "secret", "", 10) +
+      f("port", "text", "TCP port; empty: 1433") + f("instance", "text", "Named instance, e.g. SQLEXPRESS") +
+      f("encrypt", "yes/no", "Encrypt the connection") + f("trustServerCertificate", "yes/no", "Skip the certificate check") + `</ul></div>`;
+  }
+
+  // The open list of names scrolls into view, as in the editor.
+  if (state === "field") document.querySelector(".menu").scrollIntoView({ block: "end" });
+
+  // Dialogs.
+  const app = document.getElementById("app");
+  if (state === "new") {
+    const types = [["db", "SQL Server", "Microsoft SQL Server, also Windows sign-in"], ["db", "PostgreSQL", "PostgreSQL database"], ["sqlite", "SQLite", "A database in a single file"],
+      ["http", "HTTP API", "Base address and sign-in of a REST API"], ["smtp", "SMTP", "A mail server for sending mails"]];
+    app.insertAdjacentHTML("beforeend", `<div class="scrim"><div class="dialog wide" role="dialog" aria-label="New connection">
+      <h2>New connection</h2><p class="intro">A connection holds the address and sign-in of a system in one place; workflows name it with <span class="mono">connection:</span>.</p>
+      ${fld("Name", "name", inp('erp-archive<span style="display:inline-block;width:1px;height:14px;background:var(--foreground)"></span>', { mono: 1, cls: "focus" }), { help: "Creates <span class=mono>connections/erp-archive.yaml</span>" })}
+      <div class="lab" style="font-size:var(--rn-text-xs);font-weight:500;margin:4px 0">Type</div>
+      <div class="types">${types.map(([k, n, d]) => `<div class="type ${n === "PostgreSQL" ? "sel" : ""}"><span class="tile ${k === "http" || k === "smtp" ? "net" : ""}">${icon(I[k])}</span><div><b>${n}</b><span>${d}</span></div></div>`).join("")}</div>
+      <div class="foot"><small>The form shows the fields of the type next; secrets are set there.</small><span class="spacer"></span><button class="btn">Cancel</button><button class="btn primary">Create</button></div>
+    </div></div>`);
+  }
+  if (state === "set") {
+    app.insertAdjacentHTML("beforeend", `<div class="scrim"><div class="dialog" role="dialog" aria-label="Set secret">
+      <h2>Set secret <span class="mono">smtp-client-secret</span></h2><p class="intro">Used by <span class="mono">connections/mail.yaml</span> (clientSecret).</p>
+      <div class="where"><span>Environment</span><span><b>prod</b></span><span>Stored in</span><span><span class="mono">local</span> – this computer, encrypted, outside the project folder</span></div>
+      ${fld("Value", "", `<div class="inp focus mono"><span class="dots">••••••••••••••••••••</span><span style="display:inline-block;width:1px;height:14px;background:var(--foreground)"></span><span class="caret-d" title="Show while typing">${icon(I.eye, 14)}</span></div>`,
+        { help: "Pasted from the clipboard · 34 characters" })}
+      ${fld("Expires", "", inp("2027-05-31", { mono: 1 }), { help: "Optional; the editor warns 14 days before" })}
+      <div class="info">${icon(I.lock, 14)}<span>After saving, the value is never shown again – not here, not in the log or in results. Runs of other environments do not get it.</span></div>
+      <div class="foot"><span class="spacer"></span><button class="btn">Cancel</button><button class="btn primary">Set secret</button></div>
+    </div></div>`);
+  }
+</script>
+</body>
+</html>
