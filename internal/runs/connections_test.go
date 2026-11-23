@@ -80,7 +80,7 @@ func TestRunConnectionProblems(t *testing.T) {
 func TestCheckConnection(t *testing.T) {
 	for conn, want := range map[string]string{
 		appConnection: "",
-		strings.Replace(appConnection, "type: sqlite", "type: mysql", 1):            `connections/app.yaml:4:7: unknown connection type "mysql" (available: sqlite)`,
+		strings.Replace(appConnection, "type: sqlite", "type: mysql", 1):            `connections/app.yaml:4:7: unknown connection type "mysql" (available: postgres, sqlite, sqlserver)`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "file: x.db", 1):         `connections/app.yaml:6:9: sqlite connection: unknown field "file"`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "path: ${secret:pw}", 1): `connections/app.yaml:6:9: ${secret:pw} is not allowed here`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "path: ${NOT_SET}", 1):   `warning: variable "NOT_SET" is not defined`,
@@ -140,5 +140,25 @@ func TestConnectionResolverMasks(t *testing.T) {
 	}
 	if m := mask.String("open secret-folder/x.db"); m != "open ***/x.db" {
 		t.Errorf("mask: %q", m)
+	}
+}
+
+// Switched off certificate checks and unencrypted connections are warnings (ADR 0022).
+func TestCheckConnectionWarnings(t *testing.T) {
+	for conn, want := range map[string]string{
+		"kind: Connection\napiVersion: runnel/v1\nname: app\ntype: sqlserver\nwith:\n  host: db\n  database: d\n  user: u\n  trustServerCertificate: true\n": "connections/app.yaml:9:27: warning: the certificate of the server is not checked",
+		"kind: Connection\napiVersion: runnel/v1\nname: app\ntype: sqlserver\nwith:\n  host: db\n  database: d\n  user: u\n  encrypt: \"false\"\n":           "warning: the connection is not encrypted (only the login is)",
+		"kind: Connection\napiVersion: runnel/v1\nname: app\ntype: postgres\nwith:\n  host: db\n  database: d\n  user: u\n  sslMode: disable\n":              "warning: the connection is not encrypted",
+		"kind: Connection\napiVersion: runnel/v1\nname: app\ntype: postgres\nwith:\n  host: db\n  database: d\n  user: u\n":                                  "",
+	} {
+		dir := dbProject(t, conn)
+		p, err := model.LoadProject(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := CheckConnections(p, "").Error()
+		if want == "" && got != "" || want != "" && !strings.Contains(got, want) {
+			t.Errorf("%s\nwant %q", got, want)
+		}
 	}
 }

@@ -377,7 +377,9 @@
               "app-db"
             ],
             "x-runnel-connection": [
-              "sqlite"
+              "sqlite",
+              "sqlserver",
+              "postgres"
             ]
           },
           "sql": {
@@ -1726,7 +1728,9 @@
               "app-db"
             ],
             "x-runnel-connection": [
-              "sqlite"
+              "sqlite",
+              "sqlserver",
+              "postgres"
             ]
           },
           "sql": {

@@ -37,8 +37,15 @@ func Value(v any, declared string) any {
 	case bool:
 		return v
 	case []byte:
-		if kind == kindText {
+		switch kind {
+		case kindText:
 			return string(v)
+		case kindDecimal, kindDate, kindDateTime, kindBool:
+			return fromText(string(v), kind) // e.g. DECIMAL and MONEY of SQL Server come as text
+		case kindGUID:
+			if len(v) == 16 {
+				return guid(v)
+			}
 		}
 		return append([]byte(nil), v...) // the driver may reuse its buffer
 	case time.Time:
@@ -86,6 +93,7 @@ const (
 	kindDate
 	kindDateTime
 	kindBool
+	kindGUID
 )
 
 // columnKind sorts a declared column type (as the database names it) into the kinds
@@ -104,9 +112,26 @@ func columnKind(declared string) int {
 		return kindDateTime
 	case "BOOL", "BOOLEAN", "BIT":
 		return kindBool
+	case "UNIQUEIDENTIFIER":
+		return kindGUID
 	}
 	if strings.Contains(t, "CHAR") || strings.Contains(t, "TEXT") || strings.Contains(t, "CLOB") {
 		return kindText
 	}
 	return kindOther
+}
+
+// guid writes a UNIQUEIDENTIFIER of SQL Server as text; its first three groups are
+// stored with the bytes in reverse order.
+func guid(b []byte) string {
+	order := []int{3, 2, 1, 0, -1, 5, 4, -1, 7, 6, -1, 8, 9, -1, 10, 11, 12, 13, 14, 15}
+	var sb strings.Builder
+	for _, i := range order {
+		if i < 0 {
+			sb.WriteByte('-')
+			continue
+		}
+		sb.WriteString(strconv.FormatUint(uint64(b[i])|0x100, 16)[1:])
+	}
+	return strings.ToUpper(sb.String())
 }

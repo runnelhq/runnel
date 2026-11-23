@@ -41,6 +41,11 @@ func resolved(file string) connection.Resolved {
 // read runs db.table-input on the database file and returns its records.
 func read(ctx context.Context, t testing.TB, file string, with map[string]any) ([]record.Record, error) {
 	t.Helper()
+	return readResolved(ctx, resolved(file), with)
+}
+
+// readResolved runs db.table-input on a resolved connection.
+func readResolved(ctx context.Context, conn connection.Resolved, with map[string]any) ([]record.Record, error) {
 	with["connection"] = "test"
 	tr, err := newTableInput(with)
 	if err != nil {
@@ -54,7 +59,7 @@ func read(ctx context.Context, t testing.TB, file string, with map[string]any) (
 		out = append(out, r)
 		return nil
 	}, func(slog.Level, string) {}).WithConnections(func(context.Context, string) (connection.Resolved, error) {
-		return resolved(file), nil
+		return conn, nil
 	})
 	in := make(chan transform.Batch)
 	close(in)
