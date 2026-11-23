@@ -21,7 +21,7 @@ func BenchmarkHTTPTrigger(b *testing.B) {
 	for name, content := range map[string]string{
 		"project.yaml": "kind: Project\napiVersion: runnel/v1\nname: p\n",
 		"workflows/w.workflow.yaml": "kind: Workflow\napiVersion: runnel/v1\nname: w\nparameters:\n  - { name: ID, type: integer }\n" +
-			"actions:\n  - { id: start, type: core.start }\n  - { id: reply, type: http.respond, with: { body: { id: \"{{ params.ID }}\" } } }\n" +
+			"actions:\n  - { id: start, type: core.start }\n  - { id: reply, type: http.response, with: { body: { id: \"{{ params.ID }}\" } } }\n" +
 			"  - { id: log, type: core.log, with: { message: \"answered {{ params.ID }}\" } }\n" +
 			"links:\n  - { from: start, to: reply }\n  - { from: reply, to: log }\n",
 		"triggers/w.yaml": "kind: Trigger\napiVersion: runnel/v1\nname: w\ntype: http\ntarget: workflows/w.workflow.yaml\n" +

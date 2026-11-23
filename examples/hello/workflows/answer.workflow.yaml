@@ -5,7 +5,7 @@
 # - "reply" answers the waiting caller: status, a header and a JSON body, with
 #   expressions; request.* describes the request.
 # - "done" runs after the answer; the caller does not wait for it.
-# Started from the editor or with "runnel run", http.respond does nothing.
+# Started from the editor or with "runnel run", http.response does nothing.
 kind: Workflow
 apiVersion: runnel/v1
 name: answer
@@ -17,7 +17,7 @@ actions:
   - id: start
     type: core.start
   - id: reply
-    type: http.respond
+    type: http.response
     with:
       status: "{{ params.NAME == 'nobody' ? 404 : 200 }}"
       headers:

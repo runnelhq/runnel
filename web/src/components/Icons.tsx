@@ -322,7 +322,6 @@ const actionIcons: Record<string, ReactNode> = {
   // HTTP request (S10, variant B chosen by the maintainer): the request out, the answer back.
   "http.request": <path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4" />,
   // Network: answering the caller; the same sign for the action and the transform.
-  "http.respond": <path d={replyPath} />,
   "http.response": <path d={replyPath} />,
   // Transforms (design/mockups/s25a-pipeline.html); core.log and core.dummy as above.
   "csv.input": <path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6" />,

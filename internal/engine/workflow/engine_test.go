@@ -628,7 +628,7 @@ links:
 }
 
 // TestNumberInTextField: a number in a field of type text (message: 42) is accepted
-// before the run and passed on as text, like in pipelines (e.g. status: 404 of http.respond).
+// before the run and passed on as text, like in pipelines (e.g. status: 404 of http.response).
 func TestNumberInTextField(t *testing.T) {
 	w := parse(t, `actions:
   - { id: start, type: core.start }

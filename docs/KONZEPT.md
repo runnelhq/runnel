@@ -214,7 +214,7 @@ with:
 |---|---|
 | `manual` | Start über UI oder CLI (kein Typ in Trigger-Dateien) |
 | `cron` | Zeitplan (Cron-Syntax + Zeitzone), Option `overlap` (kein paralleler Lauf); Nachholen verpasster Läufe später (Backlog) |
-| `http` | (seit S38a) HTTP-Endpunkt mit Methode und Pfad (`/api/customers/{id}`); Pfad, Query und Body werden zu Parametern. Als Webhook sofort `202` (`response: accepted`) oder als Dienst mit Antwort aus dem Lauf (`response: run`, Action `http.respond` bzw. Transform `http.response`) – [ADR 0018](adr/0018-http-trigger.md) |
+| `http` | (seit S38a) HTTP-Endpunkt mit Methode und Pfad (`/api/customers/{id}`); Pfad, Query und Body werden zu Parametern. Als Webhook sofort `202` (`response: accepted`) oder als Dienst mit Antwort aus dem Lauf (`response: run`, Action bzw. Transform `http.response`) – [ADR 0018](adr/0018-http-trigger.md) |
 | `file` | Ordner-Überwachung (Ordner + Pattern), z. B. neue CSV im Eingangsordner: ein Lauf je neuer Datei oder einer für alle neuen Dateien; der Ordner wird abgefragt (Polling), damit Netzlaufwerke und UNC-Pfade gleich funktionieren |
 | `interval` | fester Abstand, z. B. alle 15 Minuten; der erste Lauf nach dem ersten Abstand |
 
@@ -680,11 +680,11 @@ with:
 - **Antwort bei `accepted`:** `202` mit `{ "runId": …, "status": "/api/v1/runs/…" }` (der Status steht in der API des
   Editors).
 - **Antwort bei `run` (seit S38b1):** Der Aufrufer wartet auf den Lauf, höchstens `timeout`.
-  - Die erste ausgeführte Action **`http.respond`** antwortet (`status`, `headers`, `body` mit Ausdrücken; ein Text geht
+  - Die erste ausgeführte Action **`http.response`** antwortet (`status`, `headers`, `body` mit Ausdrücken; ein Text geht
     als Text, andere Werte als JSON); spätere schreiben eine Warnung ins Log. Der Workflow arbeitet nach der Antwort
-    weiter. Auch eine `http.respond` in einem aufgerufenen Workflow (`core.run-workflow`) antwortet. Ohne wartenden
+    weiter. Auch eine `http.response` in einem aufgerufenen Workflow (`core.run-workflow`) antwortet. Ohne wartenden
     Aufrufer (Editor, `runnel run`, andere Trigger) tut sie nichts.
-  - Ohne `http.respond`: Endet der Lauf erfolgreich, sind die `outputs` als JSON-Objekt die Antwort (`200`; bei einer
+  - Ohne `http.response`: Endet der Lauf erfolgreich, sind die `outputs` als JSON-Objekt die Antwort (`200`; bei einer
     Pipeline die Zähler der Transforms); scheitert er, `500` mit der Lauf-ID, ohne Details (die stehen im Log).
   - **Pipelines (seit S38c):** Der Transform **`http.response`** antwortet mit den Datensätzen, die er erhält, als
     JSON – eine Liste, mit `single: true` der erste Datensatz als Objekt (ohne Datensätze `null`). Felder in ihrer
@@ -1085,7 +1085,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen (`core.check`, seit S10), Log schreiben, Schleife (ForEach über Liste/Dateien) |
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell, Programm starten |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
-| Netzwerk | HTTP-Request (`http.request`, seit S10), HTTP-Antwort (`http.respond`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`: upload, download, list, delete, move, mkdir, exists, wait; Protokoll in der Connection, S57), Mail senden, Mail abrufen (IMAP) |
+| Netzwerk | HTTP-Request (`http.request`, seit S10), HTTP-Antwort (`http.response`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`: upload, download, list, delete, move, mkdir, exists, wait; Protokoll in der Connection, S57), Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Tabelle existiert, Zeilen zählen |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,

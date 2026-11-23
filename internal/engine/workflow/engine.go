@@ -51,7 +51,7 @@ type Options struct {
 	// Request is the request of the caller of an http trigger (request in expressions,
 	// S38b1); nil otherwise.
 	Request map[string]any
-	// Respond answers the waiting caller of an http trigger (http.respond); nil if none.
+	// Respond answers the waiting caller of an http trigger (http.response); nil if none.
 	Respond action.Responder
 	// BaseDir is the folder relative paths of actions refer to (ADR 0020): the project
 	// folder, or the folder of the workflow file; empty: the working directory.

@@ -136,7 +136,7 @@ func (a *copyAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 | Keine Panics | Fehler zurückgeben, nie `panic`; keine globalen Zustände ändern |
 | Log | `ec.Log` / `ec.Logf`: `Info` für das Ergebnis (eine Zeile), `Debug` für Details (sichtbar mit `-v`), `Warn` für Auffälliges, das kein Fehler ist |
 | Secrets | Passwörter, Tokens und `${secret:…}`-Werte nie loggen und nicht in Fehlermeldungen aufnehmen |
-| Antwort an HTTP-Aufrufer | `ec.Respond` (nur `http.respond`, seit S38b1): `nil` ohne wartenden Aufrufer – dann nichts tun; gibt `false` zurück, wenn schon geantwortet wurde |
+| Antwort an HTTP-Aufrufer | `ec.Respond` (nur `http.response`, seit S38b1): `nil` ohne wartenden Aufrufer – dann nichts tun; gibt `false` zurück, wenn schon geantwortet wurde |
 | `Result.End` | nur für Actions, die den Workflow beenden (`core.success`, `core.abort`); sonst leeres `Result` |
 | Ausgabedaten | `action.Result{Output: …}`: strukturierte Ergebnisse (z. B. Dateiliste, Statuscode) für nachfolgende Actions; Ausdrücke lesen sie als `result.output` bzw. `results["id"].output` (ADR 0006). Erlaubt sind Text, Zahlen, Wahrheitswerte, Listen und Maps davon; im Beschreibungstext der Action dokumentieren, was `output` enthält |
 | Wiederholbarkeit | Eine Action kann wiederholt werden (`retry`, Schleifen) – sie sollte bei erneutem Aufruf sinnvoll funktionieren (z. B. Zieldatei überschreiben oder klar melden) |

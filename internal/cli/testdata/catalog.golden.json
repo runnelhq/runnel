@@ -747,7 +747,7 @@
       "example": "method: GET\nurl: https://api.example.com/orders\nquery:\n  status: open\nheaders:\n  Authorization: \"Bearer ${env:API_TOKEN}\"\n"
     },
     {
-      "type": "http.respond",
+      "type": "http.response",
       "kind": "action",
       "category": "network",
       "label": "HTTP Response",
