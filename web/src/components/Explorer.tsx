@@ -63,6 +63,8 @@ export function Explorer(props: {
   onOpen: (path: string) => void;
   onReload: () => void;
   changes?: ExplorerChanges;
+  /** Shows a file: opens its folders and scrolls its row into view ("Reveal in explorer", E21). */
+  reveal?: { path: string; seq: number } | null;
 }) {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -328,6 +330,7 @@ export function Explorer(props: {
             onSubmit={submit}
             onCancel={() => setEditing(null)}
             connectionTypes={connectionTypes}
+            reveal={props.reveal ?? null}
           />
         ))}
       </ul>
@@ -482,12 +485,24 @@ function Node(props: {
   onCancel: () => void;
   /** Types of the connection and trigger files by path, for their sign and tag (mockups S39b, E20). */
   connectionTypes: Map<string, string>;
+  reveal: { path: string; seq: number } | null;
 }) {
   const { entry, depth, editing } = props;
   const connectionType = entry.kind === "connection" ? props.connectionTypes.get(entry.path) : undefined;
   const typeTag = entry.kind === "connection" || entry.kind === "trigger" ? props.connectionTypes.get(entry.path) : undefined;
   const [open, setOpen] = useState(true);
   const isDir = entry.type === "dir";
+  const row = useRef<HTMLDivElement>(null);
+  // "Reveal in explorer": the folders of the file open, its row scrolls into view.
+  const { reveal } = props;
+  useEffect(() => {
+    if (!reveal) return;
+    if (isDir && reveal.path.startsWith(entry.path + "/")) setOpen(true);
+    if (reveal.path === entry.path) {
+      row.current?.scrollIntoView?.({ block: "nearest" });
+      row.current?.focus({ preventScroll: true });
+    }
+  }, [reveal, isDir, entry.path]);
   const selected = !isDir && entry.path === props.selected;
   const activate = () => (isDir ? setOpen(!open) : props.onOpen(entry.path));
   const renaming = editing && "rename" in editing && editing.rename.path === entry.path;
@@ -513,6 +528,7 @@ function Node(props: {
   return (
     <li role="treeitem" aria-label={entry.name} aria-expanded={isDir ? open : undefined} aria-selected={isDir ? undefined : selected}>
       <div
+        ref={row}
         tabIndex={0}
         title={entry.path}
         draggable={!!props.drag && entry.path !== projectFile}

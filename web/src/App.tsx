@@ -12,7 +12,7 @@ import { missingIn, useVariables } from "./reference";
 import { Splitter, useExplorerHeight } from "./components/Splitter";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
-import { fetchTree, movedPath, type Entry } from "./files";
+import { fetchTree, fullPath, movedPath, type Entry } from "./files";
 import type { RunView } from "./run";
 import { useTheme } from "./theme";
 
@@ -26,6 +26,8 @@ export function App() {
   const [tree, setTree] = useState<Entry | null>(null);
   const [treeError, setTreeError] = useState<string | null>(null);
   const [tabs, setTabs] = useState<string[]>([]);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
   const [active, setActive] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [paletteTarget, setPaletteTarget] = useState<PaletteTarget | null>(null);
@@ -38,7 +40,12 @@ export function App() {
   const variables = useVariables(varsKey);
   const [run, setRun] = useState<RunView | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
-  const [closing, setClosing] = useState<string | null>(null);
+  // Files with unsaved changes waiting for "Save changes?", one after the other (E21).
+  const [closingQueue, setClosingQueue] = useState<string[]>([]);
+  const closing = closingQueue[0] ?? null;
+  const nextClosing = () => setClosingQueue((q) => q.slice(1));
+  // "Reveal in explorer" (E21): the explorer opens the folders of the file and shows its row.
+  const [reveal, setReveal] = useState<{ path: string; seq: number } | null>(null);
   // Files changed outside their tab (references updated when moving, E12) load again.
   const [reloads, setReloads] = useState<Record<string, number>>({});
   const handles = useRef(new Map<string, FileHandle>());
@@ -140,15 +147,28 @@ export function App() {
     const readme = tree.children?.find((e) => e.type === "file" && e.name.toLowerCase() === "readme.md");
     if (readme && tabs.length === 0) open(readme.path);
   }, [tree, tabs.length, open]);
-  const closeNow = (path: string) => {
-    const i = tabs.indexOf(path);
-    const rest = tabs.filter((p) => p !== path);
-    setTabs(rest);
-    onDirty(path, false);
-    if (active === path) setActive(rest[Math.min(i, rest.length - 1)] ?? null);
+  // Closes tabs at once; the active one passes to its next neighbour that stays open.
+  const closeNow = (paths: string[]) => {
+    if (paths.length === 0) return;
+    // The latest tabs, also after a save that finished later (Save in "Save changes?").
+    const t = tabsRef.current;
+    const gone = new Set(paths);
+    setTabs((cur) => cur.filter((p) => !gone.has(p)));
+    setActive((a) => {
+      if (!a || !gone.has(a)) return a;
+      const i = t.indexOf(a);
+      return t.slice(i + 1).find((p) => !gone.has(p)) ?? t.slice(0, i).reverse().find((p) => !gone.has(p)) ?? null;
+    });
+    paths.forEach((p) => onDirty(p, false));
   };
-  // Closing a tab with unsaved changes asks first (decision for mockup E6a).
-  const close = (path: string) => (dirty.has(path) ? setClosing(path) : closeNow(path));
+  // Closing a tab with unsaved changes asks first (decision for mockup E6a); with several
+  // files, the saved ones close at once and the others ask one after the other (E21).
+  const closeMany = (paths: string[]) => {
+    closeNow(paths.filter((p) => !dirty.has(p)));
+    const ask = paths.filter((p) => dirty.has(p));
+    if (ask.length > 0) setClosingQueue((q) => [...q, ...ask.filter((p) => !q.includes(p))]);
+  };
+  const close = (path: string) => closeMany([path]);
 
   return (
     <div className="grid h-full grid-rows-[48px_1fr_24px]">
@@ -167,6 +187,7 @@ export function App() {
               selected={active}
               onOpen={open}
               onReload={loadTree}
+              reveal={reveal}
               changes={{
                 projectDir: project?.dir ?? null,
                 isDirty: (path) => dirty.has(path),
@@ -210,7 +231,16 @@ export function App() {
           )}
           {active ? (
             <>
-              <Tabs paths={tabs} active={active} dirty={dirty} onSelect={setActive} onClose={close} />
+              <Tabs
+                paths={tabs}
+                active={active}
+                dirty={dirty}
+                onSelect={setActive}
+                onClose={close}
+                onCloseMany={closeMany}
+                onCopyPath={(path) => void navigator.clipboard?.writeText(project?.dir ? fullPath(project.dir, path) : path)}
+                onReveal={(path) => setReveal((r) => ({ path, seq: (r?.seq ?? 0) + 1 }))}
+              />
               {tabs.map((path) => (
                 // An error in a file stays in its tab; the message shows while the tab is active.
                 <ErrorBoundary
@@ -259,14 +289,15 @@ export function App() {
       {closing && (
         <Dialog
           title="Save changes?"
-          onCancel={() => setClosing(null)}
+          onCancel={() => setClosingQueue([])}
           actions={[
-            { label: "Cancel", onClick: () => setClosing(null) },
+            // Cancel keeps this file and the ones still waiting open.
+            { label: "Cancel", onClick: () => setClosingQueue([]) },
             {
               label: "Don’t save",
               onClick: () => {
-                closeNow(closing);
-                setClosing(null);
+                closeNow([closing]);
+                nextClosing();
               },
             },
             {
@@ -274,8 +305,8 @@ export function App() {
               tone: "primary",
               onClick: async () => {
                 const path = closing;
-                setClosing(null);
-                if (await handles.current.get(path)?.save()) closeNow(path);
+                nextClosing();
+                if (await handles.current.get(path)?.save()) closeNow([path]);
               },
             },
           ]}
