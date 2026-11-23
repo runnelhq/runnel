@@ -28,6 +28,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s23b-info-link.html`](s23b-info-link.html) | S23b – Info-Links und Stream Lookup | `canvas`, `link`, `run`, `problems` | freigegeben mit PR #157, umgesetzt mit S23b1 (Engine) und S23b2 (Editor) |
 | [`s39-connections.html`](s39-connections.html) | S39b/S39f – Connections und Secrets im Editor | `form`, `test`, `new`, `field`, `plaintext`, `secrets`, `set` | freigegeben mit PR #173; `form` und `test` umgesetzt mit S39c2a, `new`, `field` und `plaintext` (ohne „Store as secret…“) mit S39c2b; `secrets` und `set` folgen mit S39g |
 | [`e20-forms.html`](e20-forms.html) | E20 – Formulare für Trigger, Environments und `project.yaml` | `cron`, `http`, `type`, `environment`, `project`, `new` | freigegeben mit PR #178; `cron`, `http`, `type` und `new` umgesetzt mit E20a, `environment` und `project` mit E20b |
+| [`e21-tabs.html`](e21-tabs.html) | E21 – Viele offene Dateien: Liste und Menü der Tabs | `many`, `list`, `search`, `menu` | zur Freigabe |
 
 ## Entscheidungen
 
@@ -112,6 +113,10 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | E20 | `secrets:` (Quelle `inline`) zeigt im Formular nur die Namen, nie die Werte, mit roter Warnung zu Klartext; die Werte bleiben in der YAML-Ansicht sichtbar wie bisher |
 | E20 | „New → Trigger“ fragt Name, Typ und Ziel; der neue Trigger startet deaktiviert (wie bisher in E11) |
 | E20 | Umsetzung in zwei Schritten: E20a Server (allgemeiner Edit-Endpunkt für Dateien mit Metadaten, Varianten und Gruppen im Trigger-Schema, Zeitplan in Worten) mit dem Trigger-Formular, E20b Environments und `project.yaml` |
+| E21 | Baut auf dem Fix der Tab-Leiste auf (PR #183): Tabs erst schmaler, dann Scrollen ohne Scrollleiste, Mausrad waagerecht, aktiver Tab immer sichtbar, Verlauf am Rand |
+| E21 | Am rechten Ende der Leiste fest „▾ 14“ (Zahl der offenen Dateien; Strg+Umschalt+E): Liste aller offenen Dateien in der Reihenfolge der Tabs mit Symbol, Name, Ordner, ● für ungespeichert und ×; Suchfeld oben (Tippen filtert nach Name und Pfad, ↑↓ wählen, Enter öffnet, Esc schließt); unten „Close saved files“ und „Close all…“ |
+| E21 | Rechtsklick auf einen Tab: Close (Strg+W), Close others, Close to the right, Close saved (mit Zahl), Close all; Copy path, Reveal in explorer. Schließen mehrerer Dateien mit ungespeicherten Änderungen fragt wie bisher je Datei (E6a); „Close saved“ lässt sie offen |
+| E21 | Kein Vorschau-Tab (wie in VS Code): vom Maintainer verworfen |
 | S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
 | E14 | Listen in Konfigurationen werden im Panel bearbeitet; der Editor ergibt sich aus dem Schema (ADR 0014), ohne eigenen Code je Transform. Statt „Lists and nested values are changed in the YAML view.“ |
 | E14 | Darstellung: Listen mit bis zu drei kurzen, einfachen Eigenschaften als **Tabelle** (eine Zeile je Eintrag, Spaltenköpfe mit `*` für Pflicht, z. B. `core.constant`, `core.convert`, `core.select-fields`, `core.sort`); längere oder mehr Eigenschaften als **Karten** (z. B. `aggregates` von `core.group-by`, `cases` von `core.switch`): zugeklappt mit einer Zusammenfassung (`total = sum(Betrag)`, Bedingung → Ziel), aufgeklappt die Felder. Listen von Texten (Feldnamen wie `groupBy`, `remove`) als **Chips** |
