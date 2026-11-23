@@ -241,3 +241,21 @@ func TestConnectionPaginate(t *testing.T) {
 		t.Errorf("%v", auths)
 	}
 }
+
+// Check sends GET to the base address with the sign-in (test of the editor, S39c1).
+func TestCheck(t *testing.T) {
+	srv, s := apiServer(t)
+	res := func(conn map[string]any) (string, error) {
+		return Check(context.Background(), connection.Resolved{Name: "api", Type: connections.TypeHTTP, With: conn})
+	}
+	msg, err := res(map[string]any{"baseUrl": srv.URL + "/v1", "auth": "bearer", "token": "tok"})
+	if err != nil || msg != "GET "+srv.URL+"/v1/ answered 200 OK" || s.last().Header.Get("Authorization") != "Bearer tok" {
+		t.Fatalf("%q %v", msg, err)
+	}
+	if _, err := res(map[string]any{"baseUrl": srv.URL, "auth": "bearer", "token": "old"}); err == nil || !strings.Contains(err.Error(), "the API refused the sign-in (401 Unauthorized)") {
+		t.Errorf("error %v", err)
+	}
+	if _, err := res(map[string]any{"baseUrl": "http://api.example.com", "auth": "basic", "user": "u"}); err == nil || !strings.Contains(err.Error(), "unencrypted") {
+		t.Errorf("error %v", err)
+	}
+}

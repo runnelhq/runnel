@@ -13,6 +13,35 @@ type VarUse struct {
 	Pos  Position
 }
 
+// SecretUse is a reference ${secret:[STORE/]NAME} in a file, at the position of its value.
+type SecretUse struct {
+	Name  string
+	Store string // the store named in the reference; empty for the default store
+	Pos   Position
+}
+
+// ScanSecrets returns the references to secrets in any YAML file of a project, like
+// ScanVariables (S39c1).
+func ScanSecrets(name string, data []byte) ([]SecretUse, error) {
+	src, err := parseSource(name, data)
+	if err != nil {
+		return nil, err
+	}
+	var uses []SecretUse
+	for _, sc := range src.scalars() {
+		refs, err := vars.Parse(sc.value)
+		if err != nil {
+			continue
+		}
+		for _, r := range refs {
+			if r.Kind == vars.KindSecret {
+				uses = append(uses, SecretUse{Name: r.Name, Store: r.Store, Pos: sc.pos})
+			}
+		}
+	}
+	return uses, nil
+}
+
 // ScanVariables returns the references to variables in any YAML file of a project and
 // the names of the parameters it declares (parameters[].name of workflows and
 // pipelines), so that uses of parameters can be told apart from uses of project

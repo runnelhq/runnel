@@ -181,6 +181,10 @@ func (s *server) dialog(c *smtp.Client, cfg *tls.Config, secret, from string, to
 			return fmt.Errorf("sign-in failed: %w", err)
 		}
 	}
+	if data == nil {
+		// Only the sign-in is checked (Check, test of the editor): no mail.
+		return c.Quit()
+	}
 	if err := c.Mail(from); err != nil {
 		return err
 	}

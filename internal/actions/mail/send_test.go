@@ -270,3 +270,22 @@ func TestConnectionWarning(t *testing.T) {
 		t.Error("password is not a secret field")
 	}
 }
+
+// Check signs in without sending a mail (test of the editor, S39c1).
+func TestCheck(t *testing.T) {
+	srv := &testServer{tls: certificate(t), ext: []string{"STARTTLS", "AUTH PLAIN"}}
+	srv.start(t)
+	conn := func(pw string) connection.Resolved {
+		return connection.Resolved{Name: "mail", Type: connections.TypeSMTP, With: map[string]any{"host": "127.0.0.1", "port": srv.port(), "user": "runnel", "password": pw}}
+	}
+	msg, err := Check(context.Background(), conn("secret-pw"))
+	if err != nil || msg != "signed in to 127.0.0.1:"+srv.port()+" as runnel (starttls)" {
+		t.Fatalf("%q %v", msg, err)
+	}
+	if from, rcpt, data := srv.received(); from != "" || rcpt != nil || data != "" {
+		t.Errorf("a mail was sent: %s %v", from, rcpt)
+	}
+	if _, err := Check(context.Background(), conn("wrong")); err == nil || !strings.Contains(err.Error(), "sign-in failed: 535") {
+		t.Errorf("error %v", err)
+	}
+}

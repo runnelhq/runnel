@@ -500,3 +500,17 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
 - **`Retry-After`:** bei `429` und `503` mit dem Header; höchstens `retryAfter.maxRetries` Wiederholungen (3) und je
   höchstens `retryAfter.maxWait` (1 Minute). Ohne Header wird nicht wiederholt; dafür bleibt `retry:` der Action. Die
   Wiederholung gilt je Anfrage, bei Paginierung also je Seite.
+
+## Nachtrag 2026-11-23 (S39c1): Test und Stand der Secrets
+
+- **Test einer Connection** (Abschnitt 8): `POST /api/v1/connections/{name}/test` mit `{"environment": "…"}` (leer:
+  Standard-Environment). Getestet wird nur die gespeicherte Datei, aufgelöst wie für einen Lauf. Höchstens 15 s und ein
+  Test je Connection gleichzeitig (sonst `409`). Ein fehlgeschlagener Test ist eine Antwort (`ok: false`) mit Meldung,
+  maskiert wie das Log eines Laufs.
+- **Was getestet wird:** Datenbanken Ping und Version des Servers; SQLite legt dabei keine Datei an (eine fehlende Datei
+  ist „wird beim ersten Lauf angelegt“). `http` sendet `GET` an `baseUrl` mit Headern und Anmeldung; `401`/`403` sind ein
+  Fehlschlag, jede andere Antwort zeigt, dass die API erreichbar ist. `smtp` meldet sich an und beendet den Dialog ohne
+  Mail. Geschrieben oder gesendet wird nichts.
+- **Stand der Secrets:** `GET /api/v1/secrets` nennt jedes `${secret:…}` des Projekts mit Fundstellen und je Environment
+  die Quelle und den Stand (`set`, `missing`, `unavailable` für Quellen, die es noch nicht gibt). Werte verlassen den
+  Server nie; `env` meldet nur, ob die Variable gesetzt ist.

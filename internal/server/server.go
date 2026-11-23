@@ -64,6 +64,8 @@ type Server struct {
 	// stop is closed by Shutdown to end open event streams.
 	stop     chan struct{}
 	stopOnce sync.Once
+	// testing holds the names of connections being tested (one test each at a time).
+	testing sync.Map
 }
 
 // New opens the project directory. Close releases it.
@@ -129,6 +131,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+APIPrefix+"/schemas/{kind}", s.handleSchema)
 	mux.HandleFunc("GET "+APIPrefix+"/variables", s.handleVariables)
 	mux.HandleFunc("GET "+APIPrefix+"/connections", s.handleConnections)
+	mux.HandleFunc("POST "+APIPrefix+"/connections/{name}/test", s.handleTestConnection)
+	mux.HandleFunc("GET "+APIPrefix+"/secrets", s.handleSecrets)
 	mux.HandleFunc("GET "+APIPrefix+"/expressions", s.handleExpressions)
 	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
 	mux.HandleFunc("POST "+APIPrefix+"/workflows/edit", s.handleEditWorkflow)

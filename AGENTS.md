@@ -61,6 +61,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
 | `internal/connection/` | Schnittstelle zu den Connection-Typen (ADR 0022): Registry mit Schema je Typ, aufgelöste Connection (`Resolved`) |
 | `internal/connections/` | eingebaute Connection-Typen: `connections.go` (`Builtin()`), eine Datei je Typ (z. B. `sqlite.go`) |
+| `internal/conntest/` | Connections testen für den Editor (S39c1): Datenbanken Ping und Version, `http` und `smtp` über `Check` der Actions; nichts wird geschrieben oder gesendet |
 | `internal/sqldb/` | Datenbanken der Connections öffnen (Pool je Datenbank), Parameter `@name` im SQL erkennen und übergeben |
 | `internal/engine/pipeline/` | Pipeline-Engine: Goroutine je Transform, gepufferte Kanäle, Batches, Zähler |
 | `internal/record/` | Record: geordnete Felder (ADR 0007) |

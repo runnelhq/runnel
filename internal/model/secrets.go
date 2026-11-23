@@ -59,6 +59,35 @@ func SecretLookup(p *Project, env *Environment) func(store, name string) (string
 	}
 }
 
+// States of a secret in an environment (SecretStatus).
+const (
+	SecretSet         = "set"
+	SecretMissing     = "missing"
+	SecretUnavailable = "unavailable" // the store cannot be read (yet), e.g. local before S39d
+)
+
+// SecretStatus tells from which store a secret of an environment comes and whether it is
+// set, for the editor (S39c1); it never returns the value. store is the store named in
+// the reference, empty for the default store of the environment.
+func SecretStatus(p *Project, env *Environment, store, name string) (from, state string) {
+	if store == "" {
+		store = DefaultSecretStore(p, env)
+	}
+	if secretStoreAvailable(store) != nil {
+		return store, SecretUnavailable
+	}
+	if store == SecretStoreInline {
+		if _, err := inlineSecret(p, env, name); err != nil {
+			return store, SecretMissing
+		}
+		return store, SecretSet
+	}
+	if v, ok := os.LookupEnv(name); ok && v != "" {
+		return store, SecretSet
+	}
+	return store, SecretMissing
+}
+
 // inlineSecret reads a secret from secrets: of the environment, else of project.yaml.
 func inlineSecret(p *Project, env *Environment, name string) (string, error) {
 	if env != nil {
