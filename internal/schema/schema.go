@@ -46,6 +46,10 @@ const FormatText = "runnel-text"
 // the fields known on the incoming link. Names of new fields are not marked.
 const FormatField = "runnel-field"
 
+// FormatInfoField marks the name of a field of the records on the info link (lookup data,
+// S23b): the editor offers the fields known on the info link.
+const FormatInfoField = "runnel-info-field"
+
 // FormatTarget marks the id of a transform that a data link of this transform leads to,
 // e.g. "to" of core.switch (E14b): the editor offers the targets of the links.
 const FormatTarget = "runnel-target"

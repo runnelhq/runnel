@@ -354,6 +354,21 @@ const actionIcons: Record<string, ReactNode> = {
       <path d="M10 17v2a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2" strokeDasharray="2.4 2.2" />
     </>
   ),
+  // Lookups (mockup S23b): a magnifier; for the database the cylinder of the category.
+  "core.stream-lookup": (
+    <>
+      <circle cx="10" cy="10" r="5" />
+      <path d="M14 14l6 6M8 10h4" />
+    </>
+  ),
+  "db.lookup": (
+    <>
+      <ellipse cx="10" cy="6" rx="6" ry="2.5" />
+      <path d="M4 6v8c0 1.4 2.7 2.5 6 2.5M16 6v4" />
+      <circle cx="17" cy="16" r="3" />
+      <path d="M19.2 18.2L21 20" />
+    </>
+  ),
   // Map values and split field (S16f, icons chosen by the maintainer from variant A of the proposal).
   "core.map-values": (
     <>

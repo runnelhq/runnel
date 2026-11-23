@@ -25,7 +25,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s16d-icons.html`](s16d-icons.html) | S16d – Icons für Berechnen, Duplikate entfernen und Sequenz | `choice`, `canvas` | freigegeben mit PR #120 (Variante A); umgesetzt mit S16d |
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
-| [`s23b-info-link.html`](s23b-info-link.html) | S23b – Info-Links und Stream Lookup | `canvas`, `link`, `run`, `problems` | zur Freigabe |
+| [`s23b-info-link.html`](s23b-info-link.html) | S23b – Info-Links und Stream Lookup | `canvas`, `link`, `run`, `problems` | freigegeben mit PR #157, umgesetzt mit S23b1 (Engine) und S23b2 (Editor) |
 
 ## Entscheidungen
 
