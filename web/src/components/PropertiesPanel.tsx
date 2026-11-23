@@ -24,6 +24,7 @@ import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, DetectI
 import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
+import { useConnections } from "../reference";
 import { ExpressionInput } from "./ExpressionInput";
 import { ExpressionDialog } from "./ExpressionDialog";
 import { ListField } from "./ListField";
@@ -700,6 +701,11 @@ function SchemaField(props: {
       </Field>
     );
   }
+  // The connection of a step: those of the project with a fitting type; a name with ${…}
+  // or {{ … }} stays a text field.
+  if (s.format === "runnel-connection" && !/\$\{|\{\{/.test(String(value ?? ""))) {
+    return <ConnectionField label={label} fieldKey={key} required={props.required} schema={s} problems={props.problems} value={value} onChange={props.onChange} />;
+  }
   if (s.enum && s.enum.length > 0) {
     const current = value === undefined ? "" : String(value);
     return (
@@ -742,7 +748,7 @@ function SchemaField(props: {
         problems={props.problems}
         value={text}
         placeholder={placeholder}
-        multiline={s.format === "runnel-text"}
+        multiline={s.format === "runnel-text" || s.format === "runnel-sql" || s.format === "runnel-script"}
         ctx={props.ctx}
         owner={props.owner}
         onCommit={(v) => props.onChange(v === "" ? null : v)}
@@ -776,6 +782,54 @@ function SchemaField(props: {
             props.onChange(v);
           }}
         />
+      )}
+    </Field>
+  );
+}
+
+/**
+ * The connection of a step (ADR 0022): a choice of the connections of the project whose
+ * type the step accepts; a name that is not among them stays selectable and is marked.
+ */
+function ConnectionField(props: {
+  label: string;
+  fieldKey: string;
+  required?: boolean;
+  schema: Schema;
+  problems: Problem[];
+  value: unknown;
+  onChange: (value: string | null) => void;
+}) {
+  const all = useConnections();
+  const types = props.schema["x-runnel-connection"] ?? [];
+  const fitting = (all ?? []).filter((c) => types.length === 0 || types.includes(c.type));
+  const current = props.value === undefined || props.value === null ? "" : String(props.value);
+  const known = fitting.some((c) => c.name === current);
+  const other = (all ?? []).find((c) => c.name === current);
+  const help =
+    all && fitting.length === 0
+      ? `No connection of type ${types.join(" or ")} in connections/ yet`
+      : props.schema.description;
+  return (
+    <Field label={props.label} fieldKey={props.fieldKey} required={props.required} help={help} problems={props.problems}>
+      {(p) => (
+        <select
+          id={p.id}
+          value={current}
+          aria-invalid={p.invalid}
+          onChange={(e) => props.onChange(e.target.value === "" ? null : e.target.value)}
+          className={inputClass(p.invalid) + " font-mono" + (current === "" ? " text-muted-foreground" : "")}
+        >
+          <option value="">Not set</option>
+          {fitting.map((c) => (
+            <option key={c.name} value={c.name}>
+              {types.length > 1 ? `${c.name} (${c.type})` : c.name}
+            </option>
+          ))}
+          {current !== "" && !known && (
+            <option value={current}>{other ? `${current} (type ${other.type} does not fit)` : `${current} (not found)`}</option>
+          )}
+        </select>
       )}
     </Field>
   );

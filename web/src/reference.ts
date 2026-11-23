@@ -33,6 +33,28 @@ export function useSchema(kind: ReferenceKind | null): Schema | null {
   return schema;
 }
 
+/** A connection of the project as GET /connections returns it. */
+export interface ConnectionInfo {
+  name: string;
+  type: string;
+  file: string;
+}
+
+/** useConnections loads the connections of the project (null while loading or on an error). */
+export function useConnections(): ConnectionInfo[] | null {
+  const [list, setList] = useState<ConnectionInfo[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`${apiBase}/connections`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ connections: ConnectionInfo[] }>) : Promise.reject(new Error(r.statusText))))
+      .then((v) => live && setList(v.connections), () => live && setList(null));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return list;
+}
+
 /** A variable of the project as GET /variables returns it (E18a). */
 export interface VariableInfo {
   name: string;

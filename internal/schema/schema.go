@@ -83,6 +83,11 @@ const FormatScript = "runnel-script"
 // and never shown. The editor offers no value from the file.
 const FormatSecret = "runnel-secret"
 
+// VariantsKey is the schema keyword of a mapping whose fields depend on the sibling field
+// type: the schema for each type, e.g. with: of a connection file (fields of sqlite,
+// http …). Editors pick the variant by the type in the file.
+const VariantsKey = "x-runnel-variants"
+
 // OnlyKey is the schema keyword of the option only=: the field applies only when a
 // sibling field has one of the given values. The editor hides it otherwise (mockup E14).
 const OnlyKey = "x-runnel-only"
@@ -105,6 +110,9 @@ type Schema struct {
 	// Connection: see ConnectionKey; the connection types a field of format
 	// runnel-connection accepts.
 	Connection []string `json:"x-runnel-connection,omitempty"`
+	// Variants: see VariantsKey; the schema of this mapping by the value of the sibling
+	// field type, e.g. with: of a connection file.
+	Variants map[string]*Schema `json:"x-runnel-variants,omitempty"`
 	// AdditionalProperties is false for structs (unknown fields are errors) and the
 	// value schema for maps.
 	AdditionalProperties any `json:"additionalProperties,omitempty"`

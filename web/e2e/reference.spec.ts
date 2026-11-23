@@ -97,7 +97,8 @@ test("an environment shows the variables and adds a missing one", async ({ page 
 
   await row.click();
   await vars.getByRole("button", { name: "+ Add to prod.yaml" }).click();
-  expect(await editorText(page)).toContain('\n  E2E_MISSING: ""\n');
+  // Inserting goes through the file model: wait for it instead of reading once.
+  await expect.poll(() => editorText(page)).toContain('\n  E2E_MISSING: ""\n');
   await page.keyboard.type("https://api.example.com");
   await expect.poll(() => editorText(page)).toContain('  E2E_MISSING: "https://api.example.com"\n');
 

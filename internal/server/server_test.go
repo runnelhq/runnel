@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -392,4 +393,52 @@ func TestSchemas(t *testing.T) {
 	expect(t, do(t, s, "GET", "/api/v1/schemas/environment", ""), http.StatusOK, `"variables"`)
 	expect(t, do(t, s, "GET", "/api/v1/schemas/workflow-x", ""), http.StatusNotFound, `no schema for \"workflow-x\" (kinds: connection, environment, project, trigger)`)
 	expect(t, do(t, s, "GET", "/api/v1/schemas/project", "", "Origin", "http://evil.example"), http.StatusForbidden, "other origins")
+}
+
+// Connection files: type lists the connection types, with: has the fields of each type
+// (x-runnel-variants), so that the editor can help with them.
+func TestConnectionSchema(t *testing.T) {
+	_, s := newProject(t)
+	rec := do(t, s, "GET", "/api/v1/schemas/connection", "")
+	var sc struct {
+		Properties map[string]struct {
+			Enum     []string `json:"enum"`
+			Variants map[string]struct {
+				Properties map[string]any `json:"properties"`
+			} `json:"x-runnel-variants"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &sc); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(sc.Properties["type"].Enum, " "); got != "http postgres smtp sqlite sqlserver" {
+		t.Errorf("types: %s", got)
+	}
+	v := sc.Properties["with"].Variants
+	if v["http"].Properties["baseUrl"] == nil || v["smtp"].Properties["host"] == nil || v["sqlite"].Properties["path"] == nil {
+		t.Errorf("variants: %v", v)
+	}
+}
+
+// GET /connections lists the connections of the project with their types.
+func TestConnectionList(t *testing.T) {
+	dir, s := newProject(t)
+	list := func() string {
+		var got struct{ Connections []connectionInfo }
+		rec := do(t, s, "GET", "/api/v1/connections", "")
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || got.Connections == nil {
+			t.Fatalf("%s %v", rec.Body, err)
+		}
+		return fmt.Sprint(got.Connections)
+	}
+	if got := list(); got != "[]" {
+		t.Errorf("empty project: %s", got)
+	}
+	writeFile(t, filepath.Join(dir, "connections", "shop.yaml"), "kind: Connection\napiVersion: runnel/v1\nname: shop\ntype: sqlite\nwith: { path: x.db }\n")
+	writeFile(t, filepath.Join(dir, "connections", "api.yaml"), "kind: Connection\napiVersion: runnel/v1\nname: api\ntype: http\nwith: { baseUrl: https://h }\n")
+	writeFile(t, filepath.Join(dir, "connections", "broken.yaml"), "kind: Connection\n")
+	if got := list(); got != "[{api http connections/api.yaml} {shop sqlite connections/shop.yaml}]" {
+		t.Errorf("%s", got)
+	}
+	expect(t, do(t, s, "GET", "/api/v1/connections", "", "Origin", "http://evil.example"), http.StatusForbidden, "other origins")
 }
