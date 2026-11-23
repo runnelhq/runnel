@@ -86,6 +86,10 @@ var Functions = []Doc{
 		Example:     "{{ concat(', ', record.street, record.city) }}"},
 	{Group: "Text", Name: "normalize", Signature: "normalize(text)", Type: "string", Description: "Replaces umlauts and ß, joins spaces – e.g. for file names", Example: "{{ normalize('Jürgen Groß') }}"},
 
+	{Group: "Paths", Name: "basename", Signature: "basename(path)", Type: "string", Description: "Last part of a path or address, e.g. the file name; / and \\ both separate", Example: "{{ basename('Exports/2026/orders.zip') }}"},
+	{Group: "Paths", Name: "dirname", Signature: "dirname(path)", Type: "string", Description: "The path without its last part, e.g. the folder of a file; empty without a folder", Example: "{{ dirname('Exports/2026/orders.zip') }}"},
+	{Group: "Paths", Name: "ext", Signature: "ext(path)", Type: "string", Description: "Ending of the file name with its dot, e.g. .zip; empty without one", Example: "{{ ext('Exports/2026/orders.zip') }}"},
+
 	{Group: "Numbers and lists", Name: "len", Signature: "len(value)", Type: "integer", Description: "Number of characters, entries of a list or keys of a map", Example: "{{ len(['a', 'b']) }}"},
 	{Group: "Numbers and lists", Name: "round", Signature: "round(number)", Type: "number", Description: "Rounds to a whole number", Example: "{{ round(2.5) }}"},
 	{Group: "Numbers and lists", Name: "sum", Signature: "sum(list)", Type: "number", Description: "Sum of a list of numbers", Example: "{{ sum([1, 2, 3]) }}"},
