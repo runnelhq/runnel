@@ -12,8 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions/actiontest"
+	"github.com/runnelhq/runnel/internal/record"
 )
 
 func TestRequestConfig(t *testing.T) {
@@ -70,6 +73,30 @@ func TestRequestJSON(t *testing.T) {
 	// The log names neither the query nor the headers.
 	if len(logs) != 1 || !strings.HasPrefix(logs[0].Msg, "POST "+srv.URL+"/orders: 200 OK (") || strings.Contains(logs[0].Msg, "secret") {
 		t.Errorf("logs %v", logs)
+	}
+}
+
+// Values of the run in a JSON body keep their type: decimals and large whole numbers
+// are exact numbers, dates ISO text.
+func TestRequestBodyValues(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+	}))
+	defer srv.Close()
+	day, _ := record.ParseDate("2026-11-23")
+	for _, tt := range []struct {
+		body any
+		want string
+	}{
+		{map[string]any{"amount": decimal.RequireFromString("12.50"), "id": int64(9007199254740993), "day": day}, `{"amount":12.5,"day":"2026-11-23","id":9007199254740993}`},
+		{[]any{decimal.RequireFromString("0.1"), decimal.RequireFromString("0.2")}, `[0.1,0.2]`},
+		{decimal.RequireFromString("1.25"), `1.25`},
+	} {
+		if _, _, err := request(t, map[string]any{"method": "post", "url": srv.URL, "body": tt.body}); err != nil || gotBody != tt.want {
+			t.Errorf("%v: got %s %v, want %s", tt.body, gotBody, err, tt.want)
+		}
 	}
 }
 

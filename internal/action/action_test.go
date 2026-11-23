@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
 
 type copyConfig struct {
@@ -88,5 +90,42 @@ func TestDecodeConfig(t *testing.T) {
 		if (tt.want == "" && err != nil) || (tt.want != "" && (err == nil || err.Error() != tt.want)) {
 			t.Errorf("%v: error %v, want %q", tt.with, err, tt.want)
 		}
+	}
+}
+
+// Fields of type any, map[string]any and []any keep the values of the run: decoding
+// through JSON would turn exact decimals into text and round large whole numbers.
+func TestDecodeConfigKeepsValues(t *testing.T) {
+	type config struct {
+		Body   any            `json:"body"`
+		Params map[string]any `json:"params"`
+		Items  []any          `json:"items,omitempty"`
+		Name   string         `json:"name"`
+		Size   int            `json:"size"`
+	}
+	price := decimal.RequireFromString("12.50")
+	big := int64(9007199254740993)
+	with := map[string]any{
+		"body":   map[string]any{"price": price, "id": big},
+		"params": map[string]any{"rate": price},
+		"items":  []any{price, big},
+		"name":   "x", "size": 3,
+	}
+	var c config
+	if err := DecodeConfig(with, &c); err != nil {
+		t.Fatal(err)
+	}
+	body := c.Body.(map[string]any)
+	if body["price"] != price || body["id"] != big || c.Params["rate"] != price || c.Items[0] != price || c.Items[1] != big || c.Name != "x" || c.Size != 3 {
+		t.Errorf("%#v", c)
+	}
+	// A single value and null.
+	c = config{Body: "old"}
+	if err := DecodeConfig(map[string]any{"body": price, "params": nil}, &c); err != nil || c.Body != price || c.Params != nil {
+		t.Errorf("%#v %v", c, err)
+	}
+	// A value of another type is still an error (map[string]any expected).
+	if err := DecodeConfig(map[string]any{"params": "x"}, &c); err == nil || !strings.Contains(err.Error(), `field "params"`) {
+		t.Errorf("params as text: %v", err)
 	}
 }

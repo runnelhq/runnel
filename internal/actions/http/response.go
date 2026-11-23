@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/record"
 )
 
 // http.response answers the waiting caller of an http trigger with response: run
@@ -49,7 +50,7 @@ func (a *responseAction) Execute(ctx context.Context, ec *action.ExecContext) (a
 		ec.Logf(slog.LevelDebug, "no HTTP caller waits for an answer; status %d not sent", status)
 		return action.Result{Output: out}, nil
 	}
-	if !ec.Respond(action.Response{Status: status, Headers: a.Headers, Body: a.Body}) {
+	if !ec.Respond(action.Response{Status: status, Headers: a.Headers, Body: record.JSONValue(a.Body)}) {
 		ec.Logf(slog.LevelWarn, "the caller has already been answered; status %d not sent", status)
 		return action.Result{Output: out}, nil
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/proc"
+	"github.com/runnelhq/runnel/internal/record"
 )
 
 // shell.powershell runs a PowerShell script (ADR 0023): inline or from a file, without
@@ -141,7 +142,7 @@ func (a *powershellAction) Execute(ctx context.Context, ec *action.ExecContext) 
 	if params == nil {
 		params = map[string]any{}
 	}
-	input, err := json.Marshal(params)
+	input, err := json.Marshal(record.JSONValue(params))
 	if err != nil {
 		return action.Result{}, fmt.Errorf("params: %w", err)
 	}
