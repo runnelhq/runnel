@@ -451,3 +451,20 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   kleinere Grenze, bricht Runnel vor dem Senden mit einer Meldung ab.
 - **Output:** `messageId`, `recipients` (Anzahl) und `size` (Bytes). Das Log nennt nur die Anzahl der Empfänger, die
   Adressen erst auf Stufe Debug.
+
+## Nachtrag 2026-11-23 (S62b): OAuth2 für `smtp`
+
+- **Felder:** `auth: oauth2` mit `user` (das Postfach, das sendet), `tenant` (Microsoft Entra, ID oder Domain),
+  `clientId`, `clientSecret` (Secret) und `scope` (Standard `https://outlook.office365.com/.default`). `tokenUrl`
+  ersetzt die aus `tenant` gebildete Adresse für andere Anbieter; sie muss `https://` sein (`http://` nur zum eigenen
+  Rechner, für Tests). Im Schema gehören die Felder mit `only=auth:oauth2` zu dieser Anmeldung.
+- **Ablauf:** Runnel holt das Token mit Client Credentials (RFC 6749, 4.4) und meldet sich mit SASL `XOAUTH2` an. Das
+  Token bleibt im Speicher des Prozesses, bis es in weniger als 5 Minuten abläuft, und wird nach einer Ablehnung durch
+  den Mail-Server verworfen (z. B. nach Entzug der Berechtigung). Schlüssel des Zwischenspeichers ist ein Hash aus
+  Adresse, Client-ID, Secret und Scope; ein geändertes Secret holt also ein neues Token. Tokens stehen nie in Datei, Log
+  oder Ergebnis. `timeout` der Connection gilt für Token-Abruf und Versand zusammen.
+- **Sicherheit:** Das Token ist ein Zugangsdatum wie ein Passwort: `tls: none` ist mit `oauth2` nur zum eigenen Rechner
+  erlaubt. Fehlermeldungen des Token-Servers enthalten Code und erste Zeile der Beschreibung, ohne Trace- und
+  Correlation-IDs; das Secret erscheint nie darin.
+- **Paket:** Abruf und Zwischenspeicher liegen in `internal/oauth`, damit die spätere `http`-Connection (Abschnitt 7) sie
+  wiederverwenden kann. Keine neue Abhängigkeit (`net/http`).

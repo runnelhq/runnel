@@ -26,5 +26,6 @@ Korrekturen.
   mit den nötigen Rechten statt `LocalSystem` verwenden ([ADR 0023](docs/adr/0023-programme-powershell.md)).
 - `mail.send` prüft das Zertifikat des Mail-Servers immer und sendet ein Passwort nie unverschlüsselt (außer an den
   eigenen Rechner); `tls: none` ist nur für ein Relay im vertrauenswürdigen Netz gedacht und wird von `validate`
-  gemeldet ([ADR 0022, Nachtrag S62a](docs/adr/0022-connections-secrets.md)).
+  gemeldet ([ADR 0022, Nachtrag S62a](docs/adr/0022-connections-secrets.md)). Mit `auth: oauth2` gilt dasselbe für das
+  Token; es bleibt nur im Speicher des Prozesses (Nachtrag S62b).
 - Regeln für Beiträge: [AGENTS.md, Abschnitt „Sicherheit“](AGENTS.md#sicherheit).
