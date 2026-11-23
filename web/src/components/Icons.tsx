@@ -360,6 +360,14 @@ const actionIcons: Record<string, ReactNode> = {
       <path d="M14 14l6 6M8 10h4" />
     </>
   ),
+  // Merge join (S23c, variant C chosen by the maintainer): two sets with their intersection, as for joins in SQL.
+  "core.merge-join": (
+    <>
+      <circle cx="9" cy="12" r="6" />
+      <circle cx="15" cy="12" r="6" />
+      <path d="M12 7.2c1.2 1.1 1.9 2.8 1.9 4.8s-.7 3.7-1.9 4.8c-1.2-1.1-1.9-2.8-1.9-4.8s.7-3.7 1.9-4.8z" fill="currentColor" stroke="none" />
+    </>
+  ),
   "db.lookup": (
     <>
       <ellipse cx="10" cy="6" rx="6" ry="2.5" />
