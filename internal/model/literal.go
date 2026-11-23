@@ -28,13 +28,28 @@ func (pl *Pipeline) CheckSQL(isSQL func(typ, field string) bool) Errors {
 }
 
 func checkSQL(s *source, isSQL func(path string) bool) Errors {
+	return checkLiteral(s, isSQL, "the statement must not contain ${…} or {{ … }}: write @name and give the value under params, so that values cannot change the statement")
+}
+
+// CheckScript reports ${…} and {{ … }} in the scripts of shell.powershell and their
+// files (format runnel-script, isScript): values come in as params only (ADR 0023).
+func (w *Workflow) CheckScript(isScript func(typ, field string) bool) Errors {
+	types := make([]string, len(w.Actions))
+	for i, a := range w.Actions {
+		types[i] = a.Type
+	}
+	return checkLiteral(w.src, stepSecretPaths("actions", types, isScript),
+		"the script must not contain ${…} or {{ … }}: declare a parameter with param(...) and give the value under params, so that values cannot change the script; for PowerShell variables write $Name or $env:NAME instead of ${…}")
+}
+
+// checkLiteral reports ${…} and {{ … }} in fields that are passed as written.
+func checkLiteral(s *source, is func(path string) bool, msg string) Errors {
 	var errs Errors
 	for _, sc := range s.scalars() {
-		if !isSQL(sc.path) || (!strings.Contains(sc.value, "${") && !strings.Contains(sc.value, "{{")) {
+		if !is(sc.path) || (!strings.Contains(sc.value, "${") && !strings.Contains(sc.value, "{{")) {
 			continue
 		}
-		errs = append(errs, &Error{File: s.name, Pos: sc.pos, Path: sc.path,
-			Msg: "the statement must not contain ${…} or {{ … }}: write @name and give the value under params, so that values cannot change the statement"})
+		errs = append(errs, &Error{File: s.name, Pos: sc.pos, Path: sc.path, Msg: msg})
 	}
 	return errs
 }

@@ -1,0 +1,32 @@
+# Runs a PowerShell script with shell.powershell (S61, ADR 0023): the folder comes as
+# the named parameter Folder (never written into the script), the script answers with
+# JSON (ConvertTo-Json), which the next action reads from results.files.output.json.
+# Needs PowerShell 7 (pwsh) or, on Windows, Windows PowerShell 5.1.
+#   runnel run -v examples/hello/workflows/powershell.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: powershell
+parameters:
+  - name: FOLDER
+    default: workflows
+actions:
+  - id: start
+    type: core.start
+  - id: files
+    type: shell.powershell
+    with:
+      script: |
+        param([string]$Folder)
+        $files = @(Get-ChildItem -LiteralPath $Folder -File)
+        [pscustomobject]@{ count = $files.Count; bytes = ($files | Measure-Object Length -Sum).Sum } | ConvertTo-Json
+      params:
+        Folder: ${FOLDER}
+      json: true
+      timeout: 1m
+  - id: report
+    type: core.log
+    with:
+      message: "{{ results.files.output.json.count }} files with {{ results.files.output.json.bytes }} bytes in ${FOLDER}"
+links:
+  - { from: start, to: files }
+  - { from: files, to: report }

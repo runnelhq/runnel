@@ -48,6 +48,7 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 	diags = append(diags, w.CheckSecrets(ActionSecretField(c.Registry), stores)...)
 	diags = append(diags, w.CheckSQL(ActionSQLField(c.Registry))...)
 	diags = append(diags, w.CheckProgram(ActionProgramField(c.Registry))...)
+	diags = append(diags, w.CheckScript(ActionScriptField(c.Registry))...)
 	if c.Variables && c.Project != nil {
 		diags = append(diags, checkConnectionRefs(workflowSteps(w, c.Registry), c.Project)...)
 	}

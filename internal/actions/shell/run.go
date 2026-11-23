@@ -2,14 +2,10 @@ package shell
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -58,23 +54,14 @@ func newRun(with map[string]any) (action.Action, error) {
 		return nil, err
 	}
 	for name := range a.Env {
-		if name == "" || strings.ContainsAny(name, "=\x00") {
-			return nil, fmt.Errorf("env: invalid name %q", name)
+		if err := checkEnvName(name); err != nil {
+			return nil, err
 		}
 	}
 	return a, nil
 }
 
-func (a *runAction) timeout() (time.Duration, error) {
-	if a.Timeout == "" {
-		return 10 * time.Minute, nil
-	}
-	d, err := time.ParseDuration(a.Timeout)
-	if err != nil || d <= 0 {
-		return 0, fmt.Errorf("invalid timeout %q (expected e.g. 30s or 10m)", a.Timeout)
-	}
-	return d, nil
-}
+func (a *runAction) timeout() (time.Duration, error) { return parseTimeout(a.Timeout) }
 
 func (a *runAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
 	if err := ctx.Err(); err != nil {
@@ -93,81 +80,11 @@ func (a *runAction) Execute(ctx context.Context, ec *action.ExecContext) (action
 	if a.Input != nil {
 		cmd.Input, cmd.HasInput = *a.Input, true
 	}
-	var secrets []string
-	if len(a.Env) > 0 {
-		cmd.Env = os.Environ()
-		for name, v := range a.Env {
-			cmd.Env = append(cmd.Env, name+"="+v)
-			secrets = append(secrets, v)
-		}
-	}
-	name := filepath.Base(program)
-	ec.Log(slog.LevelDebug, fmt.Sprintf("starting %s with %d %s", name, len(a.Args), plural(len(a.Args), "argument")))
-	res, err := proc.Run(ctx, cmd)
-	// Values of env (e.g. secrets) never leave in the output.
-	res.Stdout, res.Stderr = hide(res.Stdout, secrets), hide(res.Stderr, secrets)
-	switch {
-	case errors.Is(err, proc.ErrTimeout):
-		return action.Result{}, fmt.Errorf("%s took longer than %s and was ended with the processes it started", name, timeout)
-	case err != nil:
-		return action.Result{}, err
-	}
-	if res.Truncated {
-		ec.Log(slog.LevelWarn, fmt.Sprintf("the output of %s was longer than %d bytes; the rest was dropped", name, maxOutput(a.MaxOutput)))
-	}
-	out := map[string]any{"exitCode": int64(res.ExitCode), "stdout": res.Stdout, "stderr": res.Stderr,
-		"truncated": res.Truncated, "duration": res.Duration.Round(time.Millisecond).String()}
 	ok := []int{0}
 	if len(a.OKCodes) > 0 {
 		ok = a.OKCodes
 	}
-	if !slices.Contains(ok, res.ExitCode) {
-		return action.Result{Output: out}, fmt.Errorf("%s ended with exit code %d%s", name, res.ExitCode, lastLines(res.Stderr, 5))
-	}
-	if a.JSON {
-		var v any
-		if err := json.Unmarshal([]byte(res.Stdout), &v); err != nil {
-			return action.Result{Output: out}, fmt.Errorf("the output of %s is not JSON: %w", name, err)
-		}
-		out["json"] = v
-	}
-	ec.Log(slog.LevelInfo, fmt.Sprintf("%s ended with exit code %d in %s", name, res.ExitCode, res.Duration.Round(time.Millisecond)))
-	return action.Result{Output: out}, nil
-}
-
-func maxOutput(n int) int {
-	if n <= 0 {
-		return proc.DefaultMaxOutput
-	}
-	return n
-}
-
-// hide replaces the given values in a text.
-func hide(text string, values []string) string {
-	for _, v := range values {
-		if len(v) >= 3 {
-			text = strings.ReplaceAll(text, v, "***")
-		}
-	}
-	return text
-}
-
-// lastLines returns the last n lines of stderr for a message, ": …" or empty.
-func lastLines(text string, n int) string {
-	lines := strings.Split(strings.TrimRight(strings.ReplaceAll(text, "\r\n", "\n"), "\n"), "\n")
-	if len(lines) > n {
-		lines = lines[len(lines)-n:]
-	}
-	s := strings.TrimSpace(strings.Join(lines, "\n"))
-	if s == "" {
-		return ""
-	}
-	return ": " + s
-}
-
-func plural(n int, word string) string {
-	if n == 1 {
-		return word
-	}
-	return word + "s"
+	name := filepath.Base(program)
+	ec.Log(slog.LevelDebug, fmt.Sprintf("starting %s with %d %s", name, len(a.Args), plural(len(a.Args), "argument")))
+	return execute(ctx, ec, name, cmd, a.Env, ok, a.JSON)
 }

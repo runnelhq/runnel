@@ -74,6 +74,10 @@ const FormatSQL = "runnel-sql"
 // that a caller (e.g. of an http trigger) cannot choose what runs.
 const FormatProgram = "runnel-program"
 
+// FormatScript marks the script of shell.powershell or its file (ADR 0023): passed as
+// written; ${…} or {{ … }} in it are an error, values come as parameters.
+const FormatScript = "runnel-script"
+
 // FormatSecret marks a field that holds a secret, e.g. a password or token (ADR 0022):
 // only such fields may use ${secret:…}; their values are resolved without expressions
 // and never shown. The editor offers no value from the file.

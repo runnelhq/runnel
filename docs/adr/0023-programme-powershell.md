@@ -203,3 +203,18 @@ Mit dem Maintainer bestätigt:
   nur bei Timeout oder Abbruch. Prozesse, die ein Programm nach normalem Ende zurücklässt, laufen weiter (z. B. ein
   gestarteter Dienst). Unter Linux eine eigene Prozessgruppe.
 - **Ende:** Nach dem Ende wartet Runnel höchstens 2 s auf noch offene Ausgaben von Kindprozessen.
+
+## Nachtrag 2026-11-23 (S61): `shell.powershell`
+
+- **Startskript:** in Runnel eingebettet (`runner.ps1`) und wie das Inline-Skript je Lauf in einen temporären Ordner
+  geschrieben, UTF-8 mit BOM (sonst liest Windows PowerShell 5.1 im ANSI-Zeichensatz); der Ordner wird danach gelöscht.
+  Aufruf: `-NoProfile -NonInteractive -ExecutionPolicy Bypass -File runner.ps1 <skript>`, die Parameter als JSON über
+  stdin. Ein Skript aus `file` wird nicht kopiert, sondern direkt aufgerufen.
+- **Exit-Code:** der des Skripts (`exit N`) bzw. des letzten Programms, das es gestartet hat (`$LASTEXITCODE`); eine
+  nicht abgefangene Ausnahme gibt 1 mit ihrer Meldung auf stderr. Erfolg ist nur 0 (kein `okCodes` wie bei `shell.run`).
+- **`${…}` im Skript:** PowerShell kennt selbst `${name}`. Die Prüfung meldet es trotzdem, mit dem Hinweis, `$Name`
+  oder `$env:NAME` zu schreiben – so ist eindeutig, dass Runnel im Skript nichts ersetzt.
+- **`json`:** der ganze stdout als JSON, sonst der letzte JSON-Wert ab einer Zeile, die mit `{` oder `[` beginnt (z. B.
+  `ConvertTo-Json` nach anderen Ausgaben). Gilt seitdem auch für `shell.run`.
+- **Tests:** Die Skriptläufe brauchen PowerShell und laufen in der CI (Linux mit `pwsh`, Windows mit beiden
+  Editionen); fehlt PowerShell in der CI, schlagen sie fehl statt übersprungen zu werden.
