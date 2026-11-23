@@ -29,6 +29,8 @@ import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
 import { ConnectionForm, TestButton, type TestResult } from "./ConnectionForm";
+import { TriggerForm } from "./TriggerForm";
+import { runTriggerTarget } from "../forms";
 import { MarkdownView } from "./MarkdownView";
 import { YamlEditor } from "./YamlEditor";
 import { Dialog } from "./Dialog";
@@ -142,8 +144,10 @@ export function FileView(props: {
   const isDoc = fileKind === "document";
   const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger" || fileKind === "connection";
   const isConnection = fileKind === "connection";
-  // Connections open as a form (mockup S39b); "canvas" is the form there.
-  const [view, setView] = useState<View>(isGraph || isDoc || isConnection ? "canvas" : "yaml");
+  const isTrigger = fileKind === "trigger";
+  // Connections and triggers open as a form (mockups S39b, E20); "canvas" is the form there.
+  const isForm = isConnection || isTrigger;
+  const [view, setView] = useState<View>(isGraph || isDoc || isForm ? "canvas" : "yaml");
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [focusLine, setFocusLine] = useState<number | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
@@ -890,6 +894,24 @@ export function FileView(props: {
             </span>
           ))}
         {isConnection && <TestButton name={path.split("/").pop()!.replace(/\.yaml$/, "")} onResult={setTestResult} />}
+        {isTrigger && (
+          <button
+            type="button"
+            title={dirty ? "Starts the target of the saved trigger, with its environment and parameters" : "Starts the target with the environment and parameters of the trigger"}
+            onClick={() =>
+              void runTriggerTarget(path).then(
+                (r) => setToast({ text: `Started a run of ${r.target.split("/").pop()}`, detail: "open the target to follow it", status: "ok" }),
+                (e: Error) => setToast({ text: "Could not start the target", detail: e.message, status: "error" }),
+              )
+            }
+            className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted"
+          >
+            <span className="text-status-success">
+              <PlayIcon width={14} height={14} />
+            </span>
+            Run target now
+          </button>
+        )}
         {editsText && (
           <>
             <div className="inline-flex gap-1">
@@ -913,7 +935,7 @@ export function FileView(props: {
           </>
         )}
         {isDoc && <ViewSwitch view={view} onView={switchView} document />}
-        {isConnection && <ViewSwitch view={view} onView={switchView} form />}
+        {isForm && <ViewSwitch view={view} onView={switchView} form />}
         {isGraph && (
           <>
             <ViewSwitch view={view} onView={switchView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
@@ -957,6 +979,17 @@ export function FileView(props: {
             result={testResult}
             onText={(next) => setText(next, "push")}
             onError={setEditError}
+          />
+        ) : view === "canvas" && isTrigger ? (
+          <TriggerForm
+            path={path}
+            text={doc.text}
+            saved={!dirty}
+            problems={validation?.problems ?? []}
+            files={props.files ?? noFiles}
+            onText={(next) => setText(next, "push")}
+            onError={setEditError}
+            onOpenFile={props.onOpenFile}
           />
         ) : view === "canvas" && isDoc ? (
           <MarkdownView text={doc.text} path={path} files={props.files ?? noFiles} onOpen={(p) => props.onOpenFile?.(p)} />

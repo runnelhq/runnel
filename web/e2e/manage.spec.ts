@@ -58,18 +58,21 @@ test("creates a workflow from the template and renames it", async ({ page, reque
   expect((await request.get("/api/v1/files/workflows/import.workflow.yaml")).status()).toBe(404);
 });
 
+// New → Trigger asks for name, type and target (mockup E20, "new"); the trigger starts
+// disabled with the required fields of its type and opens as a form.
 test("creates a trigger that starts disabled", async ({ page, request }) => {
   await page.goto("/");
-  // The template takes the first workflow from the loaded tree: wait for it, else the
-  // fallback workflows/main.workflow.yaml is used.
   await expect(row(page, "workflows")).toBeVisible();
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByRole("menu", { name: "New" }).getByRole("menuitem", { name: /^Trigger/ }).click();
-  await tree(page).getByRole("textbox", { name: "Name of the new trigger" }).press("Enter");
+  const dialog = page.getByRole("dialog", { name: "New trigger" });
+  await expect(dialog.getByRole("combobox", { name: "Target" })).toHaveValue(firstWorkflow);
+  await dialog.getByRole("radio", { name: /Interval/ }).click();
+  await dialog.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("tab", { name: /new-trigger\.yaml/ })).toBeVisible();
   const text = await (await request.get("/api/v1/files/triggers/new-trigger.yaml")).text();
-  expect(text).toContain("enabled: false\n");
-  expect(text).toContain(`target: ${firstWorkflow}\n`);
+  expect(text).toBe(`kind: Trigger\napiVersion: runnel/v1\nname: new-trigger\ntype: interval\ntarget: ${firstWorkflow}\nenabled: false\nwith:\n  every: 1h\n`);
+  await expect(page.getByTestId("trigger-form").getByRole("switch", { name: "Enabled" })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByTestId("error-count")).toHaveCount(0);
 });
 

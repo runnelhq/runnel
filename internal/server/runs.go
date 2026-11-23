@@ -18,9 +18,11 @@ import (
 	"github.com/runnelhq/runnel/internal/triggers"
 )
 
-// startRequest starts a run of a saved workflow or pipeline file.
+// startRequest starts a run of a saved workflow or pipeline file, or the target of a
+// saved trigger file with its environment and parameters ("Run target now", E20a).
 type startRequest struct {
-	Path        string            `json:"path"`
+	Path        string            `json:"path,omitempty"`
+	Trigger     string            `json:"trigger,omitempty"`
 	Environment string            `json:"environment,omitempty"`
 	Params      map[string]string `json:"params,omitempty"`
 }
@@ -40,6 +42,24 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
+	opts := startOptions{env: req.Environment, params: req.Params}
+	if req.Trigger != "" {
+		if req.Path != "" || req.Environment != "" || len(req.Params) > 0 {
+			writeError(w, http.StatusBadRequest, "a run of a trigger takes path, environment and params from the trigger")
+			return
+		}
+		t, err := s.savedTrigger(req.Trigger)
+		if diags := (model.Errors)(nil); errors.As(err, &diags) {
+			writeJSON(w, http.StatusUnprocessableEntity, startProblems{Error: "the trigger has problems; fix them first", validateResponse: s.response(diags)})
+			return
+		}
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		req.Path = t.Target
+		opts = startOptions{env: t.Environment, params: triggers.TriggerParams(t), trigger: t.Type + ":" + t.Name}
+	}
 	name, err := filePath(req.Path)
 	if err != nil {
 		writeErr(w, err)
@@ -55,7 +75,7 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	run, err := s.startFile(name, data, startOptions{env: req.Environment, params: req.Params})
+	run, err := s.startFile(name, data, opts)
 	var diags model.Errors
 	switch {
 	case errors.As(err, &diags):
@@ -171,6 +191,23 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// savedTrigger reads a saved trigger file for "Run target now"; a trigger with problems
+// is refused with them (422 like a workflow with problems).
+func (s *Server) savedTrigger(path string) (*model.Trigger, error) {
+	name, err := filePath(path)
+	if err != nil {
+		return nil, err
+	}
+	if fileKind(name) != "trigger" {
+		return nil, errorf(http.StatusBadRequest, "trigger must be a trigger file (triggers/*.yaml)")
+	}
+	data, err := s.readFile(name)
+	if err != nil {
+		return nil, err
+	}
+	return model.ParseTrigger(name, data)
 }
 
 // startTrigger starts a run of a trigger's target (the saved file), with its

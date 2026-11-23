@@ -471,3 +471,22 @@ links:
 		}
 	}
 }
+
+// "Run target now" (E20a): POST /runs with a saved trigger starts its target with the
+// environment and parameters of the trigger.
+func TestRunTriggerTarget(t *testing.T) {
+	dir, s := newRunProject(t)
+	writeFile(t, filepath.Join(dir, "triggers", "hourly.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: hourly\ntype: interval\ntarget: workflows/wait.workflow.yaml\nenvironment: dev\nenabled: false\nparams:\n  DELAY: 1ms\nwith:\n  every: 1h\n")
+	run := startRun(t, s, `{"trigger": "triggers/hourly.yaml"}`)
+	d := waitRun(t, s, run.ID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
+	if d.Status != "succeeded" || d.Environment != "dev" || d.Trigger != "interval:hourly" || d.Log[len(d.Log)-1].Message != "done in dev" {
+		t.Errorf("run %+v, log %+v", d.Run, d.Log)
+	}
+	// Refused: other fields beside trigger, a file that is not a trigger, a trigger with problems, a missing one.
+	expect(t, do(t, s, "POST", "/api/v1/runs", `{"trigger": "triggers/hourly.yaml", "environment": "prod"}`), http.StatusBadRequest, "takes path, environment and params from the trigger")
+	expect(t, do(t, s, "POST", "/api/v1/runs", `{"trigger": "workflows/wait.workflow.yaml"}`), http.StatusBadRequest, "must be a trigger file")
+	writeFile(t, filepath.Join(dir, "triggers", "broken.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: broken\ntype: cron\ntarget: workflows/wait.workflow.yaml\n")
+	expect(t, do(t, s, "POST", "/api/v1/runs", `{"trigger": "triggers/broken.yaml"}`), http.StatusUnprocessableEntity, `missing required field \"schedule\"`)
+	expect(t, do(t, s, "POST", "/api/v1/runs", `{"trigger": "triggers/gone.yaml"}`), http.StatusNotFound, "file not found")
+	expect(t, do(t, s, "POST", "/api/v1/runs", `{"trigger": "../x.yaml"}`), http.StatusBadRequest, "")
+}

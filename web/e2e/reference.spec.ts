@@ -65,7 +65,11 @@ test("project.yaml shows its fields and inserts one", async ({ page }) => {
 });
 
 test("a trigger shows the fields of its type and inserts under with:", async ({ page }) => {
-  await openFile(page, "morning.yaml");
+  // Triggers open as a form (E20a); Insert works in the YAML view.
+  await page.goto("/");
+  await page.getByRole("tree").getByText("morning.yaml", { exact: true }).click();
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
+  await expect(page.getByTestId("yaml-editor")).toBeVisible();
   const ref = page.getByRole("region", { name: "Reference" });
   await expect(ref.getByRole("button", { name: "Fields" })).toHaveCount(0); // triggers have no variables view
   const cron = ref.getByRole("group", { name: "with: for cron" });

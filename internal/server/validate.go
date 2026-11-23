@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -53,8 +54,11 @@ func (*Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "cannot build the schema")
 		return
 	}
-	if r.PathValue("kind") == "connection" {
+	switch r.PathValue("kind") {
+	case "connection":
 		connectionVariants(sc)
+	case "trigger":
+		triggerVariants(sc)
 	}
 	writeJSON(w, http.StatusOK, sc)
 }
@@ -80,6 +84,62 @@ func connectionVariants(sc *schema.Schema) {
 			}
 		}
 	}
+}
+
+// triggerRequired are the fields under with: each trigger type needs (as checked by
+// model.ParseTrigger).
+var triggerRequired = map[string][]string{
+	model.TriggerCron: {"schedule"}, model.TriggerInterval: {"every"},
+	model.TriggerFile: {"path"}, model.TriggerHTTP: {"method", "path", "auth"},
+}
+
+// triggerVariants adds the fields under with: for each trigger type to the schema of
+// trigger files (E20a), like connectionVariants: the form and the help show only those
+// of the chosen type.
+func triggerVariants(sc *schema.Schema) {
+	for _, p := range sc.Properties {
+		if p.Name != "with" {
+			continue
+		}
+		p.Schema.Variants = map[string]*schema.Schema{}
+		for _, typ := range []string{model.TriggerCron, model.TriggerInterval, model.TriggerFile, model.TriggerHTTP} {
+			v := &schema.Schema{Type: "object", AdditionalProperties: false}
+			for _, f := range model.TriggerFields(typ) {
+				if fs, ok := p.Schema.Properties.Lookup(f); ok {
+					c := *fs
+					c.Description = typeText(fs.Description, typ)
+					v.Properties = append(v.Properties, schema.Property{Name: f, Schema: &c})
+				}
+			}
+			v.Required = triggerRequired[typ]
+			p.Schema.Variants[typ] = v
+		}
+	}
+}
+
+// typePrefix is the start of a part of a description that names the trigger types it is
+// for, e.g. "cron, interval, file: ".
+var typePrefix = regexp.MustCompile(`^((cron|interval|file|http)(, )?)+: `)
+
+// typeText keeps the parts of the description of a field under with: that are for the
+// given trigger type, without naming the types: "file: folder …; http: path …" gives
+// "path …" for http.
+func typeText(desc, typ string) string {
+	var out []string
+	for part := range strings.SplitSeq(desc, "; ") {
+		if m := typePrefix.FindString(part); m != "" {
+			if !slices.Contains(strings.Split(strings.TrimSuffix(m, ": "), ", "), typ) {
+				continue
+			}
+			part = part[len(m):]
+		}
+		out = append(out, part)
+	}
+	if len(out) == 0 {
+		return desc
+	}
+	text := strings.Join(out, "; ")
+	return strings.ToUpper(text[:1]) + text[1:]
 }
 
 // connectionInfo names a connection of the project for the editor (GET /connections).

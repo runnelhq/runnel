@@ -27,7 +27,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 | [`s23b-info-link.html`](s23b-info-link.html) | S23b – Info-Links und Stream Lookup | `canvas`, `link`, `run`, `problems` | freigegeben mit PR #157, umgesetzt mit S23b1 (Engine) und S23b2 (Editor) |
 | [`s39-connections.html`](s39-connections.html) | S39b/S39f – Connections und Secrets im Editor | `form`, `test`, `new`, `field`, `plaintext`, `secrets`, `set` | freigegeben mit PR #173; `form` und `test` umgesetzt mit S39c2a, `new`, `field` und `plaintext` (ohne „Store as secret…“) mit S39c2b; `secrets` und `set` folgen mit S39g |
-| [`e20-forms.html`](e20-forms.html) | E20 – Formulare für Trigger, Environments und `project.yaml` | `cron`, `http`, `type`, `environment`, `project`, `new` | zur Freigabe |
+| [`e20-forms.html`](e20-forms.html) | E20 – Formulare für Trigger, Environments und `project.yaml` | `cron`, `http`, `type`, `environment`, `project`, `new` | freigegeben mit PR #178; `cron`, `http`, `type` und `new` umgesetzt mit E20a, `environment` und `project` folgen mit E20b |
 
 ## Entscheidungen
 

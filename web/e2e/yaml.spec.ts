@@ -174,6 +174,7 @@ test.describe("other files of the project", () => {
     await page.goto("/");
     await page.getByRole("tree").getByText("hourly.yaml", { exact: true }).click();
     await expect(page.getByTestId("kind")).toHaveText("Trigger");
+    await page.getByRole("button", { name: "YAML", exact: true }).click();
     await retype(page, "target: workflows/hello.workflow.yaml", "hello.workflow.yaml".length, "nope.workflow.yaml");
     await expect(page.getByTestId("error-count")).toHaveText("✖ 1");
     await expect(page.locator(".ry-tooltip")).toContainText("nope.workflow.yaml");
