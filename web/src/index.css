@@ -642,3 +642,12 @@
 .runnel-yaml .rx-hover-text {
   white-space: pre-line;
 }
+
+/* A bar that scrolls without a visible scrollbar (tabs of the open files): the classic
+   scrollbar of Windows would cover half of the 36 px high bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
