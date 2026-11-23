@@ -26,6 +26,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s44-preview.html`](s44-preview.html) | S44 – Datenvorschau | `preview`, `json`, `link`, `error` | freigegeben mit PR #94, umgesetzt mit S44 |
 | [`s46-fields.html`](s46-fields.html) | S46 – Felder ermitteln | `fields`, `detect`, `written`, `update`, `error` | freigegeben mit PR #88, umgesetzt mit S46 |
 | [`s23b-info-link.html`](s23b-info-link.html) | S23b – Info-Links und Stream Lookup | `canvas`, `link`, `run`, `problems` | freigegeben mit PR #157, umgesetzt mit S23b1 (Engine) und S23b2 (Editor) |
+| [`s39-connections.html`](s39-connections.html) | S39b/S39f – Connections und Secrets im Editor | `form`, `test`, `new`, `field`, `plaintext`, `secrets`, `set` | zur Freigabe |
 
 ## Entscheidungen
 
@@ -92,6 +93,14 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | S23b | Ein Info-Link endet in einem eigenen Anschluss oben in der Mitte des Knotens; den Anschluss haben nur Transforms, die Nachschlagedaten annehmen (`core.stream-lookup`). Ein Link, der dort abgelegt wird, ist sofort ein Info-Link; im Link-Menü (E6b) kommt „Info“ (Taste I) zu Data und Error hinzu, nur bei solchen Zielen. Höchstens ein Info-Link je Transform |
 | S23b | Das Panel von `core.stream-lookup` zeigt oben „Lookup data“ (Quelle des Info-Links oder rot „No info link“) und `maxRecords` (Standard 100.000; mehr hält die Pipeline an, Hinweis auf Database Lookup). Schlüssel als Paare Feld = Lookup-Feld, Rückgabe mit Lookup-Feld, As und Default, dazu `notFound` (Keep/Drop/Error) und `multiple` (First/Error) wie bei `db.lookup`. Die Feldauswahl bietet für „Lookup field“ die Felder des Info-Links an; „Incoming fields“ zeigt beide Eingänge getrennt |
 | S23b | Nach einem Lauf trägt der Info-Link die Zahl der Nachschlage-Datensätze (gepunktete Pille); das Panel nennt zusätzlich „lookup records“. Das Log meldet das Warten auf den Info-Link (Debug) und „loaded N lookup records“ |
+| S39b | Connection-Dateien öffnen als **Formular** aus dem Schema ihres Typs (`x-runnel-variants`), mit „Form \| YAML“ wie „Canvas \| YAML“; Felder in Gruppen (z. B. Server, Sign-in, Security, eingeklappt „More“), nur die Felder der gewählten Anmeldung (`x-runnel-only`), Warnungen von `validate` am Feld. Kopf: Typ mit Symbol, `description` und wo die Connection genutzt wird |
+| S39b | „Test connection“ in der Dateileiste mit dem Environment daneben (wie Run); Ergebnis über dem Formular: ✓ mit Dauer und Version des Servers, ✕ mit Meldung, Environment, Adresse und Hinweisen; bei falscher Anmeldung direkt „Set password for prod…“. Getestet wird nur die gespeicherte Datei (`POST /connections/{name}/test`, 15 s) |
+| S39b | Im Explorer tragen Connections das Symbol ihrer Art (Zylinder für Datenbanken wie `db.*`, Globus für `http`, Umschlag für `smtp`) und rechts den Typ; „New → Connection“ fragt Name und Typ (Karten mit Beschreibung aus der Registry) und legt die Datei mit den Pflichtfeldern an |
+| S39f | Felder mit `format: runnel-secret` zeigen nur die Referenz `${secret:…}` (Schloss, Farbe der Ausdrücke) und je Environment, ob das Secret gesetzt ist (● Quelle, ⚠ fehlt, ⏱ läuft bald ab); „Change…“ öffnet die Auswahl der Namen: Secrets des Projekts mit ihrem Stand, Umgebungsvariablen (`env/…`), „New secret …“ |
+| S39f | Klartext in einem Secret-Feld wird gelb unterstrichen und erklärt; „Store as secret…“ legt das Secret mit dem Wert an und setzt die Referenz ein |
+| S39f | „Secrets“ ist der dritte Reiter neben „Fields“ und „Variables“ (project.yaml, Environments): Tabelle je Environment mit Quelle (`local`, `env`, `inline`), fehlenden und bald ablaufenden Secrets, Fundstellen und „Set for prod…“; Klartext aus `inline` rot markiert. Werte werden nie angezeigt |
+| S39f | „Set secret“: Environment und Quelle stehen fest (aus `secretStore`), Wert nur verdeckt (Anzeigen nur beim Tippen), optional Ablaufdatum mit Warnung 14 Tage vorher. Setzen geht nur bei schreibbaren Quellen (`local`, später `shared`); bei `env` erklärt der Editor, wo die Variable zu setzen ist |
+| S39b/S39f | Abgestimmt mit dem Maintainer: Connection-Dateien öffnen standardmäßig als Formular (YAML per Umschalter); „Secrets“ ist der dritte Reiter neben „Fields“ und „Variables“; das Ablaufdatum bleibt im Mockup, umgesetzt wird es erst mit S39e. Umgesetzt wird zunächst S39c (Formular, Test, Anzeige der Secret-Felder mit dem Stand aus `env` und `inline`); S39d (lokaler Store) und S39g (Secrets setzen und löschen) sind vorerst zurückgestellt |
 | S46 | „Detect fields…“ im Abschnitt „Fields“ des Panels bei Eingabe-Transforms, die Felder ermitteln können (zuerst `csv.input`); der Server meldet das je Typ, der Editor zeigt den Knopf nur dort |
 | E14 | Listen in Konfigurationen werden im Panel bearbeitet; der Editor ergibt sich aus dem Schema (ADR 0014), ohne eigenen Code je Transform. Statt „Lists and nested values are changed in the YAML view.“ |
 | E14 | Darstellung: Listen mit bis zu drei kurzen, einfachen Eigenschaften als **Tabelle** (eine Zeile je Eintrag, Spaltenköpfe mit `*` für Pflicht, z. B. `core.constant`, `core.convert`, `core.select-fields`, `core.sort`); längere oder mehr Eigenschaften als **Karten** (z. B. `aggregates` von `core.group-by`, `cases` von `core.switch`): zugeklappt mit einer Zusammenfassung (`total = sum(Betrag)`, Bedingung → Ziel), aufgeklappt die Felder. Listen von Texten (Feldnamen wie `groupBy`, `remove`) als **Chips** |
@@ -142,6 +151,7 @@ node design/mockups/screenshots.cjs e14-lists constant,convert,group,switch,help
 node design/mockups/screenshots.cjs e16-copy-paste copy,paste,refs,wrongkind
 node design/mockups/screenshots.cjs e17-markdown open,text,new,links
 node design/mockups/screenshots.cjs s16d-icons choice,canvas
+node design/mockups/screenshots.cjs s39-connections form,test,new,field,plaintext,secrets,set
 ```
 
 Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
