@@ -26,6 +26,11 @@ actions:
           amount NUMERIC NOT NULL,
           created TEXT NOT NULL
         )
+  - id: totals
+    type: db.execute
+    with:
+      connection: shop
+      sql: CREATE TABLE IF NOT EXISTS totals (customer TEXT PRIMARY KEY, orders INTEGER, total NUMERIC)
   - id: insert
     type: db.execute
     with:
@@ -42,5 +47,6 @@ actions:
       sql: DELETE FROM orders WHERE id NOT IN (SELECT id FROM orders ORDER BY id DESC LIMIT 5)
 links:
   - { from: start, to: table }
-  - { from: table, to: insert }
+  - { from: table, to: totals }
+  - { from: totals, to: insert }
   - { from: insert, to: cleanup }

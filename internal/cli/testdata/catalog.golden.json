@@ -1764,6 +1764,141 @@
       "example": "connection: app-db\nsql: SELECT id, name, amount FROM orders WHERE status = @status\nparams:\n  status: open\n"
     },
     {
+      "type": "db.table-output",
+      "kind": "transform",
+      "category": "output",
+      "label": "Table Output",
+      "description": "Inserts each record as a new row into a database table",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the database (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "app-db"
+            ],
+            "x-runnel-connection": [
+              "sqlite",
+              "sqlserver",
+              "postgres"
+            ]
+          },
+          "table": {
+            "type": "string",
+            "description": "Table to write to, e.g. orders or sales.orders",
+            "examples": [
+              "orders"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields to write, each into the column of the same name; empty: all fields (not those starting with _)",
+            "items": {
+              "type": "string",
+              "format": "runnel-field"
+            }
+          },
+          "commitSize": {
+            "type": "integer",
+            "description": "Rows per transaction",
+            "default": 1000
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time one transaction may take",
+            "format": "runnel-duration",
+            "default": "5m"
+          }
+        },
+        "required": [
+          "connection",
+          "table"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: app-db\ntable: orders\nfields: [id, customer, amount]\ncommitSize: 1000\n",
+      "recordErrors": true
+    },
+    {
+      "type": "db.upsert",
+      "kind": "transform",
+      "category": "output",
+      "label": "Insert or Update",
+      "description": "Updates the row with the same keys in a database table, or inserts the record as a new row",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the database (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "app-db"
+            ],
+            "x-runnel-connection": [
+              "sqlite",
+              "sqlserver",
+              "postgres"
+            ]
+          },
+          "table": {
+            "type": "string",
+            "description": "Table to write to, e.g. orders or sales.orders",
+            "examples": [
+              "orders"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields to write, each into the column of the same name; empty: all fields (not those starting with _)",
+            "items": {
+              "type": "string",
+              "format": "runnel-field"
+            }
+          },
+          "commitSize": {
+            "type": "integer",
+            "description": "Rows per transaction",
+            "default": 1000
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time one transaction may take",
+            "format": "runnel-duration",
+            "default": "5m"
+          },
+          "keys": {
+            "type": "array",
+            "description": "Fields that identify a row; SQLite and PostgreSQL need a unique index on them",
+            "items": {
+              "type": "string",
+              "format": "runnel-field"
+            }
+          },
+          "update": {
+            "type": "array",
+            "description": "Fields to change in an existing row; empty: all written fields except the keys",
+            "items": {
+              "type": "string",
+              "format": "runnel-field"
+            }
+          }
+        },
+        "required": [
+          "connection",
+          "table",
+          "keys"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: app-db\ntable: customers\nkeys: [id]\nfields: [id, name, email]\n",
+      "recordErrors": true
+    },
+    {
       "type": "file.list",
       "kind": "transform",
       "category": "input",

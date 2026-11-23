@@ -10,4 +10,6 @@ import "github.com/runnelhq/runnel/internal/transform"
 // Register adds all transforms of the namespace "db" to a registry.
 func Register(r *transform.Registry) {
 	r.Register(tableInputDefinition)
+	r.Register(tableOutputDefinition)
+	r.Register(upsertDefinition)
 }

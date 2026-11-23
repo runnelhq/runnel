@@ -8,4 +8,4 @@ examples/broken/graph.workflow.yaml:14:9: warning: action "cleanup" is not reach
 examples/broken/graph.workflow.yaml:18:27: error: link #2 (download → imprt): unknown action "imprt" (did you mean "import"?)
 examples/broken/graph.workflow.yaml:19:7: error: link #3 (import → download) closes a cycle (download → import → download); mark the link back with loop: true if the repetition is intended
 examples/http/project.yaml:13:3: warning: secrets in plain text (secretStore: inline): meant for development and simple APIs; keep this file out of shared repositories and use another secret store for production
-17 workflow files, 16 pipeline files and 8 trigger files checked: 7 errors, 3 warnings
+17 workflow files, 17 pipeline files and 8 trigger files checked: 7 errors, 3 warnings

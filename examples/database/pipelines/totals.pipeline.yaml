@@ -1,0 +1,21 @@
+# Sums the orders per customer and writes them with db.upsert (S21) into the table
+# totals: new customers are inserted, existing ones updated by their key customer.
+# Run the workflow orders first (it creates both tables), then:
+#   runnel run examples/database/pipelines/totals.pipeline.yaml
+kind: Pipeline
+apiVersion: runnel/v1
+name: totals
+transforms:
+  - id: read
+    type: db.table-input
+    with:
+      connection: shop
+      sql: SELECT customer, COUNT(*) AS orders, SUM(amount) AS total FROM orders GROUP BY customer
+  - id: write
+    type: db.upsert
+    with:
+      connection: shop
+      table: totals
+      keys: [customer]
+links:
+  - { from: read, to: write }

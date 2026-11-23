@@ -60,6 +60,9 @@ test("creates a workflow from the template and renames it", async ({ page, reque
 
 test("creates a trigger that starts disabled", async ({ page, request }) => {
   await page.goto("/");
+  // The template takes the first workflow from the loaded tree: wait for it, else the
+  // fallback workflows/main.workflow.yaml is used.
+  await expect(row(page, "workflows")).toBeVisible();
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByRole("menu", { name: "New" }).getByRole("menuitem", { name: /^Trigger/ }).click();
   await tree(page).getByRole("textbox", { name: "Name of the new trigger" }).press("Enter");
