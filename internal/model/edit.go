@@ -1240,10 +1240,10 @@ func pipelineDoc(name string, text []byte) (*graphDoc, *Pipeline, error) {
 
 func checkLinkType(t LinkType) error {
 	switch t {
-	case "", DataLink, ErrorLink:
+	case "", DataLink, ErrorLink, InfoLink:
 		return nil
 	}
-	return fmt.Errorf("link type %q is not supported here (data or error)", t)
+	return fmt.Errorf("link type %q is not supported here (data, error or info)", t)
 }
 
 // pipelineLinkItem writes a pipeline link; "data" is the default and left out.

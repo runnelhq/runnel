@@ -7,5 +7,4 @@ field-values.pipeline.yaml:13:11: transform "map": invalid type "Mapper" (expect
 field-values.pipeline.yaml:14:5: transform "write": missing required field "type"
 field-values.pipeline.yaml:15:5: transform #4: missing required field "id"
 field-values.pipeline.yaml:17:7: link #1: missing required field "to"
-field-values.pipeline.yaml:19:35: link #3: info links are not supported yet (roadmap S23)
-field-values.pipeline.yaml:20:35: link #4: invalid link type "lookup" (expected data or error)
+field-values.pipeline.yaml:20:35: link #4: invalid link type "lookup" (expected data, error or info)

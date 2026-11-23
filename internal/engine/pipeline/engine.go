@@ -93,6 +93,8 @@ type Counts struct {
 	Written int64 `json:"written"`
 	// Errors is the number of records the transform passed to its error links.
 	Errors int64 `json:"errors,omitempty"`
+	// Info is the number of records the transform received over its info link (S23b).
+	Info int64 `json:"info,omitempty"`
 }
 
 // Result is the outcome of a run.
@@ -156,7 +158,10 @@ type Runner struct {
 	errSchemas []record.Schema
 	// inputs holds the merged schema of the incoming records of each transform; nil
 	// for a transform without incoming links.
-	inputs   []*record.Schema
+	inputs []*record.Schema
+	// infos holds the schema of the records on the info link of each transform; nil
+	// without one (S23b).
+	infos    []*record.Schema
 	warnings model.Errors
 	emitMu   sync.Mutex
 }
@@ -170,6 +175,7 @@ func Prepare(p *model.Pipeline, opts Options) (*Runner, error) {
 		return nil, err
 	}
 	diags := r.deriveSchemas()
+	diags = append(diags, checkInfoLinks(p, opts.Registry)...)
 	for i, l := range p.Links {
 		if l.Type != model.ErrorLink {
 			continue
@@ -247,6 +253,8 @@ type TransformSchemas struct {
 	// Errors is the schema of the records on its error links (with _error, _errorField
 	// and _errorTransform).
 	Errors record.Schema `json:"errors"`
+	// Info is the schema of the records on its info link (S23b); missing without one.
+	Info *record.Schema `json:"info,omitempty"`
 }
 
 // Schemas derives the schemas of all transforms by id, like Prepare does. Unlike
@@ -258,7 +266,7 @@ func Schemas(p *model.Pipeline, opts Options) map[string]TransformSchemas {
 	out := make(map[string]TransformSchemas, len(p.Transforms))
 	for i, t := range p.Transforms {
 		if _, dup := out[t.ID]; !dup {
-			out[t.ID] = TransformSchemas{Input: r.inputs[i], Output: r.schemas[i], Errors: r.errSchemas[i]}
+			out[t.ID] = TransformSchemas{Input: r.inputs[i], Output: r.schemas[i], Errors: r.errSchemas[i], Info: r.infos[i]}
 		}
 	}
 	return out
@@ -270,6 +278,7 @@ type outLink struct {
 	index  int    // index of the link in the pipeline
 	to     int    // index of the transform it leads to
 	target string // its id
+	info   bool   // an info link: counted apart from the records read (S23b)
 }
 
 // port is a group of outgoing links that get the same records (e.g. all data links,
@@ -348,6 +357,7 @@ func (r *Runner) deriveSchemas() model.Errors {
 	type input struct {
 		from  int
 		error bool // an error link: the records the transform could not process
+		info  bool // an info link: lookup data, not merged with the data links
 	}
 	inputs := make([][]input, len(p.Transforms))
 	pending := make([]int, len(p.Transforms))
@@ -355,8 +365,8 @@ func (r *Runner) deriveSchemas() model.Errors {
 	targets := make([][]string, len(p.Transforms))
 	for _, l := range p.Links {
 		from, to := index[l.From], index[l.To]
-		inputs[to] = append(inputs[to], input{from, l.Type == model.ErrorLink})
-		if l.Type != model.ErrorLink && !slices.Contains(targets[from], l.To) {
+		inputs[to] = append(inputs[to], input{from, l.Type == model.ErrorLink, l.Type == model.InfoLink})
+		if (l.Type == model.DataLink || l.Type == "") && !slices.Contains(targets[from], l.To) {
 			targets[from] = append(targets[from], l.To)
 		}
 		next[from] = append(next[from], to)
@@ -371,6 +381,7 @@ func (r *Runner) deriveSchemas() model.Errors {
 	r.schemas = make([]record.Schema, len(p.Transforms))
 	r.errSchemas = make([]record.Schema, len(p.Transforms))
 	r.inputs = make([]*record.Schema, len(p.Transforms))
+	r.infos = make([]*record.Schema, len(p.Transforms))
 	errSchemas := r.errSchemas
 	var diags model.Errors
 	for len(queue) > 0 {
@@ -378,6 +389,13 @@ func (r *Runner) deriveSchemas() model.Errors {
 		queue = queue[1:]
 		var in []record.Schema
 		for _, x := range inputs[i] {
+			if x.info {
+				if r.infos[i] == nil { // a second info link is reported by checkInfoLinks
+					s := r.schemas[x.from]
+					r.infos[i] = &s
+				}
+				continue
+			}
 			if x.error {
 				in = append(in, errSchemas[x.from])
 			} else {
@@ -401,12 +419,13 @@ func (r *Runner) deriveSchemas() model.Errors {
 			ic := transform.NewInitContext(record.Merge(in...))
 			ic.Targets = targets[i]
 			ic.Strict = p.Settings.Strict
+			ic.Info = r.infos[i]
 			out, err := init.Init(ic)
 			// The copies get the same Init; their problems are those of the first one.
 			for _, c := range r.copies[i] {
 				if ci, ok := c.(transform.Initializer); ok {
 					cic := transform.NewInitContext(record.Merge(in...))
-					cic.Targets, cic.Strict = targets[i], ic.Strict
+					cic.Targets, cic.Strict, cic.Info = targets[i], ic.Strict, ic.Info
 					_, _ = ci.Init(cic)
 				}
 			}
@@ -609,12 +628,17 @@ func (r *Runner) Run(parent context.Context) Result {
 	}
 	ins := make([][]int, len(r.p.Transforms))
 	outs := make([][]int, len(r.p.Transforms))
+	info := map[int]int{} // transform → its info link, read apart from its data links (S23b)
 	for i, l := range r.p.Links {
 		outs[index[l.From]] = append(outs[index[l.From]], i)
+		if l.Type == model.InfoLink {
+			info[index[l.To]] = i
+			continue
+		}
 		ins[index[l.To]] = append(ins[index[l.To]], i)
 	}
 
-	counts := make([]struct{ read, written, errors atomic.Int64 }, len(r.p.Transforms))
+	counts := make([]struct{ read, written, errors, info atomic.Int64 }, len(r.p.Transforms))
 	linkRows := make([]atomic.Int64, len(r.p.Links))
 	samples := make([][]record.Record, len(r.p.Links))
 	var sampleMu sync.Mutex
@@ -643,7 +667,7 @@ func (r *Runner) Run(parent context.Context) Result {
 		var dataLinks, errLinks []outLink
 		for _, li := range outs[i] {
 			l := r.p.Links[li]
-			ol := outLink{ch: links[li], index: li, to: index[l.To], target: l.To}
+			ol := outLink{ch: links[li], index: li, to: index[l.To], target: l.To, info: l.Type == model.InfoLink}
 			if l.Type == model.ErrorLink {
 				errLinks = append(errLinks, ol)
 			} else {
@@ -671,7 +695,11 @@ func (r *Runner) Run(parent context.Context) Result {
 					}
 					select {
 					case l.ch <- batch:
-						counts[l.to].read.Add(int64(len(b)))
+						if l.info {
+							counts[l.to].info.Add(int64(len(b)))
+						} else {
+							counts[l.to].read.Add(int64(len(b)))
+						}
 						linkRows[l.index].Add(int64(len(b)))
 					case <-ctx.Done():
 						return context.Cause(ctx)
@@ -731,6 +759,9 @@ func (r *Runner) Run(parent context.Context) Result {
 					}
 					return add(all, rec)
 				}, log).WithValues(values).WithResults(r.opts.Rows, addResult).WithRespond(r.opts.Respond).WithConnections(r.opts.Connections)
+				if li, ok := info[i]; ok {
+					out.WithInfo(r.p.Links[li].From, links[li])
+				}
 				if len(errLinks) > 0 {
 					out.WithErrorLinks(func(rec record.Record) error {
 						counts[i].errors.Add(1)
@@ -789,7 +820,11 @@ func (r *Runner) Run(parent context.Context) Result {
 			// Records still arriving are discarded, so that the transforms before can finish.
 			for range in {
 			}
-			c := Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load()}
+			if li, ok := info[i]; ok {
+				for range links[li] {
+				}
+			}
+			c := Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load(), Info: counts[i].info.Load()}
 			rows := make(map[int]int64, len(outs[i]))
 			for _, li := range outs[i] {
 				rows[li] = linkRows[li].Load()
@@ -810,7 +845,7 @@ func (r *Runner) Run(parent context.Context) Result {
 		res.LinkRows[i] = linkRows[i].Load()
 	}
 	for i, t := range r.p.Transforms {
-		res.Counts[t.ID] = Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load()}
+		res.Counts[t.ID] = Counts{Read: counts[i].read.Load(), Written: counts[i].written.Load(), Errors: counts[i].errors.Load(), Info: counts[i].info.Load()}
 	}
 	switch {
 	case failure != nil:

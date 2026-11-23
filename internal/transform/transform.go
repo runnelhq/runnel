@@ -43,6 +43,8 @@ type Output struct {
 	result  func(record.Record) error
 	respond action.Responder
 	conns   connection.Resolver
+	info    <-chan Batch
+	infoSrc string
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
@@ -65,6 +67,18 @@ func (o *Output) Connection(ctx context.Context, name string) (connection.Resolv
 	}
 	return o.conns(ctx, name)
 }
+
+// WithInfo sets the info link of the transform (S23b): the id of the transform it comes
+// from and its batches; the engine sets it for transforms with InfoInput.
+func (o *Output) WithInfo(from string, batches <-chan Batch) *Output {
+	o.infoSrc, o.info = from, batches
+	return o
+}
+
+// Info returns the batches of the info link – e.g. the data of a lookup – and the id of
+// the transform they come from; nil without an info link. The transform reads it to the
+// end before it reads its data links: records on the data links wait until then.
+func (o *Output) Info() (batches <-chan Batch, from string) { return o.info, o.infoSrc }
 
 // WithTargets sets how EmitTo reaches a single outgoing data link; the engine sets it.
 func (o *Output) WithTargets(emitTo func(target string, r record.Record) error) *Output {
@@ -217,6 +231,9 @@ type Definition struct {
 	// because each record is handled on its own; not for inputs and outputs, which would
 	// read or write twice.
 	Parallel bool
+	// InfoInput is set for transforms that take lookup data over exactly one info link
+	// (S23b), e.g. core.stream-lookup; they read it with Output.Info.
+	InfoInput bool
 	// DetectFields proposes the fields of an input transform from the first rows (at most
 	// limit) of its input, for "Detect fields" in the editor (S46); nil if it cannot.
 	// with is the configuration with variables resolved.
@@ -239,6 +256,8 @@ type Descriptor struct {
 	Parallel bool `json:"parallel,omitempty"`
 	// DetectFields: the transform can propose its fields (Definition.DetectFields).
 	DetectFields bool `json:"detectFields,omitempty"`
+	// InfoInput: the transform takes lookup data over an info link (Definition.InfoInput).
+	InfoInput bool `json:"infoInput,omitempty"`
 }
 
 // Registry holds the available transform types.
@@ -270,7 +289,7 @@ func (r *Registry) Register(d Definition) {
 	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, Example: d.Example, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
-		DetectFields: d.DetectFields != nil}
+		DetectFields: d.DetectFields != nil, InfoInput: d.InfoInput}
 }
 
 // Lookup returns the definition of a transform type.

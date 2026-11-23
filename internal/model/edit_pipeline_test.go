@@ -96,7 +96,7 @@ func TestEditPipelineErrors(t *testing.T) {
 	}{
 		{PipelineEdit{Delete: []string{"nope"}}, `cannot delete transform "nope"`},
 		{PipelineEdit{Add: []NewAction{{ID: "read", Type: "csv.input"}}}, `cannot add transform "read": the id is already used`},
-		{PipelineEdit{AddLinks: []PipelineLink{{From: "read", To: "write", Type: "info"}}}, `link type "info" is not supported here`},
+		{PipelineEdit{AddLinks: []PipelineLink{{From: "read", To: "write", Type: "lookup"}}}, `link type "lookup" is not supported here`},
 		{PipelineEdit{UpdateLinks: []PipelineLinkUpdate{{Index: 5, Type: new(ErrorLink)}}}, "cannot change link #6"},
 		{PipelineEdit{Set: []SetField{{ID: "read", Field: "timeout", Value: "1s"}}}, `field "timeout" cannot be changed here`},
 		{PipelineEdit{Set: []SetField{{ID: "write", Field: "copies", Value: 2}}}, "flow style"},

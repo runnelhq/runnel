@@ -1,0 +1,34 @@
+# Adds the customer number and city of each order from customers.csv (S23b): the
+# customers come over an info link (type: info) into "lookup", which reads them
+# completely first and then looks up every order by the name of the customer.
+#   runnel run -v examples/pipelines/pipelines/orders-enrich.pipeline.yaml
+kind: Pipeline
+apiVersion: runnel/v1
+name: orders-enrich
+transforms:
+  - id: customers
+    type: csv.input
+    with:
+      path: data/customers.csv
+      delimiter: ";"
+  - id: orders
+    type: csv.input
+    with:
+      path: data/orders.csv
+      delimiter: ";"
+  - id: lookup
+    type: core.stream-lookup
+    with:
+      keys:
+        - { field: Kunde, lookupField: name }
+      return:
+        - { lookupField: kdnr, as: customerNumber }
+        - { lookupField: ort, as: city, default: unknown }
+  - id: write
+    type: csv.output
+    with:
+      path: out/orders-enriched.csv
+links:
+  - { from: customers, to: lookup, type: info }
+  - { from: orders, to: lookup }
+  - { from: lookup, to: write }

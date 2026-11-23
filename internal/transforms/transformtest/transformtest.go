@@ -96,3 +96,27 @@ func RunRouted(ctx context.Context, tr transform.Transform, input ...record.Reco
 	err := tr.Process(ctx, in, o)
 	return out, logs, err
 }
+
+// RunWithInfo is RunWithErrorLink for a transform that takes lookup data (S23b): info are
+// the records on its info link, from the transform "lookupdata".
+func RunWithInfo(ctx context.Context, tr transform.Transform, info []record.Record, input ...record.Record) (out, failed []record.Record, logs []Logged, err error) {
+	in := make(chan transform.Batch, len(input))
+	for _, r := range input {
+		in <- transform.Batch{r}
+	}
+	close(in)
+	ic := make(chan transform.Batch, len(info))
+	for _, r := range info {
+		ic <- transform.Batch{r}
+	}
+	close(ic)
+	o := transform.NewOutput("t", func(r record.Record) error {
+		out = append(out, r)
+		return ctx.Err()
+	}, func(l slog.Level, m string) { logs = append(logs, Logged{l, m}) }).WithErrorLinks(func(r record.Record) error {
+		failed = append(failed, r)
+		return ctx.Err()
+	}).WithInfo("lookupdata", ic)
+	err = tr.Process(ctx, in, o)
+	return out, failed, logs, err
+}

@@ -114,7 +114,8 @@ auf; der Editor braucht so keinen eigenen YAML-Parser. Für Pipelines heißt das
 Seit S25a2 enthält die Antwort für Pipelines außerdem `schemas`: die abgeleiteten Felder (ADR 0007) je Transform-ID –
 `input` (Felder der eingehenden Datensätze, zusammengeführt; fehlt bei Transforms ohne eingehende Links), `output`
 (Datensätze auf den Datenlinks) und `errors` (Datensätze auf den Fehlerlinks, mit `_error`, `_errorField`,
-`_errorTransform`). Ein Schema ist `{ "fields": [{ "name": "kdnr", "type": "int" }], "open": true }`; ohne `type` ist der
+`_errorTransform`); seit S23b1 bei Transforms mit Info-Link `info` (Datensätze des Info-Links, nicht in `input`
+enthalten). In `counts` eines Laufs zählt `info` die Datensätze über den Info-Link. Ein Schema ist `{ "fields": [{ "name": "kdnr", "type": "int" }], "open": true }`; ohne `type` ist der
 Typ unbekannt, `open` heißt, dass weitere Felder erst beim Lauf bekannt sind. Ein Transform, der wegen eines Fehlers
 nicht angelegt werden kann, gilt als unbekannt (offenes Schema). `schemas` fehlt, solange Felder oder Graph der
 Pipeline Fehler haben (z. B. ein Link auf einen unbekannten Transform).
