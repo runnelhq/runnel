@@ -213,3 +213,31 @@ func TestConnectionWithoutProject(t *testing.T) {
 		t.Errorf("error %v", err)
 	}
 }
+
+// Every page carries the sign-in of the connection; a next page on another host is not
+// requested.
+func TestConnectionPaginate(t *testing.T) {
+	var srv *httptest.Server
+	var auths []string
+	var mu sync.Mutex
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		auths = append(auths, r.Header.Get("Authorization"))
+		mu.Unlock()
+		next := srv.URL + "/v1/items?cursor=2"
+		if r.URL.Query().Get("cursor") == "2" {
+			next = "https://evil.example.com/v1/items?cursor=3"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"value": []any{1}, "@odata.nextLink": next})
+	}))
+	t.Cleanup(srv.Close)
+	conn := map[string]any{"baseUrl": srv.URL + "/v1", "auth": "bearer", "token": "tok"}
+	_, err := withConnection(t, conn, map[string]any{"url": "items", "paginate": map[string]any{"style": "url", "items": "value", "next": "@odata.nextLink"}})
+	if err == nil || !strings.Contains(err.Error(), "the next page is on https://evil.example.com") {
+		t.Fatalf("error %v", err)
+	}
+	if len(auths) != 2 || auths[0] != "Bearer tok" || auths[1] != "Bearer tok" {
+		t.Errorf("%v", auths)
+	}
+}

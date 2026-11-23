@@ -93,6 +93,7 @@ fuzz:
 	go test ./internal/format -run '^$$' -fuzz FuzzParse -fuzztime $(FUZZTIME)
 	go test ./internal/transforms/csv -run '^$$' -fuzz FuzzInput -fuzztime $(FUZZTIME)
 	go test ./internal/transforms/csv -run '^$$' -fuzz FuzzDetectFields -fuzztime $(FUZZTIME)
+	go test ./internal/pagination -run '^$$' -fuzz FuzzNextLink -fuzztime $(FUZZTIME)
 	go test ./internal/transforms/json -run '^$$' -fuzz FuzzInput -fuzztime $(FUZZTIME)
 	go test ./internal/actions/archive -run '^$$' -fuzz FuzzExtract -fuzztime $(FUZZTIME)
 	go test ./internal/triggers -run '^$$' -fuzz FuzzRequest -fuzztime $(FUZZTIME)

@@ -793,7 +793,7 @@
           },
           "timeout": {
             "type": "string",
-            "description": "Longest time for the request and its answer, e.g. 30s or 5m; the timeout of the action limits all attempts together",
+            "description": "Longest time for one request and its answer (with paginate: per page), e.g. 30s or 5m; the timeout of the action limits all together",
             "format": "runnel-duration",
             "default": "60s"
           },
@@ -804,8 +804,115 @@
           },
           "maxSize": {
             "type": "string",
-            "description": "Largest answer to read, e.g. 10MB or 500KB",
+            "description": "Largest answer to read, e.g. 10MB or 500KB; with paginate per page",
             "default": "10MB"
+          },
+          "retryAfter": {
+            "type": "object",
+            "description": "Asking again when the API answers 429 or 503 with Retry-After (wait in seconds or a date); on by default",
+            "properties": {
+              "maxRetries": {
+                "type": "integer",
+                "description": "Most repeats of one request after 429 or 503 with Retry-After; 0: none",
+                "default": 3
+              },
+              "maxWait": {
+                "type": "string",
+                "description": "Longest wait the API may ask for; a longer one fails the action",
+                "format": "runnel-duration",
+                "default": "1m"
+              }
+            },
+            "additionalProperties": false
+          },
+          "paginate": {
+            "type": "object",
+            "description": "Reading all pages of a paged API; output: items (all items), count and pages instead of body",
+            "properties": {
+              "style": {
+                "type": "string",
+                "description": "How the next page is found: link (header Link rel=next), url (address in the body), cursor (value in the body as query parameter), page (page number) or offset (items read so far)",
+                "enum": [
+                  "link",
+                  "url",
+                  "cursor",
+                  "page",
+                  "offset"
+                ]
+              },
+              "items": {
+                "type": "string",
+                "description": "Path to the list of items in the body, e.g. data.items; empty: the body is the list",
+                "examples": [
+                  "data"
+                ]
+              },
+              "next": {
+                "type": "string",
+                "description": "Path in the body to the address of the next page (url) or to the cursor (cursor), e.g. @odata.nextLink or meta.next_cursor",
+                "examples": [
+                  "meta.next_cursor"
+                ],
+                "x-runnel-only": {
+                  "style": [
+                    "url",
+                    "cursor"
+                  ]
+                }
+              },
+              "param": {
+                "type": "string",
+                "description": "Query parameter for the cursor, page number or offset; empty: cursor, page or offset",
+                "examples": [
+                  "starting_after"
+                ],
+                "x-runnel-only": {
+                  "style": [
+                    "cursor",
+                    "page",
+                    "offset"
+                  ]
+                }
+              },
+              "start": {
+                "type": "integer",
+                "description": "First page number (page) or offset (offset); empty: 1 for page, 0 for offset",
+                "x-runnel-only": {
+                  "style": [
+                    "page",
+                    "offset"
+                  ]
+                }
+              },
+              "size": {
+                "type": "integer",
+                "description": "Items per page; a shorter page is the last one; with sizeParam it is also sent",
+                "examples": [
+                  100
+                ]
+              },
+              "sizeParam": {
+                "type": "string",
+                "description": "Query parameter for the page size, e.g. per_page or limit",
+                "examples": [
+                  "per_page"
+                ]
+              },
+              "maxPages": {
+                "type": "integer",
+                "description": "Most pages to read; more fail the action",
+                "default": 100
+              },
+              "maxItems": {
+                "type": "integer",
+                "description": "Most items to read; more fail the action (use a pipeline for larger amounts)",
+                "default": 10000
+              }
+            },
+            "required": [
+              "style"
+            ],
+            "additionalProperties": false
           }
         },
         "additionalProperties": false
