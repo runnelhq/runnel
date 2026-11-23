@@ -11,6 +11,7 @@ func Builtin() *connection.Registry {
 	r.Register(sqliteDefinition)
 	r.Register(sqlServerDefinition)
 	r.Register(postgresDefinition)
+	r.Register(httpDefinition)
 	r.Register(smtpDefinition)
 	return r
 }

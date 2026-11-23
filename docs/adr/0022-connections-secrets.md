@@ -468,3 +468,22 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   Correlation-IDs; das Secret erscheint nie darin.
 - **Paket:** Abruf und Zwischenspeicher liegen in `internal/oauth`, damit die spätere `http`-Connection (Abschnitt 7) sie
   wiederverwenden kann. Keine neue Abhängigkeit (`net/http`).
+
+## Nachtrag 2026-11-23 (S63a): Connection `http`
+
+- **Felder:** `baseUrl`, `headers` (für jede Anfrage), `auth` mit `none` (Standard), `bearer` (`token`), `basic`
+  (`user`, `password`), `apiKey` (`apiKey`, `apiKeyName` Standard `X-API-Key`, `apiKeyIn` `header` oder `query`) und
+  `oauth2` (`tokenUrl`, `clientId`, `clientSecret`, `scope`; Client Credentials über `internal/oauth` wie bei `smtp`).
+  Proxy kommt aus der Umgebung (`HTTPS_PROXY`); eine abschaltbare Zertifikatsprüfung folgt erst bei Bedarf.
+- **Secrets in Zuordnungen:** `headers` hat das Format `runnel-secret`; ihre Werte dürfen `${secret:…}` enthalten und
+  werden einzeln aufgelöst und maskiert. Allgemein gilt jetzt: Ein Secret-Feld einer Connection darf auch eine
+  Zuordnung von Texten sein.
+- **Adressen:** Mit `connection:` ist `url` in `http.request` relativ zu `baseUrl`, auch mit `/` am Anfang
+  (`orders` und `/orders` ergeben bei `https://api.example.com/v1` beide `/v1/orders`); leer ist `baseUrl` selbst.
+  Eine absolute Adresse ist nur mit Schema und Host der Connection erlaubt, sonst ein Fehler vor der Anfrage: Die
+  Anmeldung geht nie an einen anderen Host.
+- **Vorrang:** Header der Connection, dann Header der Action, zuletzt die Anmeldung der Connection.
+- **OAuth2:** Antwortet die API mit `401`, verwirft Runnel das Token und sendet die Anfrage einmal mit einem neuen.
+- **Sicherheit:** Mit Anmeldung ist `http://` nur zum eigenen Rechner erlaubt; `validate` warnt bei einer `baseUrl`
+  mit `http://` zu einem anderen Rechner. Meldungen nennen nur Schema, Host und Pfad, nie die Query (`apiKeyIn:
+  query`) oder Header.
