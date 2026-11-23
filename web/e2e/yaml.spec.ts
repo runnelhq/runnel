@@ -149,9 +149,10 @@ test.describe("other files of the project", () => {
   test("edits an environment and checks it while typing", async ({ page, request }) => {
     await page.goto("/");
     await page.getByRole("tree").getByText("prod.yaml", { exact: true }).click();
+    // Environments open as a form (E20b); this test is about the YAML view.
+    await page.getByRole("button", { name: "YAML", exact: true }).click();
     await expect(editor(page)).toContainText("name: prod");
     await expect(page.getByText("Read-only")).toHaveCount(0);
-    await expect(page.getByRole("group", { name: "View" })).toHaveCount(0);
 
     await retype(page, "name: prod", 4, "live");
     await expect(page.getByTestId("error-count")).toHaveText("✖ 1");

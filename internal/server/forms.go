@@ -2,7 +2,9 @@ package server
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/goccy/go-yaml"
@@ -47,16 +49,35 @@ type scheduleInfo struct {
 	Next []string `json:"next"`
 }
 
+// settingsForm is what the form of an environment or project.yaml shows (E20b): its
+// fields as written, the secrets of secretStore: inline only by name.
+type settingsForm struct {
+	Name               string         `json:"name" yaml:"name"`
+	Description        string         `json:"description,omitempty" yaml:"description"`
+	DefaultEnvironment string         `json:"defaultEnvironment,omitempty" yaml:"defaultEnvironment"`
+	Variables          map[string]any `json:"variables" yaml:"variables"`
+	SecretStore        string         `json:"secretStore,omitempty" yaml:"secretStore"`
+	Secrets            map[string]any `json:"-" yaml:"secrets"`
+	SecretNames        []string       `json:"secrets" yaml:"-"`
+	Workflow           map[string]any `json:"workflow,omitempty" yaml:"workflow"`
+	Settings           map[string]any `json:"settings,omitempty" yaml:"settings"`
+}
+
 type formEditResponse struct {
-	Content    string          `json:"content"`
-	Connection *connectionForm `json:"connection,omitempty"`
-	Trigger    *triggerForm    `json:"trigger,omitempty"`
+	Content     string          `json:"content"`
+	Connection  *connectionForm `json:"connection,omitempty"`
+	Trigger     *triggerForm    `json:"trigger,omitempty"`
+	Environment *settingsForm   `json:"environment,omitempty"`
+	Project     *settingsForm   `json:"project,omitempty"`
 	// Removed names the fields under with: a new type of a trigger removed.
 	Removed []string `json:"removed,omitempty"`
 }
 
 // formKinds are the file kinds the form edits, by the kind of the tree.
-var formKinds = map[string]string{"connection": model.KindConnection, "trigger": model.KindTrigger}
+var formKinds = map[string]string{
+	"connection": model.KindConnection, "trigger": model.KindTrigger,
+	"environment": model.KindEnvironment, "project": model.KindProject,
+}
 
 // handleEditForm reads the text of a connection or trigger file for the form and applies
 // a change of one field (S39c2a, E20a), like /workflows/edit for the canvas; nothing is
@@ -76,7 +97,7 @@ func (s *Server) handleEditForm(w http.ResponseWriter, r *http.Request) {
 	}
 	kind, ok := formKinds[fileKind(name)]
 	if !ok {
-		writeError(w, http.StatusBadRequest, "only connection and trigger files can be edited in the form")
+		writeError(w, http.StatusBadRequest, "only connection, trigger and environment files and project.yaml can be edited in the form")
 		return
 	}
 	out := []byte(req.Content)
@@ -87,12 +108,20 @@ func (s *Server) handleEditForm(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// The form shows a file that reads; without connection or trigger it asks for the
-	// YAML view.
+	// The form shows a file that reads; without its fields it asks for the YAML view.
 	res := formEditResponse{Content: string(out), Removed: removed}
-	if kind == model.KindTrigger {
+	switch kind {
+	case model.KindTrigger:
 		res.Trigger = readTriggerForm(out, time.Now())
-	} else if c, _ := model.ReadConnection(name, out); c != nil {
+	case model.KindEnvironment:
+		res.Environment = readSettingsForm(out)
+	case model.KindProject:
+		res.Project = readSettingsForm(out)
+	default:
+		c, _ := model.ReadConnection(name, out)
+		if c == nil {
+			break
+		}
 		with := c.With
 		if with == nil {
 			with = map[string]any{}
@@ -127,4 +156,22 @@ func readTriggerForm(data []byte, now time.Time) *triggerForm {
 		}
 	}
 	return &t
+}
+
+// readSettingsForm reads the fields of an environment or project.yaml as written; the
+// values of secrets: stay out of the answer. nil when the text is not of that shape.
+func readSettingsForm(data []byte) *settingsForm {
+	var f settingsForm
+	if err := yaml.Unmarshal(data, &f); err != nil {
+		return nil
+	}
+	if f.Variables == nil {
+		f.Variables = map[string]any{}
+	}
+	f.SecretNames = slices.Sorted(maps.Keys(f.Secrets))
+	if f.SecretNames == nil {
+		f.SecretNames = []string{}
+	}
+	f.Secrets = nil
+	return &f
 }

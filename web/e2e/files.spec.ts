@@ -42,8 +42,9 @@ test("opens files in tabs and shows them as highlighted YAML", async ({ page }) 
   await expect(page.getByRole("tab")).toHaveCount(2);
   await expect(page.getByTestId("crumbs")).toHaveText("environments / dev.yaml");
   await expect(page.getByTestId("kind")).toHaveText("Environment");
-  // Environments are edited in the YAML view as well (E10).
+  // Environments open as a form (E20b) and are edited in the YAML view as well (E10).
   await expect(page.getByText("Read-only")).toHaveCount(0);
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
   await expect(page.getByTestId("yaml-editor")).toContainText("kind: Environment");
   await expect(page.getByRole("treeitem", { name: "dev.yaml" })).toHaveAttribute("aria-selected", "true");
 
@@ -91,6 +92,7 @@ test("shows files saved as UTF-16 (Notepad \"Unicode\")", async ({ page }) => {
   );
   await page.goto("/");
   await page.getByRole("tree").getByText("dev.yaml").click();
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
   await expect(page.getByTestId("yaml-editor")).toContainText("# Grüße");
   await expect(page.getByTestId("file-summary")).toHaveText("YAML · UTF-16 LE · 3 lines");
 });

@@ -38,6 +38,8 @@ test.afterAll(async ({ request }) => {
 async function openFile(page: Page, name: string) {
   await page.goto("/");
   await page.getByRole("tree").getByText(name, { exact: true }).click();
+  // project.yaml and environments open as a form (E20b); Insert works in the YAML view.
+  await page.getByRole("button", { name: "YAML", exact: true }).click();
   await expect(page.getByTestId("yaml-editor")).toBeVisible();
 }
 

@@ -27,7 +27,7 @@ test("project.yaml of a project without environments shows the reference", async
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.getByRole("tree").getByText("project.yaml", { exact: true }).click();
-  await expect(page.getByTestId("yaml-editor")).toBeVisible();
+  await expect(page.getByTestId("settings-form")).toBeVisible();
   const ref = page.getByRole("region", { name: "Reference" });
   await expect(ref.getByTestId("field-name")).toBeVisible();
   await ref.getByRole("button", { name: "Variables", exact: true }).click();

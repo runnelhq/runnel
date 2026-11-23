@@ -48,9 +48,10 @@ test("shows a workflow as a graph", async ({ page }) => {
 });
 
 test("other files have no canvas", async ({ page }) => {
+  // Environments open as a form (E20b): Form | YAML instead of Canvas | YAML.
   await openFile(page, "dev.yaml");
-  await expect(page.getByTestId("yaml-editor")).toBeVisible();
-  await expect(page.getByRole("group", { name: "View" })).toHaveCount(0);
+  await expect(page.getByTestId("settings-form")).toBeVisible();
+  await expect(page.getByRole("group", { name: "View" }).getByRole("button")).toHaveText(["Form", "YAML"]);
 });
 
 test("shows problems at the actions and jumps to the YAML line", async ({ page }) => {

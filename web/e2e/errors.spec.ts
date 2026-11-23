@@ -16,7 +16,7 @@ test("an error in a file stays in its tab", async ({ page }) => {
   await expect(error).toContainText("workflows/hello.workflow.yaml");
   // The rest of the editor works: another file opens and shows its text.
   await page.getByRole("tree").getByText("dev.yaml", { exact: true }).click();
-  await expect(page.getByTestId("yaml-editor")).toBeVisible();
+  await expect(page.getByTestId("settings-form")).toBeVisible();
   await expect(page.getByTestId("file-error")).toHaveCount(0);
   // Back on the broken tab, "Try again" draws it anew once the cause is gone.
   await page.unroute("**/api/v1/validate");
@@ -36,7 +36,7 @@ test("an error in the sidebar stays in its panel", async ({ page }) => {
   await expect(panel).toContainText("This panel can’t be shown");
   await expect(panel.getByRole("button", { name: "Try again" })).toBeVisible();
   // The file itself is shown and the explorer still works.
-  await expect(page.getByTestId("yaml-editor")).toBeVisible();
+  await expect(page.getByTestId("settings-form")).toBeVisible();
   await page.getByRole("tree").getByText("hello.workflow.yaml", { exact: true }).click();
   await expect(page.getByRole("region", { name: "Palette" })).toBeVisible();
 });

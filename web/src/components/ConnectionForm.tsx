@@ -5,7 +5,7 @@ import { useReference, type ExprContext } from "../expressions";
 import { useSchema, useVariables } from "../reference";
 import type { Problem } from "../workflow";
 import { ChevronIcon, ConnectionIcon, PlugIcon } from "./Icons";
-import { editForm, useForm, type FieldChange } from "../forms";
+import { useForm, useFormChange, type FieldChange } from "../forms";
 import { SchemaField } from "./PropertiesPanel";
 
 /**
@@ -41,12 +41,8 @@ export function ConnectionForm(props: {
   const ref = useReference();
   const ctx = useMemo<ExprContext>(() => ({ ref, params: noParams, actions: [] }), [ref]);
 
-  const change = (c: FieldChange) => {
-    editForm(path, text, c).then(
-      (r) => props.onText(r.content),
-      (e: Error) => onError(e.message),
-    );
-  };
+  const apply = useFormChange(path, text, props.onText, onError);
+  const change = (c: FieldChange) => void apply(c);
 
   if (data === undefined || !schema) return <div className="flex-1" aria-busy="true" />;
   if (data === null) {
