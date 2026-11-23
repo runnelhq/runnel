@@ -40,8 +40,8 @@ export interface ConnectionInfo {
   file: string;
 }
 
-/** useConnections loads the connections of the project (null while loading or on an error). */
-export function useConnections(): ConnectionInfo[] | null {
+/** useConnections loads the connections of the project (null while loading or on an error), again whenever key changes. */
+export function useConnections(key?: unknown): ConnectionInfo[] | null {
   const [list, setList] = useState<ConnectionInfo[] | null>(null);
   useEffect(() => {
     let live = true;
@@ -51,8 +51,38 @@ export function useConnections(): ConnectionInfo[] | null {
     return () => {
       live = false;
     };
-  }, []);
+  }, [key]);
   return list;
+}
+
+/** A secret of the project as GET /secrets returns it (S39c1): never a value. */
+export interface SecretInfo {
+  name: string;
+  /** The store named in the reference (${secret:env/NAME}); empty for the default store. */
+  store?: string;
+  uses: { file: string; line: number; column: number }[];
+  /** By environment ("" without environments): where it comes from and whether it is set. */
+  environments: Record<string, { store: string; state: "set" | "missing" | "unavailable" }>;
+}
+
+export interface SecretsInfo {
+  environments: string[];
+  secrets: SecretInfo[];
+}
+
+/** useSecrets loads the secrets of the project and their state per environment, again whenever key changes. */
+export function useSecrets(key?: unknown): SecretsInfo | null {
+  const [info, setInfo] = useState<SecretsInfo | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`${apiBase}/secrets`)
+      .then((r) => (r.ok ? (r.json() as Promise<SecretsInfo>) : Promise.reject(new Error(r.statusText))))
+      .then((v) => live && setInfo(v), () => live && setInfo(null));
+    return () => {
+      live = false;
+    };
+  }, [key]);
+  return info;
 }
 
 /** A variable of the project as GET /variables returns it (E18a). */

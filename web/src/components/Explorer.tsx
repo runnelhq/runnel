@@ -16,8 +16,10 @@ import {
   type NewKind,
   type Reference,
 } from "../files";
+import { NewConnectionDialog } from "./NewConnection";
+import { useConnections } from "../reference";
 import { Dialog } from "./Dialog";
-import { ChevronIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ChevronIcon, ConnectionIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
 
 /** Changes of the project files made in the explorer, for the tabs (E11). */
 export interface ExplorerChanges {
@@ -67,7 +69,10 @@ export function Explorer(props: {
   const [moveTo, setMoveTo] = useState<Entry | null>(null);
   const [moving, setMoving] = useState<Moving | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [newConnection, setNewConnection] = useState(false);
   const { changes } = props;
+  const connections = useConnections(props.tree);
+  const connectionTypes = new Map((connections ?? []).map((c) => [c.file, c.type]));
 
   const all = flatten(props.tree);
   const exists = (path: string) => all.some((e) => e.path.toLowerCase() === path.toLowerCase());
@@ -316,6 +321,7 @@ export function Explorer(props: {
             nameRow={dirExists ? nameRow : null}
             onSubmit={submit}
             onCancel={() => setEditing(null)}
+            connectionTypes={connectionTypes}
           />
         ))}
       </ul>
@@ -330,6 +336,27 @@ export function Explorer(props: {
           onDelete={startDelete}
           projectMissing={!!props.tree && !exists(projectFile)}
           onCreateProject={() => void createProject()}
+          onNewConnection={() => {
+            setMenu(null);
+            setNewConnection(true);
+          }}
+        />
+      )}
+      {newConnection && changes && (
+        <NewConnectionDialog
+          exists={exists}
+          onCancel={() => setNewConnection(false)}
+          onCreate={async (path, text) => {
+            try {
+              await createFile(path, text);
+            } catch (err) {
+              return err instanceof Error ? err.message : String(err);
+            }
+            setNewConnection(false);
+            props.onReload();
+            changes.onCreated(path);
+            return null;
+          }}
         />
       )}
       {drag?.over != null && (
@@ -428,8 +455,11 @@ function Node(props: {
   nameRow: React.ReactNode;
   onSubmit: (name: string) => Promise<string | null>;
   onCancel: () => void;
+  /** Types of the connection files by path, for their sign (mockup S39b). */
+  connectionTypes: Map<string, string>;
 }) {
   const { entry, depth, editing } = props;
+  const connectionType = entry.kind === "connection" ? props.connectionTypes.get(entry.path) : undefined;
   const [open, setOpen] = useState(true);
   const isDir = entry.type === "dir";
   const selected = !isDir && entry.path === props.selected;
@@ -486,9 +516,12 @@ function Node(props: {
         }
       >
         {isDir ? <ChevronIcon open={open} width={12} height={12} className="text-muted-foreground" /> : <span className="w-3" />}
-        <span className={selected ? "text-accent-foreground" : "text-muted-foreground"}>{isDir ? <FolderIcon /> : <KindIcon kind={entry.kind} />}</span>
+        <span className={selected ? "text-accent-foreground" : "text-muted-foreground"}>
+          {isDir ? <FolderIcon /> : connectionType ? <ConnectionIcon type={connectionType} /> : <KindIcon kind={entry.kind} />}
+        </span>
         <span className="truncate">{entry.name}</span>
         <span className="ml-auto inline-flex items-center gap-1">
+          {connectionType && <span className="font-mono text-[10px] text-muted-foreground">{connectionType}</span>}
           {isDir && <span className="text-2xs text-muted-foreground">{entry.children?.length ?? 0}</span>}
           <button
             type="button"
@@ -601,6 +634,7 @@ function ContextMenu(props: {
   /** project.yaml is missing (deleted outside the editor): "New" offers to create it. */
   projectMissing: boolean;
   onCreateProject: () => void;
+  onNewConnection: () => void;
 }) {
   const { menu } = props;
   const ref = useRef<HTMLDivElement>(null);
@@ -655,6 +689,7 @@ function ContextMenu(props: {
     content = [
       <div key="l" className="label-caps px-2 pt-1.5 pb-0.5">New</div>,
       ...kindItems(),
+      item("Connection", <ConnectionIcon type="" />, props.onNewConnection, { hint: "connections/" }),
       sep("s1"),
       item("Folder", <FolderIcon />, () => props.onCreate("folder", "")),
       ...(props.projectMissing ? [item("Project file", <ProjectIcon />, props.onCreateProject, { hint: projectFile })] : []),
