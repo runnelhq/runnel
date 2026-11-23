@@ -181,3 +181,11 @@ Die Schritte kommen mit dem ersten Umsetzungs-PR in die Roadmap.
   Windows-Besonderheiten zusätzlich im Testplan.
 - Ohne Freigabe-Schalter bleibt die Verantwortung beim Betrieb: Wer Projektdateien schreiben darf, darf Programme
   starten. Das steht so in der Doku zum Betrieb und in SECURITY.md.
+
+## Abstimmung 2026-11-23
+
+Mit dem Maintainer bestätigt:
+- Standardwerte `timeout: 10m` und `maxOutput` 1 MB je Strom.
+- `program` mit Variablen des Projekts und der Environments, ohne Workflow-Parameter und Ausdrücke.
+- Batch-Dateien mit gefährlichen Zeichen in Argumenten werden strikt abgelehnt.
+- Kein Freigabe-Schalter in `project.yaml`.

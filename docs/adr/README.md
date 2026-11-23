@@ -24,7 +24,7 @@
 | [0020](0020-relative-pfade.md) | Relative Pfade beziehen sich auf den Projektordner | Angenommen |
 | [0021](0021-unter-pipelines.md) | Unter-Pipelines in Pipelines – Mapping und Executor | Angenommen |
 | [0022](0022-connections-secrets.md) | Connections und Secrets | Angenommen |
-| [0023](0023-programme-powershell.md) | Programme und PowerShell starten – `shell.run` und `shell.powershell` | Vorgeschlagen |
+| [0023](0023-programme-powershell.md) | Programme und PowerShell starten – `shell.run` und `shell.powershell` | Angenommen |
 
 ## Wann eine ADR?
 
