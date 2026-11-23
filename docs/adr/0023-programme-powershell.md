@@ -1,6 +1,6 @@
 # ADR 0023: Programme und PowerShell starten – `shell.run` und `shell.powershell`
 
-- **Status:** Entwurf (zur Abstimmung mit dem Maintainer)
+- **Status:** Angenommen
 - **Datum:** 2026-11-23
 - **Bezug:** KONZEPT Kap. 7.2 und 12.1; [ADR 0005 – Mehrbenutzerbetrieb](0005-mehrbenutzerbetrieb.md),
   [ADR 0013 – Typnamen](0013-typnamen-namensraeume.md), [ADR 0014 – Descriptor](0014-action-descriptor-schema.md),
