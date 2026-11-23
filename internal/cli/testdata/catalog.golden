@@ -20,7 +20,9 @@ actions / files
   file.list        List Files       Lists the files of a folder; output: path, name, size, modified and folder of each entry
   file.mkdir       Create Folder    Creates a folder with its parent folders; output: the path
   file.move        Move Files       Moves files or folders; output: the new paths
+  file.read        Read File        Reads a small text file into the workflow, as text, lines or JSON; output: content, value or lines, size and modified
   file.wait        Wait for File    Waits until files exist; output: the matching paths
+  file.write       Write File       Writes a text or a value as JSON to a file, replacing it or appending; output: path and size
 actions / network
   http.request   HTTP Request   Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer
   http.response  HTTP Response  Answers the caller of an HTTP trigger with status, headers and body; output: sent and status

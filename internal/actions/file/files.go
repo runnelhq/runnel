@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -297,4 +298,35 @@ func fileInfo(path string, info fs.FileInfo) map[string]any {
 		"modified": info.ModTime().Truncate(time.Second),
 		"folder":   info.IsDir(),
 	}
+}
+
+// parseSize reads a size like 500KB, 10MB or 1024 (bytes); empty gives fallback.
+func parseSize(text string, fallback int64) (int64, error) {
+	s := strings.ToUpper(strings.TrimSpace(text))
+	if s == "" {
+		return fallback, nil
+	}
+	unit := int64(1)
+	for _, u := range []struct {
+		suffix string
+		factor int64
+	}{{"KB", 1 << 10}, {"MB", 1 << 20}, {"GB", 1 << 30}, {"B", 1}} {
+		if before, ok := strings.CutSuffix(s, u.suffix); ok {
+			s, unit = strings.TrimSpace(before), u.factor
+			break
+		}
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || n <= 0 || n > (1<<40)/unit {
+		return 0, fmt.Errorf("maxSize: %q is not a size like 500KB or 10MB", text)
+	}
+	return n * unit, nil
+}
+
+// sizeOr is the size as written, or the default for an empty one.
+func sizeOr(text, fallback string) string {
+	if strings.TrimSpace(text) == "" {
+		return fallback
+	}
+	return text
 }
