@@ -4,7 +4,7 @@ Der Editor ist eine React-Anwendung in [`web/`](../../web). Sie wird gebaut, in 
 `runnel serve` unter `http://127.0.0.1:7300/` ausgeliefert. Mit dem Server spricht sie nur über die
 [API](API.md). Gestaltung: [Corporate Design](../../design/README.md), freigegebene [Mockups](../../design/mockups/README.md).
 
-> Stand: E7c – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Palette, Tabs, Workflows als Canvas mit Anlegen, Umbenennen, Verbinden, Verschieben, Löschen, Rückgängig und Speichern; Eigenschaften von Actions, Links und Workflow im Panel; Leiste „Problems“; Ausführen mit Live-Status, Log und Ergebnis im Panel; Pipelines als Canvas mit Transforms, Daten- und Fehler-Links, Feldern und Ausführen mit Zählern. Parameter und Outputs sowie Wiederholung (`forEach`) und `params` im Panel (E7c).
+> Stand: E7c – Kopfzeile, Farbschema, Verbindungsstatus, Explorer, Palette, Tabs, Workflows als Canvas mit Anlegen, Umbenennen, Verbinden, Verschieben, Löschen, Rückgängig und Speichern; Eigenschaften von Actions, Links und Workflow im Panel; Leiste „Problems“; Ausführen mit Live-Status, Log und Ergebnis im Panel; Pipelines als Canvas mit Transforms, Daten-, Fehler- und Info-Links (S23b2), Feldern und Ausführen mit Zählern. Parameter und Outputs sowie Wiederholung (`forEach`) und `params` im Panel (E7c).
 
 ## Voraussetzungen
 

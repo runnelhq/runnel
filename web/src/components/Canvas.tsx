@@ -22,6 +22,7 @@ import {
   kindOfLink,
   newActionId,
   nodeHeight,
+  pathIndex,
   nodeWidth,
   place,
   problemsByAction,
@@ -142,6 +143,9 @@ function Graph(props: CanvasProps) {
     const ids = new Set((workflow.actions ?? []).map((a) => a.id));
     // A file with duplicate ids is shown with the first of them only (the problem is reported).
     const unique = (workflow.actions ?? []).filter((a, i, all) => a.id && all.findIndex((b) => b.id === a.id) === i);
+    // Transforms with an info link, and links with an error (drawn red, mockup S23b).
+    const withInfo = new Set((workflow.links ?? []).filter((l) => pipeline && l.type === "info").map((l) => l.to));
+    const badLinks = new Set(problems.filter((p) => p.severity === "error").map((p) => pathIndex(p.path, "links")));
     const computed: ActionNodeType[] = unique.map((a) => {
       const d = catalog.get(a.type);
       return {
@@ -156,6 +160,7 @@ function Graph(props: CanvasProps) {
           forEach: !!a.forEach,
           parallel: a.parallel,
           noInput: pipeline && d?.category === "input",
+          info: !pipeline ? undefined : withInfo.has(a.id) ? "port" : d?.infoInput ? (editable ? "missing" : "port") : undefined,
           color: d ? tileColor(d) : catalog.size === 0 ? categoryColor.general : undefined,
           problems: byAction.get(a.id) ?? [],
           onShowInYAML,
@@ -167,6 +172,7 @@ function Graph(props: CanvasProps) {
         },
       };
     });
+    const byId = new Map(unique.map((a) => [a.id, a.type]));
     const computedEdges: LinkEdgeType[] = (workflow.links ?? [])
       .map((l, i) => ({ l, i }))
       .filter(({ l }) => ids.has(l.from) && ids.has(l.to))
@@ -174,6 +180,7 @@ function Graph(props: CanvasProps) {
         id: `${i}`,
         source: l.from,
         target: l.to,
+        targetHandle: pipeline && l.type === "info" ? "info" : undefined,
         type: "link",
         selectable: editable,
         data: {
@@ -184,6 +191,8 @@ function Graph(props: CanvasProps) {
           run: pipeline ? undefined : linkRun(run, l),
           rows: pipeline ? run?.linkRows[i] : undefined,
           preview: !!preview,
+          infoTarget: pipeline && !!catalog.get(byId.get(l.to) ?? "")?.infoInput,
+          invalid: badLinks.has(i),
         },
       }));
     return { computed, computedEdges, auto };
@@ -324,8 +333,14 @@ function Graph(props: CanvasProps) {
     (c: Connection | LinkEdgeType) => {
       if (c.source === c.target) return false;
       const links = workflow.links ?? [];
-      // Records only flow forward: a pipeline takes one link per pair and no link that closes a cycle.
-      if (pipeline) return !links.some((l) => l.from === c.source && l.to === c.target) && !closesCycle(workflow, c.source, c.target);
+      // Records only flow forward: a pipeline takes one link per pair and no link that closes a cycle,
+      // and one info link per transform (S23b).
+      if (pipeline)
+        return (
+          !links.some((l) => l.from === c.source && l.to === c.target) &&
+          !closesCycle(workflow, c.source, c.target) &&
+          !(c.targetHandle === "info" && links.some((l) => l.to === c.target && l.type === "info"))
+        );
       return !links.some((l) => l.from === c.source && l.to === c.target && kindOfLink(l) === "success");
     },
     [workflow, pipeline],
@@ -333,8 +348,9 @@ function Graph(props: CanvasProps) {
   const connect = useCallback(
     (c: Connection) => {
       if (!onConnect || !c.source || !c.target) return;
-      // New pipeline links are data links; their type is changed in the link menu.
-      if (pipeline) return onConnect({ from: c.source, to: c.target, type: "data" });
+      // New pipeline links are data links, those dropped on the info port info links (mockup S23b);
+      // their type is changed in the link menu.
+      if (pipeline) return onConnect({ from: c.source, to: c.target, type: c.targetHandle === "info" ? "info" : "data" });
       // A link back to an earlier action is a loop link (decision for mockup E6b).
       onConnect({ from: c.source, to: c.target, ...(closesCycle(workflow, c.source, c.target) ? { loop: true } : {}) });
     },
@@ -352,12 +368,13 @@ function Graph(props: CanvasProps) {
     if (!menu) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") return setMenu(null);
-      // In a pipeline, D and E choose the type of the link (mockup S25a, state "link").
+      // In a pipeline, D, E and I choose the type of the link (mockups S25a and S23b, state "link").
       const kind = pipeline && !e.ctrlKey && !e.metaKey && !e.altKey && pipelineKinds.find(([, , key]) => key?.toLowerCase() === e.key.toLowerCase())?.[0];
-      if (!kind) return;
+      const edge = edges.find((x) => x.id === menu);
+      // Info only for transforms that take lookup data (mockup S23b).
+      if (!kind || (kind === "info" && !edge?.data?.infoTarget)) return;
       e.preventDefault();
       setMenu(null);
-      const edge = edges.find((x) => x.id === menu);
       if (edge && edge.data?.kind !== kind) onLinkKind?.(Number(menu), kind);
     };
     window.addEventListener("keydown", onKey);

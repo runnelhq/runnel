@@ -41,11 +41,11 @@ type streamLookup struct {
 
 type streamLookupKey struct {
 	Field       string `json:"field" doc:"Field of the record" schema:"required,format=runnel-field,example=customerId"`
-	LookupField string `json:"lookupField" doc:"Field of the lookup data; empty: the same name" schema:"example=id"`
+	LookupField string `json:"lookupField" doc:"Field of the lookup data; empty: the same name" schema:"format=runnel-info-field,example=id"`
 }
 
 type streamLookupReturn struct {
-	LookupField string `json:"lookupField" doc:"Field of the lookup data" schema:"required,example=name"`
+	LookupField string `json:"lookupField" doc:"Field of the lookup data" schema:"required,format=runnel-info-field,example=name"`
 	As          string `json:"as" doc:"Field for the value; empty: the name of the lookup field"`
 	Default     any    `json:"default" doc:"Value when no lookup record matches; missing: an empty value"`
 }

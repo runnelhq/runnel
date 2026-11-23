@@ -6,7 +6,7 @@ import { TrashIcon } from "./Icons";
  * Kinds that can be chosen in the link menu: conditions of workflow links (expressions
  * are written in the properties panel), types of pipeline links.
  */
-export type SettableKind = "success" | "failure" | "always" | "data" | "error";
+export type SettableKind = "success" | "failure" | "always" | "data" | "error" | "info";
 
 export interface LinkEdgeData extends Record<string, unknown> {
   kind: LinkKind;
@@ -19,6 +19,10 @@ export interface LinkEdgeData extends Record<string, unknown> {
   rows?: number;
   /** The counts come from a data preview (S44): drawn dashed. */
   preview?: boolean;
+  /** Pipelines: the target takes lookup data, so the menu offers "Info" (mockup S23b). */
+  infoTarget?: boolean;
+  /** The link has an error, e.g. an info link to a transform that takes none: drawn red (mockup S23b). */
+  invalid?: boolean;
   /** The link menu is open (mockup E6b). */
   menu?: boolean;
   onOpenMenu?: () => void;
@@ -29,7 +33,7 @@ export interface LinkEdgeData extends Record<string, unknown> {
 export type LinkEdgeType = Edge<LinkEdgeData, "link">;
 
 /** Symbols of the kinds; data links have none (decision for mockup S25a). */
-export const linkSymbols: Record<LinkKind, string> = { success: "✔", failure: "✖", always: "∞", expression: "ƒ", data: "", error: "✖" };
+export const linkSymbols: Record<LinkKind, string> = { success: "✔", failure: "✖", always: "∞", expression: "ƒ", data: "", error: "✖", info: "i" };
 export const linkColors: Record<LinkKind, string> = {
   success: "var(--link-success)",
   failure: "var(--link-failure)",
@@ -37,6 +41,8 @@ export const linkColors: Record<LinkKind, string> = {
   expression: "var(--link-expression)",
   data: "var(--link-always)",
   error: "var(--link-failure)",
+  // Info links keep the colour of data links; line form and symbol tell them apart (mockup S23b).
+  info: "var(--link-always)",
 };
 const workflowKinds: [SettableKind, string, string?][] = [
   ["success", "On success"],
@@ -47,8 +53,19 @@ const workflowKinds: [SettableKind, string, string?][] = [
 export const pipelineKinds: [SettableKind, string, string?][] = [
   ["data", "Data", "D"],
   ["error", "Error", "E"],
+  ["info", "Info", "I"],
 ];
-const isPipelineKind = (k: LinkKind) => k === "data" || k === "error";
+const isPipelineKind = (k: LinkKind) => k === "data" || k === "error" || k === "info";
+
+/** Path of an info link: out to the right, then down into the port at the top middle of the target (mockup S23b). */
+export function infoLinkPath(sourceX: number, sourceY: number, targetX: number, targetY: number) {
+  const path = `M${sourceX},${sourceY} C${targetX},${sourceY} ${targetX},${sourceY} ${targetX},${targetY}`;
+  const t = 0.35;
+  const u = 1 - t;
+  const x = u * u * u * sourceX + (3 * u * u * t + 3 * u * t * t + t * t * t) * targetX;
+  const y = (u * u * u + 3 * u * u * t + 3 * u * t * t) * sourceY + t * t * t * targetY;
+  return { path, x, y };
+}
 
 /** Horizontal Bézier curve between two ports and the point at 35 % of the way from the source. */
 export function linkPath(sourceX: number, sourceY: number, targetX: number, targetY: number) {
@@ -71,11 +88,14 @@ export function linkPath(sourceX: number, sourceY: number, targetX: number, targ
  */
 export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selected }: EdgeProps<LinkEdgeType>) {
   const kind = data?.kind ?? "success";
-  const { path, x, y } = linkPath(sourceX, sourceY, targetX, targetY);
-  const color = data?.disabled ? "var(--link-disabled)" : linkColors[kind];
+  const info = kind === "info";
+  const { path, x, y } = (info ? infoLinkPath : linkPath)(sourceX, sourceY, targetX, targetY);
+  const color = data?.disabled ? "var(--link-disabled)" : data?.invalid ? "var(--link-failure)" : linkColors[kind];
   const pipeline = isPipelineKind(kind);
   const title = pipeline
-    ? `${kind === "error" ? "Error" : "Data"} link`
+    ? info
+      ? "Info link: lookup data"
+      : `${kind === "error" ? "Error" : "Data"} link`
     : [data?.when ? `when: ${data.when}` : "when: success", data?.loop && "loop", data?.disabled && "disabled"].filter(Boolean).join(", ");
   const symbol = linkSymbols[kind];
 
@@ -88,8 +108,9 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
         className={data?.run === "flow" ? "runnel-flow" : undefined}
         style={{
           stroke: color,
-          strokeWidth: selected ? 3.5 : 2,
-          strokeDasharray: data?.disabled ? "5 4" : kind === "error" ? "7 4" : undefined,
+          strokeWidth: selected ? 3.5 : info ? 2.5 : 2,
+          strokeDasharray: data?.disabled ? "5 4" : kind === "error" ? "7 4" : info ? "1 5" : undefined,
+          strokeLinecap: info ? "round" : undefined,
           opacity: data?.run === "dead" ? 0.3 : undefined,
         }}
       />
@@ -107,6 +128,7 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
             "nodrag nopan pointer-events-auto absolute grid h-5 min-w-5 place-items-center rounded-full text-[11px] leading-none font-bold" +
             // A data link has no symbol: an invisible spot to click on, outlined when selected.
             (symbol ? " border-[1.5px] border-current bg-card px-[5px]" : "") +
+            (info ? " border-dotted" : "") +
             (data?.onOpenMenu ? " cursor-pointer" : "") +
             (selected ? " outline-2 outline-offset-2 outline-node-selected" : "")
           }
@@ -122,14 +144,14 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
             title={`${data.rows} ${data.rows === 1 ? "record" : "records"}`}
             className="pointer-events-none absolute inline-flex h-5 items-center rounded-full border bg-card px-[7px] font-mono text-[11px] leading-none font-semibold whitespace-nowrap tabular-nums shadow-sm"
             style={{
-              // At the middle; on an error link below its symbol.
+              // At the middle; on error and info links below their symbol.
               transform:
-                kind === "error"
+                kind === "error" || info
                   ? `translate(-50%, -50%) translate(${x}px, ${y + 26}px)`
                   : `translate(-50%, -50%) translate(${(sourceX + targetX) / 2}px, ${(sourceY + targetY) / 2}px)`,
               color: kind === "error" ? "var(--link-failure)" : "var(--foreground)",
-              borderColor: kind === "error" ? "var(--link-failure)" : "var(--border)",
-              borderStyle: data.preview ? "dashed" : undefined,
+              borderColor: kind === "error" ? "var(--link-failure)" : info ? "var(--link-always)" : "var(--border)",
+              borderStyle: data.preview ? "dashed" : info ? "dotted" : undefined,
             }}
           >
             {data.rows.toLocaleString("en-US")}
@@ -142,7 +164,7 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
             className="nodrag nopan pointer-events-auto absolute z-10 w-[196px] rounded-lg border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md"
             style={{ transform: `translate(-50%, 0) translate(${x}px, ${y + 16}px)` }}
           >
-            {(pipeline ? pipelineKinds : workflowKinds).map(([k, label, key]) => (
+            {(pipeline ? pipelineKinds.filter(([k]) => k !== "info" || data.infoTarget || info) : workflowKinds).map(([k, label, key]) => (
               <button
                 key={k}
                 type="button"
@@ -152,7 +174,7 @@ export function LinkEdge({ id, sourceX, sourceY, targetX, targetY, data, selecte
                 className="flex h-[30px] w-full cursor-pointer items-center gap-2.5 rounded-sm border-0 bg-transparent px-2 text-left hover:bg-muted aria-checked:bg-accent aria-checked:text-accent-foreground"
               >
                 <span
-                  className="grid size-[18px] place-items-center rounded-full border-[1.5px] border-current bg-card text-[10px] font-bold"
+                  className={"grid size-[18px] place-items-center rounded-full border-[1.5px] border-current bg-card text-[10px] font-bold" + (k === "info" ? " border-dotted" : "")}
                   style={{ color: linkColors[k] }}
                 >
                   {k === "data" ? "→" : linkSymbols[k]}

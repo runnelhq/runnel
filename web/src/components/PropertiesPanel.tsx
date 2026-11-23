@@ -72,7 +72,7 @@ export interface LinkChange {
   when?: SettableKind | string;
   loop?: boolean;
   disabled?: boolean;
-  type?: "data" | "error";
+  type?: "data" | "error" | "info";
 }
 
 /** Pause after typing before a change is applied (decision for mockup E7). */
@@ -179,14 +179,18 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
   const schema = d?.schema;
   // The fields of an input transform that can detect them have their own section (S46).
   const detect = pipeline && !!d?.detectFields;
-  const config = Object.entries(schema?.properties ?? {}).filter(([name]) => !(detect && name === "fields"));
+  // Transforms with lookup data show its source and limit in a section of their own (mockup S23b).
+  const lookup = pipeline && !!d?.infoInput;
+  const all = Object.entries(schema?.properties ?? {}).filter(([name]) => !(detect && name === "fields"));
+  const config = all.filter(([name]) => !(lookup && name === "maxRecords"));
 
   const declared = useDeclaredParameters(action);
   const listEnv = {
     fields: props.schemas?.[action.id]?.input?.fields ?? null,
+    infoFields: props.schemas?.[action.id]?.info?.fields ?? null,
     targets: (workflow.links ?? []).filter((l) => l.from === action.id && (l.type ?? "data") === "data" && !l.disabled).map((l) => l.to),
   };
-  const configFields = config.map(([name, s]) => (
+  const field = ([name, s]: [string, Schema]) => (
     <SchemaField
       key={name}
       name={name}
@@ -203,7 +207,9 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
       listEnv={listEnv}
       mapHelp={name === "params" ? declared : undefined}
     />
-  ));
+  );
+  const configFields = config.map(field);
+  const lookupFields = all.filter(([name]) => lookup && name === "maxRecords").map(field);
   const execution = (
     <>
       <Field label="Timeout" fieldKey="timeout" help="Per attempt, e.g. 30s or 5m. Empty: no limit" problems={at("timeout")}>
@@ -303,6 +309,7 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           )}
         </Field>
       )}
+      {lookup && <LookupData workflow={workflow} action={action}>{lookupFields}</LookupData>}
       {d && (
         <Section title="Configuration">
           {configFields.length > 0 ? (
@@ -591,7 +598,7 @@ function SchemaField(props: {
   onChangeList?: (list: KeyValue[][] | null) => void;
   onChangeTexts?: (texts: string[] | null) => void;
   /** Fields of the incoming records and targets of the data links, offered in lists (E14b). */
-  listEnv?: { fields: { name: string; type?: string }[] | null; targets: string[] };
+  listEnv?: { fields: { name: string; type?: string }[] | null; targets: string[]; infoFields?: { name: string; type?: string }[] | null };
 }) {
   const { name, schema: s, value } = props;
   const [localError, setLocalError] = useState<string | null>(null);
@@ -632,7 +639,7 @@ function SchemaField(props: {
             labelId={p.labelId}
             schema={s}
             value={value}
-            env={{ ctx: props.ctx, fields: props.listEnv?.fields ?? null, targets: props.listEnv?.targets ?? [] }}
+            env={{ ctx: props.ctx, fields: props.listEnv?.fields ?? null, targets: props.listEnv?.targets ?? [], infoFields: props.listEnv?.infoFields ?? null }}
             problems={entryProblems}
             onList={props.onChangeList!}
             onTexts={props.onChangeTexts!}
@@ -1251,15 +1258,20 @@ function WorkflowProperties(props: PropertiesProps & { ctx: ExprContext }) {
 function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
   const { index, workflow, problems } = props;
   const l = workflow.links![index];
-  const kind = l.type === "error" ? "error" : "data";
+  const kind = l.type === "error" || l.type === "info" ? l.type : "data";
   const catalog = useCatalog("pipeline");
   const from = workflow.actions?.find((a) => a.id === l.from);
   const d = from ? catalog.get(from.type) : undefined;
+  const to = workflow.actions?.find((a) => a.id === l.to);
+  // Info is offered for transforms that take lookup data (mockup S23b).
+  const infoTarget = !!(to && catalog.get(to.type)?.infoInput);
   const base = `$.links[${index}]`;
   const own = problems.filter((p) => p.path === base || p.path?.startsWith(base + "."));
   const rest = own.filter((p) => !p.path?.startsWith(`${base}.type`));
   const help =
-    kind === "data"
+    kind === "info" || infoTarget
+      ? "Info is offered for transforms that take lookup data (core.stream-lookup); one info link each"
+      : kind === "data"
       ? `Passes the records of ${l.from} on`
       : d && !d.recordErrors
         ? `${d.type} passes no records to error links`
@@ -1271,7 +1283,7 @@ function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
           className="grid h-6 min-w-6 place-items-center rounded-full border-[1.5px] border-current bg-card px-1 text-xs font-bold"
           style={{ color: kindColors[kind] }}
         >
-          {kind === "data" ? "→" : kindSymbols.error}
+          {kind === "data" ? "→" : kindSymbols[kind]}
         </span>
         <div>
           <h3 className="m-0 text-base leading-tight font-semibold">Link</h3>
@@ -1281,7 +1293,12 @@ function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
         </div>
       </div>
       <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
-        {kind === "data" ? (
+        {kind === "info" ? (
+          <>
+            Lookup data: <b className="text-foreground">{l.to}</b> reads all records of <b className="text-foreground">{l.from}</b> before it looks up
+            the first record of its data links.
+          </>
+        ) : kind === "data" ? (
           <>
             Records of <b className="text-foreground">{l.from}</b> flow to <b className="text-foreground">{l.to}</b>.
           </>
@@ -1304,6 +1321,16 @@ function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
                   <span style={{ color: kindColors.data }}>→</span> Data
                 </>,
               ],
+              ...(infoTarget || kind === "info"
+                ? [
+                    [
+                      "info",
+                      <>
+                        <span style={{ color: kindColors.info }}>i</span> Info
+                      </>,
+                    ] as [string, ReactNode],
+                  ]
+                : []),
               [
                 "error",
                 <>
@@ -1311,7 +1338,7 @@ function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
                 </>,
               ],
             ]}
-            onChange={(v) => props.onLinkChange(index, { type: v as "data" | "error" })}
+            onChange={(v) => props.onLinkChange(index, { type: v as "data" | "error" | "info" })}
           />
         )}
       </Field>
@@ -1330,18 +1357,63 @@ function PipelineLinkProperties(props: PropertiesProps & { index: number }) {
   );
 }
 
+/**
+ * Where the lookup data of a transform comes from (mockup S23b): the transform at the other
+ * end of its info link, or a red note that it has none; children are its fields, e.g. maxRecords.
+ */
+function LookupData(props: { workflow: Workflow; action: Action; children: ReactNode }) {
+  const link = (props.workflow.links ?? []).find((l) => l.to === props.action.id && l.type === "info");
+  const symbol = "grid size-[18px] shrink-0 place-items-center rounded-full border-[1.5px] font-mono text-[10px] font-bold";
+  return (
+    <Section title="Lookup data">
+      {link ? (
+        <div data-testid="lookup-source" className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-dotted border-link-always px-2.5 py-2 text-xs">
+          <span className={symbol + " border-dotted border-link-always text-link-always"}>i</span>
+          <span>
+            from <b>{link.from}</b> · info link
+            <small className="block text-2xs text-muted-foreground">Read completely before the first record of the data links is looked up</small>
+          </span>
+        </div>
+      ) : (
+        <div role="alert" data-testid="lookup-source" className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-destructive bg-danger-soft px-2.5 py-2 text-xs text-destructive">
+          <span className={symbol + " border-destructive"}>i</span>
+          <span>
+            <b>No info link</b>
+            <small className="block text-2xs">Drag a link from the transform with the data to the top of {props.action.id}</small>
+          </span>
+        </div>
+      )}
+      {props.children}
+    </Section>
+  );
+}
+
 /** Fields of the incoming records of a transform (mockup S25a, state "canvas"); fields used in its configuration are marked. */
 function IncomingFields(props: { workflow: Workflow; action: Action; schemas?: Record<string, TransformSchemas> }) {
   const { workflow, action, schemas } = props;
-  const from = [...new Set((workflow.links ?? []).filter((l) => l.to === action.id).map((l) => l.from))];
-  if (from.length === 0) return null;
+  const links = (workflow.links ?? []).filter((l) => l.to === action.id);
+  const from = [...new Set(links.filter((l) => l.type !== "info").map((l) => l.from))];
+  const infoFrom = links.find((l) => l.type === "info")?.from;
+  if (from.length === 0 && !infoFrom) return null;
   const input = schemas?.[action.id]?.input;
+  const info = schemas?.[action.id]?.info;
   const used = usedFields(action.with);
   return (
     <Section title="Incoming fields" summary={input ? `from ${from.join(", ")}${input.open ? " · open" : ""}` : undefined}>
       {input ? (
         <>
           <FieldList schema={input} used={used} />
+          {info && infoFrom && (
+            // The lookup data apart from the records of the data links (mockup S23b).
+            <>
+              <p className="mx-4 mt-0 mb-1 text-2xs text-muted-foreground">
+                Lookup data from <b>{infoFrom}</b> (info link)
+              </p>
+              <div data-testid="info-fields">
+                <FieldList schema={info} used={used} />
+              </div>
+            </>
+          )}
           <p className="mx-4 mt-0 mb-3 text-2xs text-muted-foreground">
             {input.open
               ? "Fields come from the transforms before. Not all of them are known before the pipeline runs, e.g. columns of a file read without fields:."
@@ -1356,7 +1428,7 @@ function IncomingFields(props: { workflow: Workflow; action: Action; schemas?: R
 }
 
 /** Fields of the records on a pipeline link (mockup S25a, state "link"). */
-function LinkFields(props: { kind: "data" | "error"; schemas?: TransformSchemas; known: boolean }) {
+function LinkFields(props: { kind: "data" | "error" | "info"; schemas?: TransformSchemas; known: boolean }) {
   const schema = props.schemas ? (props.kind === "error" ? props.schemas.errors : props.schemas.output) : undefined;
   return (
     <Section title="Fields on this link" summary={schema ? (schema.open ? "open" : "closed") : undefined}>
@@ -2154,7 +2226,13 @@ function LastRun(props: PropertiesProps & { id: string }) {
       {a.durationMs !== undefined && ` after ${formatDuration(a.durationMs)}`}
       {a.error && <div className="mt-0.5">{a.error}</div>}
       {a.counts && (
-        <div data-testid="run-counts" className="mt-1.5 grid grid-cols-3 gap-1 text-2xs text-muted-foreground">
+        <div data-testid="run-counts" className={"mt-1.5 grid gap-1 text-2xs text-muted-foreground " + (a.counts.info ? "grid-cols-4" : "grid-cols-3")}>
+          {a.counts.info ? (
+            // Lookup data over the info link (mockup S23b, state "run").
+            <div>
+              <b className="block font-mono text-sm text-foreground tabular-nums">{a.counts.info.toLocaleString("en-US")}</b>lookup records
+            </div>
+          ) : null}
           <div>
             <b className="block font-mono text-sm text-foreground tabular-nums">{a.counts.read}</b>read
           </div>

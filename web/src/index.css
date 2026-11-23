@@ -53,6 +53,23 @@
   border: 2px solid var(--node-selected);
   background: var(--accent);
 }
+/* The port for an info link at the top middle (mockup S23b): dotted like the link. */
+.runnel-canvas .react-flow__handle.runnel-port.runnel-info-port {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1.5px dotted var(--link-always);
+}
+.runnel-canvas .react-flow__handle.runnel-port.runnel-info-port.missing {
+  border: 1.5px solid var(--destructive);
+  background: var(--danger-soft);
+}
+.runnel-canvas .react-flow__handle.runnel-port.runnel-info-port.connectingto.valid {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--node-selected);
+  background: var(--accent);
+}
 .runnel-canvas .react-flow__node {
   font-size: var(--rn-text-sm);
   color: var(--foreground);

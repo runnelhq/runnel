@@ -14,6 +14,8 @@ export interface ListContext {
   fields: { name: string; type?: string }[] | null;
   /** Ids of the transforms the data links lead to. */
   targets: string[];
+  /** Fields of the records on the info link (lookup data, S23b); null while unknown or without one. */
+  infoFields?: { name: string; type?: string }[] | null;
 }
 
 /** A problem of an entry, located by its index in the list. */
@@ -304,7 +306,7 @@ function Entries(props: {
           <span />
           {schemaProps.map(([k]) => (
             <span role="columnheader" key={k} id={`${props.labelId}-${k}`} className="truncate text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-              {k}
+              {k.replace(/([a-z])([A-Z])/g, "$1 $2")}
               {required.has(k) && <span className="text-destructive">*</span>}
             </span>
           ))}
@@ -467,6 +469,10 @@ function Cell(props: {
   // Names of fields of the incoming records (runnel-field).
   if (s.format === "runnel-field" && props.env.fields) {
     return <FieldCombo labelledBy={props.labelId} value={text} fields={props.env.fields} used={props.used} compact={props.compact} onCommit={(v) => props.onChange(v)} />;
+  }
+  // Names of fields of the lookup data on the info link (runnel-info-field, mockup S23b).
+  if (s.format === "runnel-info-field" && props.env.infoFields) {
+    return <FieldCombo labelledBy={props.labelId} value={text} fields={props.env.infoFields} used={props.used} compact={props.compact} onCommit={(v) => props.onChange(v)} />;
   }
   return (
     <div className={props.compact ? "runnel-expr-sm min-w-0" : "min-w-0"}>

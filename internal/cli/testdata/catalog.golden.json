@@ -1482,6 +1482,7 @@
                 "lookupField": {
                   "type": "string",
                   "description": "Field of the lookup data; empty: the same name",
+                  "format": "runnel-info-field",
                   "examples": [
                     "id"
                   ]
@@ -1502,6 +1503,7 @@
                 "lookupField": {
                   "type": "string",
                   "description": "Field of the lookup data",
+                  "format": "runnel-info-field",
                   "examples": [
                     "name"
                   ]

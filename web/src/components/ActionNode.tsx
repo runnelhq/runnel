@@ -15,6 +15,11 @@ export interface ActionNodeData extends Record<string, unknown> {
   copies?: number;
   /** The type takes no incoming links: core.start, transforms of the category input. */
   noInput?: boolean;
+  /**
+   * Pipelines: the port for an info link at the top middle (mockup S23b) – "port" for transforms
+   * that take lookup data or have an info link, "missing" (red) when such a transform has none.
+   */
+  info?: "port" | "missing";
   /** Tile colour (category of the action type); unknown types have none. */
   color?: string;
   problems: Problem[];
@@ -101,6 +106,17 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
         </span>
       )}
       {hasInput && <Handle type="target" position={Position.Left} isConnectable={!!data.connectable} className="runnel-port" />}
+      {data.info && (
+        <Handle
+          type="target"
+          id="info"
+          position={Position.Top}
+          isConnectable={!!data.connectable}
+          title={data.info === "missing" ? "No info link: drag a link from the transform with the lookup data here" : "Info link: lookup data"}
+          data-testid={`info-port-${data.id}`}
+          className={"runnel-port runnel-info-port" + (data.info === "missing" ? " missing" : "")}
+        />
+      )}
       <span
         className="grid size-7 shrink-0 place-items-center rounded-md"
         style={known ? { background: data.color, color: "var(--rn-tiefe-0)" } : { background: "var(--rn-tiefe-300)", color: "var(--rn-tiefe-800)" }}

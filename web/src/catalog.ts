@@ -31,6 +31,8 @@ export interface Descriptor {
   example?: string;
   /** Input transforms: can propose their fields ("Detect fields", S46). */
   detectFields?: boolean;
+  /** Transforms: take lookup data over an info link (S23b), e.g. core.stream-lookup. */
+  infoInput?: boolean;
 }
 
 /** Category colours of the tiles (design/README.md, chapter 3.3); transforms: KONZEPT 12.2. */

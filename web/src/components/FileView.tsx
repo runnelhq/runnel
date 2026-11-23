@@ -519,7 +519,7 @@ export function FileView(props: {
   );
   const onLinkKind = useCallback(
     (index: number, kind: SettableKind) =>
-      void applyEdit({ updateLinks: [kind === "data" || kind === "error" ? { index, type: kind } : { index, when: kind }] }),
+      void applyEdit({ updateLinks: [kind === "data" || kind === "error" || kind === "info" ? { index, type: kind } : { index, when: kind }] }),
     [applyEdit],
   );
 

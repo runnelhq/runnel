@@ -22,6 +22,8 @@ export interface Counts {
   read: number;
   written: number;
   errors?: number;
+  /** Records received over the info link (lookup data, S23b). */
+  info?: number;
 }
 
 /** A line of the run log (mockup E8), worded like "runnel run -v". */
@@ -73,7 +75,7 @@ interface RunEvent {
 
 /** "read 4, written 3, errors 1", like runnel run. */
 export function countsText(c: Counts): string {
-  return `read ${c.read}, written ${c.written}${c.errors ? `, errors ${c.errors}` : ""}`;
+  return `read ${c.read}, written ${c.written}${c.errors ? `, errors ${c.errors}` : ""}${c.info ? `, lookup ${c.info}` : ""}`;
 }
 
 /** The log lines of an event, worded like the CLI (internal/cli/run.go). */

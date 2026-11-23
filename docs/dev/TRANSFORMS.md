@@ -27,7 +27,8 @@ internal/transforms/<namensraum>/
   Der Wert wird in `Process` geprüft, nicht in `New`: `runnel validate` ruft `New` mit den Variablen, wie sie in der Datei
   stehen.
 - **Für den Editor (E14):** Namen vorhandener Felder der eingehenden Datensätze mit `schema:"format=runnel-field"` (auch an
-  Listen von Texten wie `groupBy`), Ziele von Daten-Links mit `format=runnel-target`, Eigenschaften, die nur für einige
+  Listen von Texten wie `groupBy`), Ziele von Daten-Links mit `format=runnel-target`, Felder der Nachschlagedaten auf dem Info-Link mit
+  `format=runnel-info-field` (S23b2), Eigenschaften, die nur für einige
   Werte einer anderen gelten, mit `only=<feld>:<a>|<b>`. Namen neuer Felder bleiben ohne Format. Jeder Transform mit
   Konfiguration bekommt ein **`Example`** (die `with:`-Werte in YAML) für die Hilfe im Panel; der Vertragstest prüft,
   dass `New` es annimmt.

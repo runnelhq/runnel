@@ -112,6 +112,8 @@ export interface TransformSchemas {
   output: RecordSchema;
   /** Records on its error links. */
   errors: RecordSchema;
+  /** Records on its info link (lookup data, S23b); missing without one. */
+  info?: RecordSchema;
 }
 
 /**
@@ -160,7 +162,7 @@ export async function validate(path: string, content?: string): Promise<Validati
   return (await res.json()) as Validation;
 }
 
-export type LinkKind = "success" | "failure" | "always" | "expression" | "data" | "error";
+export type LinkKind = "success" | "failure" | "always" | "expression" | "data" | "error" | "info";
 
 /** Kind of a link by its condition; no condition means success. */
 export function linkKind(when: string | undefined): LinkKind {
@@ -171,7 +173,7 @@ export function linkKind(when: string | undefined): LinkKind {
 
 /** Kind of a link of a workflow (by its condition) or of a pipeline (by its type). */
 export function kindOfLink(l: Link): LinkKind {
-  if (l.type !== undefined) return l.type === "error" ? "error" : "data";
+  if (l.type !== undefined) return l.type === "error" || l.type === "info" ? l.type : "data";
   return linkKind(l.when);
 }
 
@@ -258,7 +260,7 @@ export interface WorkflowEdit {
   rename?: Record<string, string>;
   addLinks?: Link[];
   deleteLinks?: number[];
-  /** when: success, failure, always or an expression "{{ … }}"; type (pipelines): data or error. */
+  /** when: success, failure, always or an expression "{{ … }}"; type (pipelines): data, error or info. */
   updateLinks?: { index: number; when?: string; loop?: boolean; disabled?: boolean; type?: string }[];
   /**
    * Changes one field of an action (properties panel); null removes the field. map sets a mapping of texts (with.params),
@@ -389,7 +391,7 @@ export function pipelineEdit(edit: WorkflowEdit): PipelineEdit {
   const { addLinks, updateLinks, setWorkflow, ...rest } = edit;
   return {
     ...rest,
-    addLinks: addLinks?.map((l) => ({ from: l.from, to: l.to, ...(l.type === "error" ? { type: "error" } : {}) })),
+    addLinks: addLinks?.map((l) => ({ from: l.from, to: l.to, ...(l.type === "error" || l.type === "info" ? { type: l.type } : {}) })),
     updateLinks: updateLinks?.flatMap((u) => (u.type ? [{ index: u.index, type: u.type }] : [])),
     setPipeline: setWorkflow,
   };
