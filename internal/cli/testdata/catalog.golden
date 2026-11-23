@@ -9,6 +9,7 @@ actions / general
 actions / execution
   core.run-pipeline  Run Pipeline  Runs a pipeline with parameters; output: the counts of its transforms
   core.run-workflow  Run Workflow  Runs another workflow with parameters; output: its outputs
+  shell.run          Run Program   Starts a program with arguments, without a shell; output: exitCode, stdout and stderr
 actions / files
   archive.create   Create Archive   Packs files and folders into a ZIP, TAR or TAR.GZ archive; output: path, files and size
   archive.extract  Extract Archive  Unpacks a ZIP, TAR or TAR.GZ archive into a folder; output: the unpacked files

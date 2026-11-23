@@ -1,6 +1,8 @@
 package runs
 
 import (
+	"strings"
+
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
@@ -45,6 +47,7 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 	}
 	diags = append(diags, w.CheckSecrets(ActionSecretField(c.Registry), stores)...)
 	diags = append(diags, w.CheckSQL(ActionSQLField(c.Registry))...)
+	diags = append(diags, w.CheckProgram(ActionProgramField(c.Registry))...)
 	if c.Variables && c.Project != nil {
 		diags = append(diags, checkConnectionRefs(workflowSteps(w, c.Registry), c.Project)...)
 	}
@@ -98,6 +101,10 @@ func TransformSecretField(reg *transform.Registry) func(typ, field string) bool 
 func secretField(s *schema.Schema, field string) bool {
 	if s == nil {
 		return false
+	}
+	// A value in a mapping of secrets, e.g. env.TOKEN of shell.run.
+	if i := strings.IndexAny(field, ".["); i >= 0 {
+		field = field[:i]
 	}
 	for _, p := range s.Properties {
 		if p.Name == field {

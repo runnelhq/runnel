@@ -186,12 +186,13 @@ func (r *Runner) evalWith(a *model.Action, scope *vars.Scope, values map[string]
 	if a.With == nil {
 		return nil, nil
 	}
-	text, secret, literal := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	text, secret, literal, program := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	if d, ok := r.opts.Registry.Descriptor(a.Type); ok && d.Schema != nil {
 		for _, p := range d.Schema.Properties {
 			text[p.Name] = p.Schema.Type == "string"
 			secret[p.Name] = p.Schema.Format == schema.FormatSecret
 			literal[p.Name] = p.Schema.Format == schema.FormatSQL
+			program[p.Name] = p.Schema.Format == schema.FormatProgram
 		}
 	}
 	out := make(map[string]any, len(a.With))
@@ -199,6 +200,33 @@ func (r *Runner) evalWith(a *model.Action, scope *vars.Scope, values map[string]
 		if literal[k] {
 			// SQL as written: values come as parameters @name (ADR 0022).
 			out[k] = v
+			continue
+		}
+		if s, ok := v.(string); ok && program[k] {
+			// The program of shell.run: variables only, no expressions (ADR 0023).
+			e, err := expandText(s, scope)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", k, err)
+			}
+			out[k] = e
+			continue
+		}
+		if m, ok := v.(map[string]any); ok && secret[k] {
+			// A mapping of secrets, e.g. env of shell.run: each value like a field for a secret.
+			e := make(map[string]any, len(m))
+			for name, x := range m {
+				s, isText := x.(string)
+				if !isText {
+					e[name] = x
+					continue
+				}
+				val, err := expandSecret(s, scope)
+				if err != nil {
+					return nil, fmt.Errorf("%s.%s: %w", k, name, err)
+				}
+				e[name] = val
+			}
+			out[k] = e
 			continue
 		}
 		if s, ok := v.(string); ok && secret[k] {
@@ -256,6 +284,15 @@ func requestValue(r map[string]any) any {
 		return nil
 	}
 	return r
+}
+
+// expandText resolves the variables of a text without expressions; without a scope it
+// stays as it is.
+func expandText(text string, scope *vars.Scope) (string, error) {
+	if scope == nil {
+		return text, nil
+	}
+	return scope.Expand(text)
 }
 
 // expandSecret resolves a field for a secret; without a scope it stays as it is.

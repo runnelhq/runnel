@@ -139,4 +139,7 @@ test("keeps project.yaml and creates it again if it is missing", async ({ page }
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByRole("menu", { name: "New" }).getByRole("menuitem", { name: /^Project file/ }).click();
   await expect.poll(() => created).toMatch(/^kind: Project\napiVersion: runnel\/v1\nname: [A-Za-z0-9_-]+\n$/);
+  // After creating, the editor loads the tree again; a request still in the route when the
+  // page closes must not fail the test.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });

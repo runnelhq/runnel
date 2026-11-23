@@ -101,10 +101,11 @@ func Prepare(spec Spec) (*Prepared, error) {
 	}
 	p.Workflow = w
 	diags = append(diags, CheckCalls(w, spec.ProjectDir, spec.file())...)
-	// ${secret:…} outside the fields for secrets and ${…} in SQL stop the run before it
-	// starts (ADR 0022).
+	// ${secret:…} outside the fields for secrets, ${…} in SQL (ADR 0022) and parameters
+	// or expressions in the program of shell.run (ADR 0023) stop the run before it starts.
 	diags = append(diags, w.CheckSecrets(ActionSecretField(spec.Registry), nil)...)
 	diags = append(diags, w.CheckSQL(ActionSQLField(spec.Registry))...)
+	diags = append(diags, w.CheckProgram(ActionProgramField(spec.Registry))...)
 	if diags.HasErrors() {
 		diags.Sort()
 		return p, diags

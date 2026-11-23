@@ -854,6 +854,7 @@ Drei Stufen – von einfach bis mächtig:
 
 ### 7.2 Stufe 2: PowerShell / Shell
 
+- Regeln für beide (ohne Shell, Timeout mit Prozessbaum, Grenzen, Secrets nur in `env`): [ADR 0023](adr/0023-programme-powershell.md); `shell.run` startet Programme mit einer Argumentliste (seit S60).
 - `shell.powershell` mit Übergabe von Variablen als Parameter und Rückgabe von JSON (`ConvertTo-Json`) als Action-Ergebnis.
 - Bevorzugt `pwsh.exe` (PowerShell 7), Fallback `powershell.exe` (5.1).
 - In Pipelines: Transform `shell.powershell` – Records als NDJSON über stdin/stdout.
@@ -1083,7 +1084,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Kategorie | Actions |
 |---|---|
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen (`core.check`, seit S10), Log schreiben, Schleife (ForEach über Liste/Dateien) |
-| Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell, Programm starten |
+| Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell (`shell.powershell`, S61), Programm starten (`shell.run`, seit S60, [ADR 0023](adr/0023-programme-powershell.md)) |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
 | Netzwerk | HTTP-Request (`http.request`, seit S10), HTTP-Antwort (`http.response`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`: upload, download, list, delete, move, mkdir, exists, wait; Protokoll in der Connection, S57), Mail senden, Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Abfrage in den Workflow (`db.query`, seit S59: Zeilen, Anzahl, erster Wert – deckt auch „Tabelle existiert“ und „Zeilen zählen“ ab) |
