@@ -25,6 +25,7 @@ import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
 import { useConnections } from "../reference";
+import { SecretInput } from "./SecretField";
 import { ExpressionInput } from "./ExpressionInput";
 import { ExpressionDialog } from "./ExpressionDialog";
 import { ListField } from "./ListField";
@@ -703,6 +704,14 @@ export function SchemaField(props: {
   }
   // The connection of a step: those of the project with a fitting type; a name with ${…}
   // or {{ … }} stays a text field.
+  // A secret: only the reference and its state per environment (mockup S39f, S39c2b).
+  if (s.format === "runnel-secret" && s.type === "string" && (value === undefined || value === null || typeof value === "string")) {
+    return (
+      <Field label={label} fieldKey={key} required={props.required} help={s.description} problems={props.problems}>
+        {(p) => <SecretInput id={p.id} invalid={p.invalid} value={(value as string | undefined) ?? ""} onChange={props.onChange} />}
+      </Field>
+    );
+  }
   if (s.format === "runnel-connection" && !/\$\{|\{\{/.test(String(value ?? ""))) {
     return <ConnectionField label={label} fieldKey={key} required={props.required} schema={s} problems={props.problems} value={value} onChange={props.onChange} />;
   }

@@ -145,3 +145,68 @@ test("tests a database connection for real", async ({ page }) => {
   await expect(page.getByTestId("test-result")).toContainText("✓");
   await expect(page.getByTestId("test-result")).toContainText("does not exist yet; a run creates it");
 });
+
+// Secret fields (mockup S39f, S39c2b): the reference with its state per environment, a
+// choice of names, a warning for plain text; never a value.
+test("shows secrets by reference and warns about plain text", async ({ page, request }) => {
+  const path = "connections/e2e-secret.yaml";
+  const text = "kind: Connection\napiVersion: runnel/v1\nname: e2e-secret\ntype: http\nwith:\n  baseUrl: https://api.example.com/\n  auth: bearer\n  token: ${secret:env/RUNNEL_E2E_NOT_SET}\n";
+  await request.put(`/api/v1/files/${path}`, { headers: { "If-Match": "*" }, data: text });
+  try {
+    await page.goto("/");
+    await page.getByRole("tree").getByText("e2e-secret.yaml", { exact: true }).click();
+    const token = page.getByTestId("connection-form").locator('[data-field="with.token"]');
+    await expect(token.getByTestId("secret")).toContainText("${secret:env/RUNNEL_E2E_NOT_SET}");
+    await expect(token.getByTestId("secret-state-dev")).toContainText("⚠ dev missing");
+
+    // Choose another name: a new one is offered with what it will be.
+    await token.getByRole("button", { name: "Change…" }).click();
+    const picker = page.getByRole("dialog", { name: "Choose a secret" });
+    await picker.getByRole("textbox", { name: "Name of the secret" }).fill("e2e-token");
+    await picker.getByRole("button", { name: /Use new secret/ }).click();
+    await expect(token.getByTestId("secret")).toContainText("${secret:e2e-token}");
+    // The state comes from the saved files: after saving, the default store of hello is
+    // local, which comes with S39d.
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    await page.goto("/");
+    await page.getByRole("tree").getByText("e2e-secret.yaml", { exact: true }).click();
+    await expect(token.getByTestId("secret-state-dev")).toContainText("local not available yet");
+
+    // Plain text is shown with a warning.
+    await token.getByRole("button", { name: "Change…" }).click();
+    await page.getByRole("button", { name: /Edit as text/ }).click();
+    const input = token.getByRole("textbox");
+    await input.fill("Pa55word");
+    await input.press("Enter");
+    await expect(token.getByTestId("plaintext")).toContainText("Plain text in a secret field.");
+    await page.getByRole("button", { name: "YAML", exact: true }).click();
+    await expect.poll(() => editorText(page)).toContain("  token: Pa55word\n");
+  } finally {
+    await request.delete(`/api/v1/files/${path}`, { headers: { "If-Match": "*" } });
+  }
+});
+
+// The explorer shows connections with the sign of their type; New → Connection asks for
+// name and type and creates the file with the required fields (mockup S39b, "new").
+test("creates a connection and shows its type in the explorer", async ({ page, request }) => {
+  await page.goto("/");
+  const row = page.getByRole("tree").getByRole("treeitem", { name: "e2e-api.yaml" });
+  await expect(row).toContainText("http");
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menu", { name: "New" }).getByRole("menuitem", { name: /^Connection/ }).click();
+  const dialog = page.getByRole("dialog", { name: "New connection" });
+  await dialog.getByRole("textbox", { name: "Name" }).fill("e2e-new");
+  await expect(dialog.getByRole("button", { name: "Create" })).toBeDisabled(); // no type yet
+  await dialog.getByRole("radio", { name: /SQLite/ }).click();
+  await dialog.getByRole("button", { name: "Create" }).click();
+  try {
+    await expect(page.getByTestId("connection-form").getByRole("heading", { name: "e2e-new" })).toBeVisible();
+    expect(await (await request.get("/api/v1/files/connections/e2e-new.yaml")).text()).toBe(
+      'kind: Connection\napiVersion: runnel/v1\nname: e2e-new\ntype: sqlite\nwith:\n  path: "out/e2e-new.db"\n',
+    );
+    await expect(page.getByRole("tree").getByRole("treeitem", { name: "e2e-new.yaml" })).toContainText("sqlite");
+  } finally {
+    await request.delete("/api/v1/files/connections/e2e-new.yaml", { headers: { "If-Match": "*" } });
+  }
+});
