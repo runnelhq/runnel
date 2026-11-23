@@ -243,6 +243,12 @@ func ActionSQLField(reg *action.Registry) func(typ, field string) bool {
 	return formatField(workflowSteps(&model.Workflow{}, reg).schema, schema.FormatSQL)
 }
 
+// ActionProgramField tells whether a field of an action type is the program of
+// shell.run (format runnel-program, ADR 0023).
+func ActionProgramField(reg *action.Registry) func(typ, field string) bool {
+	return formatField(workflowSteps(&model.Workflow{}, reg).schema, schema.FormatProgram)
+}
+
 // TransformSQLField is ActionSQLField for transforms.
 func TransformSQLField(reg *transform.Registry) func(typ, field string) bool {
 	return formatField(pipelineSteps(&model.Pipeline{}, reg).schema, schema.FormatSQL)

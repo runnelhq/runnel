@@ -189,3 +189,17 @@ Mit dem Maintainer bestätigt:
 - `program` mit Variablen des Projekts und der Environments, ohne Workflow-Parameter und Ausdrücke.
 - Batch-Dateien mit gefährlichen Zeichen in Argumenten werden strikt abgelehnt.
 - Kein Freigabe-Schalter in `project.yaml`.
+
+## Nachtrag 2026-11-23 (S60): `shell.run`
+
+- **Programm:** Ein Name ohne Ordner wird über `PATH` gesucht, ein Pfad relativ zum Projektordner aufgelöst; Fehler
+  „not found in PATH“ bzw. „not found or not executable“. Unter Windows startet das Programm ohne eigenes Fenster.
+- **Format `runnel-program`** kennzeichnet `program`: `validate` und der Start eines Laufs melden `{{ … }}` und
+  Workflow-Parameter darin; die Engine löst nur `${…}` auf.
+- **`env`** ist eine Abbildung mit dem Format `runnel-secret` für jeden Wert. Das Schema erlaubt dafür das Format an
+  Abbildungen von Texten (Ergänzung zu ADR 0014). Die Werte von `env` werden in stdout und stderr durch `***` ersetzt;
+  Werte unter drei Zeichen nicht, damit Ausgaben lesbar bleiben.
+- **Prozessbaum:** Unter Windows landet das Programm direkt nach dem Start in einem Job Object; beendet wird der Job
+  nur bei Timeout oder Abbruch. Prozesse, die ein Programm nach normalem Ende zurücklässt, laufen weiter (z. B. ein
+  gestarteter Dienst). Unter Linux eine eigene Prozessgruppe.
+- **Ende:** Nach dem Ende wartet Runnel höchstens 2 s auf noch offene Ausgaben von Kindprozessen.

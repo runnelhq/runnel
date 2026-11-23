@@ -1,0 +1,22 @@
+# Starts a program with shell.run (S60, ADR 0023): hostname exists on Windows and Linux.
+# The program gets its arguments one by one, without a shell; its output is in
+# results.name.output.stdout.
+#   runnel run -v examples/hello/workflows/program.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: program
+actions:
+  - id: start
+    type: core.start
+  - id: name
+    type: shell.run
+    with:
+      program: hostname
+      timeout: 30s
+  - id: report
+    type: core.log
+    with:
+      message: "This computer is {{ trim(results.name.output.stdout) }}"
+links:
+  - { from: start, to: name }
+  - { from: name, to: report }

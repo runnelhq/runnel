@@ -836,6 +836,90 @@
         "additionalProperties": false
       },
       "example": "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n"
+    },
+    {
+      "type": "shell.run",
+      "kind": "action",
+      "category": "execution",
+      "label": "Run Program",
+      "description": "Starts a program with arguments, without a shell; output: exitCode, stdout and stderr",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "program": {
+            "type": "string",
+            "description": "Program to start: a name found through PATH, or a path relative to the project folder; may use variables of the project, but no parameters of the workflow and no expressions",
+            "format": "runnel-program",
+            "examples": [
+              "robocopy"
+            ]
+          },
+          "args": {
+            "type": "array",
+            "description": "Arguments, one per entry; each is passed as one argument, never read by a shell, and may use ${…} and {{ … }}",
+            "items": {
+              "type": "string"
+            }
+          },
+          "okCodes": {
+            "type": "array",
+            "description": "Exit codes that count as success; empty: 0 only",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "workdir": {
+            "type": "string",
+            "description": "Working folder, relative to the project folder; empty: the project folder"
+          },
+          "env": {
+            "type": "object",
+            "description": "Further environment variables; the only place for secrets (${secret:…}), as arguments are visible to other users",
+            "format": "runnel-secret",
+            "additionalProperties": {
+              "type": "string",
+              "format": "runnel-secret"
+            }
+          },
+          "input": {
+            "type": "string",
+            "description": "Text for stdin; missing: stdin is empty, so that a program waiting for input does not hang"
+          },
+          "encoding": {
+            "type": "string",
+            "description": "Encoding of stdout and stderr; auto: UTF-8, else the OEM code page of Windows",
+            "enum": [
+              "auto",
+              "utf-8",
+              "oem",
+              "windows-1252"
+            ],
+            "default": "auto"
+          },
+          "json": {
+            "type": "boolean",
+            "description": "Read stdout as JSON into output.json",
+            "default": false
+          },
+          "maxOutput": {
+            "type": "integer",
+            "description": "Most bytes of stdout and of stderr kept; more is dropped (truncated)",
+            "default": 1048576
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time the program may run; then it ends with all processes it started",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "program"
+        ],
+        "additionalProperties": false
+      },
+      "example": "program: robocopy\nargs: [ data/out, \"\\\\\\\\server\\\\share\\\\in\", \"*.csv\", /MIR ]\nokCodes: [ 0, 1, 2, 3 ]\ntimeout: 10m\n"
     }
   ],
   "transforms": [

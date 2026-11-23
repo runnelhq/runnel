@@ -69,6 +69,11 @@ const ConnectionKey = "x-runnel-connection"
 // without ${…} or {{ … }}; values come in as parameters @name.
 const FormatSQL = "runnel-sql"
 
+// FormatProgram marks the program of shell.run (ADR 0023): it may use variables of the
+// project and its environments, but no parameters of the workflow and no expressions, so
+// that a caller (e.g. of an http trigger) cannot choose what runs.
+const FormatProgram = "runnel-program"
+
 // FormatSecret marks a field that holds a secret, e.g. a password or token (ADR 0022):
 // only such fields may use ${secret:…}; their values are resolved without expressions
 // and never shown. The editor offers no value from the file.
@@ -301,8 +306,13 @@ func applyOptions(s *Schema, o options, path string) error {
 		case s.Type == "array" && s.Items != nil && s.Items.Type == "string":
 			// A list of texts: the format describes each text, e.g. field names (E14b).
 			s.Items.Format = o.format
+		case s.Type == "object" && isTextMap(s.AdditionalProperties):
+			// A mapping of texts: the format describes each value, e.g. secrets in env
+			// (ADR 0023); it stands on the mapping too, so that checks find it by field.
+			s.Format = o.format
+			s.AdditionalProperties.(*Schema).Format = o.format
 		default:
-			return fmt.Errorf("%s: format is only allowed for strings and lists of strings", describe(path))
+			return fmt.Errorf("%s: format is only allowed for strings, lists of strings and mappings of strings", describe(path))
 		}
 	}
 	var err error
@@ -489,4 +499,10 @@ func missing(t reflect.Type, value any, path string) string {
 		}
 	}
 	return ""
+}
+
+// isTextMap reports whether the values of a mapping are texts.
+func isTextMap(values any) bool {
+	v, ok := values.(*Schema)
+	return ok && v.Type == "string"
 }
