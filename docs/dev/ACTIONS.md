@@ -104,6 +104,10 @@ Regeln:
   Ausführung, wie in Pipelines.
 - **`DecodeConfig`** verwenden – es lehnt unbekannte Felder ab (Tippfehler im Workflow werden gemeldet; Vertragstest
   prüft das) und prüft Pflichtfelder.
+- **Freie Werte** (`any`, `map[string]any`, `[]any`, z. B. ein Body oder Parameter) erhält die Action von
+  `DecodeConfig` so, wie der Lauf sie liefert: exakte Dezimalzahlen bleiben `decimal.Decimal`, große Ganzzahlen
+  `int64`, Datumswerte `record.Date`. Zum Schreiben als JSON `record.JSONValue` verwenden – sonst würde
+  `encoding/json` Dezimalzahlen als Text in Anführungszeichen schreiben.
 - **`New` prüft nur die Struktur:** Pflichtfelder, Typen, unbekannte Felder. `New` wird zweimal aufgerufen: vor dem Lauf
   mit dem Text aus der Datei (Werte können noch `${…}` und `{{ … }}` enthalten) und vor jeder Ausführung mit aufgelösten
   Variablen und ausgewerteten Ausdrücken.

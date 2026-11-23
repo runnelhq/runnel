@@ -11,9 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/shopspring/decimal"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/encoding/unicode"
 
@@ -50,9 +48,6 @@ func newWriteFile(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
-	// The value as the run gave it: decoding goes through JSON, which would turn exact
-	// decimals into text.
-	a.Content = with["content"]
 	for _, c := range []struct{ field, value, allowed string }{
 		{"as", a.As, "text|json"}, {"encoding", a.Encoding, "utf-8|utf-8-bom|windows-1252|utf-16le"},
 		{"lineEnds", a.LineEnds, "keep|crlf|lf"}, {"ifExists", a.IfExists, "replace|append|fail"},
@@ -132,36 +127,10 @@ func (a *writeFile) text() (string, error) {
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(jsonValue(a.Content)); err != nil {
+	if err := enc.Encode(record.JSONValue(a.Content)); err != nil {
 		return "", fmt.Errorf("content cannot be written as JSON: %w", err)
 	}
 	return b.String(), nil
-}
-
-// jsonValue makes a value of the run writable as JSON: exact numbers stay numbers
-// (decimal as json.Number, not as text), dates become ISO text.
-func jsonValue(v any) any {
-	switch v := v.(type) {
-	case decimal.Decimal:
-		return json.Number(v.String())
-	case record.Date:
-		return v.String()
-	case time.Time:
-		return v.Format(time.RFC3339Nano)
-	case map[string]any:
-		out := make(map[string]any, len(v))
-		for k, x := range v {
-			out[k] = jsonValue(x)
-		}
-		return out
-	case []any:
-		out := make([]any, len(v))
-		for i, x := range v {
-			out[i] = jsonValue(x)
-		}
-		return out
-	}
-	return v
 }
 
 // encode converts the text into the bytes of the encoding; bom writes a byte order mark

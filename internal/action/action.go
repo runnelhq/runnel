@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -250,7 +251,8 @@ func (r *Registry) Types() []string {
 
 // DecodeConfig decodes a "with" configuration into the struct pointed to by v.
 // Unknown fields and missing required fields (tag schema:"required") are errors.
-// Field names are those of the json tags.
+// Field names are those of the json tags. Fields of type any, map[string]any and []any
+// get the values as they are, so that exact numbers and dates keep their type.
 func DecodeConfig(with map[string]any, v any) error {
 	return decodeConfig(with, v, false)
 }
@@ -281,11 +283,50 @@ func decodeConfig(with map[string]any, v any, useNumber bool) error {
 		}
 		return err
 	}
+	if !useNumber {
+		keepValues(with, v)
+	}
 	if field := schema.MissingRequired(v, with); field != "" {
 		return fmt.Errorf("missing required field %q", field)
 	}
 	return nil
 }
+
+// keepValues puts the values of the run back into the fields of type any, map[string]any
+// and []any: decoding goes through JSON, which turns exact decimals into text in quotes,
+// whole numbers beyond 2^53 into rounded floats and dates into text. Only fields of
+// the struct itself, not of nested structs.
+func keepValues(with map[string]any, v any) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Pointer || rv.Elem().Kind() != reflect.Struct {
+		return
+	}
+	rv = rv.Elem()
+	for i := range rv.NumField() {
+		f := rv.Type().Field(i)
+		if !f.IsExported() || !keepsValue(f.Type) {
+			continue
+		}
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		raw, ok := with[name]
+		if name == "" || name == "-" || !ok {
+			continue
+		}
+		if raw == nil {
+			rv.Field(i).SetZero()
+		} else if t := reflect.TypeOf(raw); t.AssignableTo(f.Type) {
+			rv.Field(i).Set(reflect.ValueOf(raw))
+		}
+	}
+}
+
+var (
+	anyType  = reflect.TypeFor[any]()
+	mapType  = reflect.TypeFor[map[string]any]()
+	listType = reflect.TypeFor[[]any]()
+)
+
+func keepsValue(t reflect.Type) bool { return t == anyType || t == mapType || t == listType }
 
 // Func adapts a function to the Action interface.
 type Func func(ctx context.Context, ec *ExecContext) (Result, error)

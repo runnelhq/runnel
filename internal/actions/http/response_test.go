@@ -2,9 +2,12 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"testing"
+
+	"github.com/shopspring/decimal"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions/actiontest"
@@ -49,6 +52,17 @@ func TestRespond(t *testing.T) {
 	}
 	if len(sent) != 2 || sent[0].Status != 404 || sent[0].Headers["X-Reason"] != "none" || sent[0].Body.(map[string]any)["error"] != "not found" {
 		t.Errorf("sent %+v", sent)
+	}
+
+	// Exact numbers stay numbers in the JSON answer.
+	sent = nil
+	first = true
+	a = actiontest.New(t, responseDefinition, map[string]any{"body": map[string]any{"total": decimal.RequireFromString("12.50")}})
+	if _, err := a.Execute(context.Background(), &action.ExecContext{Respond: respond, Log: func(slog.Level, string) {}}); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := json.Marshal(sent[0].Body); err != nil || string(data) != `{"total":12.5}` {
+		t.Errorf("decimal body: %s %v", data, err)
 	}
 
 	// Without a caller: nothing is sent; the default status is 200.

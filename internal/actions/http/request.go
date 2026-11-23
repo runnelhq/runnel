@@ -21,6 +21,7 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/pagination"
 	"github.com/runnelhq/runnel/internal/paths"
+	"github.com/runnelhq/runnel/internal/record"
 )
 
 // http.request sends an HTTP request, e.g. to a REST API (roadmap S10). A text body is
@@ -305,7 +306,7 @@ func encodeBody(v any) (io.Reader, string, error) {
 		}
 		return strings.NewReader(v), ct, nil
 	}
-	data, err := json.Marshal(v)
+	data, err := json.Marshal(record.JSONValue(v))
 	if err != nil {
 		return nil, "", fmt.Errorf("body: cannot write as JSON: %w", err)
 	}
