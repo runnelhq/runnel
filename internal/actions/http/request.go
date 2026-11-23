@@ -32,16 +32,17 @@ var requestDefinition = action.Definition{
 	Category:    action.CategoryNetwork,
 	Label:       "HTTP Request",
 	Description: "Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer",
-	Example:     "method: GET\nurl: https://api.example.com/orders\nquery:\n  status: open\nheaders:\n  Authorization: \"Bearer ${env:API_TOKEN}\"\n",
+	Example:     "connection: shop-api\nurl: orders\nquery:\n  status: open\n",
 	Config:      requestAction{},
 	New:         newRequest,
 }
 
 type requestAction struct {
 	Method      string            `json:"method" doc:"HTTP method" schema:"enum=GET|POST|PUT|PATCH|DELETE|HEAD,default=GET"`
-	URL         string            `json:"url" doc:"Address with http:// or https://, e.g. https://api.example.com/orders" schema:"required,example=https://api.example.com/orders"`
+	Connection  string            `json:"connection" doc:"Connection of the API (a file in connections/) with base address and sign-in; empty: url is a full address" schema:"connection=http,example=shop-api"`
+	URL         string            `json:"url" doc:"Address with http:// or https://, e.g. https://api.example.com/orders; with connection relative to its baseUrl, e.g. orders" schema:"example=https://api.example.com/orders"`
 	Query       map[string]string `json:"query" doc:"Query parameters, added to the address with encoding, e.g. status: open"`
-	Headers     map[string]string `json:"headers" doc:"Headers of the request, e.g. Authorization; take tokens from variables such as ${env:API_TOKEN}, never write them into the file"`
+	Headers     map[string]string `json:"headers" doc:"Headers of the request, e.g. Accept; tokens belong into a connection, never into the file"`
 	Body        any               `json:"body" doc:"Body: a text is sent as text, other values (maps, lists, numbers) as JSON"`
 	Timeout     string            `json:"timeout" doc:"Longest time for the request and its answer, e.g. 30s or 5m; the timeout of the action limits all attempts together" schema:"format=runnel-duration,default=60s"`
 	FailOnError *bool             `json:"failOnError" doc:"Fail the action if the answer has status 400 or above; false: the status is only in the output" schema:"default=true"`
@@ -67,7 +68,10 @@ func newRequest(with map[string]any) (action.Action, error) {
 	default:
 		return nil, fmt.Errorf("invalid method %q (expected GET, POST, PUT, PATCH, DELETE or HEAD)", a.Method)
 	}
-	if !dynamic(a.URL) {
+	switch {
+	case a.Connection == "" && strings.TrimSpace(a.URL) == "":
+		return nil, errors.New(`missing required field "url" (or a connection with its baseUrl)`)
+	case a.Connection == "" && !dynamic(a.URL):
 		if _, err := parseURL(a.URL); err != nil {
 			return nil, err
 		}
@@ -122,7 +126,19 @@ func parseSize(text string) (int64, error) {
 }
 
 func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
-	u, err := parseURL(a.URL)
+	if err := ctx.Err(); err != nil {
+		return action.Result{}, err
+	}
+	api, err := a.connect(ctx, ec)
+	if err != nil {
+		return action.Result{}, err
+	}
+	var u *url.URL
+	if api != nil {
+		u, err = api.resolve(a.URL)
+	} else {
+		u, err = parseURL(a.URL)
+	}
 	if err != nil {
 		return action.Result{}, err
 	}
@@ -147,30 +163,26 @@ func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (ac
 	if method == "" {
 		method = http.MethodGet
 	}
-	body, contentType, err := encodeBody(a.Body)
-	if err != nil {
+	if _, _, err := encodeBody(a.Body); err != nil {
 		return action.Result{}, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
-	if err != nil {
-		return action.Result{}, fmt.Errorf("cannot send the request: %w", err)
-	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	req.Header.Set("User-Agent", "Runnel")
-	for k, v := range a.Headers {
-		req.Header.Set(k, v)
-	}
 	// Only scheme, host and path go into messages: the query may hold keys.
 	where := method + " " + u.Scheme + "://" + u.Host + u.Path
 	start := time.Now()
-	resp, err := client.Do(req)
+	resp, err := a.send(ctx, api, method, u)
 	if err != nil {
 		return action.Result{}, requestError(ctx, where, timeout, err)
+	}
+	if api.refused(resp.StatusCode) {
+		// The token may have been revoked or expired early: once more with a new one.
+		_ = resp.Body.Close()
+		ec.Logf(slog.LevelDebug, "%s: 401 with the token of connection %s, getting a new one", where, api.name)
+		if resp, err = a.send(ctx, api, method, u); err != nil {
+			return action.Result{}, requestError(ctx, where, timeout, err)
+		}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxSize+1))
@@ -186,6 +198,34 @@ func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (ac
 		return action.Result{Output: out}, fmt.Errorf("%s answered with status %s%s (set failOnError: false to go on)", where, resp.Status, excerpt(data))
 	}
 	return action.Result{Output: out}, nil
+}
+
+// send sends one request: headers of the connection, of the action, then the sign-in.
+func (a *requestAction) send(ctx context.Context, api *api, method string, u *url.URL) (*http.Response, error) {
+	body, contentType, err := encodeBody(a.Body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	if err != nil {
+		return nil, fmt.Errorf("cannot send the request: %w", err)
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.Header.Set("User-Agent", "Runnel")
+	if api != nil {
+		api.headers(req)
+	}
+	for k, v := range a.Headers {
+		req.Header.Set(k, v)
+	}
+	if api != nil {
+		if err := api.signIn(ctx, req); err != nil {
+			return nil, err
+		}
+	}
+	return client.Do(req)
 }
 
 func sizeText(s string) string {

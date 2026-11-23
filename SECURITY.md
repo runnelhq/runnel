@@ -28,4 +28,6 @@ Korrekturen.
   eigenen Rechner); `tls: none` ist nur für ein Relay im vertrauenswürdigen Netz gedacht und wird von `validate`
   gemeldet ([ADR 0022, Nachtrag S62a](docs/adr/0022-connections-secrets.md)). Mit `auth: oauth2` gilt dasselbe für das
   Token; es bleibt nur im Speicher des Prozesses (Nachtrag S62b).
+- `http.request` mit einer `http`-Connection sendet deren Anmeldung nur an den Host von `baseUrl` und nie
+  unverschlüsselt an einen anderen Rechner (ADR 0022, Nachtrag S63a).
 - Regeln für Beiträge: [AGENTS.md, Abschnitt „Sicherheit“](AGENTS.md#sicherheit).

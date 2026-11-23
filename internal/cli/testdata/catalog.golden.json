@@ -756,9 +756,20 @@
             ],
             "default": "GET"
           },
+          "connection": {
+            "type": "string",
+            "description": "Connection of the API (a file in connections/) with base address and sign-in; empty: url is a full address",
+            "format": "runnel-connection",
+            "examples": [
+              "shop-api"
+            ],
+            "x-runnel-connection": [
+              "http"
+            ]
+          },
           "url": {
             "type": "string",
-            "description": "Address with http:// or https://, e.g. https://api.example.com/orders",
+            "description": "Address with http:// or https://, e.g. https://api.example.com/orders; with connection relative to its baseUrl, e.g. orders",
             "examples": [
               "https://api.example.com/orders"
             ]
@@ -772,7 +783,7 @@
           },
           "headers": {
             "type": "object",
-            "description": "Headers of the request, e.g. Authorization; take tokens from variables such as ${env:API_TOKEN}, never write them into the file",
+            "description": "Headers of the request, e.g. Accept; tokens belong into a connection, never into the file",
             "additionalProperties": {
               "type": "string"
             }
@@ -797,12 +808,9 @@
             "default": "10MB"
           }
         },
-        "required": [
-          "url"
-        ],
         "additionalProperties": false
       },
-      "example": "method: GET\nurl: https://api.example.com/orders\nquery:\n  status: open\nheaders:\n  Authorization: \"Bearer ${env:API_TOKEN}\"\n"
+      "example": "connection: shop-api\nurl: orders\nquery:\n  status: open\n"
     },
     {
       "type": "http.response",

@@ -80,7 +80,7 @@ func TestRunConnectionProblems(t *testing.T) {
 func TestCheckConnection(t *testing.T) {
 	for conn, want := range map[string]string{
 		appConnection: "",
-		strings.Replace(appConnection, "type: sqlite", "type: mysql", 1):            `connections/app.yaml:4:7: unknown connection type "mysql" (available: postgres, smtp, sqlite, sqlserver)`,
+		strings.Replace(appConnection, "type: sqlite", "type: mysql", 1):            `connections/app.yaml:4:7: unknown connection type "mysql" (available: http, postgres, smtp, sqlite, sqlserver)`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "file: x.db", 1):         `connections/app.yaml:6:9: sqlite connection: unknown field "file"`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "path: ${secret:pw}", 1): `connections/app.yaml:6:9: ${secret:pw} is not allowed here`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "path: ${NOT_SET}", 1):   `warning: variable "NOT_SET" is not defined`,
@@ -160,5 +160,41 @@ func TestCheckConnectionWarnings(t *testing.T) {
 		if want == "" && got != "" || want != "" && !strings.Contains(got, want) {
 			t.Errorf("%s\nwant %q", got, want)
 		}
+	}
+}
+
+// Mappings of a connection (headers of http) are resolved value by value; a secret
+// field may also be a mapping of texts with ${secret:…}, which are masked.
+func TestConnectionMappings(t *testing.T) {
+	t.Setenv("RUNNEL_TEST_APIKEY", "k-Pa55word")
+	const conn = "kind: Connection\napiVersion: runnel/v1\nname: app\ntype: http\nwith:\n  baseUrl: https://${HOST}/v1\n  headers:\n    X-Key: ${secret:RUNNEL_TEST_APIKEY}\n    Accept: application/json\n"
+	p := &model.Project{SecretStore: "env", Variables: map[string]string{"HOST": "api.example.com"}, Connections: map[string]*model.Connection{}}
+	c, err := model.ReadConnection("connections/app.yaml", []byte(conn))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if errs := c.CheckSecrets(func(field string) bool { return connectionTypes.SecretField(c.Type, field) }, nil); len(errs) > 0 {
+		t.Fatalf("secret in headers refused: %v", errs)
+	}
+	p.Connections["app"] = c
+	_, mask := secretScope(model.Scope(&model.Workflow{}, p, nil, nil))
+	got, err := connectionResolver(p, nil, mask)(context.Background(), "app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	headers, _ := got.With["headers"].(map[string]any)
+	if got.With["baseUrl"] != "https://api.example.com/v1" || headers["X-Key"] != "k-Pa55word" || headers["Accept"] != "application/json" {
+		t.Fatalf("%+v", got.With)
+	}
+	if m := mask.String("key k-Pa55word"); m != "key ***" {
+		t.Errorf("mask: %q", m)
+	}
+	// Other fields stay without secrets.
+	bad, err := model.ReadConnection("connections/app.yaml", []byte(strings.Replace(conn, "https://${HOST}/v1", "${secret:RUNNEL_TEST_APIKEY}", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if errs := bad.CheckSecrets(func(field string) bool { return connectionTypes.SecretField(bad.Type, field) }, nil); len(errs) != 1 || !strings.Contains(errs.Error(), "is not allowed here") {
+		t.Errorf("%v", errs)
 	}
 }

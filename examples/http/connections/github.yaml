@@ -1,0 +1,16 @@
+# The GitHub API as a connection (S63a): base address and headers in one place.
+# Workflows name it with connection: github and give only the path, e.g. url: repos/cli/cli.
+# For more requests per hour sign in with a token from an environment variable:
+#   auth: bearer
+#   token: ${secret:env/GITHUB_TOKEN}
+# The sign-in only goes to api.github.com: an absolute url to another host is an error.
+kind: Connection
+apiVersion: runnel/v1
+name: github
+description: GitHub REST API, without sign-in
+type: http
+with:
+  baseUrl: ${API_URL}/
+  headers:
+    Accept: application/vnd.github+json
+    X-GitHub-Api-Version: "2022-11-28"

@@ -39,21 +39,44 @@ func connectionResolver(p *model.Project, env *model.Environment, mask *vars.Mas
 		scope.LookupSecret = mask.Lookup(scope.LookupSecret)
 		with := make(map[string]any, len(c.With))
 		for field, v := range c.With {
-			text, ok := v.(string)
-			if !ok {
-				with[field] = v
-				continue
-			}
 			expand := scope.Expand
 			if connectionTypes.SecretField(c.Type, field) {
 				expand = scope.ExpandSecret
 			}
-			x, err := expand(text)
-			if err != nil {
-				return connection.Resolved{}, fmt.Errorf("connection %s: %s: %w", name, field, err)
+			one := func(key, text string) (string, error) {
+				x, err := expand(text)
+				if err != nil {
+					return "", fmt.Errorf("connection %s: %s: %w", name, key, err)
+				}
+				maskEnv(mask, text)
+				return x, nil
 			}
-			maskEnv(mask, text)
-			with[field] = x
+			switch v := v.(type) {
+			case string:
+				x, err := one(field, v)
+				if err != nil {
+					return connection.Resolved{}, err
+				}
+				with[field] = x
+			case map[string]any:
+				// Mappings of texts, e.g. the headers of an http connection.
+				m := make(map[string]any, len(v))
+				for k, item := range v {
+					text, ok := item.(string)
+					if !ok {
+						m[k] = item
+						continue
+					}
+					x, err := one(field+"."+k, text)
+					if err != nil {
+						return connection.Resolved{}, err
+					}
+					m[k] = x
+				}
+				with[field] = m
+			default:
+				with[field] = v
+			}
 		}
 		return connection.Resolved{Name: name, Type: c.Type, With: with}, nil
 	}

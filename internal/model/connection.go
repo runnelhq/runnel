@@ -97,7 +97,11 @@ func (c *Connection) WarningAt(path, format string, args ...any) *Error {
 func (c *Connection) CheckSecrets(isSecret func(field string) bool, stores []string) Errors {
 	return checkSecrets(c.src, func(path string) bool {
 		field, ok := strings.CutPrefix(path, "$.with.")
-		return ok && !strings.ContainsAny(field, ".[") && isSecret != nil && isSecret(field)
+		// A secret field may also be a mapping of texts (e.g. headers): its values count.
+		if i := strings.IndexAny(field, ".["); i >= 0 {
+			field = field[:i]
+		}
+		return ok && isSecret != nil && isSecret(field)
 	}, stores)
 }
 

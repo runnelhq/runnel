@@ -1,0 +1,31 @@
+# Lists the newest open issues of a repository through the connection github (S63a):
+# url is relative to its baseUrl, headers and sign-in come from the connection.
+#   runnel run -v examples/http/workflows/issues.workflow.yaml
+#   runnel run -v --param REPO=cli/cli examples/http/workflows/issues.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: issues
+parameters:
+  - name: REPO
+    description: Repository as owner/name
+    default: golangci/golangci-lint
+actions:
+  - id: start
+    type: core.start
+  - id: fetch
+    type: http.request
+    with:
+      connection: github
+      url: repos/${REPO}/issues
+      query:
+        state: open
+        per_page: "5"
+      timeout: 30s
+  - id: report
+    type: core.log
+    forEach: "{{ results.fetch.output.body }}"
+    with:
+      message: "#{{ row.number }} {{ row.title }}"
+links:
+  - { from: start, to: fetch }
+  - { from: fetch, to: report }
