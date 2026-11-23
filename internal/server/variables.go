@@ -81,8 +81,34 @@ func (s *Server) handleVariables(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 
+	truncated, err := s.walkYAML(func(p string, data []byte) {
+		uses, params, err := model.ScanVariables(p, data)
+		if err != nil {
+			return // a broken file has no uses
+		}
+		for _, u := range uses {
+			v := get(u.Name)
+			v.Uses = append(v.Uses, variableUse{File: p, Line: u.Pos.Line, Column: u.Pos.Column, Parameter: slices.Contains(params, u.Name)})
+		}
+	})
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	info.Truncated = truncated
+	for _, v := range byName {
+		info.Variables = append(info.Variables, *v)
+	}
+	slices.SortFunc(info.Variables, func(a, b variableInfo) int { return strings.Compare(a.Name, b.Name) })
+	writeJSON(w, http.StatusOK, info)
+}
+
+// walkYAML calls fn with every YAML file of the project (without hidden folders and
+// links) within the limits of the scan; truncated reports files left out. Files that
+// cannot be read are skipped: lists show what they find, validate reports broken files.
+func (s *Server) walkYAML(fn func(path string, data []byte)) (truncated bool, err error) {
 	files := 0
-	err := fs.WalkDir(s.root.FS(), ".", func(p string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(s.root.FS(), ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -97,36 +123,22 @@ func (s *Server) handleVariables(w http.ResponseWriter, _ *http.Request) {
 			return nil
 		}
 		if files++; files > maxVariableFiles {
-			info.Truncated = true
+			truncated = true
 			return fs.SkipAll
 		}
-		// Files that cannot be read or parsed are skipped: the list shows what it finds,
-		// and validate reports broken files.
 		if fi, err := d.Info(); err != nil || fi.Size() > maxVariableFileSize {
-			info.Truncated = true
+			truncated = true
 			return nil //nolint:nilerr // skipped, see above
 		}
 		data, err := fs.ReadFile(s.root.FS(), p)
 		if err != nil {
 			return nil //nolint:nilerr // skipped, see above
 		}
-		uses, params, err := model.ScanVariables(p, data)
-		if err != nil {
-			return nil //nolint:nilerr // a broken file has no uses
-		}
-		for _, u := range uses {
-			v := get(u.Name)
-			v.Uses = append(v.Uses, variableUse{File: p, Line: u.Pos.Line, Column: u.Pos.Column, Parameter: slices.Contains(params, u.Name)})
-		}
+		fn(p, data)
 		return nil
 	})
-	if err != nil && !errors.Is(err, fs.SkipAll) {
-		writeErr(w, err)
-		return
+	if errors.Is(err, fs.SkipAll) {
+		err = nil
 	}
-	for _, v := range byName {
-		info.Variables = append(info.Variables, *v)
-	}
-	slices.SortFunc(info.Variables, func(a, b variableInfo) int { return strings.Compare(a.Name, b.Name) })
-	writeJSON(w, http.StatusOK, info)
+	return truncated, err
 }

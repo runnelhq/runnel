@@ -82,6 +82,21 @@ func connectionResolver(p *model.Project, env *model.Environment, mask *vars.Mas
 	}
 }
 
+// ResolveConnection resolves one connection of a project for an environment ("" for
+// none), e.g. to test it in the editor. The mask holds its secrets and the values of
+// ${env:…}, so that messages can be cleaned before they leave.
+func ResolveConnection(ctx context.Context, p *model.Project, env, name string) (connection.Resolved, *vars.Mask, error) {
+	var e *model.Environment
+	if env != "" {
+		if e = p.Environments[env]; e == nil {
+			return connection.Resolved{}, nil, fmt.Errorf("environment %q not found (available: %s)", env, strings.Join(p.EnvironmentNames(), ", "))
+		}
+	}
+	mask := &vars.Mask{}
+	c, err := connectionResolver(p, e, mask)(ctx, name)
+	return c, mask, err
+}
+
 // maskEnv adds the values of the environment variables a connection uses to the mask.
 func maskEnv(mask *vars.Mask, text string) {
 	refs, _ := vars.Parse(text)

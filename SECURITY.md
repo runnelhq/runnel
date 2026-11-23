@@ -31,4 +31,6 @@ Korrekturen.
 - `http.request` mit einer `http`-Connection sendet deren Anmeldung nur an den Host von `baseUrl` und nie
   unverschlüsselt an einen anderen Rechner (ADR 0022, Nachtrag S63a). Mit `paginate` werden Folgeseiten nur auf
   Schema und Host der ersten Anfrage gelesen (Nachtrag S63b, S63c).
+- „Test connection“ im Editor (`POST /connections/{name}/test`) testet nur gespeicherte Connections des Projekts mit
+  15 s Zeitgrenze; `GET /secrets` nennt nur Namen und Stand, nie Werte (ADR 0022, Nachtrag S39c1).
 - Regeln für Beiträge: [AGENTS.md, Abschnitt „Sicherheit“](AGENTS.md#sicherheit).
