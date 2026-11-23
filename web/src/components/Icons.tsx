@@ -376,6 +376,57 @@ const actionIcons: Record<string, ReactNode> = {
       <path d="M19.2 18.2L21 20" />
     </>
   ),
+  // Database, shell and mail (proposal in the chat, chosen by the maintainer: variant B for
+  // the first four, A for the others); the cylinder as in db.lookup.
+  "db.execute": (
+    <>
+      <ellipse cx="10" cy="6" rx="6" ry="2.5" />
+      <path d="M4 6v12c0 1.4 2.7 2.5 6 2.5M16 6v4" />
+      <path d="M15 13v8l6-4z" />
+    </>
+  ),
+  "db.query": (
+    <>
+      <ellipse cx="10" cy="6" rx="6" ry="2.5" />
+      <path d="M4 6v12c0 1.4 2.7 2.5 6 2.5M16 6v4" />
+      <path d="M15.5 14.5a2.5 2.5 0 1 1 3.2 2.4c-.5.2-.7.6-.7 1.1v.5M18 21.2v.1" />
+    </>
+  ),
+  // Reading and writing with an arrow up and down, as csv.output writes with an arrow down.
+  "db.table-input": (
+    <>
+      <ellipse cx="10" cy="6" rx="6" ry="2.5" />
+      <path d="M4 6v12c0 1.4 2.7 2.5 6 2.5M16 6v4" />
+      <path d="M18 21v-8M15 16l3-3 3 3" />
+    </>
+  ),
+  "db.table-output": (
+    <>
+      <ellipse cx="10" cy="6" rx="6" ry="2.5" />
+      <path d="M4 6v12c0 1.4 2.7 2.5 6 2.5M16 6v4" />
+      <path d="M18 13v8M15 18l3 3 3-3" />
+    </>
+  ),
+  "db.upsert": (
+    <>
+      <ellipse cx="10" cy="6" rx="6" ry="2.5" />
+      <path d="M4 6v12c0 1.4 2.7 2.5 6 2.5M16 6v4" />
+      <path d="M21 17a3 3 0 1 1-.9-2.1M20.5 12.5v2.4h-2.4" />
+    </>
+  ),
+  "shell.run": (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M7 10l3 2-3 2M12 15h5" />
+    </>
+  ),
+  "shell.powershell": <path d="M7 5h14l-4 14H3zM8.5 9.5l3 2.5-3 2.5M12.5 15h3" />,
+  "mail.send": (
+    <>
+      <rect x="3" y="5" width="14" height="11" rx="1.5" />
+      <path d="M3 6.5l7 5 7-5M14 19.5h7.5M18.5 16.5l3 3-3 3" />
+    </>
+  ),
   // Map values and split field (S16f, icons chosen by the maintainer from variant A of the proposal).
   "core.map-values": (
     <>
