@@ -50,6 +50,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/proc/` | Programme starten für `shell.*` (ADR 0023): ohne Shell, Timeout mit Prozessbaum (Job Object/Prozessgruppe), Grenzen der Ausgabe, Kodierung, Prüfung von Batch-Argumenten |
 | `internal/textenc/` | Kodierung von Eingabedateien (UTF-8 mit/ohne BOM, UTF-16, Windows-1252) für `csv.input` und `json.input` |
 | `internal/logfile/` | Log-Datei mit Rotation nach Größe (Dienst) |
+| `internal/oauth/` | Tokens nach OAuth 2.0 Client Credentials für Connections (z. B. `smtp` mit Office 365): Abruf, Zwischenspeicher bis kurz vor Ablauf |
 | `internal/httpx/` | gemeinsame HTTP-Helfer von Server und Trigger-Listener (`IsLoopback`, JSON-Antworten) |
 | `internal/tlscert/` | Zertifikate des Trigger-Listeners: selbst erzeugt und wiederverwendet, eigene PEM-Dateien mit Neuladen |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Parameter prüfen, Prüfung für `validate` und Editor (`validate.go`), Texte der Lauf-Ereignisse (`describe.go`), Zwischenspeicher geprüfter Dateien, Läufe und Ereignisse im Speicher |

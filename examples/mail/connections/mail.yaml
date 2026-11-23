@@ -1,6 +1,7 @@
 # The mail server of the example: a test server on this computer without encryption and
 # sign-in. For a real server use tls: starttls (port 587), user and
-# password: ${secret:smtp-password}.
+# password: ${secret:smtp-password}; for Office 365 auth: oauth2 with tenant, clientId and
+# clientSecret: ${secret:smtp-client-secret}.
 kind: Connection
 apiVersion: runnel/v1
 name: mail

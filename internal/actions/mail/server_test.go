@@ -167,6 +167,22 @@ func (s *testServer) auth(tp *textproto.Conn, arg string, reply func(string, ...
 		if len(parts) == 3 {
 			user, password = parts[1], parts[2]
 		}
+	case "XOAUTH2":
+		raw, _ := base64.StdEncoding.DecodeString(initial)
+		fields := strings.Split(string(raw), "\x01")
+		user = strings.TrimPrefix(fields[0], "user=")
+		if len(fields) > 1 {
+			password = strings.TrimPrefix(fields[1], "auth=Bearer ")
+		}
+		if password != "secret-pw" {
+			s.mu.Lock()
+			s.mech, s.user, s.password = mech, user, password
+			s.mu.Unlock()
+			reply("334 %s", base64.StdEncoding.EncodeToString([]byte(`{"status":"401","schemes":"bearer"}`)))
+			_, _ = tp.ReadLine()
+			reply("535 5.7.3 Authentication unsuccessful")
+			return
+		}
 	case "LOGIN":
 		read := func(prompt string) string {
 			reply("334 %s", base64.StdEncoding.EncodeToString([]byte(prompt)))

@@ -357,7 +357,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
 | SFTP | `pkg/sftp` + `x/crypto/ssh` |
 | FTP/FTPS | offen; Auswahl mit S57 (Lizenz MIT-kompatibel) |
-| Mail | Go-Standardbibliothek (`net/smtp`, `mime`, seit S62a); OAuth2 für Office 365 mit S62b |
+| Mail | Go-Standardbibliothek (`net/smtp`, `mime`, seit S62a); OAuth2 (Client Credentials, `XOAUTH2`) für Office 365 seit S62b ohne Bibliothek (`internal/oauth`) |
 | Logging | `log/slog` (strukturiert, JSON) |
 | WebView2-Fenster | `jchv/go-webview2` oder Wails v2 |
 
