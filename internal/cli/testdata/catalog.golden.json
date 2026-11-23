@@ -804,8 +804,25 @@
           },
           "maxSize": {
             "type": "string",
-            "description": "Largest answer to read, e.g. 10MB or 500KB; with paginate per page",
+            "description": "Largest answer to read, e.g. 10MB or 500KB; with paginate per page; with saveTo the largest file (default 1GB)",
             "default": "10MB"
+          },
+          "saveTo": {
+            "type": "string",
+            "description": "Saves a successful answer (status 2xx) as a file instead of reading it, e.g. a ZIP or PDF; relative to the project folder or absolute. Written to a temporary file first, so no half file remains; output: file and size instead of body",
+            "examples": [
+              "inbox/export.zip"
+            ]
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "With saveTo, if the file exists: replace it once the download is complete, fail before the request, or skip the request",
+            "enum": [
+              "replace",
+              "fail",
+              "skip"
+            ],
+            "default": "replace"
           },
           "retryAfter": {
             "type": "object",

@@ -1,0 +1,17 @@
+# SharePoint Online over Microsoft Graph (S63d), used by workflows/sharepoint*.workflow.yaml.
+# Needs an application registered in Microsoft Entra with the application permission
+# Sites.Selected (access granted per site, recommended) or Files.Read.All, and its client
+# secret in the environment variable GRAPH_CLIENT_SECRET. Tenant and client id are
+# variables of project.yaml.
+kind: Connection
+apiVersion: runnel/v1
+name: sharepoint
+description: SharePoint Online over Microsoft Graph
+type: http
+with:
+  baseUrl: https://graph.microsoft.com/v1.0/
+  auth: oauth2
+  tokenUrl: https://login.microsoftonline.com/${GRAPH_TENANT}/oauth2/v2.0/token
+  clientId: ${GRAPH_CLIENT_ID}
+  clientSecret: ${secret:env/GRAPH_CLIENT_SECRET}
+  scope: https://graph.microsoft.com/.default

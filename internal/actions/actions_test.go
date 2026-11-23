@@ -95,8 +95,9 @@ func sample(s *schema.Schema) map[string]any {
 }
 
 // leaveOut are fields the sample of a type must not set, because they exclude another
-// one: shell.powershell takes either script or file.
-var leaveOut = map[string][]string{"shell.powershell": {"file"}}
+// one: shell.powershell takes either script or file, http.request saves an answer
+// (saveTo, with ifExists) or reads pages (paginate).
+var leaveOut = map[string][]string{"shell.powershell": {"file"}, "http.request": {"saveTo", "ifExists"}}
 
 // sampleOf is sample for an action type.
 func sampleOf(typ string, s *schema.Schema) map[string]any {

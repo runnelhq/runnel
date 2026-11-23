@@ -20,6 +20,7 @@ import (
 	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/pagination"
+	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // http.request sends an HTTP request, e.g. to a REST API (roadmap S10). A text body is
@@ -47,7 +48,9 @@ type requestAction struct {
 	Body        any                `json:"body" doc:"Body: a text is sent as text, other values (maps, lists, numbers) as JSON"`
 	Timeout     string             `json:"timeout" doc:"Longest time for one request and its answer (with paginate: per page), e.g. 30s or 5m; the timeout of the action limits all together" schema:"format=runnel-duration,default=60s"`
 	FailOnError *bool              `json:"failOnError" doc:"Fail the action if the answer has status 400 or above; false: the status is only in the output" schema:"default=true"`
-	MaxSize     string             `json:"maxSize" doc:"Largest answer to read, e.g. 10MB or 500KB; with paginate per page" schema:"default=10MB"`
+	MaxSize     string             `json:"maxSize" doc:"Largest answer to read, e.g. 10MB or 500KB; with paginate per page; with saveTo the largest file (default 1GB)" schema:"default=10MB"`
+	SaveTo      string             `json:"saveTo" doc:"Saves a successful answer (status 2xx) as a file instead of reading it, e.g. a ZIP or PDF; relative to the project folder or absolute. Written to a temporary file first, so no half file remains; output: file and size instead of body" schema:"example=inbox/export.zip"`
+	IfExists    string             `json:"ifExists" doc:"With saveTo, if the file exists: replace it once the download is complete, fail before the request, or skip the request" schema:"enum=replace|fail|skip,default=replace"`
 	RetryAfter  *retryAfterConfig  `json:"retryAfter" doc:"Asking again when the API answers 429 or 503 with Retry-After (wait in seconds or a date); on by default"`
 	Paginate    *pagination.Config `json:"paginate" doc:"Reading all pages of a paged API; output: items (all items), count and pages instead of body"`
 }
@@ -55,6 +58,8 @@ type requestAction struct {
 const (
 	defaultTimeout = 60 * time.Second
 	defaultMaxSize = 10 << 20
+	// defaultMaxFile is the largest download with saveTo unless maxSize says otherwise.
+	defaultMaxFile = 1 << 30
 )
 
 // client sends the requests of all http.request actions; proxies come from the
@@ -93,6 +98,17 @@ func newRequest(with map[string]any) (action.Action, error) {
 		if err := a.Paginate.Check(); err != nil {
 			return nil, err
 		}
+	}
+	switch {
+	case a.SaveTo != "" && a.Paginate != nil:
+		return nil, errors.New("saveTo and paginate cannot be combined: paginate reads lists of items, saveTo saves one answer as a file")
+	case a.SaveTo == "" && a.IfExists != "":
+		return nil, errors.New("ifExists needs saveTo")
+	}
+	switch a.IfExists {
+	case "", ifExistsReplace, ifExistsFail, ifExistsSkip:
+	default:
+		return nil, fmt.Errorf("invalid ifExists %q (expected replace, fail or skip)", a.IfExists)
 	}
 	if !dynamic(a.MaxSize) {
 		if _, err := parseSize(a.MaxSize); err != nil {
@@ -172,6 +188,9 @@ func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (ac
 	if err != nil {
 		return action.Result{}, err
 	}
+	if a.SaveTo != "" && strings.TrimSpace(a.MaxSize) == "" {
+		maxSize = defaultMaxFile
+	}
 	method := strings.ToUpper(a.Method)
 	if method == "" {
 		method = http.MethodGet
@@ -183,6 +202,9 @@ func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (ac
 	c := &call{a: a, ec: ec, api: api, method: method, timeout: timeout, maxSize: maxSize}
 	if a.Paginate != nil {
 		return c.pages(ctx, u)
+	}
+	if a.SaveTo != "" {
+		return c.download(ctx, u, paths.Resolve(ctx, a.SaveTo))
 	}
 	ans, err := c.fetch(ctx, u)
 	if err != nil {
