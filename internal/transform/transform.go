@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/schema"
@@ -41,11 +42,28 @@ type Output struct {
 	rows    []record.Record
 	result  func(record.Record) error
 	respond action.Responder
+	conns   connection.Resolver
 }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
 func NewOutput(transformID string, emit func(record.Record) error, log func(slog.Level, string)) *Output {
 	return &Output{id: transformID, emit: emit, log: log}
+}
+
+// WithConnections sets how Connection resolves connections; the engine sets it.
+func (o *Output) WithConnections(conns connection.Resolver) *Output {
+	o.conns = conns
+	return o
+}
+
+// Connection returns a connection of the project (connections/<name>.yaml, ADR 0022)
+// with variables and secrets resolved for the environment of the run. Its values must
+// not be logged.
+func (o *Output) Connection(ctx context.Context, name string) (connection.Resolved, error) {
+	if o.conns == nil {
+		return connection.Resolved{}, connection.ErrNotAvailable
+	}
+	return o.conns(ctx, name)
 }
 
 // WithTargets sets how EmitTo reaches a single outgoing data link; the engine sets it.

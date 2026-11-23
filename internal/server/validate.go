@@ -161,7 +161,8 @@ func (s *Server) validatePipeline(name string, data []byte) (*model.Pipeline, ma
 	if !diags.HasErrors() && s.transforms != nil {
 		schemas = pipeline.Schemas(p, pipeline.Options{Registry: s.transforms})
 	}
-	return p, schemas, runs.CheckPipeline(p, diags, s.transforms), nil
+	project, _ := model.LoadProject(s.dir) // for the connections; a project with errors still counts
+	return p, schemas, runs.CheckPipeline(p, diags, s.transforms, project), nil
 }
 
 // validate returns the parsed workflow (nil if it cannot be parsed) and all problems.

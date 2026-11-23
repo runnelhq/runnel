@@ -394,4 +394,9 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
 - **Pfade:** `path` einer SQLite-Connection ist relativ zum Projektordner (ADR 0020); der Ordner wird bei Bedarf angelegt.
 - **Editor:** Dateien unter `connections/` sind wie Trigger im YAML-Editor bearbeitbar und werden geprüft (Reference aus
   `/schemas/connection`); ein eigenes Symbol und Formular folgen mit dem Mockup S39b.
+- **S20b, `db.table-input`:** Die Typen der Felder folgen dem deklarierten Spaltentyp (`DECIMAL`/`NUMERIC` exakt als
+  `decimal`, `DATE` als `date`, `DATETIME`/`TIMESTAMP` als `datetime`, `BOOLEAN` als `bool`, `NULL` als leer); sonst der
+  Typ, den der Treiber liefert. Das Schema am Ausgang ist offen: Die Spalten stehen erst beim Lauf fest, und das Prüfen
+  einer Pipeline öffnet keine Datenbank. Beim Umbenennen einer Connection passt der Editor `connection:` in Workflows und
+  Pipelines und `name:` in der Datei an (wie E12).
 

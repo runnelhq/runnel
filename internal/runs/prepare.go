@@ -135,7 +135,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 		return p, errs
 	}
 	conns := connectionResolver(p.Project, p.Env, mask)
-	if errs := resolveConnections(w, conns, spec.Registry); len(errs) > 0 {
+	if errs := resolveConnections(workflowSteps(w, spec.Registry), conns); len(errs) > 0 {
 		return p, errs
 	}
 	p.Runner, err = workflow.Prepare(w, workflow.Options{

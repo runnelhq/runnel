@@ -12,6 +12,7 @@ import (
 	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/schema"
+	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -112,93 +113,132 @@ func fieldOf(msg string) string {
 	return ""
 }
 
-// connectionFields returns the fields of an action type that name a connection, with
-// the connection types they accept.
-func connectionFields(reg *action.Registry, typ string) map[string][]string {
-	if reg == nil {
-		return nil
-	}
-	d, ok := reg.Descriptor(typ)
-	if !ok || d.Schema == nil {
-		return nil
-	}
-	var out map[string][]string
-	for _, p := range d.Schema.Properties {
-		if p.Schema.Format == schema.FormatConnection {
-			if out == nil {
-				out = map[string][]string{}
-			}
-			out[p.Name] = p.Schema.Connection
-		}
-	}
-	return out
+// steps are the actions of a workflow or the transforms of a pipeline, for the checks
+// and the resolution of the connections they name.
+type steps struct {
+	list, noun         string // "actions"/"action" or "transforms"/"transform"
+	ids, types         []string
+	withs              []map[string]any
+	schema             func(typ string) *schema.Schema
+	errorAt, warningAt func(path, format string, args ...any) *model.Error
 }
 
-// checkConnectionRefs reports connections named by actions that the project does not
-// have or whose type does not fit; names with ${…} or {{ … }} are checked when the run
-// starts (warning, like dynamic targets).
-func checkConnectionRefs(w *model.Workflow, p *model.Project, reg *action.Registry) model.Errors {
-	var errs model.Errors
-	for i, a := range w.Actions {
-		for field, types := range connectionFields(reg, a.Type) {
-			name, ok := a.With[field].(string)
-			if !ok || name == "" {
+func workflowSteps(w *model.Workflow, reg *action.Registry) steps {
+	s := steps{list: "actions", noun: "action", errorAt: w.ErrorAt, warningAt: w.WarningAt,
+		schema: func(typ string) *schema.Schema {
+			if reg == nil {
+				return nil
+			}
+			d, _ := reg.Descriptor(typ)
+			return d.Schema
+		}}
+	for _, a := range w.Actions {
+		s.ids, s.types, s.withs = append(s.ids, a.ID), append(s.types, a.Type), append(s.withs, a.With)
+	}
+	return s
+}
+
+func pipelineSteps(pl *model.Pipeline, reg *transform.Registry) steps {
+	s := steps{list: "transforms", noun: "transform", errorAt: pl.ErrorAt, warningAt: pl.WarningAt,
+		schema: func(typ string) *schema.Schema {
+			if reg == nil {
+				return nil
+			}
+			d, _ := reg.Descriptor(typ)
+			return d.Schema
+		}}
+	for _, t := range pl.Transforms {
+		s.ids, s.types, s.withs = append(s.ids, t.ID), append(s.types, t.Type), append(s.withs, t.With)
+	}
+	return s
+}
+
+// connections calls fn for every fixed or dynamic connection name of the steps, with the
+// connection types its field accepts.
+func (s steps) connections(fn func(i int, path, name string, types []string)) {
+	for i, typ := range s.types {
+		sc := s.schema(typ)
+		if sc == nil {
+			continue
+		}
+		for _, p := range sc.Properties {
+			if p.Schema.Format != schema.FormatConnection {
 				continue
 			}
-			path := fmt.Sprintf("$.actions[%d].with.%s", i, field)
-			if strings.Contains(name, "${") || strings.Contains(name, "{{") {
-				errs = append(errs, w.WarningAt(path, "action %q: the connection is only known when the run starts; it is checked then", a.ID))
-				continue
-			}
-			c := p.Connections[name]
-			switch {
-			case c == nil:
-				errs = append(errs, w.ErrorAt(path, "action %q: %s", a.ID, model.UnknownConnection(p, name)))
-			case len(types) > 0 && !slices.Contains(types, c.Type):
-				errs = append(errs, w.ErrorAt(path, "action %q: connection %q is of type %s; %s needs %s", a.ID, name, c.Type, a.Type, strings.Join(types, " or ")))
+			if name, ok := s.withs[i][p.Name].(string); ok && name != "" {
+				fn(i, fmt.Sprintf("$.%s[%d].with.%s", s.list, i, p.Name), name, p.Schema.Connection)
 			}
 		}
 	}
+}
+
+func dynamicName(name string) bool {
+	return strings.Contains(name, "${") || strings.Contains(name, "{{")
+}
+
+// checkConnectionRefs reports connections named by the steps that the project does not
+// have or whose type does not fit; names with ${…} or {{ … }} are checked when the run
+// starts (warning, like dynamic targets).
+func checkConnectionRefs(s steps, p *model.Project) model.Errors {
+	var errs model.Errors
+	s.connections(func(i int, path, name string, types []string) {
+		id := s.ids[i]
+		if dynamicName(name) {
+			errs = append(errs, s.warningAt(path, "%s %q: the connection is only known when the run starts; it is checked then", s.noun, id))
+			return
+		}
+		c := p.Connections[name]
+		switch {
+		case c == nil:
+			errs = append(errs, s.errorAt(path, "%s %q: %s", s.noun, id, model.UnknownConnection(p, name)))
+		case len(types) > 0 && !slices.Contains(types, c.Type):
+			errs = append(errs, s.errorAt(path, "%s %q: connection %q is of type %s; %s needs %s", s.noun, id, name, c.Type, s.types[i], strings.Join(types, " or ")))
+		}
+	})
 	return errs
 }
 
-// ActionSQLField tells whether a field of an action type holds an SQL statement
-// (format runnel-sql): it must not contain ${…} or {{ … }}.
-func ActionSQLField(reg *action.Registry) func(typ, field string) bool {
+// resolveConnections resolves the connections named by the steps before the run starts:
+// a missing connection, variable or secret stops the run before it begins, and the
+// values of the secrets are in the mask before the first event. Names with ${…} or
+// {{ … }} are resolved when the step runs.
+func resolveConnections(s steps, resolve connection.Resolver) model.Errors {
+	var errs model.Errors
+	s.connections(func(i int, path, name string, _ []string) {
+		if dynamicName(name) {
+			return
+		}
+		if _, err := resolve(context.Background(), name); err != nil {
+			errs = append(errs, s.errorAt(path, "%s %q: %v", s.noun, s.ids[i], err))
+		}
+	})
+	errs.Sort()
+	return errs
+}
+
+// formatField tells whether a field of a step type has a format, e.g. runnel-sql.
+func formatField(schemaOf func(typ string) *schema.Schema, format string) func(typ, field string) bool {
 	return func(typ, field string) bool {
-		if reg == nil {
+		sc := schemaOf(typ)
+		if sc == nil {
 			return false
 		}
-		d, ok := reg.Descriptor(typ)
-		if !ok || d.Schema == nil {
-			return false
-		}
-		for _, p := range d.Schema.Properties {
+		for _, p := range sc.Properties {
 			if p.Name == field {
-				return p.Schema.Format == schema.FormatSQL
+				return p.Schema.Format == format
 			}
 		}
 		return false
 	}
 }
 
-// resolveConnections resolves the connections named by the actions before the run
-// starts: a missing connection, variable or secret stops the run before it begins, and
-// the values of the secrets are in the mask before the first event. Names with ${…} or
-// {{ … }} are resolved when the action runs.
-func resolveConnections(w *model.Workflow, resolve connection.Resolver, reg *action.Registry) model.Errors {
-	var errs model.Errors
-	for i, a := range w.Actions {
-		for field := range connectionFields(reg, a.Type) {
-			name, ok := a.With[field].(string)
-			if !ok || name == "" || strings.Contains(name, "${") || strings.Contains(name, "{{") {
-				continue
-			}
-			if _, err := resolve(context.Background(), name); err != nil {
-				errs = append(errs, w.ErrorAt(fmt.Sprintf("$.actions[%d].with.%s", i, field), "action %q: %v", a.ID, err))
-			}
-		}
-	}
-	errs.Sort()
-	return errs
+// ActionSQLField tells whether a field of an action type holds an SQL statement
+// (format runnel-sql): it must not contain ${…} or {{ … }}.
+func ActionSQLField(reg *action.Registry) func(typ, field string) bool {
+	return formatField(workflowSteps(&model.Workflow{}, reg).schema, schema.FormatSQL)
+}
+
+// TransformSQLField is ActionSQLField for transforms.
+func TransformSQLField(reg *transform.Registry) func(typ, field string) bool {
+	return formatField(pipelineSteps(&model.Pipeline{}, reg).schema, schema.FormatSQL)
 }

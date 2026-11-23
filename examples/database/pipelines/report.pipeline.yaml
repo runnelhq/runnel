@@ -1,0 +1,24 @@
+# Reads orders from the database of the connection shop (S20b) and writes those of a
+# customer as CSV. Run the workflow orders first, then:
+#   runnel run examples/database/pipelines/report.pipeline.yaml
+#   runnel run --param CUSTOMER=Ada examples/database/pipelines/report.pipeline.yaml
+kind: Pipeline
+apiVersion: runnel/v1
+name: report
+parameters:
+  - name: CUSTOMER
+    default: Grace
+transforms:
+  - id: read
+    type: db.table-input
+    with:
+      connection: shop
+      sql: SELECT id, customer, amount, created FROM orders WHERE customer = @customer ORDER BY id
+      params:
+        customer: ${CUSTOMER}
+  - id: write
+    type: csv.output
+    with:
+      path: out/orders-${CUSTOMER}.csv
+links:
+  - { from: read, to: write }

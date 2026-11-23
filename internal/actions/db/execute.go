@@ -46,16 +46,7 @@ func newExecute(with map[string]any) (action.Action, error) {
 	return a, nil
 }
 
-func (a *executeAction) timeout() (time.Duration, error) {
-	if a.Timeout == "" {
-		return sqldb.DefaultTimeout, nil
-	}
-	d, err := time.ParseDuration(a.Timeout)
-	if err != nil || d <= 0 {
-		return 0, fmt.Errorf("invalid timeout %q (examples: 30s, 5m)", a.Timeout)
-	}
-	return d, nil
-}
+func (a *executeAction) timeout() (time.Duration, error) { return sqldb.Timeout(a.Timeout) }
 
 func (a *executeAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
 	if err := ctx.Err(); err != nil {
