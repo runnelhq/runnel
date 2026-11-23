@@ -114,4 +114,10 @@ func TestPostgresUpsert(t *testing.T) {
 	if v, _ := recs[0].Get("amount"); !v.(decimal.Decimal).Equal(decimal.RequireFromString("2.5")) {
 		t.Errorf("amount = %#v", v)
 	}
+	// db.lookup (S23a) with $1 on the same table.
+	looked, _, _, err := write(t, lookupDefinition, conn, map[string]any{"table": "runnel_upsert",
+		"keys": []any{map[string]any{"field": "id"}}, "return": []any{map[string]any{"column": "customer", "as": "who"}}}, false, order(1, "x", "0"))
+	if v, _ := looked[0].Get("who"); err != nil || v != "Grace" {
+		t.Errorf("lookup: %v, %v", v, err)
+	}
 }

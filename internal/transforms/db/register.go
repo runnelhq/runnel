@@ -12,4 +12,5 @@ func Register(r *transform.Registry) {
 	r.Register(tableInputDefinition)
 	r.Register(tableOutputDefinition)
 	r.Register(upsertDefinition)
+	r.Register(lookupDefinition)
 }

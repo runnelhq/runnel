@@ -136,3 +136,14 @@ func Arg(v any) (any, error) {
 	}
 	return v, nil
 }
+
+// Select returns SELECT columns FROM table WHERE keys, the values those of keys (for
+// db.lookup); each key is compared with =.
+func (d Dialect) Select(table string, columns, keys []string) string {
+	where := make([]string, len(keys))
+	for i, k := range keys {
+		where[i] = d.Quote(k) + " = " + d.Placeholder(i+1)
+	}
+	return fmt.Sprintf("SELECT %s FROM %s WHERE %s",
+		d.list(columns, func(_ int, c string) string { return d.Quote(c) }), d.Quote(table), strings.Join(where, " AND "))
+}
