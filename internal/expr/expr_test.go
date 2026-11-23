@@ -245,3 +245,28 @@ func TestConcatErrors(t *testing.T) {
 		}
 	}
 }
+
+// Paths (S64): / and \ both separate; roots stay.
+func TestPathFunctions(t *testing.T) {
+	for _, tt := range []struct{ path, base, dir, ext string }{
+		{"Exports/2026/orders.zip", "orders.zip", "Exports/2026", ".zip"},
+		{`C:\Runnel\inbox\orders.csv`, "orders.csv", `C:\Runnel\inbox`, ".csv"},
+		{`\\fs01\share\a.tar.gz`, "a.tar.gz", `\\fs01\share`, ".gz"},
+		{"https://host/files/report.pdf", "report.pdf", "https://host/files", ".pdf"},
+		{"inbox/", "inbox", "", ""},
+		{"orders.zip", "orders.zip", "", ".zip"},
+		{"/orders.zip", "orders.zip", "/", ".zip"},
+		{`C:\orders.zip`, "orders.zip", `C:\`, ".zip"},
+		{".env", ".env", "", ""},
+		{"Makefile", "Makefile", "", ""},
+		{"", "", "", ""},
+		{"/", "/", "/", ""},
+	} {
+		env := map[string]any{"params": map[string]any{"P": tt.path}}
+		for fn, want := range map[string]string{"basename": tt.base, "dirname": tt.dir, "ext": tt.ext} {
+			if got := eval(t, "{{ "+fn+"(params.P) }}", env); got != want {
+				t.Errorf("%s(%q) = %v, want %q", fn, tt.path, got, want)
+			}
+		}
+	}
+}

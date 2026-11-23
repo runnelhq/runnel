@@ -90,6 +90,11 @@ var functions = []exprlang.Option{
 
 	exprlang.Function("concat", concat, new(func(string, ...any) string)),
 
+	// Paths (S64): / and \ both separate, as on Windows; nothing touches the disk.
+	exprlang.Function("basename", func(p ...any) (any, error) { return baseName(toString(p[0])), nil }, new(func(string) string)),
+	exprlang.Function("dirname", func(p ...any) (any, error) { return dirName(toString(p[0])), nil }, new(func(string) string)),
+	exprlang.Function("ext", func(p ...any) (any, error) { return extOf(toString(p[0])), nil }, new(func(string) string)),
+
 	exprlang.Function("coalesce", func(p ...any) (any, error) {
 		for _, v := range p {
 			if !isEmpty(v) {
@@ -370,4 +375,48 @@ func ParseDate(s, pattern string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("parseDate: %q does not match the pattern %q", s, pattern)
 	}
 	return t, nil
+}
+
+// trimSeparators removes separators at the end, but keeps a root ("/", "\\", "C:\\").
+func trimSeparators(p string) string {
+	for len(p) > 1 && strings.ContainsRune(`/\`, rune(p[len(p)-1])) && (len(p) != 3 || p[1] != ':') {
+		p = p[:len(p)-1]
+	}
+	return p
+}
+
+// baseName is the last part of a path: "orders.zip" for "Exports\\2026\\orders.zip" or
+// "https://h/a/orders.zip".
+func baseName(p string) string {
+	p = trimSeparators(p)
+	if i := strings.LastIndexAny(p, `/\`); i >= 0 && len(p) > 1 {
+		return p[i+1:]
+	}
+	return p
+}
+
+// dirName is the path without its last part, without a separator at the end, except for
+// a root: "Exports" for "Exports/orders.zip", "/" for "/orders.zip", "" for "orders.zip".
+func dirName(p string) string {
+	p = trimSeparators(p)
+	i := strings.LastIndexAny(p, `/\`)
+	switch {
+	case i < 0:
+		return ""
+	case i == 0:
+		return p[:1]
+	case i == 2 && p[1] == ':':
+		return p[:3] // C:\
+	}
+	return trimSeparators(p[:i])
+}
+
+// extOf is the ending of the last part with its dot: ".zip"; "" without one and for names
+// that only start with a dot (".env").
+func extOf(p string) string {
+	b := baseName(p)
+	if i := strings.LastIndexByte(b, '.'); i > 0 {
+		return b[i:]
+	}
+	return ""
 }

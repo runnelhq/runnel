@@ -59,7 +59,7 @@ Zusätzlich zu den eingebauten Operatoren und Funktionen von `expr` (`upper`, `l
 | Text | `padLeft(s, n, "0")`, `padRight`, `substr(s, start, len)`, `left`, `right`, `normalize` (Umlaute/Leerzeichen), `concat(trenner, a, b, …)` (seit S16e) |
 | Zahlen | `round(x, stellen)`, `decimal(s)`, `formatNumber(x, "#.##0,00")`, `parseNumber(s, "de-DE")` |
 | Null/Leer | `coalesce(a, b, …)`, `isEmpty(x)` |
-| Sonstiges | `uuid()`, `sha256(s)`, `md5(s)`, `basename(p)`, `dirname(p)`, `ext(p)` |
+| Sonstiges | `uuid()`, `sha256(s)`, `md5(s)`, `basename(p)`, `dirname(p)`, `ext(p)` (die drei Pfadfunktionen seit S64) |
 
 Datumsformate verwenden die bekannten Muster `yyyy`, `MM`, `dd`, `HH`, `mm`, `ss` (wie Hop/Java/.NET), nicht das
 Go-Referenzlayout. Dezimalzahlen (`decimal`) rechnen exakt (`shopspring/decimal`) – die arithmetischen Operatoren
@@ -164,6 +164,11 @@ when:      "{{ result.rows > 0 }}"
   Text, nur Leerzeichen – wie `isEmpty`), damit kein Trenner allein steht: `concat(', ', '', 'Köln')` ist `Köln`.
   Listen zählen mit ihren Einträgen; Zahlen und Daten werden wie bei `Format` geschrieben. Statt eines eigenen
   Transforms „Concat“, weil `core.calculate` mit dieser Funktion dasselbe kann.
+- **Nachtrag 2026-11-23 (S64):** Pfadfunktionen `basename(p)`, `dirname(p)` und `ext(p)`, z. B. für Dateinamen aus
+  SharePoint-Pfaden oder aus der Ausgabe von `file.list` und `archive.extract`. `/` und `\` trennen beide (Windows,
+  Adressen); Trenner am Ende zählen nicht, Wurzeln bleiben (`/`, `C:\`, `\\server\share`). `dirname` ist ohne Ordner
+  leer, `ext` liefert die Endung des letzten Teils mit Punkt (`.zip`, bei `a.tar.gz` `.gz`) und ist bei Namen wie
+  `.env` leer. Sie arbeiten nur mit dem Text und greifen nicht auf das Dateisystem zu.
 
 ## Konsequenzen
 
