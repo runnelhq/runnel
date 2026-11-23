@@ -1,0 +1,41 @@
+# Sends the daily report as a mail with text, HTML and the CSV file as attachment
+# (mail.send); if the mail server cannot be reached, the error link logs it.
+#   runnel run -v examples/mail/workflows/report.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: report
+parameters:
+  - name: DAY
+    type: string
+    default: "{{ formatDate(today(), 'yyyy-MM-dd') }}"
+actions:
+  - id: start
+    type: core.start
+  - id: send
+    type: mail.send
+    with:
+      connection: mail
+      to: ${ADMIN_MAIL}
+      subject: "Orders report {{ params.DAY }}"
+      body: |
+        Hello,
+
+        attached is the orders report of {{ params.DAY }}.
+      html: |
+        <p>Hello,</p>
+        <p>attached is the orders report of <b>{{ params.DAY }}</b>.</p>
+      attachments:
+        - data/report.csv
+  - id: sent
+    type: core.log
+    with:
+      message: "Sent {{ results.send.output.messageId }} ({{ results.send.output.size }} bytes)"
+  - id: failed
+    type: core.log
+    with:
+      level: error
+      message: "The report was not sent: {{ results.send.error }}"
+links:
+  - { from: start, to: send }
+  - { from: send, to: sent }
+  - { from: send, to: failed, when: failure }

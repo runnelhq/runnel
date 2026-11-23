@@ -14,7 +14,7 @@ Oberfläche, Sicherheit). Hier nur, was die Roadmap betrifft:
   verschobene Teile behalten ihre Nummer mit „(Teil)“ im Backlog.
 - **Umbau-Hinweise** stehen während einer Phase am Kopf und danach im Abschnitt [Verlauf](#verlauf).
 
-Bausteine, die vorerst nicht benötigt werden (z. B. Mail, Shell/PowerShell, Excel), stehen im [Backlog](#backlog) und
+Bausteine, die vorerst nicht benötigt werden (z. B. Excel, XML), stehen im [Backlog](#backlog) und
 werden bei Bedarf als eigener kleiner Schritt eingeplant.
 
 ---
@@ -204,6 +204,8 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S59 ✅ | DB-Abfrage im Workflow | Action `db.query`: Zeilen einer Abfrage in den Workflow (`rows` als Liste von Objekten, `count`, `first`, `value` = erste Spalte der ersten Zeile, z. B. von `COUNT(*)`); Parameter `@name` wie `db.execute`; `maxRows` (Standard 1000, mehr ist ein Fehler mit Hinweis auf `db.table-input`), `timeout` (Standard 1m) | Unit-Tests auf SQLite; Beispiel `examples/database/workflows/check.workflow.yaml` (Wert für eine Meldung, Zeilen für `forEach`) |
 | S60 ✅ | Programm starten | Action `shell.run` nach [ADR 0023](adr/0023-programme-powershell.md): Programm über `PATH` oder relativ zum Projekt, `args` als Liste ohne Shell, `okCodes`, `workdir`, `env` (einziger Ort für Secrets, im Output ersetzt), `input` (sonst leeres stdin), `encoding` (UTF-8, sonst OEM-Codepage), `json`, `maxOutput` (1 MB je Strom), `timeout` (10m, beendet den Prozessbaum); `validate` meldet Workflow-Parameter und Ausdrücke in `program` sowie Secrets in `args`; `.bat`/`.cmd` mit `& \| < > ^ % ! "` in Argumenten werden abgelehnt; Paket `internal/proc` | Unit-Tests mit echten Prozessen (Testbinary als Programm, Kindprozess beim Timeout beendet, Ausgabe begrenzt, Batch-Ablehnung, Prüfungen); Beispiel `examples/hello/workflows/program.workflow.yaml`; Windows im Testplan (W58) |
 | S61 ✅ | PowerShell | Action `shell.powershell` nach ADR 0023: `script` oder `file` (Format `runnel-script`, ohne `${…}`/`{{ … }}`), `params` mit Typen als JSON über ein eingebettetes Startskript (Splatting), `json` (letzter JSON-Wert der Ausgabe), Edition `auto`/`pwsh`/`windows`, `-NoProfile -NonInteractive -ExecutionPolicy Bypass`, `$ErrorActionPreference = 'Stop'`, UTF-8; Ausnahme → Exit-Code 1 mit Meldung; `env`, `workdir`, `maxOutput`, `timeout` wie `shell.run` | Unit-Tests; Skriptläufe in der CI mit `pwsh` (Linux, Windows) und Windows PowerShell 5.1; Beispiel `examples/hello/workflows/powershell.workflow.yaml`; Testplan W59 |
+| S62a ✅ | Mail senden | Connection-Typ `smtp` (`host`, `port`, `tls`: `starttls`/`tls`/`none`, `auth`: `password`/`none`, `user`, `password`, `from`, `timeout`) und Action `mail.send` nach ADR 0022: `to`/`cc`/`bcc` als Liste mit Kommas, `from`, `replyTo`, `subject`, `body` (Text) und/oder `html`, `attachments` (Dateien relativ zum Projekt, zusammen höchstens 25 MB); Zertifikat immer geprüft, Passwort nie unverschlüsselt (außer an den eigenen Rechner), Anmeldung `PLAIN` oder `LOGIN`; `validate` warnt bei `tls: none` zu einem anderen Rechner; nur Go-Standardbibliothek | Unit-Tests mit einem SMTP-Testserver (STARTTLS, TLS, ohne TLS, Anmeldung, Ablehnungen, Timeout, Abbruch); Beispiel `examples/mail` mit einem lokalen Testserver (z. B. Mailpit); Testplan W60 (Office 365, Exchange) |
+| S62b | Mail mit OAuth2 | `auth: oauth2` für `smtp` (Client Credentials mit Tenant, Client-ID, Secret; Token im Speicher bis kurz vor Ablauf; Anmeldung `XOAUTH2`) für Office 365 – geteilt aus S62, damit der Kern ohne OAuth2 prüfbar ist | Unit-Tests mit Token- und SMTP-Testserver; Testplan mit Office 365 |
 | S56 | Mapping: Engine und Prüfung | Transform `core.run-pipeline` ([ADR 0021](adr/0021-unter-pipelines.md)): eine Unter-Pipeline je Lauf, Datensätze strömen über `core.from-result`/`core.to-result` hindurch (Backpressure), Schema durch die Unter-Pipeline, Parameter, Selbstaufruf und Verschachtelung (max. 10) als Fehler, Log mit Präfix; Beschriftungen „Records from/to Caller“ | ADR 0021 |
 | S56b | Mockup: Mapping-Knoten und Executor-Ausgänge | Mapping im Canvas (Unter-Pipeline öffnen, Zähler), Beschriftung der Ausgänge `results`/`rows` am Executor | S56 |
 | S56c | Mapping im Editor | Umsetzung nach freigegebenem Mockup S56b | S56b |
@@ -237,7 +239,7 @@ Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-
 
 | Bereich | Bausteine |
 |---|---|
-| Kommunikation | `mail.send` (SMTP mit OAuth2), Mail abrufen (IMAP) – Connections nach ADR 0022 |
+| Kommunikation | Mail abrufen (IMAP) – Connections nach ADR 0022 (Mail senden: S62a, S62b) |
 | Secret-Quellen | `windows-credentials`, `azure-keyvault`, `vault` (REST ohne SDK), Cloud-Tresore, Plugin-Quellen (`secrets.get`) – ADR 0022 |
 | Skripte & Programme | Transform `shell.powershell` (Action: S61, Programm starten: S60), JavaScript (`core.script` als Action und Transform, mit goja) |
 | Dateiformate | Excel (Ein-/Ausgabe), XML, Fixed-Width |

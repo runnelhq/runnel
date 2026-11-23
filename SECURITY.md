@@ -24,4 +24,7 @@ Korrekturen.
 - `shell.run` und `shell.powershell` starten Programme mit dem Konto des Runnel-Prozesses, ohne Shell und
   ohne Freigabe-Schalter: Wer Projektdateien schreiben darf, darf Programme starten. Für den Dienst ein eigenes Konto
   mit den nötigen Rechten statt `LocalSystem` verwenden ([ADR 0023](docs/adr/0023-programme-powershell.md)).
+- `mail.send` prüft das Zertifikat des Mail-Servers immer und sendet ein Passwort nie unverschlüsselt (außer an den
+  eigenen Rechner); `tls: none` ist nur für ein Relay im vertrauenswürdigen Netz gedacht und wird von `validate`
+  gemeldet ([ADR 0022, Nachtrag S62a](docs/adr/0022-connections-secrets.md)).
 - Regeln für Beiträge: [AGENTS.md, Abschnitt „Sicherheit“](AGENTS.md#sicherheit).
