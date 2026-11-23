@@ -5,7 +5,8 @@
 # 2. Split by condition with core.switch: every record goes to exactly one branch, the
 #    first case that is true decides (unpaid before large). A default catches the rest,
 #    so no record is dropped without notice.
-# 3. Each branch sets the same fields (route, action), so that the branches can be joined.
+# 3. Each branch sets the same fields (route, action), so that the branches can be joined;
+#    a value without {{ … }} is fixed, e.g. route: unpaid.
 # 4. Join: several data links into one transform are read as one stream; the order
 #    between the branches is not fixed, so core.sort sets it again.
 # 5. Copy to two targets: "sorted" has two outgoing links; each gets every record
@@ -46,20 +47,20 @@ transforms:
     type: core.calculate
     with:
       fields:
-        - { name: route, value: "{{ 'unpaid' }}" }
+        - { name: route, value: unpaid }
         - { name: action, value: "Send a reminder for {{ record.Betrag }}" }
   - id: large
     type: core.calculate
     with:
       fields:
-        - { name: route, value: "{{ 'large' }}" }
-        - { name: action, value: "{{ 'Needs a release' }}" }
+        - { name: route, value: large }
+        - { name: action, value: Needs a release }
   - id: normal
     type: core.calculate
     with:
       fields:
-        - { name: route, value: "{{ 'normal' }}" }
-        - { name: action, value: "{{ '' }}" }
+        - { name: route, value: normal }
+        - { name: action, value: "" }
   - id: sorted
     type: core.sort
     with:

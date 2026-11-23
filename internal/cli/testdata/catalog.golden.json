@@ -1236,7 +1236,7 @@
                 },
                 "value": {
                   "type": "string",
-                  "description": "Expression evaluated for every record, e.g. {{ record.price * record.quantity }}; text around {{ … }} makes the result a text",
+                  "description": "Value of the field: an expression in {{ … }} evaluated for every record, e.g. {{ record.price * record.quantity }}; text around {{ … }} makes the result a text; without {{ … }} a fixed value (a number, true, false or a text)",
                   "format": "runnel-text",
                   "examples": [
                     "{{ record.price * record.quantity }}"

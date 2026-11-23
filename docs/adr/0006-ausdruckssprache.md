@@ -169,6 +169,14 @@ when:      "{{ result.rows > 0 }}"
   Adressen); Trenner am Ende zählen nicht, Wurzeln bleiben (`/`, `C:\`, `\\server\share`). `dirname` ist ohne Ordner
   leer, `ext` liefert die Endung des letzten Teils mit Punkt (`.zip`, bei `a.tar.gz` `.gz`) und ist bei Namen wie
   `.env` leer. Sie arbeiten nur mit dem Text und greifen nicht auf das Dateisystem zu.
+- **Nachtrag 2026-11-23 (S65):** In `core.calculate` ist ein Wert **ohne** `{{ … }}` ein fester Wert und kein
+  Ausdruck mehr: `route: unpaid` setzt den Text „unpaid“ (vorher: Fehler „unknown name unpaid“). Ganze Zahlen,
+  Dezimalzahlen mit Punkt, `true` und `false` behalten ihren Typ; Zahlen mit führender Null (z. B. die Postleitzahl
+  `01067`) und alles andere bleiben Text. So verhält sich das Feld wie andere Felder unter `with:`, in denen Text ohne
+  `{{ }}` ebenfalls wörtlich gilt. Bedingungen (`core.filter`, `when` von `core.switch`, Link-Bedingungen) bleiben
+  Ausdrücke, auch ohne `{{ }}`. Weil ein Wert wie `record.price * 2` bisher berechnet wurde, warnt die Prüfung, wenn ein
+  fester Text ein gültiger Ausdruck wäre, der Werte liest oder eine Funktion aufruft („… is a fixed text; write
+  {{ record.price * 2 }} to calculate it“).
 
 ## Konsequenzen
 
