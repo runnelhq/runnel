@@ -95,3 +95,56 @@ test("shows new runs without reloading and counts running ones in the header", a
   await expect(page.getByRole("button", { name: /^Runs/ })).toContainText("1");
   await expect(rows.nth(0)).toContainText("Succeeded", { timeout: 10_000 });
 });
+
+test("opens a run of the history on the canvas, with older and newer runs", async ({ page, request }) => {
+  await request.put(`/api/v1/files/${path}`, { headers: { "If-Match": "*" }, data: workflow });
+  const start = async (params: Record<string, string>) => {
+    const res = await request.post("/api/v1/runs", { data: { path, environment: "prod", params } });
+    const id = ((await res.json()) as { id: string }).id;
+    await expect.poll(async () => ((await (await request.get(`/api/v1/runs/${id}`)).json()) as { status: string }).status).not.toBe("running");
+    return id;
+  };
+  const ok = await start({});
+  const failed = await start({ WAIT: "oops" });
+  // The file changes after the runs: "wait" becomes "pause".
+  await request.put(`/api/v1/files/${path}`, { headers: { "If-Match": "*" }, data: workflow.replaceAll("wait", "pause").replace("type: core.pause", "type: core.wait") });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Runs/ }).click();
+  const view = page.getByTestId("runs-view");
+  await view.getByRole("combobox", { name: "File" }).selectOption(path);
+  await view.getByRole("row").filter({ hasText: "Failed" }).first().click();
+  await page.getByTestId("run-details").getByRole("button", { name: "Open on canvas" }).click();
+
+  const info = page.getByTestId("run-info");
+  await expect(page.getByRole("tab", { name: /runs-list\.workflow\.yaml/ })).toHaveAttribute("aria-selected", "true");
+  await expect(info).toContainText("Failed");
+  await expect(info).toContainText("Editor");
+  await expect(info).toContainText("prod · 1 parameter");
+  await expect(page.getByTestId("run-status")).toContainText(`Showing run ${failed.slice(0, 12)} · failed`);
+  await expect(page.getByTestId("node-start")).toHaveAttribute("data-run", "succeeded");
+  // The file changed: the line names what differs; the new action has no status.
+  const changed = page.getByTestId("run-changed");
+  await expect(changed).toContainText("The file was changed after this run");
+  await expect(changed).toContainText("not in the run: pause");
+  await expect(changed).toContainText("no longer in the file: wait (failed 0 s)");
+  await expect(page.getByTestId("node-pause")).not.toHaveAttribute("data-run", /./);
+  // The log of the stored run.
+  await expect(page.getByRole("log", { name: "Run log" })).toBeVisible();
+
+  // Older run of the file; there is none newer than the failed one.
+  await expect(info.getByRole("button", { name: "Newer run" })).toBeDisabled();
+  await info.getByRole("button", { name: "Older run" }).click();
+  await expect(page.getByTestId("run-status")).toContainText(`Showing run ${ok.slice(0, 12)} · succeeded`);
+  await expect(info.getByRole("button", { name: "Newer run" })).toBeEnabled();
+
+  // All runs of this file: the list with the file filter.
+  await info.getByRole("button", { name: "All runs of this file" }).click();
+  await expect(view.getByRole("combobox", { name: "File" })).toHaveValue(path);
+
+  // × hides the run again.
+  await page.getByRole("tab", { name: /runs-list\.workflow\.yaml/ }).click();
+  await info.getByRole("button", { name: "Hide the run" }).click();
+  await expect(info).toHaveCount(0);
+  await expect(page.getByTestId("node-start")).not.toHaveAttribute("data-run", /./);
+});

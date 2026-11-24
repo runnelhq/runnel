@@ -192,7 +192,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S26c ✅ | Run-Historie: Aufbewahrung | `settings.history` (`keepDays` 30, `maxRuns` 10.000), Bereinigung beim Öffnen, stündlich und nach `runnel run`; `history:` für alle Trigger-Arten | S26a |
 | S26d | Mockup: Liste der Läufe im Editor | Liste mit Filter, ein beendeter Lauf auf dem Canvas mit Status und Log | S26a |
 | S26e1 ✅ | Liste der Läufe im Editor | Nach Mockup S26d (`list`, `filter`, `empty`): Tab „Runs“ über die Kopfzeile, Filter Status/Datei/Trigger (`trigger=editor` für Läufe ohne Trigger), Details eines Laufs, live; `settings.history` im Formular von `project.yaml` | S26d, S26b |
-| S26e2 | Lauf aus der Historie auf dem Canvas | Nach Mockup S26d (`run`, `changed`): „Open on canvas“, Zeile mit dem Lauf, älterer/neuerer Lauf der Datei, Hinweis bei geänderter Datei; Pipelines mit Zählern wie S25a | S26e1 |
+| S26e2 ✅ | Lauf aus der Historie auf dem Canvas | Nach Mockup S26d (`run`, `changed`): „Open on canvas“, Zeile mit dem Lauf, älterer/neuerer Lauf der Datei, Hinweis bei geänderter Datei; Pipelines mit Zählern wie S25a | S26e1 |
 | S29 | Resume | Fortsetzen ab fehlgeschlagener Action (`/runs/{id}/resume`, CLI `runnel resume`); Voraussetzung für `core.approval` (ADR 0012) | S26 |
 | S36 | Teilausführung | „Ab hier ausführen“, „Nur diese Action ausführen“ | – |
 | S24 (Teil) | Ergebnis-Datensätze auslagern | `resultSpillRows`: große Ergebnisse in eine temporäre Datei statt in den Speicher | S24a |

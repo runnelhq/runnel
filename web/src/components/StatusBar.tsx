@@ -52,7 +52,8 @@ function RunStatus({ run }: { run: RunView }) {
     const t = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(t);
   }, [running]);
-  const t = runText[run.status];
+  // A run of the run history on the canvas (S26e2): "Showing run 01M… · failed".
+  const t = run.history && !running ? { ...runText[run.status], text: `Showing run ${run.id.slice(0, 12)} · ${run.status}` } : runText[run.status];
   const ms = run.durationMs ?? (running ? Math.max(0, now - run.started) : undefined);
   return (
     <span data-testid="run-status" className={t.className} title={run.error}>

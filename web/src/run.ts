@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiBase } from "./api";
 import { APIError } from "./files";
+import type { RunDetail } from "./runs";
 import type { Problem, Workflow } from "./workflow";
 
 /** Status of an action in a run (GET /runs/{id}, docs/dev/API.md). */
@@ -55,6 +56,11 @@ export interface RunView {
   log: LogLine[];
   /** Actions and links when the run started; the status is hidden once they change (decision for mockup E8). */
   signature: string;
+  /**
+   * Set for a run opened from the run history (S26e2): its status stays shown when the file
+   * changes; the canvas names actions that were not in the run.
+   */
+  history?: { trigger?: string; params?: Record<string, string> };
 }
 
 /** Event of the live stream (GET /events). */
@@ -166,19 +172,9 @@ export function useRun(path: string) {
   const source = useRef<EventSource | null>(null);
   useEffect(() => () => source.current?.close(), []);
 
-  const start = useCallback(
-    async (settings: RunSettings, workflow: Workflow) => {
-      const params = Object.fromEntries(Object.entries(settings.params).filter(([, v]) => v !== ""));
-      const res = await fetch(`${apiBase}/runs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, environment: settings.environment || undefined, params }),
-      });
-      const body = (await res.json()) as { id?: string; environment?: string; error?: string; problems?: Problem[] };
-      if (!res.ok || !body.id) {
-        throw new StartError(body.error ?? `${res.status} ${res.statusText}`, res.status, body.problems);
-      }
-      const id = body.id;
+  // Follows a run from its first event on (filtered by run); every event adds its lines to the log.
+  const follow = useCallback(
+    (id: string, workflow: Workflow, meta: { environment: string; started: number; history?: RunView["history"] }) => {
       const actions: Record<string, ActionRun> = {};
       for (const a of workflow.actions ?? []) actions[a.id] = { status: "pending" };
       setRun({
@@ -187,13 +183,13 @@ export function useRun(path: string) {
         workflow: workflow.name,
         linkRows: {},
         log: [],
-        environment: body.environment ?? settings.environment,
+        environment: meta.environment,
         status: "running",
-        started: Date.now(),
+        started: meta.started,
         actions,
         signature: structureSignature(workflow),
+        history: meta.history,
       });
-
       source.current?.close();
       const es = new EventSource(`${apiBase}/events?run=${encodeURIComponent(id)}&since=0`);
       source.current = es;
@@ -239,17 +235,74 @@ export function useRun(path: string) {
           ),
         }));
       });
+    },
+    [],
+  );
+
+  const start = useCallback(
+    async (settings: RunSettings, workflow: Workflow) => {
+      const params = Object.fromEntries(Object.entries(settings.params).filter(([, v]) => v !== ""));
+      const res = await fetch(`${apiBase}/runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, environment: settings.environment || undefined, params }),
+      });
+      const body = (await res.json()) as { id?: string; environment?: string; error?: string; problems?: Problem[] };
+      if (!res.ok || !body.id) {
+        throw new StartError(body.error ?? `${res.status} ${res.statusText}`, res.status, body.problems);
+      }
+      const id = body.id;
+      follow(id, workflow, { environment: body.environment ?? settings.environment, started: Date.now() });
       return id;
     },
-    [path],
+    [path, follow],
   );
+
+  /** Shows a run of the run history (S26e2): an ended one as it is stored, a running one followed live. */
+  const show = useCallback(
+    (d: RunDetail, workflow: Workflow) => {
+      const history = { trigger: d.trigger, params: d.params };
+      const meta = { environment: d.environment ?? "", started: Date.parse(d.started), history };
+      if (d.status === "running") return follow(d.id, workflow, meta);
+      source.current?.close();
+      const actions: Record<string, ActionRun> = {};
+      for (const a of d.actions) {
+        const ran = a.status === "succeeded" || a.status === "failed" || a.status === "cancelled";
+        actions[a.id] = { status: a.status, durationMs: ran ? (a.durationMs ?? 0) : undefined, error: a.error, counts: a.counts };
+      }
+      setRun({
+        id: d.id,
+        kind: d.kind,
+        workflow: d.workflow,
+        environment: meta.environment,
+        status: d.status,
+        started: meta.started,
+        durationMs: d.durationMs,
+        error: d.error,
+        actions,
+        linkRows: Object.fromEntries((d.linkRows ?? []).map((n, i) => [i, n])),
+        // Stored times leave out trailing zeros (RFC 3339): the log shows them with milliseconds.
+        log: d.log.map((l) => ({ ...l, time: new Date(l.time).toISOString() })),
+        signature: structureSignature(workflow),
+        history,
+      });
+    },
+    [follow],
+  );
+
+  /** Hides the status of the run shown (× of a run from the history). */
+  const hide = useCallback(() => {
+    source.current?.close();
+    setRun(null);
+  }, []);
+
 
   const cancel = useCallback(async () => {
     if (!run || run.status !== "running") return;
     await fetch(`${apiBase}/runs/${encodeURIComponent(run.id)}/cancel`, { method: "POST" });
   }, [run]);
 
-  return { run, start, cancel };
+  return { run, start, cancel, show, hide };
 }
 
 /** "1.4 s", "2 min 5 s". */

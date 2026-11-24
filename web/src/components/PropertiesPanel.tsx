@@ -2317,7 +2317,7 @@ function LastRun(props: PropertiesProps & { id: string }) {
     >
       <b>
         {failed ? "✖ " : a.status === "succeeded" ? "✔ " : ""}
-        {lastRunText[a.status]}
+        {props.run?.history ? lastRunText[a.status].replace("in the last run", "in this run") : lastRunText[a.status]}
       </b>
       {a.durationMs !== undefined && ` after ${formatDuration(a.durationMs)}`}
       {a.error && <div className="mt-0.5">{a.error}</div>}

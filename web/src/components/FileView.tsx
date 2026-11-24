@@ -21,6 +21,8 @@ import {
 import { Canvas, type Selection } from "./Canvas";
 import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { RunDialog } from "./RunDialog";
+import { RunInfoBar, type RunChanges } from "./RunInfoBar";
+import { fetchRun } from "../runs";
 import { DetectFieldsDialog } from "./DetectFieldsDialog";
 import { PreviewPanel, type PreviewSelection } from "./PreviewPanel";
 import { listItems, type Item } from "../yaml";
@@ -133,6 +135,10 @@ export function FileView(props: {
   request?: { seq: number; action: ReferenceAction } | null;
   /** Variables used but not set for this environment (E18b): a warning badge. */
   variableWarning?: { count: number; text: string } | null;
+  /** A run of the run history to show on the canvas (S26e2); seq changes with every request. */
+  showRun?: { id: string; seq: number } | null;
+  /** Opens the list of runs filtered by this file. */
+  onRunsOf?: (path: string) => void;
 }) {
   const { path, active, epoch, onSummary, onPalette, onDirty, onRegister, onRun } = props;
   const [state, setState] = useState<State>({ status: "loading" });
@@ -571,13 +577,52 @@ export function FileView(props: {
 
   // Running (mockup E8): Run uses the remembered values; the dialog opens on the first run of a
   // workflow with parameters or several environments, or via the arrow. Unsaved changes are asked about.
-  const { run, start: startRun, cancel: cancelRun } = useRun(path);
+  const { run, start: startRun, cancel: cancelRun, show: showHistoryRun, hide: hideRun } = useRun(path);
   const [runDialog, setRunDialog] = useState(false);
   const [unsavedAsk, setUnsavedAsk] = useState<null | { dialog: boolean }>(null);
   const running = run?.status === "running";
   const wfNow = graph;
   // The status belongs to the actions and links it ran with; it is hidden once they change.
-  const shownRun = run && wfNow && run.signature === structureSignature(wfNow) ? run : null;
+  // A run opened from the run history (S26e2) stays; the line above the canvas names the
+  // actions that differ, and the record counts of links are left out then (their order may differ).
+  const changes = useMemo<RunChanges | null>(() => {
+    if (!run?.history || !wfNow) return null;
+    const ids = new Set((wfNow.actions ?? []).map((a) => a.id));
+    const notInRun = (wfNow.actions ?? []).filter((a) => !run.actions[a.id]).map((a) => a.id);
+    const gone = Object.entries(run.actions)
+      .filter(([id]) => !ids.has(id))
+      .map(([id, a]) => ({ id, status: a.status, durationMs: a.durationMs }));
+    return { notInRun, gone };
+  }, [run, wfNow]);
+  const shownRun =
+    run && wfNow && run.history
+      ? changes && (changes.notInRun.length > 0 || changes.gone.length > 0)
+        ? { ...run, linkRows: {} }
+        : run
+      : run && wfNow && run.signature === structureSignature(wfNow)
+        ? run
+        : null;
+  // "Open on canvas" in the list of runs: once the graph is there, the stored run is loaded.
+  const shownRequest = useRef(0);
+  const openHistoryRun = useCallback(
+    async (id: string) => {
+      if (!graph) return;
+      try {
+        showHistoryRun(await fetchRun(id), graph);
+        setBottomTab("log");
+        setEditError(null);
+      } catch (err) {
+        setEditError(`Could not open the run: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [graph, showHistoryRun],
+  );
+  useEffect(() => {
+    const req = props.showRun;
+    if (!req || !graph || shownRequest.current === req.seq) return;
+    shownRequest.current = req.seq;
+    void openHistoryRun(req.id);
+  }, [props.showRun, graph, openHistoryRun]);
   useEffect(() => {
     if (active) onRun(run);
   }, [active, run, onRun]);
@@ -969,6 +1014,16 @@ export function FileView(props: {
             Dismiss
           </button>
         </div>
+      )}
+      {isGraph && run?.history && (
+        <RunInfoBar
+          run={run}
+          path={path}
+          changes={changes}
+          onOpenRun={(id) => void openHistoryRun(id)}
+          onRunsOf={() => props.onRunsOf?.(path)}
+          onHide={hideRun}
+        />
       )}
       <div className="flex min-h-0 flex-1">
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">

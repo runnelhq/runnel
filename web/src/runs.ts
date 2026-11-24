@@ -26,6 +26,8 @@ export interface RunInfo {
   finished?: string;
   durationMs: number;
   error?: string;
+  /** Pipelines: records per link (index in links). */
+  linkRows?: number[];
 }
 
 /** A run with its actions and log (GET /runs/{id}). */
@@ -45,9 +47,9 @@ export interface RunFilter {
 /** Runs per page, as the server lists them by default (runs.DefaultList). */
 export const runsPage = 200;
 
-export async function fetchRuns(filter: RunFilter, before?: string): Promise<RunInfo[]> {
+export async function fetchRuns(filter: RunFilter, before?: string, limit = runsPage): Promise<RunInfo[]> {
   const q = new URLSearchParams();
-  for (const [k, v] of Object.entries({ ...filter, before, limit: String(runsPage) })) if (v) q.set(k, v);
+  for (const [k, v] of Object.entries({ ...filter, before, limit: String(limit) })) if (v) q.set(k, v);
   const res = await fetch(`${apiBase}/runs?${q}`);
   const body = (await res.json()) as { runs?: RunInfo[]; error?: string };
   if (!res.ok) throw new Error(body.error ?? `${res.status} ${res.statusText}`);

@@ -190,3 +190,10 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
   Liste der Läufe sie zeigen kann.
 - Der Editor lädt die Liste neu, wenn ein Lauf startet oder endet (Ereignisse `run.started`, `run.finished`, `reset` des
   Stroms `/events`, höchstens alle 0,5 s), nicht auf jedes Ereignis eines Laufs.
+
+## Nachtrag 2026-11-24 (S26e2)
+
+- Ein Lauf aus der Historie erscheint auf dem Canvas der **aktuellen** Datei; die Historie speichert keine Kopie der
+  Datei. Weichen die Actions ab (IDs), nennt der Editor sie und lässt die Zähler an Links weg, weil deren Reihenfolge
+  nicht mehr stimmen muss. Geänderte Links bei gleichen Actions erkennt er nicht.
+- Ein noch laufender Lauf aus der Liste wird wie ein im Editor gestarteter über `/events?run=<id>&since=0` verfolgt.
