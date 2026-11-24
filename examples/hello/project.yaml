@@ -6,4 +6,4 @@ description: Small example project with two environments
 defaultEnvironment: dev
 variables:
   TARGET: World
-  OUTBOX: ${env:TEMP}\runnel-hello
+  OUTBOX: ${env:TEMP:-.}\runnel-hello # ${env:NAME:-text}: text if NAME is not set (TEMP outside Windows)

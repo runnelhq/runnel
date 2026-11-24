@@ -439,6 +439,7 @@ function VariableRow(props: {
                       {u.file}:{u.line}
                     </button>
                     {u.parameter && <span className="text-muted-foreground"> (parameter)</span>}
+                    {u.default && <span className="text-muted-foreground"> (with default)</span>}
                   </li>
                 ))}
               </ul>

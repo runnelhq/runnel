@@ -31,7 +31,7 @@ actions:
   - id: log
     type: core.log
     with:
-      message: "${INBOX} ${API_URL} ${DAY} ${env:TEMP}"
+      message: "${INBOX} ${API_URL} ${DAY} ${env:TEMP} ${REGION:-eu}"
 links:
   - { from: start, to: log }
 `)
@@ -56,7 +56,7 @@ links:
 		names = append(names, v.Name)
 	}
 	// DAY is a parameter; no ${env:…}, nothing from hidden folders or broken files.
-	if strings.Join(names, ",") != "API_URL,BASE,DAY,INBOX,TARGET" {
+	if strings.Join(names, ",") != "API_URL,BASE,DAY,INBOX,REGION,TARGET" {
 		t.Fatalf("names %v", names)
 	}
 	base := vars["BASE"]
@@ -75,6 +75,10 @@ links:
 	}
 	if day := vars["DAY"]; len(day.Uses) != 1 || !day.Uses[0].Parameter {
 		t.Errorf("DAY %+v", day)
+	}
+	// ${REGION:-eu} has a default (K1): the editor does not report it as missing.
+	if r := vars["REGION"]; len(r.Uses) != 1 || !r.Uses[0].Default || r.Uses[0].Parameter {
+		t.Errorf("REGION %+v", r)
 	}
 	// TARGET: set in dev only, used by the two workflows of the test project.
 	if target := vars["TARGET"]; len(target.Uses) != 2 || target.Uses[0].File != "workflows/Archive.workflow.yaml" ||

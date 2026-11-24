@@ -18,7 +18,7 @@ actions:
   - id: greet
     type: core.log
     with:
-      message: "${GREETING}, ${TARGET}! (${STAGE} on ${env:COMPUTERNAME}, files in ${OUTBOX})"
+      message: "${GREETING}, ${TARGET}! (${STAGE} on ${env:COMPUTERNAME:-this computer}, files in ${OUTBOX})"
   - id: pause
     type: core.wait
     with:

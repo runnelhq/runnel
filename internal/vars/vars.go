@@ -7,9 +7,12 @@
 //	${env:NAME}     environment variable of the operating system
 //	${secret:NAME}  secret from the default secret store (ADR 0022)
 //	${secret:STORE/NAME} secret from a named secret store, e.g. ${secret:env/API_TOKEN}
+//	${NAME:-text}   NAME, or text if NAME is not set or empty (K1); also ${env:NAME:-text}
 //	$${             literal "${" (escape)
 //
-// Variable values may reference other variables; they are expanded recursively.
+// Variable values may reference other variables; they are expanded recursively. The
+// default after ":-" is literal text: it cannot contain "}" or further references.
+// Secrets have no default, so that no secret ends up in a project file.
 package vars
 
 import (
@@ -38,18 +41,26 @@ type Ref struct {
 	Name string
 	// Store is the secret store named in ${secret:STORE/NAME}; empty for the default store.
 	Store string
+	// Default is the text after ":-" in ${NAME:-text}, used when the variable is not set or
+	// empty; HasDefault tells an empty default (${NAME:-}) from none.
+	Default    string
+	HasDefault bool
 	// Offset is the byte offset of "${" in the text.
 	Offset int
 }
 
 func (r Ref) String() string {
+	def := ""
+	if r.HasDefault {
+		def = ":-" + r.Default
+	}
 	if r.Kind == KindVar {
-		return "${" + r.Name + "}"
+		return "${" + r.Name + def + "}"
 	}
 	if r.Store != "" {
 		return "${" + string(r.Kind) + ":" + r.Store + "/" + r.Name + "}"
 	}
-	return "${" + string(r.Kind) + ":" + r.Name + "}"
+	return "${" + string(r.Kind) + ":" + r.Name + def + "}"
 }
 
 var (
@@ -115,7 +126,14 @@ func scan(text string, onRef func(Ref), onText func(string)) error {
 	return nil
 }
 
-func parseRef(body string, offset int) (Ref, error) {
+func parseRef(full string, offset int) (Ref, error) {
+	body, def, hasDefault := strings.Cut(full, ":-")
+	if hasDefault && strings.HasPrefix(body, string(KindSecret)+":") {
+		return Ref{}, fmt.Errorf("a secret has no default: %q (set the secret instead)", "${"+full+"}")
+	}
+	if strings.Contains(def, "${") {
+		return Ref{}, fmt.Errorf("the default in %q cannot contain a reference", "${"+full+"}")
+	}
 	kind, name := KindVar, body
 	if k, n, ok := strings.Cut(body, ":"); ok {
 		kind, name = Kind(k), n
@@ -123,28 +141,28 @@ func parseRef(body string, offset int) (Ref, error) {
 	switch kind {
 	case KindVar:
 		if !ValidName(name) {
-			return Ref{}, fmt.Errorf("invalid variable name %q in %q (letters, digits and _, not starting with a digit)", name, "${"+body+"}")
+			return Ref{}, fmt.Errorf("invalid variable name %q in %q (letters, digits and _, not starting with a digit)", name, "${"+full+"}")
 		}
 	case KindEnv:
 		if name == "" || strings.ContainsAny(name, "${=") {
-			return Ref{}, fmt.Errorf("invalid environment variable name %q in %q", name, "${"+body+"}")
+			return Ref{}, fmt.Errorf("invalid environment variable name %q in %q", name, "${"+full+"}")
 		}
 	case KindSecret:
 		store := ""
 		if s, n, ok := strings.Cut(name, "/"); ok {
 			store, name = s, n
 			if !varNamePattern.MatchString(store) {
-				return Ref{}, fmt.Errorf("invalid secret store %q in %q (letters, digits and _)", store, "${"+body+"}")
+				return Ref{}, fmt.Errorf("invalid secret store %q in %q (letters, digits and _)", store, "${"+full+"}")
 			}
 		}
 		if !secretNamePattern.MatchString(name) {
-			return Ref{}, fmt.Errorf("invalid secret name %q in %q (letters, digits, ., - and _)", name, "${"+body+"}")
+			return Ref{}, fmt.Errorf("invalid secret name %q in %q (letters, digits, ., - and _)", name, "${"+full+"}")
 		}
 		return Ref{Kind: kind, Store: store, Name: name, Offset: offset}, nil
 	default:
-		return Ref{}, fmt.Errorf("unknown reference type %q in %q (expected ${NAME}, ${env:NAME} or ${secret:NAME})", kind, "${"+body+"}")
+		return Ref{}, fmt.Errorf("unknown reference type %q in %q (expected ${NAME}, ${env:NAME} or ${secret:NAME})", kind, "${"+full+"}")
 	}
-	return Ref{Kind: kind, Name: name, Offset: offset}, nil
+	return Ref{Kind: kind, Name: name, Offset: offset, Default: def, HasDefault: hasDefault}, nil
 }
 
 // Layer is a named set of variables, e.g. the variables of the project or of an environment.
@@ -237,6 +255,9 @@ func (s *Scope) resolve(r Ref, chain []string, secrets bool) (string, error) {
 			lookup = os.LookupEnv
 		}
 		v, ok := lookup(r.Name)
+		if r.HasDefault && v == "" {
+			return r.Default, nil
+		}
 		if !ok {
 			return "", fmt.Errorf("environment variable %q is %w", r.Name, ErrUndefined)
 		}
@@ -256,10 +277,13 @@ func (s *Scope) resolve(r Ref, chain []string, secrets bool) (string, error) {
 		return "", fmt.Errorf("variable cycle: %s → %s", strings.Join(chain, " → "), r.Name)
 	}
 	v, _, ok := s.Lookup(r.Name)
-	if !ok {
+	if !ok && !r.HasDefault {
 		return "", fmt.Errorf("variable %q is %w", r.Name, ErrUndefined)
 	}
-	return s.expand(v, append(chain, r.Name), secrets)
+	if v, err := s.expand(v, append(chain, r.Name), secrets); err != nil || v != "" || !r.HasDefault {
+		return v, err
+	}
+	return r.Default, nil
 }
 
 // Names returns the names of all variables of all layers, sorted.

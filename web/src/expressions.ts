@@ -167,7 +167,8 @@ export function place(text: string, pos: number): { in: "var" | "expr" | "text";
   const e = before.lastIndexOf("{{");
   const v = before.lastIndexOf("${");
   if (e >= 0 && e > v && before.indexOf("}}", e) < 0) return { in: "expr", start: e + 2 };
-  if (v >= 0 && before.indexOf("}", v) < 0) return { in: "var", start: v + 2 };
+  // After ":-" the default of ${NAME:-text} is plain text (K1).
+  if (v >= 0 && before.indexOf("}", v) < 0 && !before.slice(v).includes(":-")) return { in: "var", start: v + 2 };
   return { in: "text", start: pos };
 }
 

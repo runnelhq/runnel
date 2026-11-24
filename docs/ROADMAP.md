@@ -261,6 +261,7 @@ Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-
 
 | Thema | Inhalt | Hinweis |
 |---|---|---|
+| ✅ Standardwerte in Variablen (K1) | `${NAME:-text}` und `${env:NAME:-text}`: der Text, wenn die Variable nicht gesetzt oder leer ist; keine Warnung „not defined“ für Verweise mit Standardwert (Prüfung, `/variables`, Editor); keine Standardwerte für Secrets; `examples/hello` läuft damit unter Linux | K2 (Variablen in Zeitangaben) bleibt zurückgestellt |
 | ✅ Kodierung beim Speichern erhalten (K13) | Der Editor speichert eine Datei in der Kodierung, in der sie geöffnet wurde (UTF-8 mit/ohne BOM, UTF-16 LE/BE, Windows-1252); Zeichen, die in Windows-1252 nicht darstellbar sind, werden vor dem Speichern gemeldet statt still ersetzt | betrifft seit E9/E10 alle bearbeitbaren Dateien |
 
 ### Weitere Bausteine

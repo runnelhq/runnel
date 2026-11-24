@@ -279,7 +279,7 @@ function Variables(props: {
   const [adding, setAdding] = useState<string | null>(null);
   const names = Object.keys(data.variables);
   // Used, but set neither here nor elsewhere for this level.
-  const missing = [...info.values()].filter((v) => !(v.name in data.variables) && (env ? missingIn(v, env) : !v.project && props.environments.every((e) => !v.environments[e]) && v.uses.some((u) => !u.parameter)));
+  const missing = [...info.values()].filter((v) => !(v.name in data.variables) && (env ? missingIn(v, env) : !v.project && props.environments.every((e) => !v.environments[e]) && v.uses.some((u) => !u.parameter && !u.default)));
   const inherited = env ? [...info.values()].filter((v) => v.project && !(v.name in data.variables)).map((v) => v.name) : [];
   const addName = adding?.trim() ?? "";
   const addProblem = addName === "" ? null : !namePattern.test(addName) ? "Use letters, digits, “_” and “-”, not starting with a digit" : addName in data.variables ? `${addName} is already set` : null;
