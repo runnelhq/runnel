@@ -43,6 +43,9 @@ type stream struct {
 	broken  chan struct{} // closed when the plugin did not keep to the protocol
 	once    sync.Once
 	reason  error
+	// fields are those of the last transform.emit, which apply to an emit without fields
+	// (ADR 0019); only notify uses them, in the order of the messages.
+	fields []record.FieldDef
 }
 
 // emitMsg is a transform.emit or (closed set) a transform.closed of the plugin.
@@ -114,6 +117,10 @@ func (pr *Process) notify(method string, params json.RawMessage) {
 		s.fail(fmt.Errorf("the plugin sent more than %d transform.emit without waiting for $/ack", EmitWindow))
 		return
 	}
+	if m.Fields == nil {
+		m.Fields = s.fields
+	}
+	s.fields = m.Fields
 	recs, err := decodeRows(m.Fields, m.Rows)
 	if err != nil {
 		s.fail(fmt.Errorf("transform.emit: %w", err))

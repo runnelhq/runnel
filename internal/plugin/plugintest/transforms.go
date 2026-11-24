@@ -15,7 +15,8 @@ import (
 //	demo.count  an input: "count" records with a value of every type
 //
 // Modes: "bad-to" emits to a target that is not in the configuration, "close-error"
-// closes every stream with an error.
+// closes every stream with an error, "same-fields" leaves out the fields of an emit when
+// they are those of the last emit.
 
 func transformDescriptors() []any {
 	return []any{
@@ -49,6 +50,7 @@ type pstream struct {
 	batches chan json.RawMessage // transform.batch and nil for transform.end; at most window
 	credits int                  // emits the host still takes
 	cond    *sync.Cond
+	sent    string // fields of the last emit, as JSON (mode same-fields)
 }
 
 type streams struct {
@@ -125,8 +127,16 @@ func (s *streams) emit(id int64, st *pstream, to string, fields []any, rows [][]
 		st.cond.Wait()
 	}
 	st.credits--
+	msg := map[string]any{"stream": id, "to": to, "fields": fields, "rows": rows}
+	if s.mode == "same-fields" {
+		header, _ := json.Marshal(fields)
+		if string(header) == st.sent {
+			delete(msg, "fields") // the fields of the last emit apply
+		}
+		st.sent = string(header)
+	}
 	s.mu.Unlock()
-	s.notify("transform.emit", map[string]any{"stream": id, "to": to, "fields": fields, "rows": rows})
+	s.notify("transform.emit", msg)
 }
 
 func (s *streams) run(id int64, st *pstream) {
