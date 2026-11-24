@@ -1346,7 +1346,8 @@ Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dat
 
 ## 13. Windows-Betrieb im Detail
 
-- **Installation**: (a) ZIP entpacken und starten (portabel), (b) MSI (WiX v4) mit Dienst-Registrierung und Startmenü-Eintrag, (c) `winget install runnel`.
+- **Installation**: ZIP entpacken und starten (portabel); als Dienst mit `runnel service install` (siehe unten). Ein
+  Installer (MSI, `winget`) ist für 1.0 nicht vorgesehen (Roadmap S48, Backlog).
 - **Dienst** (seit S41): `runnel service install D:\flows` registriert über den Service Control Manager einen Dienst,
   der das Projekt wie `runnel serve` bedient und seine Trigger ausführt. `runnel service start|stop|status|uninstall`
   steuern ihn; Installieren, Entfernen, Starten und Stoppen brauchen eine Konsole „als Administrator“.
@@ -1413,7 +1414,7 @@ runnel/
 ├─ examples/                # Beispielprojekte
 ├─ docs/                    # Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (docs/dev/)
 ├─ design/                  # Corporate Design: Logos, Design Tokens, Mockups
-│                           # geplant: pkg/sdk/ (Go-SDK für Plugins), build/ (WiX-Installer, Signierung)
+│                           # geplant: pkg/sdk/ (Go-SDK für Plugins), build/ (Signierung)
 ```
 
 **Build**: `make build` → `web` wird mit Vite gebaut, nach `internal/webui/dist` geschrieben, per `go:embed` eingebettet,
