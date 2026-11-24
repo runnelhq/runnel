@@ -391,7 +391,7 @@ func TestSchemas(t *testing.T) {
 	_, s := newProject(t)
 	expect(t, do(t, s, "GET", "/api/v1/schemas/trigger", ""), http.StatusOK, `"schedule"`)
 	expect(t, do(t, s, "GET", "/api/v1/schemas/environment", ""), http.StatusOK, `"variables"`)
-	expect(t, do(t, s, "GET", "/api/v1/schemas/workflow-x", ""), http.StatusNotFound, `no schema for \"workflow-x\" (kinds: connection, environment, project, trigger)`)
+	expect(t, do(t, s, "GET", "/api/v1/schemas/workflow-x", ""), http.StatusNotFound, `no schema for \"workflow-x\" (kinds: connection, environment, plugin, project, trigger)`)
 	expect(t, do(t, s, "GET", "/api/v1/schemas/project", "", "Origin", "http://evil.example"), http.StatusForbidden, "other origins")
 }
 

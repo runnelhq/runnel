@@ -10,6 +10,7 @@ var fileFormats = map[string]any{
 	"environment": Environment{},
 	"trigger":     Trigger{},
 	"connection":  Connection{},
+	"plugin":      Plugin{},
 }
 
 // FileFormat returns the struct of a file kind (project, environment, trigger, connection) for its
