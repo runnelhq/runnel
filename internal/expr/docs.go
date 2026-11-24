@@ -75,6 +75,7 @@ var Functions = []Doc{
 	{Group: "Text", Name: "lower", Signature: "lower(text)", Type: "string", Description: "Text in small letters", Example: "{{ lower('ABC') }}"},
 	{Group: "Text", Name: "trim", Signature: "trim(text)", Type: "string", Description: "Removes spaces at the start and end", Example: "{{ trim(' a ') }}"},
 	{Group: "Text", Name: "replace", Signature: "replace(text, old, new)", Type: "string", Description: "Replaces all occurrences", Example: "{{ replace('a-b', '-', '_') }}"},
+	{Group: "Text", Name: "replaceRegex", Signature: "replaceRegex(text, pattern, new)", Type: "string", Description: "Replaces every match of a regular expression (write patterns with \\ in backticks, e.g. `\\d+`); new may use groups as $1 or ${name}, $$ for a $", Example: "{{ replaceRegex('0221 / 123-45', '[^0-9]', '') }}"},
 	{Group: "Text", Name: "split", Signature: "split(text, separator)", Type: "list", Description: "Splits text into a list", Example: "{{ split('a;b', ';') }}"},
 	{Group: "Text", Name: "padLeft", Signature: "padLeft(text, length, fill)", Type: "string", Description: "Fills on the left up to a length, e.g. 007; fill defaults to a space", Example: "{{ padLeft('7', 3, '0') }}"},
 	{Group: "Text", Name: "padRight", Signature: "padRight(text, length, fill)", Type: "string", Description: "Fills on the right up to a length", Example: "{{ padRight('ab', 4) }}"},

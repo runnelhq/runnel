@@ -89,6 +89,7 @@ var functions = []exprlang.Option{
 		new(func(string) string)),
 
 	exprlang.Function("concat", concat, new(func(string, ...any) string)),
+	exprlang.Function("replaceRegex", replaceRegex, new(func(string, string, string) string)),
 
 	// Paths (S64): / and \ both separate, as on Windows; nothing touches the disk.
 	exprlang.Function("basename", func(p ...any) (any, error) { return baseName(toString(p[0])), nil }, new(func(string) string)),

@@ -56,7 +56,7 @@ Zusätzlich zu den eingebauten Operatoren und Funktionen von `expr` (`upper`, `l
 | Bereich | Funktionen |
 |---|---|
 | Datum/Zeit | `now()`, `today()`, `addDays(d, n)`, `addHours(d, n)`, `addMonths(d, n)`, `formatDate(d, "yyyy-MM-dd")`, `parseDate(s, "dd.MM.yyyy")`, `dayOfWeek(d)`, `diffDays(a, b)` |
-| Text | `padLeft(s, n, "0")`, `padRight`, `substr(s, start, len)`, `left`, `right`, `normalize` (Umlaute/Leerzeichen), `concat(trenner, a, b, …)` (seit S16e) |
+| Text | `padLeft(s, n, "0")`, `padRight`, `substr(s, start, len)`, `left`, `right`, `normalize` (Umlaute/Leerzeichen), `concat(trenner, a, b, …)` (seit S16e), `replaceRegex(s, muster, neu)` (seit S69) |
 | Zahlen | `round(x, stellen)`, `decimal(s)`, `formatNumber(x, "#.##0,00")`, `parseNumber(s, "de-DE")` |
 | Null/Leer | `coalesce(a, b, …)`, `isEmpty(x)` |
 | Sonstiges | `uuid()`, `sha256(s)`, `md5(s)`, `basename(p)`, `dirname(p)`, `ext(p)` (die drei Pfadfunktionen seit S64) |
@@ -177,6 +177,14 @@ when:      "{{ result.rows > 0 }}"
   Ausdrücke, auch ohne `{{ }}`. Weil ein Wert wie `record.price * 2` bisher berechnet wurde, warnt die Prüfung, wenn ein
   fester Text ein gültiger Ausdruck wäre, der Werte liest oder eine Funktion aufruft („… is a fixed text; write
   {{ record.price * 2 }} to calculate it“).
+- **Nachtrag 2026-11-24 (S69):** `replaceRegex(text, muster, neu)` ersetzt jeden Treffer eines regulären Ausdrucks;
+  `replace` bleibt für festen Text. Syntax ist RE2 aus der Go-Standardbibliothek: lineare Laufzeit ohne
+  katastrophales Backtracking, deshalb auch für Muster aus Daten oder Parametern sicher; Lookahead/Lookbehind und
+  Rückverweise gibt es nicht (die Fehlermeldung nennt das). Im Ersatztext stehen Gruppen als `$1` oder `${name}`, `$$`
+  für ein `$`; `$1x` ist die Gruppe „1x“, daher `${1}x`. Groß- und Kleinschreibung mit `(?i)` im Muster. Übersetzte
+  Muster werden zwischengespeichert (höchstens 256), ein Muster hat höchstens 4.096 Zeichen. Muster mit `\` stehen in
+  Backticks (`` `\d{2}` ``), denn in `'…'` und `"…"` ist `\d` eine ungültige Escape-Sequenz des Textes; in YAML steht der
+  ganze Wert dann in einfachen Anführungszeichen, weil doppelte Anführungszeichen in YAML `\` selbst auswerten.
 
 ## Konsequenzen
 
