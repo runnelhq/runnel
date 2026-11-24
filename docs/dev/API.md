@@ -50,8 +50,8 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | POST | `/pipelines/fields` | Felder eines Eingabe-Transforms ermitteln (S46), siehe unten |
 | POST | `/preview` | Datenvorschau einer Pipeline bis zu einem Transform (S44), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
-| GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst |
-| GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log` |
+| GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst: laufende und kürzlich beendete aus dem Speicher, dazu die neuesten aus der Run-Historie (seit S26a, zusammen höchstens 200) |
+| GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log`, auch aus der Run-Historie; `500`, wenn sie nicht lesbar ist (Details im Server-Log) |
 | POST | `/runs/{id}/cancel` | Lauf abbrechen: `202`; bereits beendet `409` |
 | GET | `/events` | Live-Ereignisse (Server-Sent Events), siehe unten |
 | GET | `/triggers` | Trigger des Projekts (S37, S38): `{"triggers": [{name, file, type, target, schedule, timezone, enabled, next, last} …], "problems": [Problem …]}`. `schedule` ist der Cron-Ausdruck, `every 15m` (`interval`), `new *.csv in inbox` (`file`) oder `POST /hooks/import` (`http`, seit S38a); `http` ist die Adresse des Listeners der HTTP-Trigger, sobald er offen ist; `timezone` nur bei `cron`. `next` ist der nächste Zeitpunkt, bei `file` die nächste Abfrage des Ordners (fehlt bei deaktivierten Triggern), `last` das Ergebnis des letzten fälligen Zeitpunkts seit dem Start des Servers (`{time, runId}`, `{time, skipped: true}` bei `overlap: skip` oder `{time, error}`, bei `file` zusätzlich `files` mit den absoluten Pfaden; ein nicht lesbarer Ordner steht als `error`); `problems` sind Fehler in Trigger-Dateien (Format wie `/validate`), solche Trigger sind nicht aktiv |

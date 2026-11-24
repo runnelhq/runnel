@@ -41,7 +41,7 @@ func TestHistory(t *testing.T) {
 	}
 	gone := func(id string) bool {
 		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
-			if _, ok := m.Get(id); !ok {
+			if _, ok := get(m, id); !ok {
 				return true
 			}
 		}
@@ -59,7 +59,7 @@ func TestHistory(t *testing.T) {
 		t.Fatalf("errors: %+v", d.Run)
 	}
 	time.Sleep(20 * time.Millisecond)
-	if _, ok := m.Get(id); !ok {
+	if _, ok := get(m, id); !ok {
 		t.Error("errors: a failed run is dropped")
 	}
 	if _, ok := m.Wait(context.Background(), "none"); ok {
@@ -89,11 +89,11 @@ func TestHTTPRunLimit(t *testing.T) {
 	m.mu.Lock()
 	m.prune()
 	m.mu.Unlock()
-	if _, ok := m.Get(first.ID); !ok {
+	if _, ok := get(m, first.ID); !ok {
 		t.Error("the run started by hand was pushed out")
 	}
 	http := 0
-	for _, r := range m.Runs() {
+	for _, r := range list(m) {
 		if strings.HasPrefix(r.Trigger, "http:") {
 			http++
 		}

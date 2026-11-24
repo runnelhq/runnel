@@ -12,7 +12,8 @@ const dir = mkdtempSync(join(tmpdir(), "runnel-e2e-"));
 cpSync(join(repo, "examples", "hello"), dir, { recursive: true });
 
 const binary = join(repo, "bin", process.platform === "win32" ? "runnel.exe" : "runnel");
-const server = spawn(binary, ["serve", dir, "--port", port], { stdio: "inherit" });
+// The run history (ADR 0026) goes to a folder of the copy that the explorer hides.
+const server = spawn(binary, ["serve", dir, "--port", port, "--history-dir", join(dir, ".history")], { stdio: "inherit" });
 const stop = () => server.kill("SIGINT");
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);

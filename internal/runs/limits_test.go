@@ -74,7 +74,7 @@ func TestDrain(t *testing.T) {
 	if err := m.Drain(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if d, _ := m.Get(run.ID); d.Status != "succeeded" {
+	if d, _ := get(m, run.ID); d.Status != "succeeded" {
 		t.Errorf("drained run: %s", d.Status)
 	}
 	if _, _, err := m.Start("workflows/a.workflow.yaml", short); !errors.Is(err, ErrShutdown) {

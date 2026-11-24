@@ -38,7 +38,7 @@ func waitFor(t *testing.T, m *Manager, id string, cond func(Detail) bool) Detail
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		d, ok := m.Get(id)
+		d, ok := get(m, id)
 		if ok && cond(d) {
 			return d
 		}
@@ -90,7 +90,7 @@ func TestStartAndRecord(t *testing.T) {
 			t.Errorf("event %d: %+v", i, ev)
 		}
 	}
-	if runs := m.Runs(); len(runs) != 1 || runs[0].ID != run.ID {
+	if runs := list(m); len(runs) != 1 || runs[0].ID != run.ID {
 		t.Errorf("runs %+v", runs)
 	}
 }
@@ -104,7 +104,7 @@ func TestStartFails(t *testing.T) {
 	if !errors.As(err, &diags) || !diags.HasErrors() {
 		t.Errorf("invalid workflow: %v", err)
 	}
-	if len(m.Runs()) != 0 || m.LastSeq() != 0 {
+	if len(list(m)) != 0 || m.LastSeq() != 0 {
 		t.Error("failed start left a run or events")
 	}
 }
@@ -147,7 +147,7 @@ func TestShutdown(t *testing.T) {
 	if err := m.Shutdown(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if d, _ := m.Get(run.ID); d.Status != workflow.Cancelled {
+	if d, _ := get(m, run.ID); d.Status != workflow.Cancelled {
 		t.Errorf("status after shutdown %s", d.Status)
 	}
 	if _, _, err := m.Start("x", s); !errors.Is(err, ErrShutdown) {
@@ -170,10 +170,10 @@ func TestPruneAndEventWindow(t *testing.T) {
 		}
 		waitFor(t, m, run.ID, finished)
 	}
-	if n := len(m.Runs()); n != MaxRuns {
+	if n := len(list(m)); n != MaxRuns {
 		t.Errorf("%d runs kept, want %d", n, MaxRuns)
 	}
-	if _, ok := m.Get(first); ok {
+	if _, ok := get(m, first); ok {
 		t.Error("oldest run was not dropped")
 	}
 
@@ -223,4 +223,21 @@ func TestPrepareErrors(t *testing.T) {
 	if _, err := Prepare(s); err == nil || !strings.Contains(err.Error(), "no project (project.yaml) found") {
 		t.Errorf("environment without project: %v", err)
 	}
+}
+
+// get and list read runs like the API, failing on errors of the history.
+func get(m *Manager, id string) (Detail, bool) {
+	d, ok, err := m.Get(context.Background(), id)
+	if err != nil {
+		panic(err)
+	}
+	return d, ok
+}
+
+func list(m *Manager) []Run {
+	r, err := m.Runs(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	return r
 }

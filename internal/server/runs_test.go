@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -463,7 +464,7 @@ links:
 		t.Fatal("no run")
 	}
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-		if _, ok := s.runs.Get(last.RunID); !ok {
+		if _, ok, _ := s.runs.Get(context.Background(), last.RunID); !ok {
 			break
 		}
 		if time.Now().After(deadline) {

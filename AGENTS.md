@@ -56,6 +56,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/httpx/` | gemeinsame HTTP-Helfer von Server und Trigger-Listener (`IsLoopback`, JSON-Antworten) |
 | `internal/tlscert/` | Zertifikate des Trigger-Listeners: selbst erzeugt und wiederverwendet, eigene PEM-Dateien mit Neuladen |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Parameter prüfen, Prüfung für `validate` und Editor (`validate.go`), Texte der Lauf-Ereignisse (`describe.go`), Zwischenspeicher geprüfter Dateien, Läufe und Ereignisse im Speicher |
+| `internal/history/` | Run-Historie (ADR 0026): SQLite-Datei je Projekt im Datenordner, Migrationen, Läufe, Status je Knoten, Log, Lebenszeichen und abgebrochene Läufe; geschrieben vom Manager in `internal/runs/record.go` |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
 | `internal/version/` | Versionsinformationen (`runnel version`, `/api/v1/version`) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |

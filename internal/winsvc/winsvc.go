@@ -51,6 +51,11 @@ type Config struct {
 	// TLSDir is the folder of the self-signed certificate (--triggers-tls auto); it is
 	// created for the account, Administrators and SYSTEM only. Empty: not needed.
 	TLSDir string
+	// HistoryDir is the folder of the run histories (ADR 0026). It is created for the
+	// account, Administrators and SYSTEM only, or, with HistoryShared (an own folder,
+	// e.g. shared with runnel serve of a user), made writable for the account.
+	HistoryDir    string
+	HistoryShared bool
 }
 
 // Info describes an installed service.

@@ -224,7 +224,8 @@ C:\Runnel\runnel.exe service start
 - **Während des Wechsels:** Zeitpunkte von Cron- und Interval-Triggern entfallen (Nachholen steht im Backlog); neue
   Dateien in überwachten Ordnern verarbeitet der Dienst nach dem Start (`existing: process`); Aufrufe von HTTP-Triggern
   scheitern, bis er wieder läuft.
-- **Läufe:** Die Liste der Läufe liegt nur im Speicher und beginnt nach dem Neustart leer (Run-Historie: S26).
+- **Läufe:** Beendete Läufe bleiben in der Run-Historie (`%ProgramData%\runnel\history`, seit S26a) und sind nach dem
+  Neustart weiter sichtbar; Läufe, die beim Stopp abgebrochen wurden, stehen dort als `cancelled`.
 - **Mehrere Dienste** (`--name`), die dieselbe `runnel.exe` starten, vorher alle stoppen – Windows sperrt die Datei,
   solange einer läuft.
 - **Ohne Dienst:** `runnel serve` mit Strg+C beenden, die Datei ersetzen, neu starten.

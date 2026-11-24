@@ -7,7 +7,9 @@ const port = 7399;
 const editPort = 7398;
 /** Port of the server on examples/pipelines (documents, E17). */
 const docsPort = 7397;
-const binary = process.platform === "win32" ? "..\\bin\\runnel.exe" : "../bin/runnel";
+
+/** Stop the servers with SIGTERM, so that e2e/serve.mjs and e2e/serve-copy.mjs remove their temporary folders. */
+const gracefulShutdown = { signal: "SIGTERM" as const, timeout: 5_000 };
 
 export default defineConfig({
   testDir: "./e2e",
@@ -24,18 +26,21 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
   webServer: [
     {
-      command: `${binary} serve ../examples/hello --port ${port}`,
+      // e2e/serve.mjs keeps the run history in a temporary folder (ADR 0026).
+      command: `node e2e/serve.mjs ../examples/hello --port ${port}`,
       url: `http://127.0.0.1:${port}/api/v1/version`,
       reuseExistingServer: false,
       timeout: 30_000,
+      gracefulShutdown,
     },
     {
       // examples/pipelines with its README.md, which opens at the start (e2e/markdown.spec.ts);
       // only read, and on a server of its own so that other tests start without it.
-      command: `${binary} serve ../examples/pipelines --port ${docsPort} --triggers=`,
+      command: `node e2e/serve.mjs ../examples/pipelines --port ${docsPort} --triggers=`,
       url: `http://127.0.0.1:${docsPort}/api/v1/version`,
       reuseExistingServer: false,
       timeout: 30_000,
+      gracefulShutdown,
     },
     {
       // A copy of the example project for tests that save files (e2e/edit.spec.ts).
@@ -43,6 +48,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${editPort}/api/v1/version`,
       reuseExistingServer: false,
       timeout: 30_000,
+      gracefulShutdown,
     },
   ],
 });
