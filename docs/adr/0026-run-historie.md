@@ -86,7 +86,9 @@ Betrachtete Varianten:
 
 - `GET /runs` und `GET /runs/{id}` behalten ihre Antworten. Sie lesen laufende Läufe aus dem Speicher und alle
   anderen aus der Historie. Neu sind Filter und Seiten (`status`, `path`, `trigger`, `before`, `limit`).
-- `runnel run` schreibt in die Historie, mit Trigger `cli`; `--no-history` schaltet das für einen Aufruf ab.
+- `runnel run` schreibt in die Historie, mit Trigger `cli`. Welche beendeten Läufe bleiben, regelt
+  `settings.history.cli` im Projekt (Abschnitt 6); `--history all|errors|none` setzt es für einen Aufruf. Vorrang: Schalter,
+  dann Projekt, dann Standard `all`.
 - `runnel runs` listet Läufe (Filter wie die API) und zeigt einen Lauf mit Knoten und Log (`runnel runs <id>`), auch
   als JSON (`--json`). Damit braucht niemand ein SQLite-Werkzeug.
 
@@ -95,6 +97,7 @@ Betrachtete Varianten:
 - In `project.yaml` unter `settings.history`:
   - `keepDays`: Standard 30
   - `maxRuns`: Standard 10.000 je Projekt
+  - `cli`: welche Läufe von `runnel run` bleiben, `all | errors | none` wie `history:` an den Triggern; Standard `all`
   - Ältere bzw. überzählige Läufe werden mit Knoten und Log gelöscht.
 - Bereinigt wird beim Öffnen, danach im Server stündlich und nach einem `runnel run`, in kleinen Schritten, damit kein
   Lauf wartet. `auto_vacuum = INCREMENTAL` gibt den Platz frei.
@@ -113,7 +116,7 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
 | Schritt | Inhalt |
 |---|---|
 | S26a | Paket `internal/history` (Öffnen, Migrationen, Schreiben, Lesen), Manager schreibt mit, `GET /runs` und `GET /runs/{id}` lesen aus der Historie, Lebenszeichen und abgebrochene Läufe, `--history-dir` |
-| S26b | `runnel run` schreibt mit (`--no-history`), `runnel runs`, Filter und Seiten in `GET /runs` |
+| S26b | `runnel run` schreibt mit (`settings.history.cli`, `--history`), `runnel runs`, Filter und Seiten in `GET /runs` |
 | S26c | Aufbewahrung (`settings.history`), `history:` für alle Trigger-Arten |
 | S26d | Mockup: Liste der Läufe im Editor (Filter, alter Lauf auf dem Canvas mit Status und Log) |
 | S26e | Umsetzung nach freigegebenem Mockup |
