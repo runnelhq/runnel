@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { categoryColor } from "../catalog";
 import { useForm, useFormChange, type FieldChange, type SettingsData } from "../forms";
 import { missingIn, useVariables, type VariableInfo } from "../reference";
@@ -181,8 +181,62 @@ export function SettingsForm(props: {
             </Field>
           </Section>
         )}
+
+        {!env && <HistorySection data={data} problems={props.problems} onChange={change} onError={onError} />}
       </div>
     </div>
+  );
+}
+
+/**
+ * settings.history of project.yaml (S26b, S26c) in the form (S26e1): which runs of runnel run
+ * are kept and how long ended runs stay. The three fields are written together as a mapping;
+ * all empty removes it.
+ */
+type HistoryValues = { cli?: string; keepDays?: number; maxRuns?: number };
+
+function HistorySection(props: { data: SettingsData; problems: Problem[]; onChange: (c: FieldChange) => Promise<void>; onError: (message: string) => void }) {
+  // Open when project.yaml sets something.
+  const [open, setOpen] = useState(() => props.data.settings?.history !== undefined);
+  const h = (props.data.settings?.history ?? {}) as HistoryValues;
+  // The values with the changes not yet answered by the server: a change right after
+  // another one keeps the first.
+  const latest = useRef(h);
+  useEffect(() => {
+    latest.current = h;
+  }, [props.data]); // h comes from props.data
+  const at = (p: string) => props.problems.filter((x) => x.path === p || !!x.path?.startsWith(p + "."));
+  const set = (key: keyof HistoryValues, value: string | number | undefined) => {
+    const next = { ...latest.current, [key]: value };
+    latest.current = next;
+    const map = (["cli", "keepDays", "maxRuns"] as const).filter((k) => next[k] !== undefined && next[k] !== "").map((k) => ({ key: k, value: next[k]! }));
+    void props.onChange(map.length > 0 ? { field: "settings.history", map } : { field: "settings.history", value: null });
+  };
+  const number = (key: "keepDays" | "maxRuns", label: string, max: number) => (v: string) => {
+    const n = Number(v.trim());
+    if (v.trim() === "") set(key, undefined);
+    else if (Number.isInteger(n) && n >= 1 && n <= max) set(key, n);
+    else props.onError(`${label}: enter a whole number from 1 to ${max.toLocaleString("en-US")}`);
+  };
+  return (
+    <Section title="Run history" folded={!open} onToggle={() => setOpen((o) => !o)} summary="settings.history">
+      <Field label="Runs of runnel run" fieldKey="settings.history.cli" problems={at("$.settings.history.cli")} help="Which runs started on the command line are kept; --history overrides it">
+        {(f) => (
+          <select id={f.id} value={h.cli ?? ""} onChange={(e) => set("cli", e.target.value || undefined)} className={inputClass(f.invalid) + " cursor-pointer"}>
+            <option value="">Not set (all)</option>
+            <option value="all">all – every run</option>
+            <option value="errors">errors – only failed runs</option>
+            <option value="none">none – no runs</option>
+          </select>
+        )}
+      </Field>
+      <Field label="Keep for days" fieldKey="settings.history.keepDays" problems={at("$.settings.history.keepDays")} help="Ended runs older than this are removed; empty: 30">
+        {(f) => <TextInput {...f} mono value={h.keepDays === undefined ? "" : String(h.keepDays)} placeholder="30" onCommit={number("keepDays", "Keep for days", 3650)} />}
+      </Field>
+      <Field label="Most runs" fieldKey="settings.history.maxRuns" problems={at("$.settings.history.maxRuns")} help="Only the newest ended runs are kept; empty: 10,000">
+        {(f) => <TextInput {...f} mono value={h.maxRuns === undefined ? "" : String(h.maxRuns)} placeholder="10000" onCommit={number("maxRuns", "Most runs", 1_000_000)} />}
+      </Field>
+    </Section>
   );
 }
 

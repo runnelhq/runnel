@@ -26,7 +26,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | Methode | Pfad | Ergebnis |
 |---|---|---|
 | GET | `/version` | `{"version", "commit", "date", "goVersion", "os", "arch"}` wie `runnel version --json` |
-| GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello", "environments": ["dev", "prod"], "defaultEnvironment": "dev"}` |
+| GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello", "environments": ["dev", "prod"], "defaultEnvironment": "dev", "history": {"keepDays": 30, "maxRuns": 10000}}`; `history` ist die Aufbewahrung der Run-Historie mit den Standardwerten (seit S26e1) |
 | GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `trigger` (seit E10), `document` (`*.md`), `image` (`*.png`, `*.jpg`, `*.jpeg`, `*.gif`, `*.webp`; beide seit E17), `other`; versteckte Einträge und symbolische Links fehlen |
 | GET | `/files/{path}` | Inhalt der Datei, Header `ETag`; Bilder (siehe `kind: image`) mit ihrem Typ (`image/png` …), damit Dokumente sie zeigen können. Dateien des Projekts sind Daten, keine Seiten des Editors: `X-Content-Type-Options: nosniff` und `Content-Security-Policy: default-src 'none'; …; sandbox` (seit E17), direkt im Browser geöffnet führt etwa eine SVG- oder HTML-Datei keine Skripte aus; SVG gilt deshalb nicht als Bild |
 | PUT | `/files/{path}` | Datei speichern (Body = Inhalt, max. 10 MiB); Antwort `{path, etag}` und Header `ETag` |
@@ -50,7 +50,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | POST | `/pipelines/fields` | Felder eines Eingabe-Transforms ermitteln (S46), siehe unten |
 | POST | `/preview` | Datenvorschau einer Pipeline bis zu einem Transform (S44), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
-| GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst: laufende und kürzlich beendete aus dem Speicher, dazu die aus der Run-Historie (seit S26a). Filter (S26b): `status`, `path` (Datei im Projekt), `trigger` (z. B. `cron:nightly`, `cli` für `runnel run`), `before` (Lauf-ID: ältere Läufe, nächste Seite), `limit` (Standard 200, höchstens 1.000; sonst `400`) |
+| GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst: laufende und kürzlich beendete aus dem Speicher, dazu die aus der Run-Historie (seit S26a). Filter (S26b): `status`, `path` (Datei im Projekt), `trigger` (z. B. `cron:nightly`, `cli` für `runnel run`, `editor` für Läufe ohne Trigger – aus dem Editor oder mit `POST /runs`, seit S26e1), `before` (Lauf-ID: ältere Läufe, nächste Seite), `limit` (Standard 200, höchstens 1.000; sonst `400`) |
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log`, auch aus der Run-Historie; `500`, wenn sie nicht lesbar ist (Details im Server-Log) |
 | POST | `/runs/{id}/cancel` | Lauf abbrechen: `202`; bereits beendet `409` |
 | GET | `/events` | Live-Ereignisse (Server-Sent Events), siehe unten |

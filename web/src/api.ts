@@ -9,6 +9,8 @@ export interface ProjectInfo {
   /** Names of the environments, sorted. */
   environments?: string[];
   defaultEnvironment?: string;
+  /** How long ended runs are kept (S26c), with the defaults. */
+  history?: { keepDays: number; maxRuns: number };
 }
 
 export interface VersionInfo {
@@ -39,9 +41,11 @@ export type Connection = "connecting" | "connected" | "disconnected";
  * The browser reconnects by itself; the state shows whether the server is reachable.
  * epoch increases on every (re)connect, so that data can be reloaded.
  */
-export function useConnection(): { state: Connection; epoch: number } {
+export function useConnection(): { state: Connection; epoch: number; runsTick: number } {
   const [state, setState] = useState<Connection>("connecting");
   const [epoch, setEpoch] = useState(0);
+  // runsTick changes when runs start or end (the list of runs, S26e1), at most every half second.
+  const [runsTick, setRunsTick] = useState(0);
   useEffect(() => {
     const es = new EventSource(apiBase + "/events");
     es.onopen = () => {
@@ -49,7 +53,18 @@ export function useConnection(): { state: Connection; epoch: number } {
       setEpoch((e) => e + 1);
     };
     es.onerror = () => setState("disconnected");
-    return () => es.close();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      timer ??= setTimeout(() => {
+        timer = undefined;
+        setRunsTick((t) => t + 1);
+      }, 500);
+    };
+    for (const kind of ["run.started", "run.finished", "reset"]) es.addEventListener(kind, tick);
+    return () => {
+      es.close();
+      clearTimeout(timer);
+    };
   }, []);
-  return { state, epoch };
+  return { state, epoch, runsTick };
 }

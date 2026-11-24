@@ -59,7 +59,7 @@ func newRunsCommand() *cobra.Command {
 	f := cmd.Flags()
 	f.StringVar(&o.filter.Status, "status", "", "only runs with this status: running, succeeded, failed or cancelled")
 	f.StringVar(&o.filter.Path, "path", "", "only runs of this file, relative to the project (e.g. workflows/import.workflow.yaml)")
-	f.StringVar(&o.filter.Trigger, "trigger", "", "only runs started by this trigger, e.g. cron:nightly, http:orders or cli")
+	f.StringVar(&o.filter.Trigger, "trigger", "", "only runs started by this trigger, e.g. cron:nightly, http:orders, cli or editor")
 	f.StringVar(&o.filter.Before, "before", "", "only runs started before the run with this id (the next page)")
 	f.IntVar(&o.filter.Limit, "limit", 20, "most runs listed")
 	f.BoolVar(&o.json, "json", false, "print the runs as JSON, as the API (GET /api/v1/runs) returns them")

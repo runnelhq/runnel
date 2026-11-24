@@ -11,7 +11,7 @@ export interface Entry {
 }
 
 /** Kinds of files; documents (.md) and images since E17. */
-export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "connection" | "document" | "image" | "other";
+export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "connection" | "document" | "image" | "runs" | "other";
 
 /** Error of the file API with its HTTP status (404: file not found). */
 export class APIError extends Error {
@@ -141,6 +141,7 @@ function concat(head: number[], body: Uint8Array): Uint8Array<ArrayBuffer> {
 
 /** Kind of a file by its path, as the server classifies it. */
 export function kindOf(path: string): FileKind {
+  if (path === ":runs") return "runs"; // the tab with the list of runs (S26e1)
   if (path.endsWith(".workflow.yaml")) return "workflow";
   if (path.endsWith(".pipeline.yaml")) return "pipeline";
   if (path === "project.yaml") return "project";
@@ -163,8 +164,12 @@ export const kindLabel: Record<FileKind, string> = {
   connection: "Connection",
   document: "Document",
   image: "Image",
+  runs: "Runs",
   other: "File",
 };
+
+/** The name of a tab: the file name, "Runs" for the list of runs (S26e1). */
+export const tabName = (path: string) => (path === ":runs" ? "Runs" : path.slice(path.lastIndexOf("/") + 1));
 
 /** Images a document can show (as the server serves them, E17). */
 export const isImage = (path: string) => /\.(png|jpe?g|gif|webp)$/i.test(path);

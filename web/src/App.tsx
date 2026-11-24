@@ -6,6 +6,7 @@ import { Dialog } from "./components/Dialog";
 import { ErrorBoundary, FileError, PanelError } from "./components/ErrorBoundary";
 import { FileView, type FileHandle } from "./components/FileView";
 import { Header } from "./components/Header";
+import { RunsView } from "./components/RunsView";
 import { Palette, type PaletteTarget } from "./components/Palette";
 import { ReferencePanel, type ReferenceAction, type ReferenceTarget } from "./components/ReferencePanel";
 import { missingIn, useVariables } from "./reference";
@@ -14,13 +15,18 @@ import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
 import { fetchTree, fullPath, movedPath, type Entry } from "./files";
 import type { RunView } from "./run";
+import { runsTab, useRunningCount } from "./runs";
+import { useTriggers } from "./forms";
 import { useTheme } from "./theme";
 
 // Editor shell after the approved mockups E4–E6b (design/mockups/): header, explorer and
 // palette, tabs with file views (workflows editable on the canvas), status bar.
 export function App() {
   const [theme, setTheme] = useTheme();
-  const { state, epoch } = useConnection();
+  const { state, epoch, runsTick } = useConnection();
+  // The list of runs (S26e1) follows runs that start and end; after a reconnect it loads again.
+  const runsKey = epoch * 1_000_000 + runsTick;
+  const running = useRunningCount(runsKey);
   const [project, setProject] = useState<ProjectInfo | null>(null);
   const [version, setVersion] = useState<string | null>(null);
   const [tree, setTree] = useState<Entry | null>(null);
@@ -39,6 +45,7 @@ export function App() {
   const [varsKey, setVarsKey] = useState(0);
   const variables = useVariables(varsKey);
   const [run, setRun] = useState<RunView | null>(null);
+  const triggers = useTriggers(`${epoch}:${varsKey}`);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   // Files with unsaved changes waiting for "Save changes?", one after the other (E21).
   const [closingQueue, setClosingQueue] = useState<string[]>([]);
@@ -128,7 +135,8 @@ export function App() {
     return { count: missing.length, text };
   };
   // Without an open file the palette stays, with the hint to open a workflow or pipeline.
-  const sidePanel = !active || paletteTarget ? "palette" : reference ? "reference" : null;
+  const onRuns = active === runsTab;
+  const sidePanel = !active || onRuns || paletteTarget ? "palette" : reference ? "reference" : null;
   // The files of the project, for the links of documents (E17).
   const files = useMemo(() => {
     const out = new Set<string>();
@@ -139,6 +147,7 @@ export function App() {
     if (tree) walk(tree);
     return out;
   }, [tree]);
+  const runFiles = useMemo(() => [...files].filter((p) => p.endsWith(".workflow.yaml") || p.endsWith(".pipeline.yaml")).sort(), [files]);
   // Without an open file, the editor starts with the README.md of the project (E17).
   const started = useRef(false);
   useEffect(() => {
@@ -172,7 +181,7 @@ export function App() {
 
   return (
     <div className="grid h-full grid-rows-[48px_1fr_24px]">
-      <Header project={project} theme={theme} onTheme={setTheme} />
+      <Header project={project} theme={theme} onTheme={setTheme} running={running} runsOpen={onRuns} onRuns={() => open(runsTab)} />
       <div className="grid min-h-0 grid-cols-[280px_1fr]">
         <aside ref={sidebar} className="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
           <div
@@ -184,7 +193,7 @@ export function App() {
             <Explorer
               tree={tree}
               error={treeError}
-              selected={active}
+              selected={onRuns ? null : active}
               onOpen={open}
               onReload={loadTree}
               reveal={reveal}
@@ -212,7 +221,7 @@ export function App() {
           {sidePanel && <Splitter container={sidebar} explorer={explorer} height={explorerHeight} onHeight={setExplorerHeight} />}
           {sidePanel && (
             <ErrorBoundary key={sidePanel} fallback={(error, retry) => <PanelError error={error} onRetry={retry} />}>
-              {sidePanel === "palette" && <Palette target={active ? paletteTarget : null} />}
+              {sidePanel === "palette" && <Palette target={active && !onRuns ? paletteTarget : null} />}
               {sidePanel === "reference" && reference && <ReferencePanel target={reference} variables={variables} onAction={onReferenceAction} />}
             </ErrorBoundary>
           )}
@@ -241,7 +250,23 @@ export function App() {
                 onCopyPath={(path) => void navigator.clipboard?.writeText(project?.dir ? fullPath(project.dir, path) : path)}
                 onReveal={(path) => setReveal((r) => ({ path, seq: (r?.seq ?? 0) + 1 }))}
               />
-              {tabs.map((path) => (
+              {tabs.includes(runsTab) && (
+                <div className={onRuns ? "flex min-h-0 flex-1" : "hidden"}>
+                  <ErrorBoundary fallback={(error, retry) => <PanelError error={error} onRetry={retry} />}>
+                    <RunsView
+                      active={onRuns}
+                      tick={runsKey}
+                      files={runFiles}
+                      triggers={triggers?.triggers ?? []}
+                      keepDays={project?.history?.keepDays}
+                      maxRuns={project?.history?.maxRuns}
+                      onOpenFile={open}
+                      onSummary={setSummary}
+                    />
+                  </ErrorBoundary>
+                </div>
+              )}
+              {tabs.filter((path) => path !== runsTab).map((path) => (
                 // An error in a file stays in its tab; the message shows while the tab is active.
                 <ErrorBoundary
                   key={`${path}#${reloads[path] ?? 0}`}
@@ -284,7 +309,7 @@ export function App() {
         version={version}
         summary={active ? summary : null}
         dirty={active !== null && dirty.has(active)}
-        run={active ? run : null}
+        run={active && !onRuns ? run : null}
       />
       {closing && (
         <Dialog

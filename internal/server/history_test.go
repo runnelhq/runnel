@@ -126,6 +126,7 @@ func TestRunsFilter(t *testing.T) {
 		"?status=failed":                     ids[1], // TARGET is missing without environment
 		"?limit=1&before=" + ids[2]:          ids[1],
 		"?trigger=cron:x":                    "",
+		"?trigger=editor":                    ids[2] + "," + ids[1] + "," + ids[0], // started with POST /runs (S26e1)
 		"?status=succeeded&path=workflows/x.yaml": "",
 	} {
 		if got := list(query); got != want {
