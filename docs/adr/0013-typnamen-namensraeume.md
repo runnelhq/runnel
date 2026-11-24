@@ -124,3 +124,39 @@ Die reservierten Namensräume `ftp` und `sftp` werden durch **`transfer`** erset
 (`transfer.upload`, `transfer.download`, `transfer.list` …) wählen das Protokoll über die Connection (`type: sftp |
 ftps | ftp`), nicht über den Typnamen – wie `archive` das Format über `format` ([ADR 0022](0022-connections-secrets.md),
 Abschnitt 6). `ftp` und `sftp` waren nie umgesetzt und sind nicht mehr reserviert.
+
+## Nachtrag 2026-11-24: Namen von SDKs und Plugins (zu ADR 0019)
+
+SDKs und offizielle Plugins liegen in eigenen Repositorys der Organisation `runnelhq` (ADR 0019, Nachtrag
+2026-11-24). Abgestimmt mit dem Maintainer:
+
+- **Repositorys in `runnelhq` ohne Präfix**, die Organisation nennt den Zusammenhang:
+
+  | Art | Repository | Beispiel |
+  |---|---|---|
+  | SDK | `sdk-<sprache>` | `runnelhq/sdk-go`, `sdk-dotnet`, `sdk-python`, `sdk-rust`, `sdk-node` |
+  | Offizielles Plugin | `plugin-<name>` | `runnelhq/plugin-iban` |
+  | Vorlage für Plugins | `plugin-template-<sprache>` | `runnelhq/plugin-template-go` (GitHub-Template) |
+
+- **Mit „runnel“ alles, was die Organisation verlässt:**
+  - **Pakete der SDKs:**
+    - Go: Modul `github.com/runnelhq/sdk-go`, Paket `runnel`; Major-Versionen mit `/v2`.
+    - PyPI: `runnel-sdk`.
+    - NuGet: `Runnel.Sdk`.
+    - crates.io: `runnel-sdk`.
+    - npm: `@runnelhq/sdk`.
+  - **Release-Archive von Plugins:** `runnel-plugin-<name>_<version>_<os>_<arch>.zip`. Darin liegt der fertige Ordner
+    `<name>/` mit `plugin.yaml`, ausführbaren Dateien, `LICENSE` und `THIRD_PARTY_NOTICES`, dazu `SHA256SUMS`.
+  - **GitHub-Topic** `runnel-plugin`.
+- **Name und Namensraum:** `<name>` des Repositorys ist gleich `name:` in `plugin.yaml` und gleich dem Ordner unter
+  `plugins/`. Bei offiziellen Plugins ist er auch der Namensraum, kurz und ohne Präfix, z. B. `iban`, `ldap`, `pdf`.
+- **Plugins von anderen:**
+  - Empfohlen ist das Repository `runnel-plugin-<name>` in der eigenen Organisation.
+  - Für den Namensraum empfiehlt sich ein Präfix der Firma oder des Autors, z. B. `contoso-sap`, damit es keine
+    Zusammenstöße mit offiziellen Plugins gibt.
+  - Durchgesetzt wird das nicht. Zwei Plugins mit demselben Namensraum in einem Projekt bleiben ein Fehler beim
+    Laden (oben).
+- **Versionen:**
+  - Plugins und SDKs haben SemVer-Tags `v1.2.0`, unabhängig von der Version von Runnel.
+  - Die Version in `plugin.yaml` muss zum Tag passen; das prüft die CI des Plugins.
+  - Ein SDK nennt in seiner README die unterstützte Protokollversion.
