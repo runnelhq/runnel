@@ -382,12 +382,45 @@ func scanRun(row interface{ Scan(...any) error }) (Run, error) {
 	return r, nil
 }
 
+// Filter selects runs for List; empty fields select all.
+type Filter struct {
+	Status  string // e.g. failed
+	Path    string // the file of the workflow or pipeline, as in the project ("workflows/a.workflow.yaml")
+	Trigger string // e.g. cron:nightly, http:orders, cli
+	// Before lists the runs started before the one with this id (pages: the id of the
+	// last run of the page before).
+	Before string
+	Limit  int
+}
+
 // List returns the newest runs first, at most limit.
 func (s *Store) List(ctx context.Context, limit int) ([]Run, error) {
+	return s.Find(ctx, Filter{Limit: limit})
+}
+
+// Find returns the runs that match f, newest first, at most f.Limit (100 if 0).
+func (s *Store) Find(ctx context.Context, f Filter) ([]Run, error) {
 	if err := s.MarkStale(ctx, time.Now()); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT `+runColumns+` FROM runs ORDER BY id DESC LIMIT ?`, limit)
+	var where []string
+	var args []any
+	for _, c := range []struct{ col, op, val string }{
+		{"status", "=", f.Status}, {"path", "=", f.Path}, {"trigger", "=", f.Trigger}, {"id", "<", f.Before},
+	} {
+		if c.val != "" {
+			where = append(where, c.col+" "+c.op+" ?")
+			args = append(args, c.val)
+		}
+	}
+	q := `SELECT ` + runColumns + ` FROM runs`
+	if len(where) > 0 {
+		q += " WHERE " + strings.Join(where, " AND ")
+	}
+	if f.Limit <= 0 {
+		f.Limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx, q+` ORDER BY id DESC LIMIT ?`, append(args, f.Limit)...)
 	if err != nil {
 		return nil, err
 	}

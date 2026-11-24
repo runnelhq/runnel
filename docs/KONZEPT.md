@@ -304,6 +304,7 @@ flowchart LR
 | Windows-Dienst | `runnel service install/start/stop/status/uninstall` (seit S41) | Dauerbetrieb auf Server |
 | Validierung | `runnel validate <datei/ordner>` (Workflows, Pipelines, Trigger) | Lint/Prüfung in CI |
 | Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
+| Läufe anzeigen | `runnel runs [projektordner] [lauf-id] [--status] [--path] [--trigger] [--before] [--limit] [--json]` (seit S26b) | Läufe aus der Run-Historie (Server, Dienst, `runnel run`), einer mit Knoten und Log |
 | Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments und Triggern (seit S58), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
@@ -1000,7 +1001,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/variables` | Genutzte und definierte Variablen mit Fundstellen und Werten je Ebene (seit E18a) |
 | GET | `/expressions` · `/version` | Wurzeln, Funktionen und Variablen für den Ausdruckseditor · Version des Servers |
 | POST | `/runs` | Run starten `{ path, environment, params }`; später `runConfig`, `startAt`, `only`, `reuseResultsFrom` |
-| GET | `/runs?status=&path=` | Läufe: laufende aus dem Speicher, beendete aus der Run-Historie (seit S26a); Filter folgen mit S26b |
+| GET | `/runs?status=&path=&trigger=&before=&limit=` | Läufe: laufende aus dem Speicher, beendete aus der Run-Historie (seit S26a), Filter und Seiten (seit S26b) |
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern (`resume` mit S29, Backlog) |
 | POST | `/preview` | Pipeline-Vorschau bis Transform X (S44, `docs/dev/API.md`) |

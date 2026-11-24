@@ -22,7 +22,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Benchmarks | `make bench` |
 | Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
 | Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – nur das betroffene Paket, nie `./... -update`; danach Diff prüfen (Pakete mit Golden-Dateien: `cli`, `model`, `schema`, `server`, `transforms/csv`) |
-| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel schema trigger` · `bin/runnel triggers examples/hello` · `bin/runnel serve examples/hello` |
+| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel schema trigger` · `bin/runnel triggers examples/hello` · `bin/runnel runs examples/hello` · `bin/runnel serve examples/hello` |
 
 **Vor jedem Push:** `make lint` und `make test` müssen grün sein. Bei Änderungen am Editor zusätzlich in `web/`
 `npm run typecheck` und die betroffenen Playwright-Tests (`npx playwright test e2e/<datei>`); vollständig prüft die CI.
@@ -35,7 +35,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | Pfad | Inhalt |
 |---|---|
 | `cmd/runnel/` | Einstiegspunkt, Signalbehandlung |
-| `internal/cli/` | Befehle (`version`, `validate`, `run`, `catalog`, `schema`, `serve`, `triggers`, `service`) |
+| `internal/cli/` | Befehle (`version`, `validate`, `run`, `runs`, `catalog`, `schema`, `serve`, `triggers`, `service`) |
 | `internal/model/` | Dateiformate (Workflow, Pipeline, Project, Environment, Trigger), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
 | `internal/paths/` | Relative Pfade von Actions und Transforms auflösen: Bezugsordner eines Laufs im Kontext (Projektordner, ADR 0020) |

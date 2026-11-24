@@ -55,6 +55,14 @@ type ProjectSettings struct {
 	// MaxConcurrentRuns limits the runs of the server that run at the same time; a
 	// start beyond it is rejected (KONZEPT, chapter 6.4). 0: no limit.
 	MaxConcurrentRuns int `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty" doc:"Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit" schema:"default=0"`
+	// History controls the run history of the project (ADR 0026).
+	History HistorySettings `yaml:"history,omitempty" json:"history,omitzero" doc:"Run history of the project: which runs are kept"`
+}
+
+// HistorySettings control the run history of a project (ADR 0026, S26b).
+type HistorySettings struct {
+	// CLI chooses which runs of runnel run are kept: all, errors or none.
+	CLI string `yaml:"cli,omitempty" json:"cli,omitempty" doc:"Which ended runs of runnel run are kept in the run history: all, errors (only failed ones) or none; runnel run --history overrides it" schema:"enum=all|errors|none,default=all"`
 }
 
 // Environment is the content of environments/<name>.yaml: variables for one target system.
@@ -237,6 +245,11 @@ func (p *Project) validate() Errors {
 	}
 	if p.Settings.MaxConcurrentRuns < 0 {
 		errs = append(errs, p.src.errorf("$.settings.maxConcurrentRuns", "maxConcurrentRuns must not be negative"))
+	}
+	switch p.Settings.History.CLI {
+	case "", HistoryAll, HistoryErrors, HistoryNone:
+	default:
+		errs = append(errs, p.src.errorf("$.settings.history.cli", "invalid history %q (expected all, errors or none)", p.Settings.History.CLI))
 	}
 	errs = append(errs, checkVariables(p.src, p.Variables)...)
 	errs = append(errs, checkReferenceSyntax(p.src)...)

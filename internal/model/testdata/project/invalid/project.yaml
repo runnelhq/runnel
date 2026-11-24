@@ -8,3 +8,6 @@ variables:
   GOOD: ok
   bad-name: x
   BROKEN: ${UNCLOSED
+settings:
+  history:
+    cli: always

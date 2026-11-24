@@ -78,6 +78,18 @@ Das Server-Log von `runnel serve` und des Dienstes (S71): `--log-level debug|inf
 Einstellungen gelten nach erneutem `service install`.
 
 ```bash
+runnel runs examples/hello
+```
+
+`runnel runs [projektordner] [lauf-id]` listet die Läufe des Projekts aus seiner Run-Historie, neueste zuerst: die von
+`runnel serve`, des Dienstes und von `runnel run` (Trigger `cli`). Mit einer Lauf-ID zeigt es den Lauf mit Status je
+Action bzw. Transform und Log. Filter: `--status`, `--path`, `--trigger`, `--limit`, nächste Seite mit `--before <lauf-id>`;
+`--json` gibt dasselbe aus wie die API. Welche Läufe von `runnel run` bleiben, steht in `project.yaml` unter
+`settings.history.cli` (`all`, `errors`, `none`; Standard `all`) und lässt sich mit `runnel run --history` je Aufruf
+setzen. Die Historie des Dienstes liegt unter `%ProgramData%\runnel\history` (lesen mit `--history-dir`, als
+Administrator).
+
+```bash
 runnel triggers examples/hello
 ```
 

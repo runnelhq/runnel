@@ -37,6 +37,9 @@ type runOptions struct {
 	params  []string
 	verbose bool
 	log     logOptions
+	// history (all, errors, none) overrides settings.history.cli; historyDir is the
+	// folder of the run histories (ADR 0026, S26b).
+	history, historyDir string
 }
 
 func newRunCommand() *cobra.Command {
@@ -50,6 +53,8 @@ func newRunCommand() *cobra.Command {
 			"directory or above), the environment (--env, default: defaultEnvironment\n" +
 			"of the project) and --param, in this order of precedence (last wins).\n\n" +
 			"Ctrl+C cancels the run cleanly (running actions and transforms are stopped); press it twice to exit at once.\n\n" +
+			"The run is kept in the run history of the project (see \"runnel runs\"): all runs, only failed ones or none,\n" +
+			"as set by --history or settings.history.cli in project.yaml (default all).\n\n" +
 			"Exit codes: 0 succeeded, 1 failed, 2 not started (invalid file or arguments), 130 cancelled.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -63,36 +68,28 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&opts.params, "param", nil, "parameter `KEY=VALUE` (repeatable)")
 	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "also log debug messages and every action or transform start and end (--log-level debug)")
 	logFlags(cmd, &opts.log)
+	cmd.Flags().StringVar(&opts.history, "history", "", "which ended runs are kept in the run history: all, errors or none; empty: settings.history.cli of the project, else all")
+	historyDirFlag(cmd, &opts.historyDir, defaultHistoryHint)
 	return cmd
 }
 
 func runWorkflow(ctx context.Context, out, errOut io.Writer, file string, opts runOptions) error {
-	runner, err := prepareRun(out, errOut, file, opts)
+	r, err := prepareRun(out, errOut, file, opts)
 	if err != nil {
 		if _, ok := errors.AsType[errExitCode](err); !ok {
 			_, _ = fmt.Fprintln(errOut, "Error:", err)
 		}
 		return errExitCode(exitNotRun)
 	}
-	res := runner.Run(ctx)
-	switch res.Status {
-	case workflow.Succeeded:
-		return nil
-	case workflow.Cancelled:
-		return errExitCode(ExitCancelled)
-	}
-	return errExitCode(exitRunFailed)
+	return r.execute(ctx, errOut)
 }
 
 // prepareRun loads and checks everything needed for a run. Problems in files are
 // printed to errOut and returned as errExitCode; other problems as plain errors.
 // The run log is written to out.
-func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.Runner, error) {
-	params, err := parseParams(opts.params)
+func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*cliRun, error) {
+	params, err := checkRunOptions(out, opts)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := newRunLogger(out, opts, "", nil); err != nil {
 		return nil, err
 	}
 	if info, err := os.Stat(file); err == nil && info.IsDir() {
@@ -104,7 +101,8 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 	}
 
 	var logger *runLogger
-	p, err := runs.Prepare(runs.Spec{
+	m := runs.NewManager()
+	pend, p, err := m.PrepareRun(runPath(file, projectDir), runs.Spec{
 		Name:       filepath.ToSlash(file),
 		Data:       data,
 		ProjectDir: projectDir,
@@ -112,6 +110,7 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 		Params:     params,
 		Registry:   actions.Builtin(),
 		Transforms: transforms.Builtin(),
+		Trigger:    runTriggerCLI,
 		Observer:   func(e workflow.Event) { logger.event(e) },
 	})
 	printDiags(errOut, p.Warnings)
@@ -130,7 +129,7 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 			name, p.Workflow.Name, name)
 	}
 	logger, _ = newRunLogger(out, opts, p.Workflow.Name, p.Env)
-	return p.Runner, nil
+	return newCLIRun(m, pend, errOut, opts, projectDir, p.Project), nil
 }
 
 // readRunFile reads a workflow or pipeline file and finds its project ("" if none).

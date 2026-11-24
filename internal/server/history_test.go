@@ -88,3 +88,50 @@ func logText(d runs.Detail) string {
 	}
 	return b.String()
 }
+
+// GET /runs filters by status, path and trigger and pages with before and limit (S26b).
+func TestRunsFilter(t *testing.T) {
+	dir, _ := newRunProject(t)
+	s, err := New(Options{Dir: dir, Registry: actions.Builtin(), UI: fstest.MapFS{}, HistoryDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Shutdown(context.Background()); _ = s.Close() })
+	var ids []string
+	for _, body := range []string{`{"path": "workflows/wait.workflow.yaml", "environment": "dev"}`, `{"path": "workflows/wait.workflow.yaml"}`,
+		`{"path": "workflows/import.workflow.yaml", "environment": "dev"}`} {
+		run := startRun(t, s, body)
+		s.runs.Wait(context.Background(), run.ID)
+		ids = append(ids, run.ID)
+	}
+	list := func(query string) string {
+		t.Helper()
+		rec := do(t, s, "GET", "/api/v1/runs"+query, "")
+		var l struct{ Runs []runs.Run }
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &l) != nil {
+			t.Fatalf("%s: %d %s", query, rec.Code, rec.Body)
+		}
+		var out []string
+		for _, r := range l.Runs {
+			out = append(out, r.ID)
+		}
+		return strings.Join(out, ",")
+	}
+	for query, want := range map[string]string{
+		"":                                   ids[2] + "," + ids[1] + "," + ids[0],
+		"?path=workflows/wait.workflow.yaml": ids[1] + "," + ids[0],
+		"?status=failed":                     ids[1], // TARGET is missing without environment
+		"?limit=1&before=" + ids[2]:          ids[1],
+		"?trigger=cron:x":                    "",
+		"?status=succeeded&path=workflows/x.yaml": "",
+	} {
+		if got := list(query); got != want {
+			t.Errorf("%q: %s, want %s", query, got, want)
+		}
+	}
+	for _, q := range []string{"?limit=0", "?limit=x", "?limit=1001"} {
+		if rec := do(t, s, "GET", "/api/v1/runs"+q, ""); rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid limit") {
+			t.Errorf("%s: %d %s", q, rec.Code, rec.Body)
+		}
+	}
+}

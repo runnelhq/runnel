@@ -50,7 +50,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | POST | `/pipelines/fields` | Felder eines Eingabe-Transforms ermitteln (S46), siehe unten |
 | POST | `/preview` | Datenvorschau einer Pipeline bis zu einem Transform (S44), siehe unten |
 | POST | `/runs` | Lauf starten, siehe unten |
-| GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst: laufende und kürzlich beendete aus dem Speicher, dazu die neuesten aus der Run-Historie (seit S26a, zusammen höchstens 200) |
+| GET | `/runs` | `{"runs": [Run …]}`, neueste zuerst: laufende und kürzlich beendete aus dem Speicher, dazu die aus der Run-Historie (seit S26a). Filter (S26b): `status`, `path` (Datei im Projekt), `trigger` (z. B. `cron:nightly`, `cli` für `runnel run`), `before` (Lauf-ID: ältere Läufe, nächste Seite), `limit` (Standard 200, höchstens 1.000; sonst `400`) |
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log`, auch aus der Run-Historie; `500`, wenn sie nicht lesbar ist (Details im Server-Log) |
 | POST | `/runs/{id}/cancel` | Lauf abbrechen: `202`; bereits beendet `409` |
 | GET | `/events` | Live-Ereignisse (Server-Sent Events), siehe unten |

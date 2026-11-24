@@ -15,28 +15,19 @@ import (
 
 // runPipeline runs a pipeline file (roadmap S13b) with the same flags and exit codes as a workflow.
 func runPipeline(ctx context.Context, out, errOut io.Writer, file string, opts runOptions) error {
-	runner, err := preparePipelineRun(out, errOut, file, opts)
+	r, err := preparePipelineRun(out, errOut, file, opts)
 	if err != nil {
 		if _, ok := errors.AsType[errExitCode](err); !ok {
 			_, _ = fmt.Fprintln(errOut, "Error:", err)
 		}
 		return errExitCode(exitNotRun)
 	}
-	switch runner.Run(ctx).Status {
-	case pipeline.Succeeded:
-		return nil
-	case pipeline.Cancelled:
-		return errExitCode(ExitCancelled)
-	}
-	return errExitCode(exitRunFailed)
+	return r.execute(ctx, errOut)
 }
 
-func preparePipelineRun(out, errOut io.Writer, file string, opts runOptions) (*pipeline.Runner, error) {
-	params, err := parseParams(opts.params)
+func preparePipelineRun(out, errOut io.Writer, file string, opts runOptions) (*cliRun, error) {
+	params, err := checkRunOptions(out, opts)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := newRunLogger(out, opts, "", nil); err != nil {
 		return nil, err
 	}
 	data, projectDir, err := readRunFile(file, opts.env)
@@ -44,13 +35,15 @@ func preparePipelineRun(out, errOut io.Writer, file string, opts runOptions) (*p
 		return nil, err
 	}
 	var logger *pipelineLogger
-	p, err := runs.PreparePipeline(runs.PipelineSpec{
+	m := runs.NewManager()
+	pend, p, err := m.PreparePipelineRun(runPath(file, projectDir), runs.PipelineSpec{
 		Name:       filepath.ToSlash(file),
 		Data:       data,
 		ProjectDir: projectDir,
 		Env:        opts.env,
 		Params:     params,
 		Registry:   transforms.Builtin(),
+		Trigger:    runTriggerCLI,
 		Observer:   func(e pipeline.Event) { logger.event(e) },
 	})
 	printDiags(errOut, p.Warnings)
@@ -70,7 +63,7 @@ func preparePipelineRun(out, errOut io.Writer, file string, opts runOptions) (*p
 	}
 	rl, _ := newRunLogger(out, opts, p.Pipeline.Name, p.Env)
 	logger = &pipelineLogger{runLogger: *rl}
-	return p.Runner, nil
+	return newCLIRun(m, pend, errOut, opts, projectDir, p.Project), nil
 }
 
 // pipelineLogger prints the events of a pipeline run; every transform ends with its
