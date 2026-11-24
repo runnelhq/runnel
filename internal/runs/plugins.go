@@ -7,6 +7,7 @@ import (
 	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/conntest"
 	"github.com/runnelhq/runnel/internal/plugin"
+	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
@@ -22,6 +23,36 @@ func WithPlugins(reg *action.Registry, projectDir string) *action.Registry {
 		return reg
 	}
 	return plugin.Registry(context.Background(), reg, projectDir, store)
+}
+
+// WithPluginTransforms returns reg with the transform types of the trusted plugins of
+// the project in projectDir and hints for those that cannot be used (S50a); reg itself
+// without a project, without plugins or without a configuration folder for approvals.
+func WithPluginTransforms(reg *transform.Registry, projectDir string) *transform.Registry {
+	if reg == nil || projectDir == "" {
+		return reg
+	}
+	store, err := plugin.DefaultStore()
+	if err != nil {
+		return reg
+	}
+	return plugin.Transforms(context.Background(), reg, projectDir, store)
+}
+
+// pluginStreams runs the transforms of plugins of a pipeline run; nil without a project.
+func pluginStreams(projectDir, environment string, mask *vars.Mask) transform.PluginRunner {
+	if projectDir == "" {
+		return nil
+	}
+	store, err := plugin.DefaultStore()
+	if err != nil {
+		return nil
+	}
+	var m func(string) string
+	if mask != nil {
+		m = mask.String
+	}
+	return plugin.NewSession(projectDir, environment, store, m)
 }
 
 // pluginSession runs the actions of plugins of a run; nil without a project.

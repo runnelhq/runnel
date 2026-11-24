@@ -336,7 +336,7 @@ func (s *Server) transformSchema(typ string) *schema.Schema {
 	if s.transforms == nil {
 		return nil
 	}
-	d, _ := s.transforms.Descriptor(typ)
+	d, _ := runs.WithPluginTransforms(s.transforms, s.dir).Descriptor(typ)
 	return d.Schema
 }
 

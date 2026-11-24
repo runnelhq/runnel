@@ -42,7 +42,7 @@ links:
 
 // pluginProject is a project with the test binary as plugin demo, a connection with a
 // secret and an http trigger whose token is in HOOK_TOKEN.
-func pluginProject(t *testing.T) string {
+func pluginProject(t testing.TB) string {
 	t.Helper()
 	exe, err := os.Executable()
 	if err != nil {
@@ -72,7 +72,7 @@ func pluginProject(t *testing.T) string {
 	return dir
 }
 
-func trustDemo(t *testing.T, dir string) {
+func trustDemo(t testing.TB, dir string) {
 	t.Helper()
 	store, err := plugin.DefaultStore()
 	if err != nil {

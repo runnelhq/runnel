@@ -12,6 +12,7 @@ import (
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/plugintrust"
+	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/version"
 )
 
@@ -40,18 +41,31 @@ func NewSession(projectDir, environment string, store plugintrust.Store, mask fu
 
 // Execute runs an action of a plugin in its process for this run.
 func (s *Session) Execute(ctx context.Context, plugin, typ string, config map[string]any, ec *action.ExecContext) (any, error) {
-	pr, err := s.process(ctx, plugin, ec)
+	pr, err := s.process(ctx, plugin, ec.Log)
 	if err != nil {
 		return nil, err
 	}
 	return pr.Execute(ctx, typ, config, ExecContext{RunID: ec.RunID, ActionID: ec.ActionID, ProjectDir: s.projectDir, Environment: s.environment})
 }
 
+// Stream runs a transform of a plugin in its process for this run (S50a).
+func (s *Session) Stream(ctx context.Context, plugin, typ string, config map[string]any, targets []string, in <-chan transform.Batch, out *transform.Output) error {
+	pr, err := s.process(ctx, plugin, func(level slog.Level, msg string) { out.Logf(level, "%s", msg) })
+	if err != nil {
+		return err
+	}
+	sc := StreamContext{TransformID: out.TransformID(), ProjectDir: s.projectDir, Environment: s.environment}
+	if run, ok := out.Values()["run"].(map[string]any); ok {
+		sc.RunID, _ = run["id"].(string)
+	}
+	return pr.Stream(ctx, typ, config, sc, in, out, targets)
+}
+
 // process returns the process of a plugin for the run, starting it on first use. Lines
-// on stderr go to the log of the action that called the plugin last.
-func (s *Session) process(ctx context.Context, name string, ec *action.ExecContext) (*Process, error) {
+// on stderr go to the log of the step that called the plugin last.
+func (s *Session) process(ctx context.Context, name string, logf func(slog.Level, string)) (*Process, error) {
 	s.logMu.Lock()
-	s.current = ec.Log
+	s.current = logf
 	s.logMu.Unlock()
 	s.mu.Lock()
 	defer s.mu.Unlock()
