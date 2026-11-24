@@ -50,8 +50,8 @@ type requestAction struct {
 	Timeout     string             `json:"timeout" doc:"Longest time for one request and its answer (with paginate: per page), e.g. 30s or 5m; the timeout of the action limits all together" schema:"format=runnel-duration,default=60s"`
 	FailOnError *bool              `json:"failOnError" doc:"Fail the action if the answer has status 400 or above; false: the status is only in the output" schema:"default=true"`
 	MaxSize     string             `json:"maxSize" doc:"Largest answer to read, e.g. 10MB or 500KB; with paginate per page; with saveTo the largest file (default 1GB)" schema:"default=10MB"`
-	SaveTo      string             `json:"saveTo" doc:"Saves a successful answer (status 2xx) as a file instead of reading it, e.g. a ZIP or PDF; relative to the project folder or absolute. Written to a temporary file first, so no half file remains; output: file and size instead of body" schema:"example=inbox/export.zip"`
-	IfExists    string             `json:"ifExists" doc:"With saveTo, if the file exists: replace it once the download is complete, fail before the request, or skip the request" schema:"enum=replace|fail|skip,default=replace"`
+	SaveTo      string             `json:"saveTo" doc:"Saves a successful answer (status 2xx) as a file instead of reading it, e.g. a ZIP or PDF; relative to the project folder or absolute. Written to a temporary file first, so no half file remains; output: path and size instead of body" schema:"example=inbox/export.zip"`
+	IfExists    string             `json:"ifExists" doc:"With saveTo, if the file exists: replace it once the download is complete, skip the request, or fail before the request" schema:"enum=replace|skip|fail,default=replace"`
 	RetryAfter  *retryAfterConfig  `json:"retryAfter" doc:"Asking again when the API answers 429 or 503 with Retry-After (wait in seconds or a date); on by default"`
 	Paginate    *pagination.Config `json:"paginate" doc:"Reading all pages of a paged API; output: items (all items), count and pages instead of body"`
 }
@@ -109,7 +109,7 @@ func newRequest(with map[string]any) (action.Action, error) {
 	switch a.IfExists {
 	case "", ifExistsReplace, ifExistsFail, ifExistsSkip:
 	default:
-		return nil, fmt.Errorf("invalid ifExists %q (expected replace, fail or skip)", a.IfExists)
+		return nil, fmt.Errorf("invalid ifExists %q (expected replace, skip or fail)", a.IfExists)
 	}
 	if !dynamic(a.MaxSize) {
 		if _, err := parseSize(a.MaxSize); err != nil {

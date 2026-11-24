@@ -3,7 +3,7 @@
 #   runnel run -v --param ARCHIVE=D:\archive examples/files/workflows/archive.workflow.yaml
 # - "check" fails if the inbox has no *.csv files; the failure link reports that.
 # - "folder" creates ARCHIVE\<today>; its result (the path) is the target of "copy".
-# - The files are copied, not moved, so that the example can run again (overwrite: true).
+# - The files are copied, not moved, so that the example can run again (ifExists: replace).
 # - "report" uses the outputs of "copy" and "list": the copied paths and the file details.
 # - The outputs use ?. and ??, because "folder" and "copy" do not run when the inbox is empty.
 kind: Workflow
@@ -38,7 +38,7 @@ actions:
     with:
       source: ${INBOX}/*.csv
       target: "{{ results.folder.output }}"
-      overwrite: true
+      ifExists: replace
   - id: list
     type: file.list
     with:

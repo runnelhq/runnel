@@ -43,7 +43,7 @@ type extract struct {
 	Target   string `json:"target" doc:"Folder to unpack into; it is created if missing" schema:"required,example=inbox/delivery"`
 	Format   string `json:"format" doc:"Format of the archive; auto: by the ending of source, else by its content" schema:"enum=auto|zip|tar|tar.gz,default=auto"`
 	Pattern  string `json:"pattern" doc:"Only files whose name matches, e.g. *.csv; empty: all files" schema:"example=*.csv"`
-	IfExists string `json:"ifExists" doc:"What happens to files that exist in the folder: fail before anything is written, replace them, or skip them" schema:"enum=fail|replace|skip,default=fail"`
+	IfExists string `json:"ifExists" doc:"If files exist in the folder: replace them, skip them, or fail before anything is written" schema:"enum=replace|skip|fail,default=fail"`
 	MaxSize  string `json:"maxSize" doc:"Largest total size of the unpacked files, e.g. 500MB or 10GB; protects against archives that unpack to far more than they hold" schema:"default=1GB"`
 	MaxFiles int    `json:"maxFiles" doc:"Largest number of entries in the archive" schema:"default=10000"`
 }
@@ -64,7 +64,7 @@ func newExtract(with map[string]any) (action.Action, error) {
 	switch a.IfExists {
 	case "", "fail", "replace", "skip":
 	default:
-		return nil, fmt.Errorf("invalid ifExists %q (expected fail, replace or skip)", a.IfExists)
+		return nil, fmt.Errorf("invalid ifExists %q (expected replace, skip or fail)", a.IfExists)
 	}
 	if _, err := path.Match(a.Pattern, ""); err != nil {
 		return nil, fmt.Errorf("pattern: invalid wildcard pattern %q", a.Pattern)

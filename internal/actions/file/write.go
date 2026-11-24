@@ -29,18 +29,19 @@ var writeDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "Write File",
 	Description: "Writes a text or a value as JSON to a file, replacing it or appending; output: path and size",
-	Example:     "path: out/status.json\nas: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n",
+	Example:     "path: out/status.json\nformat: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n",
 	Config:      writeFile{},
 	New:         newWriteFile,
+	Renamed:     map[string]string{"as": "renamed to format"},
 }
 
 type writeFile struct {
 	Path     string `json:"path" doc:"File to write, relative to the project folder or absolute; missing folders are created" schema:"required,example=out/status.txt"`
-	Content  any    `json:"content" doc:"What to write: a text, or with as: json any value, e.g. {{ results.query.output.rows }}"`
-	As       string `json:"as" doc:"text writes the content as text (other values as JSON), json writes the value as formatted JSON" schema:"enum=text|json,default=text"`
+	Content  any    `json:"content" doc:"What to write: a text, or with format: json any value, e.g. {{ results.query.output.rows }}"`
+	Format   string `json:"format" doc:"text writes the content as text (other values as JSON), json writes the value as formatted JSON" schema:"enum=text|json,default=text"`
 	Encoding string `json:"encoding" doc:"Encoding of the file; utf-8-bom lets Excel and older Windows programs recognize umlauts" schema:"enum=utf-8|utf-8-bom|windows-1252|utf-16le,default=utf-8"`
 	LineEnds string `json:"lineEnds" doc:"Line ends: as in the content, crlf (Windows) or lf" schema:"enum=keep|crlf|lf,default=keep"`
-	IfExists string `json:"ifExists" doc:"If the file exists: replace it (written completely, then renamed), append to it, or fail" schema:"enum=replace|append|fail,default=replace"`
+	IfExists string `json:"ifExists" doc:"If the file exists: replace it once the content is written, append to it, or fail" schema:"enum=replace|append|fail,default=replace"`
 }
 
 func newWriteFile(with map[string]any) (action.Action, error) {
@@ -49,7 +50,7 @@ func newWriteFile(with map[string]any) (action.Action, error) {
 		return nil, err
 	}
 	for _, c := range []struct{ field, value, allowed string }{
-		{"as", a.As, "text|json"}, {"encoding", a.Encoding, "utf-8|utf-8-bom|windows-1252|utf-16le"},
+		{"format", a.Format, "text|json"}, {"encoding", a.Encoding, "utf-8|utf-8-bom|windows-1252|utf-16le"},
 		{"lineEnds", a.LineEnds, "keep|crlf|lf"}, {"ifExists", a.IfExists, "replace|append|fail"},
 	} {
 		if c.value != "" && !strings.Contains("|"+c.allowed+"|", "|"+c.value+"|") {
@@ -114,13 +115,13 @@ func (a *writeFile) Execute(ctx context.Context, ec *action.ExecContext) (action
 	return action.Result{Output: map[string]any{"path": name, "size": int64(len(data))}}, nil
 }
 
-// text is the content as it is written: a text as it is; with as: json (and for other
+// text is the content as it is written: a text as it is; with format: json (and for other
 // values than text) formatted JSON with exact numbers.
 func (a *writeFile) text() (string, error) {
-	if s, ok := a.Content.(string); ok && a.As != "json" {
+	if s, ok := a.Content.(string); ok && a.Format != "json" {
 		return s, nil
 	}
-	if a.Content == nil && a.As != "json" {
+	if a.Content == nil && a.Format != "json" {
 		return "", nil
 	}
 	var b bytes.Buffer

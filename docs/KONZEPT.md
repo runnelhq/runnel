@@ -1090,7 +1090,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Abfrage in den Workflow (`db.query`, seit S59: Zeilen, Anzahl, erster Wert – deckt auch „Tabelle existiert“ und „Zeilen zählen“ ab) |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,
-`file.mkdir`, `file.list`, seit S66 `file.read` (kleine Textdatei als Text, Zeilen oder JSON-Wert in den Workflow,
+`file.mkdir`, `file.list`, seit S66 `file.read` (kleine Textdatei mit `format` als Text, Zeilen oder JSON-Wert in den Workflow,
 `maxSize` 10 MB, Kodierung wie `csv.input`) und `file.write` (Text oder Wert als JSON; `replace` über eine temporäre
 Datei, `append`, `fail`; Kodierung mit oder ohne BOM, Windows-1252, UTF-16; Zeilenenden); Umbenennen ist `file.move` mit neuem Dateinamen als Ziel. Packen und Entpacken übernehmen
 seit S54 die Archiv-Actions (siehe unten).
@@ -1102,12 +1102,13 @@ seit S54 die Archiv-Actions (siehe unten).
 - **Ziel bei Kopieren/Verschieben:** Bei Platzhaltern, einem Ziel mit `\` am Ende oder einem vorhandenen Ordner landen
   die Dateien im Ordner; eine einzelne Datei kann auch unter neuem Namen abgelegt werden. Fehlende Ordner werden
   angelegt.
-- **Konflikte:** Vorhandene Dateien werden nur mit `overwrite: true` ersetzt. Alle Ziele werden **vor** dem ersten
-  Kopieren geprüft, damit ein Konflikt keinen halb erledigten Vorgang hinterlässt. Kopiert wird über eine temporäre
+- **Konflikte:** Vorhandene Dateien im Ziel: `ifExists: fail` (Standard), `replace` oder `skip` (die Datei bleibt, die
+  Quelle wird nicht kopiert bzw. verschoben und steht nicht im Ergebnis; ADR 0025). Bei `fail` werden alle Ziele **vor**
+  dem ersten Kopieren geprüft, damit ein Konflikt keinen halb erledigten Vorgang hinterlässt. Kopiert wird über eine temporäre
   Datei im Zielordner, der Änderungszeitpunkt bleibt erhalten; ein Abbruch des Laufs stoppt zwischen zwei Blöcken.
   Verschieben benennt innerhalb eines Laufwerks um, sonst kopiert es und löscht danach die Quelle.
 - **Sicherheit beim Löschen:** Ordner nur mit `recursive: true` (sonst wird gar nichts gelöscht); nichts zu löschen ist kein Fehler (außer mit
-  `mustExist: true`).
+  `ifMissing: fail`).
 - **Ergebnis (`result.output`):** die gefundenen bzw. geschriebenen Pfade als Liste, bei `file.mkdir` der Pfad, bei
   `file.list` je Eintrag `path`, `name`, `size`, `modified` und `folder` – z. B.
   `{{ sum(map(results.list.output, .size)) }}`.

@@ -8,17 +8,18 @@ import (
 )
 
 // file.copy copies files or folders. With wildcards, several files go into the target
-// folder; a single file may also get a new name. Existing files are only replaced with
-// overwrite. Files are written via a temporary file and keep their modification time.
+// folder; a single file may also get a new name. Existing files are replaced or skipped
+// with ifExists (ADR 0025); by default the action fails before copying anything. Files are written via a temporary file and keep their modification time.
 // Output: the paths of the copied files.
 var copyDefinition = action.Definition{
 	Type:        "file.copy",
 	Category:    action.CategoryFiles,
 	Label:       "Copy Files",
 	Description: "Copies files or folders; output: the copied files",
-	Example:     "source: inbox/*.csv\ntarget: archive/\noverwrite: true\n",
+	Example:     "source: inbox/*.csv\ntarget: archive/\nifExists: replace\n",
 	Config:      transfer{},
 	New:         newCopy,
+	Renamed:     renamedTransfer,
 }
 
 type copyAction struct{ transfer }
@@ -28,7 +29,7 @@ func newCopy(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, &a.transfer); err != nil {
 		return nil, err
 	}
-	return a, nil
+	return a, a.checkIfExists()
 }
 
 func (a *copyAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
@@ -45,7 +46,7 @@ func (a *copyAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 	var written []string
 	for _, p := range pairs {
 		ec.Logf(slog.LevelDebug, "copying %s to %s", p[0], p[1])
-		files, err := copyPath(ctx, p[0], p[1], a.Overwrite)
+		files, err := copyPath(ctx, p[0], p[1], a.IfExists)
 		written = append(written, files...)
 		if err != nil {
 			return action.Result{Output: list(written)}, err

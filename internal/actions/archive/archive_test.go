@@ -162,7 +162,7 @@ func TestCreateWithWildcardsAndOptions(t *testing.T) {
 func TestConfigErrors(t *testing.T) {
 	actiontest.ConfigError(t, createDefinition, map[string]any{"source": "a", "target": "b.zip", "format": "rar"}, `invalid format "rar"`)
 	actiontest.ConfigError(t, createDefinition, map[string]any{"source": "a", "target": "b.zip", "ifExists": "skip"}, "expected replace or fail")
-	actiontest.ConfigError(t, extractDefinition, map[string]any{"source": "a.zip", "target": "b", "ifExists": "keep"}, "expected fail, replace or skip")
+	actiontest.ConfigError(t, extractDefinition, map[string]any{"source": "a.zip", "target": "b", "ifExists": "keep"}, "expected replace, skip or fail")
 	actiontest.ConfigError(t, extractDefinition, map[string]any{"source": "a.zip", "target": "b", "pattern": "[a"}, "invalid wildcard pattern")
 	actiontest.ConfigError(t, extractDefinition, map[string]any{"source": "a.zip", "target": "b", "maxSize": "lots"}, `maxSize: "lots" is not a size`)
 	actiontest.ConfigError(t, extractDefinition, map[string]any{"source": "a.zip", "target": "b", "maxFiles": -1}, "must not be negative")

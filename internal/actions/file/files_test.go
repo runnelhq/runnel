@@ -41,6 +41,16 @@ func present(path string) bool {
 	return err == nil
 }
 
+// configError checks the configuration as the engine does: through a registry, so that
+// renamed fields get their hint (ADR 0025).
+func configError(def action.Definition, with map[string]any) error {
+	r := action.NewRegistry()
+	r.Register(def)
+	d, _ := r.Lookup(def.Type)
+	_, err := d.New(with)
+	return err
+}
+
 // run executes an action and returns its output as strings (for lists of paths).
 func run(t *testing.T, def action.Definition, with map[string]any) ([]string, error) {
 	t.Helper()
@@ -109,7 +119,7 @@ func TestCancelledRunStopsCopying(t *testing.T) {
 	}
 	// No temporary files are left behind when copying stops.
 	info, _ := os.Stat(filepath.Join(dir, "big.bin"))
-	if err := copyFile(ctx, filepath.Join(dir, "big.bin"), filepath.Join(dir, "c.bin"), info, false); !errors.Is(err, context.Canceled) {
+	if err := copyFile(ctx, filepath.Join(dir, "big.bin"), filepath.Join(dir, "c.bin"), info, "fail"); !errors.Is(err, context.Canceled) {
 		t.Errorf("copyFile: %v", err)
 	}
 	entries, _ := os.ReadDir(dir)

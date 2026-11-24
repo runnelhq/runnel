@@ -70,7 +70,7 @@ func TestDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, "inbox", "data.zip"))
-	if string(data) != zip || out["size"] != int64(len(zip)) || out["file"] != filepath.Join(dir, "inbox", "data.zip") || out["body"] != nil || out["status"] != int64(200) {
+	if string(data) != zip || out["size"] != int64(len(zip)) || out["path"] != filepath.Join(dir, "inbox", "data.zip") || out["body"] != nil || out["status"] != int64(200) {
 		t.Fatalf("output %v, %d bytes", out, len(data))
 	}
 

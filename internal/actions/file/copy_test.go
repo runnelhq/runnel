@@ -28,17 +28,29 @@ func TestCopyFilesIntoFolder(t *testing.T) {
 		t.Errorf("modification time %v, want %v", info.ModTime(), old)
 	}
 
-	// Existing files are only replaced with overwrite.
+	// Existing files: fail (default), skip or replace (ifExists, ADR 0025).
 	tree(t, dir, map[string]string{"in/a.csv": "A2"})
 	_, err = run(t, copyDefinition, map[string]any{"source": filepath.Join(dir, "in", "a.csv"), "target": out})
-	if err == nil || !strings.Contains(err.Error(), "already exists (set overwrite: true") {
+	if err == nil || !strings.Contains(err.Error(), "already exists (set ifExists: replace or skip)") {
 		t.Errorf("err = %v", err)
 	}
-	if _, err := run(t, copyDefinition, map[string]any{"source": filepath.Join(dir, "in", "a.csv"), "target": out, "overwrite": true}); err != nil {
+	got, err = run(t, copyDefinition, map[string]any{"source": filepath.Join(dir, "in", "*.csv"), "target": out, "ifExists": "skip"})
+	if err != nil || names(got) != "" || read(t, filepath.Join(out, "a.csv")) != "A" {
+		t.Errorf("skip: %v %v %q", got, err, read(t, filepath.Join(out, "a.csv")))
+	}
+	if _, err := run(t, copyDefinition, map[string]any{"source": filepath.Join(dir, "in", "a.csv"), "target": out, "ifExists": "replace"}); err != nil {
 		t.Fatal(err)
 	}
 	if read(t, filepath.Join(out, "a.csv")) != "A2" {
-		t.Error("not overwritten")
+		t.Error("not replaced")
+	}
+	// The old field names the new one; wrong values are rejected.
+	if err := configError(copyDefinition, map[string]any{"source": "a", "target": "b", "overwrite": true}); err == nil ||
+		err.Error() != `unknown field "overwrite" (renamed to ifExists: overwrite: true is now ifExists: replace)` {
+		t.Errorf("overwrite: %v", err)
+	}
+	if err := configError(copyDefinition, map[string]any{"source": "a", "target": "b", "ifExists": "keep"}); err == nil || !strings.Contains(err.Error(), `invalid ifExists "keep" (expected replace, skip or fail)`) {
+		t.Errorf("keep: %v", err)
 	}
 }
 

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // file.delete deletes files and, with recursive, folders with their content.
-// Nothing to delete is fine unless mustExist is set. Output: the deleted paths.
+// Nothing to delete is fine unless ifMissing: fail is set. Output: the deleted paths.
 var deleteDefinition = action.Definition{
 	Type:        "file.delete",
 	Category:    action.CategoryFiles,
@@ -20,18 +21,26 @@ var deleteDefinition = action.Definition{
 	Example:     "path: out/*.tmp\n",
 	Config:      deleteAction{},
 	New:         newDelete,
+	Renamed:     map[string]string{"mustExist": "renamed to ifMissing: mustExist: true is now ifMissing: fail"},
 }
 
 type deleteAction struct {
 	Path      string `json:"path" doc:"File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.tmp" schema:"required,example=C:\\work\\*.tmp"`
 	Recursive bool   `json:"recursive" doc:"Also delete folders with everything in them" schema:"default=false"`
-	MustExist bool   `json:"mustExist" doc:"Fail if nothing matches the path" schema:"default=false"`
+	IfMissing string `json:"ifMissing" doc:"If nothing matches the path: skip (nothing is deleted) or fail" schema:"enum=skip|fail,default=skip"`
 }
 
 func newDelete(with map[string]any) (action.Action, error) {
 	a := &deleteAction{}
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
+	}
+	switch a.IfMissing {
+	case "", "skip", "fail":
+	default:
+		if !strings.Contains(a.IfMissing, "${") {
+			return nil, fmt.Errorf("invalid ifMissing %q (expected skip or fail)", a.IfMissing)
+		}
 	}
 	return a, nil
 }
@@ -45,7 +54,7 @@ func (a *deleteAction) Execute(ctx context.Context, ec *action.ExecContext) (act
 		return action.Result{}, err
 	}
 	if len(found) == 0 {
-		if a.MustExist {
+		if a.IfMissing == "fail" {
 			return action.Result{Output: []any{}}, fmt.Errorf("no file or folder matches %q", a.Path)
 		}
 		ec.Logf(slog.LevelDebug, "nothing to delete for %s", a.Path)

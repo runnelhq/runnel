@@ -26,7 +26,7 @@ actions:
   - id: unpack
     type: archive.extract
     with:
-      source: "{{ results.download.output.file }}"
+      source: "{{ results.download.output.path }}"
       target: inbox/unpacked/${PATH}
       pattern: "*.csv"
       ifExists: replace

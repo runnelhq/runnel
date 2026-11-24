@@ -36,7 +36,7 @@ func TestReadFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "config.json"), "as": "json"})
+	out, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "config.json"), "format": "json"})
 	value, _ := out["value"].(map[string]any)
 	if err != nil || len(value["customers"].([]any)) != 2 || value["customers"].([]any)[0] != int64(4711) || out["size"] != int64(41) {
 		t.Fatalf("json: %v %v", out, err)
@@ -44,7 +44,7 @@ func TestReadFile(t *testing.T) {
 	if value["rate"] != 0.19 {
 		t.Errorf("rate %T %v", value["rate"], value["rate"])
 	}
-	if out, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "list.txt"), "as": "lines"}); err != nil || len(out["lines"].([]any)) != 4 || out["lines"].([]any)[2] != "" || out["lines"].([]any)[3] != "c" {
+	if out, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "list.txt"), "format": "lines"}); err != nil || len(out["lines"].([]any)) != 4 || out["lines"].([]any)[2] != "" || out["lines"].([]any)[3] != "c" {
 		t.Errorf("lines: %v %v", out, err)
 	}
 	if out, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "bom.txt")}); err != nil || out["content"] != "Grüße" {
@@ -56,14 +56,14 @@ func TestReadFile(t *testing.T) {
 	if _, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "ansi.txt")}); err == nil || !strings.Contains(err.Error(), "windows-1252") {
 		t.Errorf("not utf-8: %v", err)
 	}
-	if _, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "bad.json"), "as": "json"}); err == nil || !strings.Contains(err.Error(), "line 4, column 1") {
+	if _, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "bad.json"), "format": "json"}); err == nil || !strings.Contains(err.Error(), "line 4, column 1") {
 		t.Errorf("bad json: %v", err)
 	}
 	// Missing: an error, or empty content with ifMissing: empty.
 	if _, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "gone.txt")}); err == nil || !strings.Contains(err.Error(), "cannot read") {
 		t.Errorf("missing: %v", err)
 	}
-	if out, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "gone.json"), "as": "json", "ifMissing": "empty"}); err != nil || out["missing"] != true || out["value"] != nil {
+	if out, err := output(t, readDefinition, map[string]any{"path": filepath.Join(dir, "gone.json"), "format": "json", "ifMissing": "empty"}); err != nil || out["missing"] != true || out["value"] != nil {
 		t.Errorf("missing empty: %v %v", out, err)
 	}
 	// Larger than maxSize, a folder.
@@ -73,7 +73,10 @@ func TestReadFile(t *testing.T) {
 	if _, err := output(t, readDefinition, map[string]any{"path": dir}); err == nil || !strings.Contains(err.Error(), "it is a folder") {
 		t.Errorf("folder: %v", err)
 	}
-	actiontest.ConfigError(t, readDefinition, map[string]any{"path": "a", "as": "xml"}, `invalid as "xml"`)
+	actiontest.ConfigError(t, readDefinition, map[string]any{"path": "a", "format": "xml"}, `invalid format "xml"`)
+	if err := configError(readDefinition, map[string]any{"path": "a", "as": "json"}); err == nil || err.Error() != `unknown field "as" (renamed to format)` {
+		t.Errorf("as: %v", err)
+	}
 	actiontest.ConfigError(t, readDefinition, map[string]any{"path": "a", "encoding": "latin9"}, "invalid encoding")
 	actiontest.ConfigError(t, readDefinition, map[string]any{"path": "a", "maxSize": "huge"}, "is not a size")
 }
@@ -109,7 +112,7 @@ func TestWriteFile(t *testing.T) {
 
 	// JSON with exact numbers; a value other than text is JSON even with as: text.
 	value := map[string]any{"run": "01J", "rows": int64(3), "total": decimal.RequireFromString("1234.50"), "names": []any{"Anna", "Bäcker & Söhne"}}
-	if _, err := output(t, writeDefinition, map[string]any{"path": path, "content": value, "as": "json"}); err != nil ||
+	if _, err := output(t, writeDefinition, map[string]any{"path": path, "content": value, "format": "json"}); err != nil ||
 		read() != "{\n  \"names\": [\n    \"Anna\",\n    \"Bäcker & Söhne\"\n  ],\n  \"rows\": 3,\n  \"run\": \"01J\",\n  \"total\": 1234.5\n}\n" {
 		t.Errorf("json: %q %v", read(), err)
 	}

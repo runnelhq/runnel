@@ -27,14 +27,15 @@ var readDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "Read File",
 	Description: "Reads a small text file into the workflow, as text, lines or JSON; output: content, value or lines, size and modified",
-	Example:     "path: config/customers.json\nas: json\n",
+	Example:     "path: config/customers.json\nformat: json\n",
 	Config:      readFile{},
 	New:         newReadFile,
+	Renamed:     map[string]string{"as": "renamed to format"},
 }
 
 type readFile struct {
 	Path      string `json:"path" doc:"File to read, relative to the project folder or absolute" schema:"required,example=config/settings.json"`
-	As        string `json:"as" doc:"How the content is read: text, lines (a list without line ends) or json (a value, e.g. {{ results.read.output.value.customers }})" schema:"enum=text|lines|json,default=text"`
+	Format    string `json:"format" doc:"How the content is read: text, lines (a list without line ends) or json (a value, e.g. {{ results.read.output.value.customers }})" schema:"enum=text|lines|json,default=text"`
 	Encoding  string `json:"encoding" doc:"Encoding of the file; auto recognizes UTF-8 with or without byte order mark and UTF-16" schema:"enum=auto|utf-8|windows-1252|utf-16,default=auto"`
 	IfMissing string `json:"ifMissing" doc:"If the file does not exist: fail, or go on with empty content (output missing: true)" schema:"enum=fail|empty,default=fail"`
 	MaxSize   string `json:"maxSize" doc:"Largest file to read, e.g. 500KB or 10MB; the content goes into the result of the run" schema:"default=10MB"`
@@ -47,10 +48,10 @@ func newReadFile(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
-	switch a.As {
+	switch a.Format {
 	case "", "text", "lines", "json":
 	default:
-		return nil, fmt.Errorf("invalid as %q (expected text, lines or json)", a.As)
+		return nil, fmt.Errorf("invalid format %q (expected text, lines or json)", a.Format)
 	}
 	switch a.IfMissing {
 	case "", "fail", "empty":
@@ -84,7 +85,7 @@ func (a *readFile) Execute(ctx context.Context, ec *action.ExecContext) (action.
 	if errors.Is(err, fs.ErrNotExist) && a.IfMissing == "empty" {
 		ec.Logf(slog.LevelInfo, "%s does not exist, going on with empty content", a.Path)
 		out := map[string]any{"content": "", "size": int64(0), "missing": true}
-		switch a.As {
+		switch a.Format {
 		case "lines":
 			out["lines"] = []any{}
 		case "json":
@@ -116,7 +117,7 @@ func (a *readFile) Execute(ctx context.Context, ec *action.ExecContext) (action.
 	}
 	text := string(data)
 	out := map[string]any{"content": text, "size": info.Size(), "modified": info.ModTime()}
-	switch a.As {
+	switch a.Format {
 	case "lines":
 		out["lines"] = lines(text)
 	case "json":
