@@ -312,7 +312,7 @@ flowchart LR
 | Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments, Triggern, Connections und `plugin.yaml` (seit S58 bzw. S49a), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
-| Plugins | `runnel plugins [trust\|untrust] [projektordner] [--plugin <name>] [--yes] [--service]` (seit S49a) | Plugins anzeigen und für das Projekt auf diesem Rechner freigeben ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag; [docs/dev/PLUGINS.md](dev/PLUGINS.md)) |
+| Plugins | `runnel plugins [trust\|untrust] [projektordner] [--plugin <name>] [--yes] [--service]` (seit S49a) | Plugins anzeigen (freigegebene mit ihren Typen, seit S49b1) und für das Projekt auf diesem Rechner freigeben ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag; [docs/dev/PLUGINS.md](dev/PLUGINS.md)) |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---

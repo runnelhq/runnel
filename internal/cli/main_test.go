@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/runnelhq/runnel/internal/plugin/plugintest"
 )
 
 // TestMain keeps the run histories of "runnel serve" in the tests (ADR 0026) in a
 // temporary folder instead of the user's data folder.
 func TestMain(m *testing.M) {
+	plugintest.ServeIfPlugin() // the test binary is also the plugin of the tests (S49b1)
 	dir, err := os.MkdirTemp("", "runnel-cli-test-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

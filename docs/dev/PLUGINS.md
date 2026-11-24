@@ -5,8 +5,8 @@ Programm in beliebiger Sprache, das Runnel als Kindprozess startet und über JSO
 ([ADR 0019](../adr/0019-plugin-protokoll.md) mit Nachträgen; Namen nach [ADR 0013](../adr/0013-typnamen-namensraeume.md),
 Nachtrag 2026-11-24).
 
-Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S49a** – Ablage, `plugin.yaml` und
-Freigabe. Das Protokoll (Handshake, `describe`, `action.execute`) folgt mit S49b, Transforms mit S50.
+Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S49b1** – Ablage, `plugin.yaml`, Freigabe
+und Protokoll für Actions. Actions aus Plugins in Workflows folgen mit S49b2, Transforms mit S50.
 
 ## Ablage
 
@@ -93,6 +93,50 @@ runnel plugins untrust D:\flows --plugin iban
 
 ## Protokoll
 
-Folgt mit S49b: Transport (NDJSON über stdin/stdout, stderr als Log), Handshake mit `protocolVersion: 1` und
-`concurrency`, `describe`, `action.execute`, Abbruch, Maskierung von Secrets. Bis dahin gilt die Beschreibung in
-[ADR 0019](../adr/0019-plugin-protokoll.md).
+JSON-RPC 2.0, **eine Nachricht je Zeile** (UTF-8, `\n`, ein `\r` davor ist erlaubt), höchstens 16 MiB je Nachricht.
+
+| Strom | Inhalt |
+|---|---|
+| stdin | Host → Plugin |
+| stdout | Plugin → Host, **nur** Protokoll |
+| stderr | Log des Plugins: je Zeile ein Eintrag (`DEBUG`, `INFO`, `WARN`, `ERROR` am Anfang setzen die Stufe), höchstens 64 KiB je Zeile |
+
+Das Plugin läuft im **Projektordner** (Arbeitsverzeichnis) mit der Umgebung von Runnel und `RUNNEL_PLUGIN=1`. Ohne diese
+Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
+
+### Ablauf
+
+```text
+→ {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"encodings":["json"],"runnel":{"version":"0.9.0"}}}
+← {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"encoding":"json","name":"iban","version":"1.0.0","concurrency":4}}
+→ {"jsonrpc":"2.0","id":2,"method":"describe","params":{}}
+← {"jsonrpc":"2.0","id":2,"result":{"actions":[{"type":"iban.check","category":"general","label":"Check IBAN","description":"Checks an IBAN","schema":{"type":"object","properties":{"iban":{"type":"string"}},"required":["iban"]}}]}}
+→ {"jsonrpc":"2.0","id":3,"method":"action.execute","params":{"type":"iban.check","config":{"iban":"DE02…"},"context":{"runId":"01M…","actionId":"check","projectDir":"D:\\flows","environment":"prod"}}}
+← {"jsonrpc":"2.0","id":3,"result":{"output":{"valid":true,"country":"DE"}}}
+→ {"jsonrpc":"2.0","id":4,"method":"shutdown","params":{}}
+← {"jsonrpc":"2.0","id":4,"result":null}
+```
+
+| Methode | Antwort | Regeln |
+|---|---|---|
+| `initialize` | `protocolVersion` (1), `encoding` (`json`), `name` (wie in `plugin.yaml`), `version`, optional `concurrency` | Zeitgrenze 10 s; andere Version oder anderer Name: Plugin wird nicht genutzt |
+| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
+| `action.execute` | `{"output": …}` (Text, Zahl, Liste, Objekt; im Workflow `result.output`) | `config` ist geprüft und aufgelöst (Variablen, Ausdrücke); ein Fehler ist eine Fehlerantwort, ihre `message` die Meldung der Action |
+| `shutdown` | `null` | danach schließt der Host stdin; nach 5 s beendet er den Prozess mit allen Kindprozessen |
+
+- **Parallelität:** Ohne `concurrency` schickt der Host eine Anfrage nach der anderen. Mit `concurrency: n` bis zu n
+  gleichzeitig; Antworten werden über `id` zugeordnet und dürfen in beliebiger Reihenfolge kommen.
+- **Abbruch:** `$/cancelRequest` (Notification, `{"id": n}`) bei Abbruch oder Timeout. Das Plugin soll die Arbeit
+  beenden und kann mit dem Fehler `-32800` antworten; der Host wartet nicht darauf.
+- **Unbekannte Methoden** beantwortet das Plugin mit `-32601`; der Host behandelt das als „nicht angeboten“. Unbekannte
+  Felder ignorieren beide Seiten (Änderungen in Version 1 sind nur additiv).
+- **Fehler:** Endet das Plugin während einer Anfrage oder schreibt es etwas anderes als JSON-RPC auf stdout, scheitert
+  die Anfrage mit den letzten Zeilen von stderr; der Lauf behandelt das wie jeden Fehler.
+- **Secrets**, die der Host in der `config` übergibt, maskiert er in stderr, Fehlermeldungen und `output` (mit S49b2).
+
+Ströme für Transforms (`transform.open`, `.batch`, `.end`, Kredite) folgen mit S50 nach [ADR 0019](../adr/0019-plugin-protokoll.md).
+
+## Testen
+
+`runnel plugins <projekt>` startet freigegebene Plugins und zeigt ihre Typen; Fehler beim Start oder in `describe`
+stehen dort. Von Hand lässt sich ein Plugin mit `RUNNEL_PLUGIN=1` starten und die Zeilen oben eintippen.

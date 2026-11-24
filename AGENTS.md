@@ -56,6 +56,8 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/httpx/` | gemeinsame HTTP-Helfer von Server und Trigger-Listener (`IsLoopback`, JSON-Antworten) |
 | `internal/tlscert/` | Zertifikate des Trigger-Listeners: selbst erzeugt und wiederverwendet, eigene PEM-Dateien mit Neuladen |
 | `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Parameter prüfen, Prüfung für `validate` und Editor (`validate.go`), Texte der Lauf-Ereignisse (`describe.go`), Zwischenspeicher geprüfter Dateien, Läufe und Ereignisse im Speicher |
+| `internal/jsonrpc/` | JSON-RPC 2.0 über zwei Ströme, eine Nachricht je Zeile (Plugins, später MCP): Anfragen mit Zuordnung der Antworten, Notifications, `$/cancelRequest`, Grenze 16 MiB |
+| `internal/plugin/` | Plugins ausführen (ADR 0019): Prozess mit Prozessbaum, Handshake, `describe`, `action.execute`, stderr als Log, Maskierung; Test-Plugin in `plugintest/` |
 | `internal/plugintrust/` | Freigabe von Plugins je Projekt und Rechner (ADR 0019): Hash über den Plugin-Ordner, Dateien der Freigaben für Benutzer und Dienst |
 | `internal/history/` | Run-Historie (ADR 0026): SQLite-Datei je Projekt im Datenordner, Migrationen, Läufe, Status je Knoten, Log, Lebenszeichen und abgebrochene Läufe; geschrieben vom Manager in `internal/runs/record.go` |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
