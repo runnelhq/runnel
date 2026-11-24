@@ -1,0 +1,519 @@
+<!doctype html>
+<!--
+  Mockup S52 – Plugins in the editor.
+  The plugins of the project (plugins/<name>/) appear in the explorer with their state:
+  trusted, not trusted, changed since trusted, or failing to start. A plugin opens as an
+  overview (like the form of a connection, with "Overview | YAML" for plugin.yaml): version,
+  namespace, program, the state of its approval for this user and for the Windows service,
+  its types (actions, transforms, connection types) and where the project uses them.
+  "Trust…" shows what is trusted (folder, program, hash) before Runnel starts any code of the
+  plugin; the same approval as "runnel plugins trust" (ADR 0019). Steps of a plugin that
+  cannot be used show the reason at the node and lead to the plugin.
+  Builds on the approved mockups E4 (shell), E7 (properties), E9 (YAML view) and S39
+  (connection form). Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                                        (default light)
+    state = plugin | untrusted | trust | changed | error | canvas                 (default plugin)
+    controls = 0                                            hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>plugins – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5; color: var(--foreground);
+         background: var(--background); -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  .mono, code { font-family: var(--rn-font-mono); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; position: relative; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 3px 8px;
+                      border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); cursor: pointer; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); color: var(--sidebar-foreground);
+          border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 8px 0 16px; flex: none; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; flex: none; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .kind { color: var(--muted-foreground); display: inline-flex; }
+  .row.selected .kind { color: var(--accent-foreground); }
+  .row .tag { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .icon-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: var(--rn-radius-sm);
+              background: transparent; color: var(--muted-foreground); }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); flex: none; }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; white-space: nowrap; }
+  .btn.small { height: 24px; padding: 0 8px; font-size: var(--rn-text-2xs); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn.danger { color: var(--destructive); }
+  .btn.split { border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md); }
+  .btn.split + .btn { border-radius: 0 var(--rn-radius-md) var(--rn-radius-md) 0; margin-left: -1px; padding: 0 6px; }
+  .btn svg.i { width: 13px; height: 13px; }
+  .btn kbd { font: 10px var(--rn-font-mono); opacity: .75; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+
+  /* Connection form (new in S39b) */
+  .formwrap { flex: 1; overflow: auto; background: var(--background); }
+  .form { max-width: 680px; margin: 0 auto; padding: 16px 28px 40px; }
+  .conn-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-datenbank); color: var(--rn-tiefe-0); flex: none; }
+  .tile.net { background: var(--rn-kategorie-netzwerk); }
+  .tile svg.i { width: 20px; height: 20px; }
+  .conn-head h2 { margin: 0; font-size: var(--rn-text-lg); font-weight: 600; }
+  .conn-head .sub { font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .lead { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 12px 48px; }
+  .sec { border-top: 1px solid var(--border); padding: 10px 0 4px; }
+  .sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: var(--rn-text-sm); font-weight: 600; }
+  .sec h3 .count { font-weight: 400; margin-left: 4px; }
+  .sec.closed h3 { color: var(--muted-foreground); font-weight: 500; margin-bottom: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 140px; gap: 0 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 120px 160px; gap: 0 14px; }
+  .fld { margin-bottom: 10px; position: relative; }
+  .fld .lab { display: flex; align-items: baseline; gap: 6px; font-size: var(--rn-text-xs); font-weight: 500; margin-bottom: 4px; }
+  .fld .lab .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .fld .lab .req { color: var(--destructive); font-weight: 700; }
+  .inp { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border: 1px solid var(--input); border-radius: var(--rn-radius-md);
+         background: var(--background); font-size: var(--rn-text-xs); min-width: 0; }
+  .inp.mono { font-family: var(--rn-font-mono); }
+  .inp.ph { color: var(--muted-foreground); }
+  .inp.focus { border-color: var(--ring); outline: 3px solid color-mix(in srgb, var(--ring) 22%, transparent); }
+  .inp.warn { border-color: var(--warning); }
+  .inp .caret-d { margin-left: auto; color: var(--muted-foreground); }
+  .inp .v { color: var(--expression); background: var(--expression-soft); border-radius: 3px; padding: 0 3px; font-family: var(--rn-font-mono); }
+  .help { font-size: var(--rn-text-2xs); color: var(--muted-foreground); margin-top: 3px; }
+  .note { display: flex; gap: 6px; align-items: flex-start; font-size: var(--rn-text-2xs); margin-top: 4px; padding: 5px 8px; border-radius: var(--rn-radius-sm); }
+  .note.warn { background: var(--warning-soft); color: var(--warning); }
+  .note.warn b { color: var(--foreground); font-weight: 600; }
+  .note .act { margin-left: auto; }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--rn-text-xs); }
+  .box { width: 14px; height: 14px; border: 1px solid var(--input); border-radius: 3px; display: inline-grid; place-items: center; background: var(--background); }
+  .box.on { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .box svg.i { width: 11px; height: 11px; stroke-width: 2.4; }
+  .wavy { text-decoration: underline wavy var(--warning); text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+
+  /* Dialogs */
+  .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--rn-tiefe-950) 40%, transparent); display: grid; place-items: center; z-index: 10; }
+  .dialog { width: 520px; background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--rn-radius-lg);
+            box-shadow: var(--rn-shadow-lg); padding: 18px 20px 16px; }
+  .dialog.wide { width: 620px; }
+  .dialog h2 { margin: 0 0 4px; font-size: var(--rn-text-md); font-weight: 600; }
+  .dialog .intro { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 14px; }
+  .dialog .foot { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .dialog .foot small { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .type { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--background); }
+  .type.sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .type .tile { width: 28px; height: 28px; }
+  .type .tile svg.i { width: 16px; height: 16px; }
+  .type b { display: block; font-size: var(--rn-text-xs); }
+  .type div span { font-size: 10px; color: var(--muted-foreground); line-height: 1.35; display: block; }
+  .where { display: grid; grid-template-columns: 96px 1fr; gap: 6px 10px; font-size: var(--rn-text-xs); align-items: center; margin-bottom: 12px; }
+  .where span:nth-child(odd) { color: var(--muted-foreground); }
+  .dots { letter-spacing: 2px; }
+  .info { display: flex; gap: 8px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); background: var(--muted); border-radius: var(--rn-radius-sm); padding: 7px 9px; margin-top: 10px; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+  /* Canvas (design/README.md, 6.1 "Canvas-Konventionen") */
+  .canvas {
+    position: relative; flex: 1; overflow: hidden; background-color: var(--canvas);
+    background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1.2px);
+    background-size: 16px 16px;
+  }
+  .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  svg.edges { position: absolute; left: 0; top: 0; overflow: visible; }
+  .edge { fill: none; stroke-width: 2; }
+  .edge.success { stroke: var(--link-success); }
+  .edge.failure { stroke: var(--link-failure); }
+  .edge.always { stroke: var(--link-always); }
+  .edge.expression { stroke: var(--link-expression); }
+  .edge.disabled { stroke: var(--link-disabled); stroke-dasharray: 5 4; }
+  .edge-label {
+    position: absolute; transform: translate(-50%, -50%);
+    display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: var(--rn-radius-full); background: var(--card); border: 1.5px solid currentColor;
+    font-size: 11px; font-weight: 700; line-height: 1;
+  }
+  .edge-label.success { color: var(--link-success); }
+  .edge-label.failure { color: var(--link-failure); }
+  .edge-label.always { color: var(--link-always); }
+  .edge-label.expression { color: var(--link-expression); }
+
+  .node {
+    position: absolute; width: 176px; height: 52px; display: flex; align-items: center; gap: 10px;
+    padding: 0 12px 0 10px; background: var(--node); border: 1px solid var(--node-border);
+    border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-sm);
+  }
+  .node.selected { outline: 2px solid var(--node-selected); outline-offset: 1px; }
+  .node.has-error { border-color: var(--destructive); }
+  .node.has-warning { border-color: var(--warning); }
+  .node .tile { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-allgemein); color: var(--rn-tiefe-0); flex: none; }
+  .node .tile.unknown { background: var(--rn-tiefe-300); color: var(--rn-tiefe-800); }
+  .node .text { min-width: 0; line-height: 1.25; }
+  .node .id { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .type { font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .port { position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+          background: var(--node); border: 1.5px solid var(--node-border); }
+  .port.in { left: -5px; }
+  .port.out { right: -5px; }
+  .marker { position: absolute; top: -9px; right: -9px; display: grid; place-items: center; width: 20px; height: 20px;
+            border-radius: 50%; font-size: 11px; font-weight: 700; color: var(--rn-tiefe-0); box-shadow: var(--rn-shadow-sm); }
+  .marker.err { background: var(--destructive); }
+  .marker.warn { background: var(--rn-warnung-600); }
+  /* Test result bar */
+  .result { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border-radius: var(--rn-radius-md);
+            border: 1px solid var(--border); font-size: var(--rn-text-xs); }
+  .result.ok { background: var(--success-soft); border-color: transparent; }
+  .result.ok .sym { color: var(--success); font-weight: 700; }
+  .result.fail { background: var(--danger-soft); border-color: transparent; }
+  .result.fail .sym { color: var(--destructive); font-weight: 700; }
+  .result .t { font-weight: 600; }
+  .result .m { color: var(--muted-foreground); font-size: var(--rn-text-2xs); margin-top: 2px; }
+  .result ul { margin: 6px 0 0; padding-left: 16px; }
+  .result .close { margin-left: auto; }
+  .spin { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; display: inline-block; }
+
+  .node .type { display: block; padding: 0; border: 0; background: none; gap: 0; }
+  /* Plugins (new in S52) */
+  .row .st { margin-left: auto; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+             font-size: 9px; font-weight: 700; color: var(--rn-tiefe-0); }
+  .row .st.ok { background: var(--success); }
+  .row .st.warn { background: var(--rn-warnung-600); }
+  .row .st.err { background: var(--destructive); }
+  .row .ver { font: 10px var(--rn-font-mono); color: var(--muted-foreground); margin-left: auto; }
+  .row .ver + .st { margin-left: 6px; }
+  .tile.plug { background: var(--rn-kategorie-allgemein); }
+  .tile.unknown { background: var(--rn-tiefe-300); color: var(--rn-tiefe-800); }
+  .result.warn { background: var(--warning-soft); border-color: transparent; }
+  .result.warn .sym { color: var(--warning); font-weight: 700; }
+  .result .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .result .m .mono { font-size: 10px; }
+  .approvals { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; margin-top: 8px; font-size: var(--rn-text-2xs); align-items: center; }
+  .approvals > span:nth-child(odd) { color: var(--muted-foreground); }
+  .cmd { display: inline-flex; align-items: center; gap: 6px; font: 10px var(--rn-font-mono); background: var(--muted); border: 1px solid var(--border);
+         border-radius: var(--rn-radius-sm); padding: 1px 4px 1px 6px; color: var(--foreground); }
+  .cmd .icon-btn { width: 18px; height: 18px; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: var(--rn-text-xs); margin-bottom: 8px; }
+  .kv > span:nth-child(odd) { color: var(--muted-foreground); }
+  .kv .mono { font-size: 11px; }
+  .typelist { width: 100%; border-collapse: collapse; font-size: var(--rn-text-xs); margin-bottom: 8px; }
+  .typelist th { text-align: left; font-size: 10px; font-weight: 600; color: var(--muted-foreground); padding: 2px 8px 6px 0; }
+  .typelist td { border-top: 1px solid var(--border); padding: 6px 8px 6px 0; vertical-align: top; }
+  .typelist td.t { font-family: var(--rn-font-mono); white-space: nowrap; }
+  .typelist td.u { white-space: nowrap; color: var(--muted-foreground); text-align: right; }
+  .typelist td.u a { color: var(--primary); }
+  .chip { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--rn-radius-sm); font-size: 10px; font-weight: 600;
+          border: 1px solid var(--border); color: var(--muted-foreground); white-space: nowrap; }
+  .empty-types { padding: 10px 12px; border: 1px dashed var(--border); border-radius: var(--rn-radius-md); font-size: var(--rn-text-xs); color: var(--muted-foreground); margin-bottom: 8px; }
+  .empty-types ul { margin: 6px 0 0; padding-left: 16px; }
+  .stderr { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--rn-radius-sm); background: var(--rn-tiefe-950); color: var(--rn-tiefe-100);
+            font: 11px/1.6 var(--rn-font-mono); white-space: pre; overflow: auto; }
+  .uses { list-style: none; margin: 0 0 8px; padding: 0; font-size: var(--rn-text-xs); }
+  .uses li { padding: 3px 0; }
+  .uses a { color: var(--primary); font-family: var(--rn-font-mono); font-size: 11px; text-decoration: underline; text-underline-offset: 2px; }
+  .uses .k { color: var(--muted-foreground); margin-left: 6px; }
+  .hash { font: 11px/1.5 var(--rn-font-mono); word-break: break-all; }
+  .info.warn { background: var(--warning-soft); color: var(--warning); }
+  .info.warn b { color: var(--foreground); }
+
+  /* Properties panel beside the canvas (E7) */
+  .split2 { display: grid; grid-template-columns: 1fr 320px; flex: 1; min-height: 0; }
+  .props { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--background); }
+  .props .panel-title { border-bottom: 1px solid var(--border); }
+  .props-body { padding: 12px 16px; overflow: auto; font-size: var(--rn-text-xs); }
+  .props-body h4 { margin: 0 0 2px; font-size: var(--rn-text-sm); }
+  .props-body .sub { color: var(--muted-foreground); font-family: var(--rn-font-mono); font-size: 11px; margin-bottom: 12px; }
+  .alert { display: flex; gap: 8px; padding: 10px 12px; border-radius: var(--rn-radius-md); background: var(--danger-soft); margin-bottom: 12px; }
+  .alert .sym { color: var(--destructive); font-weight: 700; }
+  .alert b { display: block; margin-bottom: 2px; }
+  .alert .m { color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .alert .acts { margin-top: 8px; }
+  .problems { border-top: 1px solid var(--border); background: var(--background); font-size: var(--rn-text-xs); flex: none; }
+  .problems .ph { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-bottom: 1px solid var(--border); }
+  .problems .pr { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
+  .problems .pr .sym { color: var(--destructive); font-weight: 700; }
+  .problems .pr .loc { color: var(--muted-foreground); font-family: var(--rn-font-mono); font-size: 11px; }
+  .problems .pr a { color: var(--primary); margin-left: auto; white-space: nowrap; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup S52</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="plugin" href="#">plugin</a> <a data-state="untrusted" href="#">untrusted</a> <a data-state="trust" href="#">trust</a>
+  <a data-state="changed" href="#">changed</a> <a data-state="error" href="#">error</a> <a data-state="canvas" href="#">canvas</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>orders</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\orders</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="panel-title"><span class="label">Explorer</span><span id="tree-actions"></span></div>
+      <ul class="tree" id="tree"></ul>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div style="display:flex;flex-direction:column;flex:1;min-height:0" id="view"></div>
+    </main>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "plugin";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const I = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    pl: '<path d="M4 7h10M4 12h16M4 17h10"/><circle cx="18" cy="7" r="2"/><circle cx="18" cy="17" r="2"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    db: '<ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/>',
+    conn: '<path d="M8 12h8"/><rect x="2" y="8" width="6" height="8" rx="2"/><rect x="16" y="8" width="6" height="8" rx="2"/>',
+    // Plugins: a plug; the general sign (square with a line) stays for types of plugins without an icon (E13).
+    plug: '<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0zM12 17v4"/>',
+    general: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/>',
+    start: '<path d="M8 5l11 7-11 7z"/>',
+    file: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/>',
+    form: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+    code: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
+    shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    reload: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    play: '<path d="M8 5l11 7-11 7z"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  };
+
+  // Which plugin is open and in which state: iban is trusted (or changed), ldap is not trusted (or fails).
+  const canvas = state === "canvas";
+  const plugin = state === "plugin" || state === "changed" ? "iban" : "ldap";
+  const ibanState = state === "changed" ? "warn" : "ok";
+  const ldapState = state === "error" ? "err" : "warn";
+
+  // Explorer: the folders of the plugins with version and state; the state sign never without its meaning (title).
+  document.getElementById("tree-actions").innerHTML =
+    `<button class="icon-btn" aria-label="New">${icon(I.plus, 15)}</button><button class="icon-btn" aria-label="Reload explorer">${icon(I.reload, 14)}</button>`;
+  const stSign = { ok: "✓", warn: "!", err: "✕" };
+  const stTitle = { ok: "Trusted", warn: plugin === "iban" ? "Changed since trusted" : "Not trusted", err: "Cannot start" };
+  const rows = [["folder", "connections", 0, "2"], ["conn", "ad.yaml", 1, "", "ldap"], ["db", "erp-sql.yaml", 1, "", "sqlserver"],
+    ["folder", "pipelines", 0, "1"], ["pl", "payments.pipeline.yaml", 1],
+    ["folder", "plugins", 0, "2"], ["plug", "iban", 1, "", "", "1.2.0", ibanState], ["plug", "ldap", 1, "", "", "0.3.0", ldapState],
+    ["folder", "workflows", 0, "1"], ["wf", "sync-users.workflow.yaml", 1],
+    ["proj", "project.yaml", 0]];
+  const open = canvas ? "sync-users.workflow.yaml" : plugin;
+  document.getElementById("tree").innerHTML = rows.map(([k, n, d, c, t, ver, st]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === open ? "selected" : ""}">` +
+    (k === "folder" ? chev : k === "plug" ? chevRight : `<span style="width:12px"></span>`) +
+    `<span class="kind">${icon(I[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}${t ? `<span class="tag">${t}</span>` : ""}` +
+    (ver ? `<span class="ver">${ver}</span><span class="st ${st}" title="${st === "ok" ? "Trusted" : n === "iban" ? "Changed since trusted" : st === "err" ? "Cannot start" : "Not trusted"}">${stSign[st]}</span>` : "") +
+    `</div></li>`).join("");
+
+  // Tabs and file bar.
+  const tabs = document.getElementById("tabs"), fb = document.getElementById("filebar");
+  if (canvas) {
+    tabs.innerHTML = `<div class="tab active">${icon(I.wf)} sync-users.workflow.yaml ×</div>`;
+    fb.innerHTML = `<span class="crumbs">workflows / <b>sync-users.workflow.yaml</b></span><span class="badge">Workflow</span>
+      <span class="badge" style="background:var(--danger-soft);color:var(--destructive)">✕ 1</span><div class="spacer"></div>
+      <span style="display:inline-flex"><button class="btn split" style="opacity:.5">${icon(I.play, 13)}Run</button><button class="btn" aria-label="Environment" style="opacity:.5">dev ${icon(I.down, 12)}</button></span>
+      <button class="btn" style="opacity:.5">Save <kbd>Ctrl+S</kbd></button>
+      <div class="segmented"><button aria-pressed="true">${icon(I.wf, 14)}Canvas</button><button>${icon(I.code, 14)}YAML</button></div>`;
+  } else {
+    tabs.innerHTML = `<div class="tab active">${icon(I.plug)} ${plugin} ×</div>`;
+    const badge = plugin === "iban"
+      ? (state === "changed" ? '<span class="badge warn">! Changed since trusted</span>' : '<span class="badge" style="background:var(--success-soft);color:var(--success)">✓ Trusted</span>')
+      : (state === "error" ? '<span class="badge" style="background:var(--danger-soft);color:var(--destructive)">✕ Cannot start</span>' : '<span class="badge warn">! Not trusted</span>');
+    const action = plugin === "iban" && state === "plugin" ? `<button class="btn">Untrust</button>`
+      : state === "error" ? `<button class="btn">${icon(I.reload, 13)}Try again</button>`
+      : `<button class="btn primary">${icon(I.shield, 13)}${state === "changed" ? "Trust again…" : "Trust…"}</button>`;
+    fb.innerHTML = `<span class="crumbs">plugins / <b>${plugin}</b> / plugin.yaml</span><span class="badge">Plugin</span>${badge}<div class="spacer"></div>
+      ${action}<div class="segmented"><button aria-pressed="true">${icon(I.form, 14)}Overview</button><button>${icon(I.code, 14)}YAML</button></div>`;
+  }
+
+  const view = document.getElementById("view");
+  const sec = (title, body, count) => `<div class="sec"><h3>${chev}${title}${count ? `<span class="count">${count}</span>` : ""}</h3>${body}</div>`;
+  const cmd = (text) => `<span class="cmd">${text}<button class="icon-btn" aria-label="Copy">${icon(I.copy, 12)}</button></span>`;
+
+  function overview() {
+    const iban = plugin === "iban";
+    const head = `<div class="conn-head"><span class="tile ${iban || state === "error" ? "plug" : "unknown"}">${icon(I.plug)}</span><div>
+      <h2>${plugin}</h2><div class="sub">Version ${iban ? "1.2.0" : "0.3.0"} · namespace <span class="mono">${plugin}</span> · ${iban ? "Checks IBAN and BIC, offline" : "Reads users and groups from an LDAP directory"}</div></div></div>
+      <p class="lead"><span class="mono" style="font-size:10px">description</span> from plugin.yaml · runs as a program of its own, started by Runnel for each run</p>`;
+
+    let status;
+    if (state === "plugin") {
+      status = `<div class="result ok"><span class="sym">✓</span><div style="flex:1"><div class="t">Trusted on this computer</div>
+        <div class="m">Runnel starts it for runs, checks and the editor. A change to any file in its folder takes the approval back.</div>
+        <div class="approvals"><span>Your account (sven)</span><span>✓ trusted on 20 Nov 2026 · version 1.2.0 · SHA-256 <span class="mono">3f9a07…c21e</span></span>
+          <span>Windows service</span><span>! not trusted – runs of the service do not start it · as administrator: ${cmd("runnel plugins trust --service --plugin iban")}</span></div></div></div>`;
+    } else if (state === "changed") {
+      status = `<div class="result warn"><span class="sym">!</span><div style="flex:1"><div class="t">Changed since it was trusted</div>
+        <div class="m">A file in <span class="mono">plugins/iban</span> changed, e.g. by an update. Runnel no longer starts the plugin until you trust it again; 3 steps that use it cannot run.</div>
+        <div class="approvals"><span>Trusted</span><span>version 1.1.0 · SHA-256 <span class="mono">3f9a07…c21e</span> · 20 Nov 2026</span>
+          <span>Now</span><span>version 1.2.0 · SHA-256 <span class="mono">8b0d5e…41d2</span> · files changed today 09:42</span></div>
+        <div class="acts"><button class="btn small primary">${icon(I.shield, 12)}Review and trust again…</button></div></div></div>`;
+    } else if (state === "error") {
+      status = `<div class="result fail"><span class="sym">✕</span><div style="flex:1"><div class="t">The plugin cannot start</div>
+        <div class="m">plugin ldap: initialize: protocol version 2 is not supported (Runnel speaks 1). Steps that use it show this message and cannot run.</div>
+        <div class="stderr">Last lines of the plugin (stderr)
+INFO ldap plugin 0.3.0 starting
+WARN built for a newer Runnel (protocol 2)</div>
+        <div class="acts"><button class="btn small">${icon(I.reload, 12)}Try again</button><button class="btn small">Plugin protocol (docs)</button></div></div></div>`;
+    } else {
+      status = `<div class="result warn"><span class="sym">!</span><div style="flex:1"><div class="t">Not trusted on this computer</div>
+        <div class="m">Runnel does not start this plugin – not to list its types, not to check workflows and not in runs – until you trust it.
+        This protects you from code that came with a copied or downloaded project.</div>
+        <div class="acts"><button class="btn small primary">${icon(I.shield, 12)}Review and trust…</button></div></div></div>`;
+    }
+
+    const program = sec("Program", `<div class="kv">
+      <span>Folder</span><span class="mono">C:\\Runnel\\projects\\orders\\plugins\\${plugin}</span>
+      <span>Program</span><span><span class="mono">bin\\${plugin}.exe</span> <span style="color:var(--muted-foreground)">· Windows; Linux: <span class="mono">bin/${plugin}</span></span></span>
+      <span>Files</span><span>${iban ? "4 · 6.2 MB" : "3 · 9.8 MB"}</span>
+      ${iban ? '<span>Parallel</span><span>up to 4 requests at once</span>' : ""}</div>`);
+
+    let types;
+    if (iban && state === "plugin") {
+      const tr = (kind, t, d, uses) => `<tr><td><span class="chip">${kind}</span></td><td class="t">${t}</td><td>${d}</td><td class="u">${uses ? `<a href="#">${uses}</a>` : "not used"}</td></tr>`;
+      types = sec("Types", `<table class="typelist"><thead><tr><th style="width:110px">Kind</th><th>Type</th><th>Description</th><th style="text-align:right">Used</th></tr></thead><tbody>
+        ${tr("Action", "iban.check", "Checks one IBAN and returns bank and BIC", "2 steps")}
+        ${tr("Transform", "iban.check-all", "Checks the IBAN of every record; invalid ones go to the error link", "1 step")}
+        ${tr("Transform", "iban.bank-info", "Adds bank name and BIC to every record", "")}
+        ${tr("Connection type", "iban-registry", "Account of the online registry, for updates of the bank list", "1 connection")}
+        </tbody></table><div class="help">Also in the palette and the reference; Runnel reads them from the plugin (describe) and keeps them until a file of the plugin changes.</div>`, "4");
+    } else {
+      // Without starting the plugin: only what the files of the project name.
+      types = sec("Types", `<div class="empty-types">${state === "error" ? "The types are shown once the plugin starts." : "Runnel learns the types by starting the plugin, so they are shown once it is trusted."}
+        Used in the project:<ul>
+        ${plugin === "iban" ? '<li><span class="mono">iban.check</span> – 2 steps</li><li><span class="mono">iban.check-all</span> – 1 step</li>'
+          : '<li><span class="mono">ldap.search</span> – <a href="#" style="color:var(--primary)" class="mono">sync-users.workflow.yaml</a></li><li>connection type <span class="mono">ldap</span> – <a href="#" style="color:var(--primary)" class="mono">connections/ad.yaml</a></li>'}</ul></div>`);
+    }
+    const uses = sec("Used by", `<ul class="uses">${plugin === "iban"
+      ? '<li><a href="#">pipelines/payments.pipeline.yaml</a><span class="k">check (iban.check-all)</span></li><li><a href="#">workflows/sync-users.workflow.yaml</a><span class="k">verify, verify-manager (iban.check)</span></li><li><a href="#">connections/bank.yaml</a><span class="k">type iban-registry</span></li>'
+      : '<li><a href="#">workflows/sync-users.workflow.yaml</a><span class="k">search (ldap.search)</span></li><li><a href="#">connections/ad.yaml</a><span class="k">type ldap</span></li>'}</ul>`, plugin === "iban" ? "3 files" : "2 files");
+    return `<div class="formwrap"><div class="form" style="max-width:760px">${head}${status}${types}${uses}${program}</div></div>`;
+  }
+
+  function workflowCanvas() {
+    const node = (x, y, id, type, ic, cls, tile) => `<div class="node ${cls || ""}" style="left:${x}px;top:${y}px"><span class="port in"></span>
+      <span class="tile ${tile || ""}">${icon(I[ic])}</span><div class="text"><div class="id">${id}</div><div class="type">${type}</div></div><span class="port out"></span>
+      ${cls && cls.includes("has-error") ? '<span class="marker err">✕</span>' : ""}</div>`;
+    const edge = (x1, y1, x2, y2) => `<path class="edge success" d="M${x1} ${y1} C ${x1 + 50} ${y1}, ${x2 - 50} ${y2}, ${x2} ${y2}"/>`;
+    return `<div class="split2"><div style="display:flex;flex-direction:column;min-height:0">
+      <div class="canvas"><div class="stage" style="transform:translate(40px,60px)">
+        <svg class="edges" width="900" height="400">${edge(176, 26, 240, 26)}${edge(416, 26, 480, 26)}</svg>
+        ${node(0, 0, "start", "core.start", "start")}
+        ${node(240, 0, "search", "ldap.search", "general", "selected has-error", "unknown")}
+        ${node(480, 0, "write", "file.write", "file", "", "")}
+      </div></div>
+      <div class="problems"><div class="ph"><b>Problems</b><span class="count">1</span></div>
+        <div class="pr"><span class="sym">✕</span><span>action "search": plugin "ldap" is not trusted on this computer</span><span class="loc">sync-users.workflow.yaml:9:11</span><a href="#">Open plugin ldap</a></div></div>
+    </div>
+    <aside class="props"><div class="panel-title"><span class="label">Action</span><button class="icon-btn" aria-label="Close">${icon(I.close, 12)}</button></div>
+      <div class="props-body"><h4>search</h4><div class="sub">ldap.search · plugin ldap</div>
+        <div class="alert"><span class="sym">✕</span><div><b>Plugin ldap is not trusted on this computer</b>
+          <div class="m">The step cannot run, and its fields are shown once the plugin is trusted. Until then, edit them in YAML.</div>
+          <div class="acts"><button class="btn small primary">${icon(I.plug, 12)}Open plugin ldap</button></div></div></div>
+        <div class="kv" style="grid-template-columns:70px 1fr"><span>with:</span><span class="mono">base: ou=staff,dc=example,dc=com<br>filter: (objectClass=user)<br>connection: ad</span></div>
+      </div></aside></div>`;
+  }
+
+  view.innerHTML = canvas ? workflowCanvas() : overview();
+  if (canvas) document.querySelector(".canvas").style.flex = "1";
+
+  document.getElementById("status").innerHTML = `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>` +
+    `<span>${canvas ? "Workflow · 3 actions" : "Plugin · " + plugin}</span><span class="spacer"></span><span>Runnel v0.2.0</span>`;
+
+  // Trust: what is trusted, before any code of the plugin runs; the same approval as "runnel plugins trust".
+  if (state === "trust") {
+    document.getElementById("app").insertAdjacentHTML("beforeend", `<div class="scrim"><div class="dialog wide" role="dialog" aria-label="Trust plugin">
+      <h2>Trust plugin ldap?</h2>
+      <p class="intro">A plugin is a program. Once trusted, Runnel starts it with the rights of your account – to list its types, to check workflows and in runs – and gives it the connections and secrets its steps name.</p>
+      <div class="where" style="grid-template-columns:110px 1fr">
+        <span>Name</span><span><b>ldap</b> · version 0.3.0 · namespace <span class="mono">ldap</span></span>
+        <span>Folder</span><span class="mono">C:\\Runnel\\projects\\orders\\plugins\\ldap</span>
+        <span>Program</span><span class="mono">bin\\ldap.exe</span>
+        <span>Files</span><span>3 · 9.8 MB · changed 21 Nov 2026</span>
+        <span>SHA-256</span><span class="hash">8e41c0d27a95f3b6e0c19d84a7b2f65c3d10e98a4f7b2c56d1e08a39b4c7f2e1</span>
+        <span>Trusted for</span><span>this project · this computer · your account (sven)</span>
+      </div>
+      <div class="info warn">${icon(I.shield, 14)}<span><b>Only trust plugins from a source you know.</b> Compare the hash with the one the publisher lists (SHA256SUMS of the release). Any change to a file in the folder takes the approval back.</span></div>
+      <div class="info">${icon(I.code, 14)}<span>For the Windows service, an administrator trusts it separately: ${cmd("runnel plugins trust --service --plugin ldap C:\\Runnel\\projects\\orders")}</span></div>
+      <div class="foot"><span class="spacer"></span><button class="btn">Cancel</button><button class="btn primary">${icon(I.shield, 13)}Trust plugin</button></div>
+    </div></div>`);
+  }
+</script>
+</body>
+</html>
