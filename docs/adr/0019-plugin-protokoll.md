@@ -462,26 +462,97 @@ Editor, Connections). Präzisierungen:
   Plugins, wenn `x-runnel-connection` sie nennt; sie kommen aufgelöst und maskiert wie die eingebauten an.
 - `runnel plugins` zeigt die Connection-Typen eines Plugins mit `connection` neben den Actions.
 
-## Nachtrag 2026-11-24 (S51a): Go-SDK für Actions und Connection-Typen
+## Nachtrag 2026-11-24 (S50a): Transforms als Strom
 
-S51 ist geteilt: S51a (Actions und Connection-Typen, auf Wunsch des Maintainers vor S50), S51b (Transforms nach S50).
-Präzisierungen bei der Umsetzung in `runnelhq/sdk-go`:
+S50 ist geteilt: S50a (Strom, dieser Nachtrag) und S50b (`transform.init`, `transform.detectFields`). Präzisierungen
+bei der Umsetzung von S50a:
 
-- **API:** `runnel.New(name, version)`, `runnel.AddAction` und `runnel.AddConnectionType` mit einem Struct je
-  Konfiguration (Go-Generics), `p.Main()`. Fehler in den Definitionen (Typ außerhalb des Namensraums, doppelt,
-  unbekannte Kategorie, ungültige Tags) sind Programmierfehler (`panic` beim Start, also im ersten Test).
-- **Schema aus Struct-Tags** wie bei eingebauten Actions (`json`, `doc`, `schema`, ADR 0014), damit Plugins und Kern
+- **`describe`** liefert `transforms` mit Descriptoren wie die eingebauten (`type`, `category`, `label`,
+  `description`, `schema`, optional `example`, `recordErrors`, `parallel`). Typen nur im eigenen Namensraum, jeder
+  einmal, mit `schema`; unbekannte Kategorie wird `transform`. Ein Typ darf zugleich Action und Transform sein.
+- **`transform.open`** (Anfrage): `stream`, `type`, `config` (geprüft und aufgelöst wie bei Actions, Connections als
+  Objekt), `context` (`runId`, `transformId`, `projectDir`, `environment`) und `emitWindow`. Antwort `{"window": n}`
+  (1 bis 64, ohne Angabe 1). `inputs` mit dem Schema des Eingangs entfällt bis S50b: Der Feldkopf kommt mit den Batches.
+- **`transform.batch`** (Notification): `stream`, `rows` und `fields` (Name und Typ), wenn sich die Felder gegenüber
+  dem letzten Batch geändert haben. Records mit anderen Feldern beginnen einen neuen Batch. Je Batch ein Kredit; der
+  Plugin gibt sie mit `$/ack {"stream", "batches"}` zurück.
+- **`transform.end`** (Notification) nach dem letzten Batch. Ein Eingabe-Transform (ohne eingehende Links) bekommt
+  es sofort nach `open`; er schreibt, bis er fertig ist, und schließt dann.
+- **`transform.emit`** (Notification vom Plugin): `stream`, `to`, `fields`, `rows`. Ohne `fields` gelten die des
+  letzten `emit` (nicht des Ziels). `to` ist
+  - `main` (oder leer): alle Daten-Links, die nicht zu einem Ziel der Konfiguration führen;
+  - `error`: der Fehler-Link; die Records tragen `_error` und `_errorField`, `_errorTransform` setzt der Host. Ohne
+    Fehler-Link scheitert der Transform mit der Meldung des ersten Records (wie eingebaute Transforms);
+  - die ID eines Transforms aus einem Feld mit `format: runnel-target` der Konfiguration. Ein anderes Ziel ist ein
+    Fehler des Plugins.
+  Je `emit` ein Kredit des Hosts (`emitWindow`, 4); der Host gibt ihn mit `$/ack` zurück, sobald die Records bei den
+  folgenden Transforms sind. Mehr `emit` als Kredite beenden den Strom mit Fehler.
+- **`transform.closed`** (Notification vom Plugin): `stream`, optional `error.message`. Mit Fehler scheitert der
+  Transform und mit ihm die Pipeline (Meldung maskiert).
+- **Werte** nach ADR 0007 statt der Namen aus der ADR: `string`, `int`, `decimal` (Text), `float`, `bool`, `date`
+  (`2026-11-24`), `datetime` (RFC 3339), `binary` (Base64), `json`; ohne Typ der JSON-Wert. Ein Wert, der nicht zum
+  Typ passt, beendet den Strom mit Fehler (`row 3, field "amount": … is not a value of type decimal`).
+- **Records sind Daten:** Der Host maskiert Log-Zeilen und Fehlermeldungen, nicht die Werte der Records (wie bei
+  eingebauten Transforms).
+- **Prozess:** wie bei Actions einer je Plugin und Lauf; alle Transforms und Kopien (`copies`) des Plugins in einer
+  Pipeline teilen ihn mit eigenen `stream`-Nummern. Endet der Prozess, scheitern seine Ströme mit den letzten Zeilen
+  von stderr.
+- **Abbruch:** Bricht der Lauf ab, sendet der Host nichts mehr und beendet den Prozess mit dem Lauf.
+- **Leistung:** Benchmark `BenchmarkPluginTransform` (200.000 Records mit fünf Feldern durch das Test-Plugin und
+  zurück, mit Start des Plugins) erreicht 310.000–330.000 Records/s auf vier Kernen, mit einem bewusst einfachen
+  Test-Plugin ohne SDK. Das Ziel ist erreicht, ein Binärformat ist nicht nötig.
+
+## Nachtrag 2026-11-24 (S50b): `transform.init` und `transform.detectFields`
+
+- **Ankündigung** je Transform in `describe`: `"init": true`, `"detectFields": true`. Ohne `init` ist das Schema
+  hinter dem Transform offen; ohne `detectFields` bietet der Editor „Detect fields“ nicht an.
+- **`transform.init`** (Anfrage): `type`, `config`, `input` (Schema des Eingangs, `{"fields": [{"name", "type"}],
+  "open"}`; ohne Eingang leer und geschlossen), `targets` (IDs der Transforms, zu denen Daten-Links führen). Antwort:
+  `output` (Schema wie `input`; fehlt es, ist der Ausgang offen) und `problems` (`path` in `with`, `message`,
+  `warning`). Fehler stehen mit Position im Feld der Datei, wie bei eingebauten Transforms; Felder des Schemas haben
+  Namen, jeden einmal, und Typen nach ADR 0007.
+  - **Ohne Secrets:** Felder mit `runnel-secret` kommen leer, Connections als Name – `init` prüft, verbindet aber
+    nicht. Variablen sind beim Prüfen ohne Lauf noch nicht aufgelöst.
+  - **Eigener Prozess:** Runnel startet das Plugin dafür kurz (Freigabe erneut geprüft) und beendet es, Zeitgrenze
+    10 s. Die Antwort wird je Plugin (Dateien und Freigaben) und Anfrage zwischengespeichert (höchstens 1.024
+    Einträge), damit Editor, `validate` und Lauf das Plugin nicht bei jeder Prüfung starten.
+  - Ein Fehler beim Start oder in `init` ist ein Fehler der Prüfung am Transform; der Lauf startet nicht.
+- **`transform.detectFields`** (Anfrage): `type`, `config` (Variablen mit den Vorgaben aufgelöst, **Connections
+  aufgelöst** wie im Lauf, mit Secrets), `limit` (1.000). Antwort wie bei eingebauten Eingaben (S46): `source`
+  (`[{"name", "value"}]`), `rows`, `complete`, `fields` (`name`, `type`, optional `format`, `values`, `note`,
+  `warning`). Runnel prüft Namen und Typen und vergleicht mit `fields:` der Konfiguration. Zeitgrenze 1 Minute;
+  Secrets der Connections sind in Fehlermeldungen maskiert.
+## Nachtrag 2026-11-24 (S51): Go-SDK
+
+Präzisierungen bei der Umsetzung in `runnelhq/sdk-go` (Actions und Connection-Typen wurden zuerst gebaut, die
+Transforms nach S50):
+
+- **API:** `runnel.New(name, version)`, `runnel.AddAction`, `runnel.AddTransform` und `runnel.AddConnectionType` mit
+  einem Struct je Konfiguration (Go-Generics), `p.Main()`. Fehler in den Definitionen (Typ außerhalb des Namensraums,
+  doppelt, unbekannte Kategorie, ungültige Tags) sind Programmierfehler (`panic` beim Start, also im ersten Test).
+- **Schema aus Struct-Tags** wie bei eingebauten Bausteinen (`json`, `doc`, `schema`, ADR 0014), damit Plugins und Kern
   dieselben Schemas liefern. Zusätzlich: `connection=<typ>` an einem Struct-Feld ergibt im Schema einen Text mit
   `format: runnel-connection`; das Feld bekommt die aufgelöste Connection. `schema:"-"` liest ein Feld, ohne es ins
   Schema zu nehmen (`runnel.ConnectionInfo` mit `name` und `type`).
 - **Werte:** Texte in Feldern vom Typ Zahl oder `bool` wandelt das SDK um, weil aufgelöste Variablen als Text
-  ankommen; ein Wert, der nicht passt, scheitert mit `field "x": expected …` ohne Go-Typnamen.
-- **`concurrency`** ist im SDK 4, wenn das Plugin nichts anderes setzt; das SDK hält die Grenze selbst ein.
+  ankommen; ein Wert, der nicht passt, scheitert mit `field "x": expected …` ohne Go-Typnamen. Für `transform.init`
+  bleiben solche Felder leer (Variablen sind dort eventuell noch `${…}`), Connections kommen dort als Name.
+- **`concurrency`** ist im SDK 4, wenn das Plugin nichts anderes setzt; das SDK hält die Grenze selbst ein. Ströme
+  zählen nicht mit.
+- **Transforms:** `Stream.Next` liefert Batches, `Stream.Emit` schreibt an `main`, `error` oder ein Ziel. Das SDK liest
+  eingehende Nachrichten in einer eigenen Goroutine und nimmt höchstens `window` (4) Batches an, die `Next` noch nicht
+  geliefert hat; `$/ack` für einen Batch schickt es, sobald `Next` ihn liefert. `Emit` wartet auf Kredite des Hosts.
+  `fields` gehen mit jedem `emit`: Runnel liest bis S50b ein `emit` ohne `fields` als eines ohne Felder, obwohl das
+  Protokoll das Weglassen erlaubt.
 - **Fehler:** Ein `error` der Action ist `-32000` mit seiner Meldung, ein `panic` ebenso (das Plugin läuft weiter, der
-  Stack steht im Log); abgebrochene Anfragen `-32800`, Anfragen vor `initialize` `-32002`, unbekannte Methoden
-  `-32601`. Ein Fehler in `connection.test` ist ein gescheiterter Test (`ok: false`), keine Fehlerantwort.
-- **Tests:** `runneltest` spricht das Protokoll im Testprozess; `runneltest.NewProject` baut das Plugin in ein
-  temporäres Projekt, gibt es frei (Freigaben im temporären Ordner) und startet `runnel`, wenn `RUNNEL_BIN` gesetzt
-  ist. Die CI der Repositorys des SDK und der Plugins baut dafür `runnel` aus `main`.
+  Stack steht im Log); bei Transforms beendet beides den Strom mit `transform.closed` und Meldung. Abgebrochene
+  Anfragen `-32800`, Anfragen vor `initialize` `-32002`, unbekannte Methoden `-32601`. Ein Fehler in `connection.test`
+  ist ein gescheiterter Test (`ok: false`), keine Fehlerantwort.
+- **Tests:** `runneltest` spricht das Protokoll im Testprozess (auch `RunTransform` mit Krediten wie der Host);
+  `runneltest.NewProject` baut das Plugin in ein temporäres Projekt, gibt es frei (Freigaben im temporären Ordner) und
+  startet `runnel`, wenn `RUNNEL_BIN` gesetzt ist. Die CI der Repositorys des SDK und der Plugins baut dafür `runnel`
+  aus `main`.
+- **Leistung:** Beispiel-Transform mit Runnel (500.000 Records mit fünf Feldern, ein Feld dazu, vier Kerne): etwa
+  360.000 Records/s; `make bench` im SDK misst den Strom ohne Runnel (≈ 300.000 Records/s mit Test-Client).
 - **Erste Plugins:** `runnelhq/plugin-iban` und `runnelhq/plugin-ldap` (Version 0.1.0) mit Release-Archiven nach
   `docs/dev/PLUGINS.md` und `THIRD_PARTY_NOTICES`.

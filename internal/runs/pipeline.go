@@ -60,6 +60,7 @@ type PreparedPipeline struct {
 // the files are returned as model.Errors, other problems as plain errors.
 func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 	p := &PreparedPipeline{}
+	spec.Registry = WithPluginTransforms(spec.Registry, spec.ProjectDir) // transforms of plugins (S50a)
 	pl, diags, err := parsePipeline(spec.Name, spec.Data)
 	if err != nil {
 		return p, err
@@ -103,6 +104,7 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		Scope:       scope,
 		Mask:        mask,
 		Connections: conns,
+		Plugins:     pluginStreams(spec.ProjectDir, envName, mask),
 		Environment: envName,
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,

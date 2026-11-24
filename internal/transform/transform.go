@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -39,6 +40,7 @@ type Output struct {
 	values  map[string]any
 	fail    func(record.Record) error
 	emitTo  func(string, record.Record) error
+	targets []string
 	rows    []record.Record
 	result  func(record.Record) error
 	respond action.Responder
@@ -46,7 +48,29 @@ type Output struct {
 	info    <-chan Batch
 	infoSrc string
 	inputs  map[string]<-chan Batch
+	plugins PluginRunner
 }
+
+// PluginRunner runs the transforms of plugins in the processes of one run (ADR 0019,
+// S50a): one process per plugin, started on first use and ended by Close at the end of
+// the run.
+type PluginRunner interface {
+	// Stream runs a transform of a plugin as a stream: the batches of in go to the
+	// plugin, the records it emits go to out. It returns when the plugin has closed the
+	// stream, or with the error of the plugin or of ctx. targets are the ids of
+	// transforms in fields with format runnel-target: the plugin may emit to them.
+	Stream(ctx context.Context, plugin, typ string, config map[string]any, targets []string, in <-chan Batch, out *Output) error
+	Close()
+}
+
+// WithPlugins sets the plugins of the run; the engine sets it.
+func (o *Output) WithPlugins(p PluginRunner) *Output {
+	o.plugins = p
+	return o
+}
+
+// Plugins returns the plugins of the run; nil where plugins are not supported.
+func (o *Output) Plugins() PluginRunner { return o.plugins }
 
 // NewOutput creates an Output; the engine creates one per transform, tests their own.
 func NewOutput(transformID string, emit func(record.Record) error, log func(slog.Level, string)) *Output {
@@ -98,6 +122,16 @@ func (o *Output) WithTargets(emitTo func(target string, r record.Record) error) 
 	o.emitTo = emitTo
 	return o
 }
+
+// WithTargetIDs sets the ids of the transforms the data links lead to; the engine sets it.
+func (o *Output) WithTargetIDs(ids []string) *Output {
+	o.targets = ids
+	return o
+}
+
+// TargetIDs returns the ids of the transforms the data links lead to, as in
+// InitContext.Targets; nil outside the engine.
+func (o *Output) TargetIDs() []string { return o.targets }
 
 // EmitTo passes a record to the data link that leads to the transform with the id
 // target only (e.g. core.switch), instead of to all of them like Emit. The targets are
@@ -235,6 +269,9 @@ type Definition struct {
 	Example string
 	// Config is the configuration struct that New decodes "with" into; nil for none.
 	Config any
+	// Schema is the schema of the configuration where there is no Config, as for the
+	// transforms of plugins (ADR 0019, S50a).
+	Schema *schema.Schema
 	// New creates a transform from its "with" configuration (variables resolved).
 	New func(with map[string]any) (Transform, error)
 	// RecordErrors is set for transforms that pass records they cannot process to an
@@ -281,6 +318,8 @@ type Descriptor struct {
 type Registry struct {
 	defs        map[string]Definition
 	descriptors map[string]Descriptor
+	// hints explain, by namespace, why types of a plugin are missing (e.g. not trusted).
+	hints map[string]string
 }
 
 // NewRegistry creates an empty registry.
@@ -300,13 +339,41 @@ func (r *Registry) Register(d Definition) {
 	if !slices.Contains(Categories, d.Category) {
 		panic(fmt.Sprintf("transform type %s: unknown category %q", d.Type, d.Category))
 	}
-	s, err := schema.For(d.Config)
-	if err != nil {
-		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
+	s := d.Schema
+	if s == nil {
+		var err error
+		if s, err = schema.For(d.Config); err != nil {
+			panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
+		}
 	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, Example: d.Example, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
 		DetectFields: d.DetectFields != nil, InfoInput: d.InfoInput}
+}
+
+// With returns a copy of the registry with more transform types (those of the plugins
+// of a project) and hints by namespace for types that are missing, e.g. of a plugin that
+// is not trusted. The definitions must be valid (checked by the caller).
+func (r *Registry) With(defs []Definition, hints map[string]string) *Registry {
+	out := &Registry{defs: maps.Clone(r.defs), descriptors: maps.Clone(r.descriptors), hints: maps.Clone(r.hints)}
+	for _, d := range defs {
+		if _, dup := out.defs[d.Type]; !dup {
+			out.Register(d)
+		}
+	}
+	for ns, h := range hints {
+		if out.hints == nil {
+			out.hints = map[string]string{}
+		}
+		out.hints[ns] = h
+	}
+	return out
+}
+
+// Hint explains why an unknown type is missing, if its namespace belongs to a plugin
+// of the project that cannot be used; empty otherwise.
+func (r *Registry) Hint(typ string) string {
+	return r.hints[model.TypeNamespace(typ)]
 }
 
 // Lookup returns the definition of a transform type.

@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/proc"
 	"github.com/runnelhq/runnel/internal/schema"
+	"github.com/runnelhq/runnel/internal/transform"
 )
 
 // ProtocolVersion is the version of the protocol this host speaks (ADR 0019, Nachtrag 2026-11-24).
@@ -77,6 +79,10 @@ type Process struct {
 
 	mu     sync.Mutex
 	stderr []string // the last lines, for messages when the plugin ends unexpectedly
+
+	streamMu   sync.Mutex
+	streams    map[int64]*stream // the open streams of transforms (S50a)
+	lastStream int64
 }
 
 // Program returns the program and arguments of a plugin for this computer: executable
@@ -143,10 +149,10 @@ func Start(ctx context.Context, p *model.Plugin, o Options) (*Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot start plugin %s: %w", p.Name, err)
 	}
-	pr := &Process{plugin: p, opts: o, cmd: cmd, tree: tree, stdin: stdin, exited: make(chan struct{})}
+	pr := &Process{plugin: p, opts: o, cmd: cmd, tree: tree, stdin: stdin, exited: make(chan struct{}), streams: map[int64]*stream{}}
 	pr.logs.Add(1)
 	go pr.readLog(stderr)
-	pr.conn = jsonrpc.New(stdout, stdin, nil)
+	pr.conn = jsonrpc.New(stdout, stdin, pr.notify)
 	go func() {
 		// stdout and stderr are read to the end before Wait closes the pipes.
 		pr.logs.Wait()
@@ -189,25 +195,39 @@ func (pr *Process) call(ctx context.Context, method string, params, result any) 
 	}
 	select {
 	case <-pr.conn.Done():
-		<-pr.exited
-		msg := "the plugin ended unexpectedly"
-		if e := pr.conn.Err(); e != nil && !errors.Is(e, jsonrpc.ErrClosed) {
-			msg = "the plugin sent something invalid: " + e.Error()
-		}
-		if last := pr.lastLines(); last != "" {
-			msg += "; last lines: " + last
-		}
-		return errors.New(pr.mask(msg))
+		return pr.ended()
 	default:
 		return err
 	}
+}
+
+// ended is the error of a plugin that ended or broke the protocol, with its last lines
+// of stderr; it waits until the process has ended.
+func (pr *Process) ended() error {
+	<-pr.exited
+	msg := "the plugin ended unexpectedly"
+	if e := pr.conn.Err(); e != nil && !errors.Is(e, jsonrpc.ErrClosed) {
+		msg = "the plugin sent something invalid: " + e.Error()
+	}
+	if last := pr.lastLines(); last != "" {
+		msg += "; last lines: " + last
+	}
+	return errors.New(pr.mask(msg))
 }
 
 // Description is the answer of a plugin to describe: its action types and its
 // connection types (S49c).
 type Description struct {
 	Actions     []action.Descriptor `json:"actions"`
+	Transforms  []TransformType     `json:"transforms"`
 	Connections []ConnectionType    `json:"connectionTypes"`
+}
+
+// TransformType is a transform type of a plugin: its descriptor and whether it answers
+// transform.init (S50b); detectFields is in the descriptor.
+type TransformType struct {
+	transform.Descriptor
+	Init bool `json:"init"`
 }
 
 // ConnectionType is a connection type of a plugin (ADR 0019, Nachtrag 2026-11-24).
@@ -220,10 +240,10 @@ type ConnectionType struct {
 	Test bool `json:"test"`
 }
 
-// Describe returns the types of the plugin (describe), checked: action types in the
-// namespace of the plugin, kind action, a schema of the configuration; connection types
-// named like the namespace or "<namespace>-…", with a schema. Transforms follow with S50
-// and are ignored until then.
+// Describe returns the types of the plugin (describe), checked: action and transform
+// types in the namespace of the plugin, of their kind, with a schema of the
+// configuration; connection types named like the namespace or "<namespace>-…", with a
+// schema.
 func (pr *Process) Describe(ctx context.Context) (Description, error) {
 	ctx, cancel := context.WithTimeout(ctx, StartTimeout)
 	defer cancel()
@@ -253,6 +273,30 @@ func (pr *Process) Describe(ctx context.Context) (Description, error) {
 		d.Kind = "action"
 		if d.Label == "" {
 			d.Label = d.Type
+		}
+	}
+	for i := range res.Transforms {
+		d := &res.Transforms[i].Descriptor
+		switch {
+		case !model.ValidTypeName(d.Type):
+			return fail("invalid type name %q", d.Type)
+		case model.TypeNamespace(d.Type) != pr.plugin.Namespace:
+			return fail("type %s is outside its namespace %q", d.Type, pr.plugin.Namespace)
+		case seen["transform:"+d.Type]:
+			return fail("transform %s is described twice", d.Type)
+		case d.Kind != "" && d.Kind != "transform":
+			return fail("%s has kind %q in transforms", d.Type, d.Kind)
+		case d.Schema == nil:
+			return fail("%s has no schema", d.Type)
+		}
+		seen["transform:"+d.Type] = true
+		d.Kind = "transform"
+		d.InfoInput = false // info links of plugins follow later
+		if d.Label == "" {
+			d.Label = d.Type
+		}
+		if !slices.Contains(transform.Categories, d.Category) {
+			d.Category = transform.CategoryTransform
 		}
 	}
 	ns := pr.plugin.Namespace

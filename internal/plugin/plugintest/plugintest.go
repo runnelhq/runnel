@@ -8,6 +8,7 @@
 //	other-name  answers initialize as plugin "other"
 //	outside     describes core.echo (outside its namespace)
 //	conn-outside describes connection type sql (outside its namespace)
+//	bad-to, close-error: see transforms.go
 //
 // The text "fail" fails, "sleep" takes 300 ms, "crash" ends the process, "hang" waits for
 // $/cancelRequest.
@@ -55,6 +56,8 @@ func serve(mode string) {
 	}
 	cancelled := make(chan struct{}, 1)
 	in := bufio.NewScanner(os.Stdin)
+	in.Buffer(make([]byte, 0, 64<<10), 16<<20)
+	ts := &streams{mode: mode, send: send, all: map[int64]*pstream{}}
 	for in.Scan() {
 		var req struct {
 			ID     json.RawMessage `json:"id"`
@@ -88,7 +91,7 @@ func serve(mode string) {
 					"text": map[string]any{"type": "string"},
 					"api":  map[string]any{"type": "string", "format": "runnel-connection", "x-runnel-connection": []string{"http", "demo"}},
 				}},
-			}}, "connectionTypes": []any{map[string]any{
+			}}, "transforms": transformDescriptors(), "connectionTypes": []any{map[string]any{
 				"type": connType, "label": "Demo", "description": "A demo service", "test": true,
 				"schema": map[string]any{"type": "object", "required": []string{"host"}, "additionalProperties": false, "properties": map[string]any{
 					"host":     map[string]any{"type": "string"},
@@ -138,6 +141,16 @@ func serve(mode string) {
 					answer(id, map[string]any{"output": out})
 				}
 			}(req.ID)
+		case "transform.init":
+			answer(req.ID, initSchema(req.Params))
+		case "transform.detectFields":
+			answer(req.ID, detect(req.Params))
+		case "transform.open":
+			answer(req.ID, ts.open(req.Params))
+		case "transform.batch", "transform.end":
+			ts.batch(req.Params, req.Method == "transform.end")
+		case "$/ack":
+			ts.ack(req.Params)
 		case "$/cancelRequest":
 			cancelled <- struct{}{}
 		case "shutdown":

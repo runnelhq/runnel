@@ -29,6 +29,13 @@ func connectionTypes(p *model.Project) *connection.Registry {
 	return ConnectionTypes(p.Dir)
 }
 
+// ConnectionResolver resolves the connections of a project for an environment (may be
+// nil) outside a run, e.g. for "Detect fields" (S50b); the mask holds their secrets.
+func ConnectionResolver(p *model.Project, env *model.Environment) (connection.Resolver, *vars.Mask) {
+	mask := &vars.Mask{}
+	return connectionResolver(p, env, mask), mask
+}
+
 // connectionResolver resolves the connections of a run for its environment: variables of
 // the project and environment, secrets from the stores of the environment (added to the
 // mask of the run, like the values of ${env:…} in the connection, ADR 0022).

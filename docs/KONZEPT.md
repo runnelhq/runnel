@@ -895,11 +895,11 @@ Windows, gRPC für andere Sprachen).
   (S49c). Secrets, die ein Plugin bekommt, maskiert der Host in allem, was zurückkommt.
 - Actions freigegebener Plugins stehen seit S49b2 in Workflows und in der Palette bereit; nicht freigegebene meldet die
   Prüfung an der Action. Connection-Typen der Plugins (S49c) prüft Runnel gegen ihr Schema, das Formular zeigt ihre
-  Felder, `connection.test` testet sie.
+  Felder, `connection.test` testet sie. Transforms der Plugins (S50a) laufen als Strom mit Krediten in Pipelines; mit `transform.init` kennt die
+  Prüfung ihre Felder, mit `transform.detectFields` bieten sie „Felder ermitteln“ (S50b).
 - Protokoll ab `protocolVersion: 1`, Änderungen darin nur additiv; `executable` je Betriebssystem; ein Plugin
   bearbeitet ohne Angabe von `concurrency` eine Anfrage nach der anderen.
-- SDKs in eigenen Repositorys: Go (Referenz, `runnelhq/sdk-go`: Actions und Connection-Typen mit S51a, Transforms mit
-  S51b), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;
+- SDKs in eigenen Repositorys: Go (Referenz, `runnelhq/sdk-go`, S51: Actions, Connection-Typen und Transforms), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;
   verbindlich ist die Beschreibung des Protokolls in `docs/dev/PLUGINS.md`.
 
 ```yaml
