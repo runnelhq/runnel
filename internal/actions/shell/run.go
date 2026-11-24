@@ -2,10 +2,10 @@ package shell
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -35,7 +35,7 @@ type runAction struct {
 	Input     *string           `json:"input" doc:"Text for stdin; missing: stdin is empty, so that a program waiting for input does not hang"`
 	Encoding  string            `json:"encoding" doc:"Encoding of stdout and stderr; auto: UTF-8, else the OEM code page of Windows" schema:"enum=auto|utf-8|oem|windows-1252,default=auto"`
 	JSON      bool              `json:"json" doc:"Read stdout as JSON into output.json" schema:"default=false"`
-	MaxOutput int               `json:"maxOutput" doc:"Most bytes of stdout and of stderr kept; more is dropped (truncated)" schema:"default=1048576"`
+	MaxOutput string            `json:"maxOutput" doc:"Largest size of stdout and of stderr kept, e.g. 500KB or 10MB; more is dropped (truncated)" schema:"default=1MB"`
 	Timeout   string            `json:"timeout" doc:"Longest time the program may run; then it ends with all processes it started" schema:"format=runnel-duration,default=10m"`
 }
 
@@ -47,8 +47,10 @@ func newRun(with map[string]any) (action.Action, error) {
 	if !proc.Valid(a.Encoding) {
 		return nil, fmt.Errorf("invalid encoding %q (expected auto, utf-8, oem or windows-1252)", a.Encoding)
 	}
-	if a.MaxOutput < 0 {
-		return nil, errors.New("maxOutput must not be negative")
+	if !strings.Contains(a.MaxOutput, "${") {
+		if _, err := outputLimit(a.MaxOutput); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := a.timeout(); err != nil {
 		return nil, err
@@ -73,7 +75,11 @@ func (a *runAction) Execute(ctx context.Context, ec *action.ExecContext) (action
 		return action.Result{}, err
 	}
 	timeout, _ := a.timeout()
-	cmd := proc.Command{Program: program, Args: a.Args, Dir: base, Encoding: a.Encoding, MaxOutput: a.MaxOutput, Timeout: timeout}
+	limit, err := outputLimit(a.MaxOutput)
+	if err != nil {
+		return action.Result{}, err
+	}
+	cmd := proc.Command{Program: program, Args: a.Args, Dir: base, Encoding: a.Encoding, MaxOutput: limit, Timeout: timeout}
 	if a.Workdir != "" {
 		cmd.Dir = paths.Resolve(ctx, a.Workdir)
 	}

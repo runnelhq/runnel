@@ -42,12 +42,14 @@ type output struct {
 	IfExists string     `json:"ifExists" doc:"If the workbook exists: replace it once all records are written, fail, or replace only the sheet (sheet) and keep the other sheets, charts and formulas" schema:"enum=replace|fail|sheet,default=replace"`
 	Fields   []outField `json:"fields" doc:"Columns to write, in this order, with a number format; empty: all fields of the records"`
 
-	cols []string // columns known before the run (fields or a closed schema)
+	cols  []string // columns known before the run (fields or a closed schema)
+	heads []string // names in the header, with fields (as or name)
 }
 
 // outField is a column of excel.output.
 type outField struct {
-	Name   string `json:"name" doc:"Name of the field to write (and of the column in the header)" schema:"required,format=runnel-field,example=amount"`
+	Name   string `json:"name" doc:"Name of the field to write" schema:"required,format=runnel-field,example=amount"`
+	As     string `json:"as" doc:"Name of the column in the header; empty: the name of the field" schema:"example=Betrag"`
 	Format string `json:"format" doc:"Number format of Excel as in English Excel, e.g. #,##0.00, 0.0% or dd.mm.yyyy hh:mm; empty: numbers as General, dates as short date" schema:"example=0.0%"`
 }
 
@@ -66,7 +68,7 @@ func newOutput(with map[string]any) (transform.Transform, error) {
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
+	seen, heads := map[string]bool{}, map[string]bool{}
 	for _, f := range t.Fields {
 		if f.Name == "" {
 			return nil, errors.New("fields: every field needs a name")
@@ -75,7 +77,16 @@ func newOutput(with map[string]any) (transform.Transform, error) {
 			return nil, fmt.Errorf("fields: the field %q is listed twice", f.Name)
 		}
 		seen[f.Name] = true
+		head := f.Name
+		if f.As != "" {
+			head = f.As
+		}
+		if heads[head] {
+			return nil, fmt.Errorf("fields: field %q: the column %q is written twice; choose another as", f.Name, head)
+		}
+		heads[head] = true
 		t.cols = append(t.cols, f.Name)
+		t.heads = append(t.heads, head)
 	}
 	if len(t.cols) > maxColumns {
 		return nil, fmt.Errorf("fields: a sheet has at most %d columns", maxColumns)
@@ -249,12 +260,16 @@ func (t *output) write(ctx context.Context, b *book, in <-chan transform.Batch, 
 	started := false
 	start := func() error {
 		started = true
-		if err := t.layout(b, cols, rows, header); err != nil {
+		heads := cols
+		if t.heads != nil {
+			heads = t.heads
+		}
+		if err := t.layout(b, heads, rows, header); err != nil {
 			return err
 		}
 		if header {
-			cells := make([]any, len(cols))
-			for i, c := range cols {
+			cells := make([]any, len(heads))
+			for i, c := range heads {
 				cells[i] = excelize.Cell{StyleID: b.header, Value: c}
 			}
 			if err := b.sw.SetRow("A1", cells); err != nil {
@@ -347,8 +362,8 @@ func (t *output) writeError(err error) error {
 
 // layout sets the widths of the columns from the header and the first rows (about one
 // unit per character, between 8 and 60) and freezes the header.
-func (t *output) layout(b *book, cols []string, rows [][]any, header bool) error {
-	for i, c := range cols {
+func (t *output) layout(b *book, heads []string, rows [][]any, header bool) error {
+	for i, c := range heads {
 		width := 0
 		if header {
 			width = utf8.RuneCountInString(c) + 2 // bold
@@ -360,7 +375,7 @@ func (t *output) layout(b *book, cols []string, rows [][]any, header bool) error
 			return err
 		}
 	}
-	if header && len(cols) > 0 {
+	if header && len(heads) > 0 {
 		return b.sw.SetPanes(&excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft",
 			Selection: []excelize.Selection{{SQRef: "A2", ActiveCell: "A2", Pane: "bottomLeft"}}})
 	}

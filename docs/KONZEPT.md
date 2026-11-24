@@ -508,8 +508,8 @@ transforms:
     type: core.select-fields
     with:
       fields:
-        - { name: kdnr, rename: externalId }
-        - { name: name, rename: companyName }
+        - { name: kdnr, as: externalId }
+        - { name: name, as: companyName }
 
   - id: stamp
     type: core.constant
@@ -688,7 +688,7 @@ with:
     Pipeline die Zähler der Transforms); scheitert er, `500` mit der Lauf-ID, ohne Details (die stehen im Log).
   - **Pipelines (seit S38c):** Der Transform **`http.response`** antwortet mit den Datensätzen, die er erhält, als
     JSON – eine Liste, mit `single: true` der erste Datensatz als Objekt (ohne Datensätze `null`). Felder in ihrer
-    Reihenfolge, Dezimalzahlen als Zahl, Datum als `yyyy-mm-dd`; höchstens `maxRows` (Standard 10.000) im Speicher.
+    Reihenfolge, Dezimalzahlen als Zahl, Datum als `yyyy-mm-dd`; höchstens `maxRecords` (Standard 10.000) im Speicher.
     Er antwortet, wenn seine Eingabe endet und er Datensätze erhalten hat; der erste gilt. Mit **`whenEmpty: true`**
     ist er die Rückfallantwort: Sie geht – mit oder ohne Datensätze – erst am Ende des Laufs hinaus und nur, wenn kein
     anderer `http.response` geantwortet hat. So entsteht z. B. „Kunde gefunden → `200`, sonst `404`“ mit zwei
@@ -1193,7 +1193,7 @@ Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, L
 - Datensätze auf Fehler-Links lassen die Action nicht scheitern; eine Pipeline, die abbricht, schon.
 - **Datensätze hinein und heraus (S24a, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** `rows: "{{ … }}"`
   gibt der Pipeline eine Liste mit (z. B. die Dateiliste von `file.list`), die `core.from-result` als Datensätze
-  weitergibt; was `core.to-result` erreicht, kommt als `output.rows` zurück (höchstens `maxRows`, Standard 100.000).
+  weitergibt; was `core.to-result` erreicht, kommt als `output.rows` zurück (höchstens `maxRecords`, Standard 100.000).
 
 **Wiederholung je Eintrag (umgesetzt mit S24b, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** Jede
 Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` und `timeout`:
@@ -1259,7 +1259,7 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Für einen Ausgang „falsch“
   `core.switch` mit `default` verwenden. Lässt sich die Bedingung nicht auswerten, geht der Datensatz auf den Fehler-Link.
 - **`core.select-fields`** behält mit `fields:` nur die genannten Felder, in dieser Reihenfolge, wahlweise umbenannt
-  (`{ name: kdnr, rename: externalId }`, geschlossenes Schema); fehlt ein Feld im Datensatz, ist es leer. Mit `remove:`
+  (`{ name: kdnr, as: externalId }`, geschlossenes Schema); fehlt ein Feld im Datensatz, ist es leer. Mit `remove:`
   werden die genannten Felder entfernt und alle anderen behalten. Beides zusammen ist ein Fehler.
 - **`core.constant`** setzt Felder mit demselben Wert in jedem Datensatz (ein vorhandenes Feld behält seine Position).
   Werte dürfen `${…}` und `{{ … }}` enthalten; Ausdrücke werden einmal beim Start ausgewertet (`vars`, `params`, `env`,
@@ -1303,9 +1303,10 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   schicken den Datensatz auf den Fehler-Link.
 - **`json.output`** schreibt ein Array mit einem Datensatz je Zeile oder NDJSON (Standard für `.ndjson`/`.jsonl`), UTF-8
   ohne BOM, Schlüssel in der Reihenfolge der Felder; Dezimalzahlen exakt, Daten in ISO 8601, mit `format` als Text.
+  `fields[].as` setzt den Schlüssel, mit Punkten verschachtelt (`total.amount`), so wie `json.input` mit `from` liest.
   Wie `csv.output` über eine temporäre Datei, die die alte erst am Ende ersetzt (`ifExists: replace|fail`).
 - **`core.map-values`** ersetzt die Werte eines Feldes über eine Tabelle `values: [{ from, to }]` (z. B. Codes durch
-  Namen), wahlweise in ein anderes Feld (`target`). Verglichen wird als Text (`1` = `"1"`), mit `ignoreCase` ohne Groß-
+  Namen), wahlweise in ein anderes Feld (`as`). Verglichen wird als Text (`1` = `"1"`), mit `ignoreCase` ohne Groß-
   und Kleinschreibung; ein leeres `from` trifft leere Werte, ein fehlendes `to` leert. Werte, die nicht in der Tabelle
   stehen, bekommen `default` oder bleiben, wie sie sind.
 - **`core.split-field`** teilt den Text eines Feldes an `separator`: mit `into: [a, b]` in Felder desselben Datensatzes
@@ -1319,7 +1320,8 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   Formate teilen sich `csv.input`, `csv.output` und `core.convert` (Paket `internal/format`).
 
 - **`csv.input`** liest alle Spalten als Text (offenes Schema) oder mit `fields:` nur die genannten, mit Typ und Format
-  (geschlossenes Schema). Spalten werden über die Kopfzeile gefunden, ohne Kopfzeile über die Position. Ein Wert, der
+  (geschlossenes Schema). Spalten werden über die Kopfzeile gefunden (`fields[].from`, wenn die Spalte anders heißt
+  als das Feld; S70b), ohne Kopfzeile über die Position. Ein Wert, der
   nicht passt, hält die Pipeline mit Datei, Zeile und Spalte an. `encoding: auto` erkennt UTF-8 und UTF-16 am BOM und
   liest sonst UTF-8; ungültiges UTF-8 wird mit dem Hinweis auf `windows-1252` gemeldet.
 - **`excel.input`** liest ein Blatt einer Arbeitsmappe (`.xlsx`, `.xlsm`; S67a), nach Name (ohne Groß- und
@@ -1330,14 +1332,15 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   höchstens 15 gültigen Stellen wie in Excel, `0,30000000000000004` wird `0,3`), `true`/`false`, Datumswerte nach dem
   Zellformat als `date` oder `datetime` (Ortszeit, Datumssystem 1900 oder 1904), reine Uhrzeiten als Text `08:30:00`.
   Formeln liefern den Wert, den Excel zuletzt berechnet hat; Runnel rechnet nicht. Ein Fehlerwert wie `#N/A` schickt
-  die Zeile mit der Zelle in `_error` auf den Fehler-Link. `fields` wählt Spalten über die Kopfzeile (ohne Kopfzeile
+  die Zeile mit der Zelle in `_error` auf den Fehler-Link. `fields` wählt Spalten über die Kopfzeile (`from` für einen
+  anderen Spaltennamen; ohne Kopfzeile
   über die Position) und wandelt sie um wie `core.convert`; Zahlen in einer Datumsspalte gelten als Datum nach Excel.
   Gelesen wird als Strom; jeder Teil der Mappe hat eine Grenze für seine entpackte Größe (Blatt 4 GB, Texte 256 MB),
   `.xls`, `.xlsb` und Mappen mit Passwort werden mit Hinweis abgelehnt. „Detect fields“ schlägt die Typen aus den Zellen
   vor.
 - **`excel.output`** schreibt die Datensätze in ein Blatt (`sheet`, Standard `Sheet1`) einer Arbeitsmappe (`.xlsx`,
   `.xlsm`; S67b) und gibt sie weiter. Spalten wie bei `csv.output` aus `fields:`, dem geschlossenen Schema oder dem ersten
-  Datensatz; `format` ist ein Zahlenformat von Excel in englischer Schreibweise (`#,##0.00`, `0.0%`, `dd.mm.yyyy`), das
+  Datensatz, `fields[].as` für einen anderen Namen in der Kopfzeile; `format` ist ein Zahlenformat von Excel in englischer Schreibweise (`#,##0.00`, `0.0%`, `dd.mm.yyyy`), das
   Excel in der Sprache des Benutzers anzeigt. Zahlen, `true`/`false` und Datumswerte behalten ihren Typ (`date` als
   Kurzdatum, `datetime` mit Uhrzeit, als Wanduhrzeit ohne Zeitzone); Listen und Objekte werden JSON-Text; Text wird nie
   als Formel geschrieben (`=1+1` bleibt Text). Die Kopfzeile ist fett und fixiert, die Spaltenbreiten richten sich nach
@@ -1346,8 +1349,9 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   Was Excel nicht fassen kann (mehr als 32.767 Zeichen in einer Zelle, Datum vor 1900, `NaN`), geht auf den Fehler-Link;
   mehr als 1.048.576 Zeilen brechen ab. Hat Excel die Datei geöffnet, meldet Windows das beim Ersetzen mit Hinweis.
   Die Blattdaten werden über temporäre Dateien gestreamt, die fertige Mappe (gepackt) entsteht am Ende im Speicher.
-- **`csv.output`** schreibt die Felder aus `fields:` (Reihenfolge, Format), sonst die des geschlossenen Schemas oder des
-  ersten Records; Zeilenende CRLF, Standard-Kodierung UTF-8 mit BOM (damit Excel Umlaute erkennt). `ifExists: replace`
+- **`csv.output`** schreibt die Felder aus `fields:` (Reihenfolge, Format, `as` für den Namen in der Kopfzeile), sonst
+  die des geschlossenen Schemas oder des ersten Records; Zeilenende CRLF, Standard-Kodierung UTF-8 mit BOM (damit Excel
+  Umlaute erkennt), außerdem `utf-8`, `windows-1252` und `utf-16` (Little Endian mit BOM, S70b). `ifExists: replace`
   schreibt in eine temporäre Datei und ersetzt die alte erst am Ende – bei einem Fehler bleibt sie unverändert;
   `append` hängt ohne zweite Kopfzeile an, `fail` bricht ab. Zeichen, die es in Windows-1252 nicht gibt, sind ein Fehler.
 - **Formate:** Zahlenmuster aus `#`, `0` und Trennzeichen (`#.##0,00`, `#,##0.00`, `#'##0.00`); Datumsmuster wie bei

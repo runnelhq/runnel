@@ -1,6 +1,7 @@
 package csv
 
 import (
+	"cmp"
 	"context"
 	stdcsv "encoding/csv"
 	"errors"
@@ -36,7 +37,7 @@ type input struct {
 	Header    *bool  `json:"header" doc:"Whether the first row holds the names of the columns" schema:"default=true"`
 	Encoding  string `json:"encoding" doc:"Encoding of the file; auto recognizes UTF-8 and UTF-16 by their byte order mark and reads UTF-8 otherwise" schema:"enum=auto|utf-8|windows-1252|utf-16,default=auto"`
 	// Fields selects and converts columns; without it all columns are text.
-	Fields []field `json:"fields" doc:"Columns to read, with type and format, matched by name in the header or else by position; empty: all columns as text"`
+	Fields []field `json:"fields" doc:"Columns to read, with type and format, matched by name (or from) in the header or else by position; empty: all columns as text"`
 
 	codecs []codec
 }
@@ -51,6 +52,13 @@ func newInput(with map[string]any) (transform.Transform, error) {
 		return nil, err
 	}
 	t.codecs = codecs
+	if t.Header != nil && !*t.Header {
+		for _, f := range t.Fields {
+			if f.From != "" {
+				return nil, fmt.Errorf("fields: field %q: from needs a header; without one the columns are read by position", f.Name)
+			}
+		}
+	}
 	if !hasVar(t.Delimiter) {
 		if _, err := delimiter(t.Delimiter); err != nil {
 			return nil, err
@@ -242,16 +250,17 @@ func (t *input) columns(first []string, header bool) ([]column, error) {
 		if !header {
 			continue
 		}
+		want := cmp.Or(f.From, f.Name)
 		cols[i].index = -1
 		for j, h := range first {
-			if strings.TrimSpace(h) == f.Name {
+			if strings.TrimSpace(h) == want {
 				cols[i].index = j
 				break
 			}
 		}
 		if cols[i].index < 0 {
-			return nil, fmt.Errorf("%s:1: the header has no column %q%s (columns: %s)", t.Path, f.Name,
-				model.Suggest(f.Name, first), strings.Join(first, ", "))
+			return nil, fmt.Errorf("%s:1: the header has no column %q%s (columns: %s)", t.Path, want,
+				model.Suggest(want, first), strings.Join(first, ", "))
 		}
 	}
 	return cols, nil

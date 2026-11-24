@@ -12,11 +12,11 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/pagination"
@@ -112,7 +112,7 @@ func newRequest(with map[string]any) (action.Action, error) {
 		return nil, fmt.Errorf("invalid ifExists %q (expected replace, skip or fail)", a.IfExists)
 	}
 	if !dynamic(a.MaxSize) {
-		if _, err := parseSize(a.MaxSize); err != nil {
+		if _, err := format.ParseSize("maxSize", a.MaxSize, defaultMaxSize); err != nil {
 			return nil, err
 		}
 	}
@@ -130,29 +130,6 @@ func parseURL(s string) (*url.URL, error) {
 		return nil, fmt.Errorf("url: %q is not an address with http:// or https://", s)
 	}
 	return u, nil
-}
-
-// parseSize reads a size like 500KB or 10MB; empty is the default.
-func parseSize(text string) (int64, error) {
-	s := strings.ToUpper(strings.TrimSpace(text))
-	if s == "" {
-		return defaultMaxSize, nil
-	}
-	unit := int64(1)
-	for _, u := range []struct {
-		suffix string
-		factor int64
-	}{{"KB", 1 << 10}, {"MB", 1 << 20}, {"GB", 1 << 30}, {"B", 1}} {
-		if before, ok := strings.CutSuffix(s, u.suffix); ok {
-			s, unit = strings.TrimSpace(before), u.factor
-			break
-		}
-	}
-	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || n <= 0 || n > (1<<40)/unit {
-		return 0, fmt.Errorf("maxSize: %q is not a size like 500KB or 10MB", text)
-	}
-	return n * unit, nil
 }
 
 func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
@@ -185,7 +162,7 @@ func (a *requestAction) Execute(ctx context.Context, ec *action.ExecContext) (ac
 			return action.Result{}, fmt.Errorf("timeout: %w", err)
 		}
 	}
-	maxSize, err := parseSize(a.MaxSize)
+	maxSize, err := format.ParseSize("maxSize", a.MaxSize, defaultMaxSize)
 	if err != nil {
 		return action.Result{}, err
 	}

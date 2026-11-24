@@ -44,9 +44,9 @@ func TestMapValues(t *testing.T) {
 		{map[string]any{"field": "status", "values": table}, "status", "Active(true) X(true) 10(true) <nil>(true)"},
 		{map[string]any{"field": "status", "values": table, "ignoreCase": true}, "status", "Active(true) X(true) 10(true) <nil>(true)"},
 		// Into another field, with a default also for the empty value.
-		{map[string]any{"field": "status", "target": "text", "values": table, "default": "Unknown"}, "text", "Active(true) Unknown(true) 10(true) Unknown(true)"},
+		{map[string]any{"field": "status", "as": "text", "values": table, "default": "Unknown"}, "text", "Active(true) Unknown(true) 10(true) Unknown(true)"},
 		// Without a default the target gets the value as it is.
-		{map[string]any{"field": "status", "target": "text", "values": table}, "text", "Active(true) X(true) 10(true) <nil>(true)"},
+		{map[string]any{"field": "status", "as": "text", "values": table}, "text", "Active(true) X(true) 10(true) <nil>(true)"},
 	} {
 		if got := mapped(t, tt.with, tt.field, "A", "X", int64(1), nil); got != tt.want {
 			t.Errorf("%v: %s, want %s", tt.with, got, tt.want)
@@ -80,9 +80,9 @@ func TestMapValuesSchema(t *testing.T) {
 		with map[string]any
 		want record.Type
 	}{
-		{map[string]any{"field": "status", "target": "text", "values": []any{map[string]any{"from": "A", "to": "Active"}}, "default": "?"}, record.String},
-		{map[string]any{"field": "status", "target": "text", "values": []any{map[string]any{"from": "A", "to": "Active"}}}, record.Unknown},
-		{map[string]any{"field": "status", "target": "text", "values": []any{map[string]any{"from": "A", "to": 1}}, "default": "?"}, record.Unknown},
+		{map[string]any{"field": "status", "as": "text", "values": []any{map[string]any{"from": "A", "to": "Active"}}, "default": "?"}, record.String},
+		{map[string]any{"field": "status", "as": "text", "values": []any{map[string]any{"from": "A", "to": "Active"}}}, record.Unknown},
+		{map[string]any{"field": "status", "as": "text", "values": []any{map[string]any{"from": "A", "to": 1}}, "default": "?"}, record.Unknown},
 	} {
 		tr := transformtest.New(t, mapValuesDefinition, tt.with)
 		ic := transform.NewInitContext(record.Schema{}.With("status", record.String))

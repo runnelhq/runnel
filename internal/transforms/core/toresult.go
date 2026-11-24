@@ -13,23 +13,24 @@ import (
 
 // core.to-result adds the records to the result of the pipeline and passes them on
 // (roadmap S24a; Hop: "Copy rows to result"): core.run-pipeline returns them as
-// output.rows. They are held in memory, at most maxRows.
+// output.rows. They are held in memory, at most maxRecords.
 var toResultDefinition = transform.Definition{
 	Type:        "core.to-result",
 	Category:    transform.CategoryExecution,
 	Label:       "Records to Workflow",
 	Description: "Returns the records to the calling workflow (output.rows) and passes them on",
-	Example:     "maxRows: 1000\n",
+	Example:     "maxRecords: 1000\n",
 	Config:      toResult{},
 	New:         newToResult,
+	Renamed:     map[string]string{"maxRows": "renamed to maxRecords"},
 }
 
 // DefaultMaxResultRows limits the result records held in memory (ADR 0008).
 const DefaultMaxResultRows = 100_000
 
 type toResult struct {
-	// MaxRows is text, so that it can be a variable; checked when the pipeline runs.
-	MaxRows string `json:"maxRows" doc:"Most records to return; more stop the pipeline, as they are held in memory" schema:"default=100000"`
+	// MaxRecords is text, so that it can be a variable; checked when the pipeline runs.
+	MaxRecords string `json:"maxRecords" doc:"Most records to return; more stop the pipeline, as they are held in memory" schema:"default=100000"`
 }
 
 func newToResult(with map[string]any) (transform.Transform, error) {
@@ -42,10 +43,10 @@ func newToResult(with map[string]any) (transform.Transform, error) {
 
 func (t *toResult) Process(_ context.Context, in <-chan transform.Batch, out *transform.Output) error {
 	limit := int64(DefaultMaxResultRows)
-	if s := strings.TrimSpace(t.MaxRows); s != "" {
+	if s := strings.TrimSpace(t.MaxRecords); s != "" {
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil || n < 1 {
-			return fmt.Errorf("maxRows: %q is not a whole number of 1 or more", t.MaxRows)
+			return fmt.Errorf("maxRecords: %q is not a whole number of 1 or more", t.MaxRecords)
 		}
 		limit = n
 	}
@@ -53,7 +54,7 @@ func (t *toResult) Process(_ context.Context, in <-chan transform.Batch, out *tr
 	for b := range in {
 		for _, r := range b {
 			if n++; n > limit {
-				return fmt.Errorf("more than %d records for the result (maxRows); they are held in memory – raise maxRows or reduce the records", limit)
+				return fmt.Errorf("more than %d records for the result (maxRecords); they are held in memory – raise maxRecords or reduce the records", limit)
 			}
 			if err := out.AddResult(r.Clone()); err != nil {
 				return err

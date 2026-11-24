@@ -512,7 +512,7 @@ export function FileView(props: {
 
   // "Detect fields" (S46): the selected fields replace "fields:" as one undo step.
   const onWriteFields = useCallback(
-    async (id: string, fields: { name: string; type: string; format?: string }[]) => {
+    async (id: string, fields: { name: string; from?: string; type: string; format?: string }[]) => {
       const list = fieldsList(fields);
       const next = await applyEdit({ set: [{ id, field: "with.fields", value: null, ...(list.length > 0 ? { list } : {}) }] });
       if (next !== null) setToast({ text: `Wrote ${fields.length} ${fields.length === 1 ? "field" : "fields"} to ${id}`, undo: true });

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/proc"
 )
 
@@ -80,6 +81,18 @@ func lastJSON(text string) (any, error) {
 		}
 	}
 	return nil, err
+}
+
+// outputLimit reads maxOutput, a size like 1MB (ADR 0025); empty is the default.
+func outputLimit(text string) (int, error) {
+	n, err := format.ParseSize("maxOutput", text, proc.DefaultMaxOutput)
+	if err != nil {
+		return 0, err
+	}
+	if n > 1<<30 {
+		return 0, fmt.Errorf("maxOutput: %q is larger than 1GB", text)
+	}
+	return int(n), nil
 }
 
 func maxOutput(n int) int {

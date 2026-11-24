@@ -1,6 +1,7 @@
 package csv
 
 import (
+	"cmp"
 	"context"
 	stdcsv "encoding/csv"
 	"errors"
@@ -33,17 +34,19 @@ type output struct {
 	Path      string     `json:"path" doc:"CSV file to write, relative to the project folder or absolute" schema:"required,example=C:\\out\\orders.csv"`
 	Delimiter string     `json:"delimiter" doc:"Character between the values, e.g. ; or \\t for tab; empty: comma" schema:"example=;"`
 	Header    *bool      `json:"header" doc:"Whether the first row holds the names of the columns" schema:"default=true"`
-	Encoding  string     `json:"encoding" doc:"Encoding of the file; utf-8-bom lets Excel recognize umlauts" schema:"enum=utf-8-bom|utf-8|windows-1252,default=utf-8-bom"`
+	Encoding  string     `json:"encoding" doc:"Encoding of the file; utf-8-bom lets Excel recognize umlauts, utf-16 is little endian with byte order mark" schema:"enum=utf-8-bom|utf-8|windows-1252|utf-16,default=utf-8-bom"`
 	IfExists  string     `json:"ifExists" doc:"If the file exists: replace it once all records are written, append to it, or fail" schema:"enum=replace|append|fail,default=replace"`
 	Fields    []outField `json:"fields" doc:"Columns to write, in this order, with a format; empty: all fields of the records"`
 
 	codecs []codec
 	cols   []string // columns known before the run (fields or a closed schema)
+	heads  []string // names in the header, with fields (as or name)
 }
 
 // outField is a column of csv.output.
 type outField struct {
-	Name   string `json:"name" doc:"Name of the field to write (and of the column in the header)" schema:"required,format=runnel-field,example=amount"`
+	Name   string `json:"name" doc:"Name of the field to write" schema:"required,format=runnel-field,example=amount"`
+	As     string `json:"as" doc:"Name of the column in the header; empty: the name of the field" schema:"example=Betrag"`
 	Format string `json:"format" doc:"Number pattern like #.##0,00 or date pattern like dd.MM.yyyy; empty: 1234.5 and ISO dates" schema:"example=dd.MM.yyyy"`
 }
 
@@ -52,7 +55,7 @@ func newOutput(with map[string]any) (transform.Transform, error) {
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
+	seen, heads := map[string]bool{}, map[string]bool{}
 	for _, f := range t.Fields {
 		if f.Name == "" {
 			return nil, errors.New("fields: every field needs a name")
@@ -67,6 +70,12 @@ func newOutput(with map[string]any) (transform.Transform, error) {
 		}
 		t.codecs = append(t.codecs, c)
 		t.cols = append(t.cols, f.Name)
+		head := cmp.Or(f.As, f.Name)
+		if heads[head] {
+			return nil, fmt.Errorf("fields: field %q: the column %q is written twice; choose another as", f.Name, head)
+		}
+		heads[head] = true
+		t.heads = append(t.heads, head)
 	}
 	if !hasVar(t.Delimiter) {
 		if _, err := delimiter(t.Delimiter); err != nil {
@@ -174,7 +183,11 @@ func (t *output) write(ctx context.Context, f io.Writer, appending bool, comma r
 			return nil
 		}
 		header = false
-		if err := t.writeRow(cw, cols, check); err != nil {
+		heads := cols
+		if t.heads != nil {
+			heads = t.heads
+		}
+		if err := t.writeRow(cw, heads, check); err != nil {
 			return fmt.Errorf("%s: header: %w", t.Path, err)
 		}
 		return nil

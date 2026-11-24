@@ -20,14 +20,15 @@ var mapValuesDefinition = transform.Definition{
 	Category:    transform.CategoryTransform,
 	Label:       "Map Values",
 	Description: "Replaces the values of a field by a table, e.g. codes by names",
-	Example:     "field: status\ntarget: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
+	Example:     "field: status\nas: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
 	Config:      mapValues{},
 	New:         newMapValues,
+	Renamed:     map[string]string{"target": "renamed to as"},
 }
 
 type mapValues struct {
 	Field      string     `json:"field" doc:"Field whose values are replaced" schema:"required,format=runnel-field,example=status"`
-	Target     string     `json:"target" doc:"Field for the result; empty: the field itself"`
+	As         string     `json:"as" doc:"Field for the result; empty: the field itself"`
 	Values     []mapEntry `json:"values" doc:"The table: a value and what it becomes" schema:"required"`
 	Default    any        `json:"default" doc:"Result for values that are not in the table, also for empty ones; missing: the value stays as it is"`
 	IgnoreCase bool       `json:"ignoreCase" doc:"Compare text regardless of upper and lower case" schema:"default=false"`
@@ -81,8 +82,8 @@ func (t *mapValues) key(s string) string {
 }
 
 func (t *mapValues) target() string {
-	if t.Target != "" {
-		return t.Target
+	if t.As != "" {
+		return t.As
 	}
 	return t.Field
 }

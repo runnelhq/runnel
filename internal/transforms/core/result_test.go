@@ -59,10 +59,10 @@ func TestToResult(t *testing.T) {
 	if v, _ := results[0].Get("n"); v != int64(1) {
 		t.Error("result shares the record")
 	}
-	if _, err := run(map[string]any{"maxRows": "1"}, in...); err == nil || !strings.Contains(err.Error(), "more than 1 records for the result (maxRows)") {
+	if _, err := run(map[string]any{"maxRecords": "1"}, in...); err == nil || !strings.Contains(err.Error(), "more than 1 records for the result (maxRecords)") {
 		t.Errorf("limit: %v", err)
 	}
-	if _, err := run(map[string]any{"maxRows": "0"}, in...); err == nil || !strings.Contains(err.Error(), `maxRows: "0" is not a whole number of 1 or more`) {
+	if _, err := run(map[string]any{"maxRecords": "0"}, in...); err == nil || !strings.Contains(err.Error(), `maxRecords: "0" is not a whole number of 1 or more`) {
 		t.Errorf("invalid limit: %v", err)
 	}
 }

@@ -35,14 +35,15 @@ type input struct {
 	Range     string  `json:"range" doc:"Where the table is: its first cell like A3, with last column A3:F or with last row B2:D100; empty: from the first row with values" schema:"example=A3:F"`
 	Header    *bool   `json:"header" doc:"Whether the first row of the table holds the names of the columns" schema:"default=true"`
 	EmptyRows string  `json:"emptyRows" doc:"Empty rows in the table: skip them, or stop at the first one, e.g. when notes follow the table" schema:"enum=skip|stop,default=skip"`
-	Fields    []field `json:"fields" doc:"Columns to read, with type and format, matched by name in the header or else by position; empty: all columns with the values of their cells"`
+	Fields    []field `json:"fields" doc:"Columns to read, with type and format, matched by name (or from) in the header or else by position; empty: all columns with the values of their cells"`
 
 	codecs []format.Codec
 }
 
 // field is a column of the field definition (fields:).
 type field struct {
-	Name   string `json:"name" doc:"Name of the field (and of the column in the header)" schema:"required,example=amount"`
+	Name   string `json:"name" doc:"Name of the field" schema:"required,example=amount"`
+	From   string `json:"from" doc:"Column in the header; empty: the column named like the field" schema:"example=Betrag"`
 	Type   string `json:"type" doc:"Type of the value; empty: as in the cell (text, number, true/false, date)" schema:"enum=string|int|decimal|float|bool|date|datetime|json"`
 	Format string `json:"format" doc:"For text in the cells: number pattern like #.##0,00 or date pattern like dd.MM.yyyy; numbers and dates of Excel need none" schema:"example=dd.MM.yyyy"`
 }
@@ -69,6 +70,9 @@ func newInput(with map[string]any) (transform.Transform, error) {
 			return nil, fmt.Errorf("fields: the field %q is listed twice", f.Name)
 		}
 		seen[f.Name] = true
+		if f.From != "" && t.Header != nil && !*t.Header {
+			return nil, fmt.Errorf("fields: field %q: from needs a header; without one the columns are read by position", f.Name)
+		}
 		var c format.Codec // without type: the value as in the cell
 		if f.Type != "" {
 			var err error
@@ -238,16 +242,20 @@ func (t *input) columns(tb *table) (columnList, error) {
 		if tb.header == 0 {
 			continue
 		}
+		want := f.Name
+		if f.From != "" {
+			want = f.From
+		}
 		cols[i].index = -1
 		for j, h := range tb.names {
-			if h == f.Name {
+			if h == want {
 				cols[i].index = j
 				break
 			}
 		}
 		if cols[i].index < 0 {
-			return nil, fmt.Errorf("%s, row %d: the header has no column %q%s (columns: %s)", tb.where, tb.header, f.Name,
-				model.Suggest(f.Name, tb.names), strings.Join(tb.names, ", "))
+			return nil, fmt.Errorf("%s, row %d: the header has no column %q%s (columns: %s)", tb.where, tb.header, want,
+				model.Suggest(want, tb.names), strings.Join(tb.names, ", "))
 		}
 	}
 	if tb.header == 0 && len(tb.names) < len(t.Fields) {

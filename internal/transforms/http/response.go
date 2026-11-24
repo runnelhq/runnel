@@ -33,17 +33,18 @@ var responseDefinition = transform.Definition{
 	Example:     "status: 200\nsingle: true\n",
 	Config:      response{},
 	New:         newResponse,
+	Renamed:     map[string]string{"maxRows": "renamed to maxRecords"},
 }
 
 // DefaultMaxRows limits the records held in memory for an answer.
 const DefaultMaxRows = 10_000
 
 type response struct {
-	Status    string            `json:"status" doc:"HTTP status code, e.g. 200 or 404" schema:"default=200,example=200"`
-	Headers   map[string]string `json:"headers" doc:"Headers of the answer"`
-	Single    bool              `json:"single" doc:"Answer with the first record as an object instead of a list" schema:"default=false"`
-	WhenEmpty bool              `json:"whenEmpty" doc:"Fallback: answer also without records, but only if no other http.response answers (e.g. 404)" schema:"default=false"`
-	MaxRows   string            `json:"maxRows" doc:"Most records in the answer; more stop the pipeline, as they are held in memory" schema:"default=10000"`
+	Status     string            `json:"status" doc:"HTTP status code, e.g. 200 or 404" schema:"default=200,example=200"`
+	Headers    map[string]string `json:"headers" doc:"Headers of the answer"`
+	Single     bool              `json:"single" doc:"Answer with the first record as an object instead of a list" schema:"default=false"`
+	WhenEmpty  bool              `json:"whenEmpty" doc:"Fallback: answer also without records, but only if no other http.response answers (e.g. 404)" schema:"default=false"`
+	MaxRecords string            `json:"maxRecords" doc:"Most records in the answer; more stop the pipeline, as they are held in memory" schema:"default=10000"`
 }
 
 func newResponse(with map[string]any) (transform.Transform, error) {
@@ -60,10 +61,10 @@ func (t *response) Process(ctx context.Context, in <-chan transform.Batch, out *
 		return err
 	}
 	limit := int64(DefaultMaxRows)
-	if s := strings.TrimSpace(t.MaxRows); s != "" {
+	if s := strings.TrimSpace(t.MaxRecords); s != "" {
 		n, err := strconv.ParseInt(s, 10, 64)
 		if err != nil || n < 1 {
-			return fmt.Errorf("maxRows: %q is not a whole number of 1 or more", t.MaxRows)
+			return fmt.Errorf("maxRecords: %q is not a whole number of 1 or more", t.MaxRecords)
 		}
 		limit = n
 	}
@@ -75,7 +76,7 @@ func (t *response) Process(ctx context.Context, in <-chan transform.Batch, out *
 			n++
 			if caller && (!t.Single || len(records) == 0) {
 				if int64(len(records)) >= limit {
-					return fmt.Errorf("more than %d records for the answer (maxRows); they are held in memory – raise maxRows or reduce the records", limit)
+					return fmt.Errorf("more than %d records for the answer (maxRecords); they are held in memory – raise maxRecords or reduce the records", limit)
 				}
 				records = append(records, r.Clone())
 			}

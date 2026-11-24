@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 
 	"github.com/runnelhq/runnel/internal/textenc"
@@ -17,6 +18,7 @@ const (
 	encUTF8        = textenc.UTF8
 	encUTF8BOM     = textenc.UTF8BOM
 	encWindows1252 = textenc.Windows1252
+	encUTF16       = textenc.UTF16
 )
 
 // decoder returns a reader that delivers UTF-8 text without byte order mark.
@@ -24,8 +26,8 @@ func decoder(r io.Reader, enc string) (io.Reader, error) { return textenc.Decode
 
 // encoder returns a writer that writes text in an encoding of csv.output and a check
 // for values it cannot represent (nil: all can be written). With bom, utf-8-bom starts
-// with a byte order mark: Excel recognizes umlauts only with it. Close the writer, if it
-// is an io.Closer, to write the rest.
+// with a byte order mark: Excel recognizes umlauts only with it; utf-16 (little endian)
+// always has one. Close the writer, if it is an io.Closer, to write the rest.
 func encoder(w io.Writer, enc string, bom bool) (io.Writer, func(string) error, error) {
 	switch enc {
 	case "", encUTF8BOM:
@@ -39,8 +41,15 @@ func encoder(w io.Writer, enc string, bom bool) (io.Writer, func(string) error, 
 		return w, nil, nil
 	case encWindows1252:
 		return transform.NewWriter(w, charmap.Windows1252.NewEncoder()), windows1252, nil
+	case encUTF16:
+		if bom {
+			if _, err := w.Write([]byte{0xFF, 0xFE}); err != nil {
+				return nil, nil, err
+			}
+		}
+		return transform.NewWriter(w, unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()), nil, nil
 	}
-	return nil, nil, fmt.Errorf("invalid encoding %q (expected utf-8-bom, utf-8 or windows-1252)", enc)
+	return nil, nil, fmt.Errorf("invalid encoding %q (expected utf-8-bom, utf-8, windows-1252 or utf-16)", enc)
 }
 
 // windows1252 rejects text with characters Windows-1252 has not, instead of writing

@@ -12,6 +12,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/paths"
+	"github.com/runnelhq/runnel/internal/proc"
 )
 
 // The test binary also serves as the program: with RUNNEL_SHELL_HELPER set, TestMain does
@@ -106,11 +107,12 @@ func TestRunRejects(t *testing.T) {
 		t.Errorf("batch: %v", err)
 	}
 	for want, with := range map[string]map[string]any{
-		`missing required field "program"`: {},
-		`invalid encoding "latin"`:         {"program": "x", "encoding": "latin"},
-		`invalid timeout "soon"`:           {"program": "x", "timeout": "soon"},
-		"maxOutput must not be negative":   {"program": "x", "maxOutput": -1},
-		`env: invalid name "A=B"`:          {"program": "x", "env": map[string]any{"A=B": "1"}},
+		`missing required field "program"`:    {},
+		`invalid encoding "latin"`:            {"program": "x", "encoding": "latin"},
+		`invalid timeout "soon"`:              {"program": "x", "timeout": "soon"},
+		`maxOutput: "-1" is not a size`:       {"program": "x", "maxOutput": "-1"},
+		`maxOutput: "2GB" is larger than 1GB`: {"program": "x", "maxOutput": "2GB"},
+		`env: invalid name "A=B"`:             {"program": "x", "env": map[string]any{"A=B": "1"}},
 	} {
 		if _, err := newRun(with); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v: %v, want %q", with, err, want)
@@ -119,5 +121,14 @@ func TestRunRejects(t *testing.T) {
 	a, _ = newRun(map[string]any{"program": "no-such-program-runnel"})
 	if _, err := a.Execute(context.Background(), &action.ExecContext{Log: func(slog.Level, string) {}}); err == nil || !strings.Contains(err.Error(), "not found in PATH") {
 		t.Errorf("missing: %v", err)
+	}
+}
+
+// maxOutput is a size like 1MB (ADR 0025); a number alone counts bytes, empty is 1 MiB.
+func TestOutputLimit(t *testing.T) {
+	for text, want := range map[string]int{"": proc.DefaultMaxOutput, "1KB": 1024, "64": 64, "2 MB": 2 << 20} {
+		if got, err := outputLimit(text); err != nil || got != want {
+			t.Errorf("outputLimit(%q) = %d, %v; want %d", text, got, err, want)
+		}
 	}
 }
