@@ -97,6 +97,9 @@ fuzz:
 	go test ./internal/transforms/json -run '^$$' -fuzz FuzzInput -fuzztime $(FUZZTIME)
 	go test ./internal/actions/archive -run '^$$' -fuzz FuzzExtract -fuzztime $(FUZZTIME)
 	go test ./internal/triggers -run '^$$' -fuzz FuzzRequest -fuzztime $(FUZZTIME)
+	go test ./internal/xlsx -run '^$$' -fuzz FuzzRows -fuzztime $(FUZZTIME)
+	go test ./internal/xlsx -run '^$$' -fuzz FuzzOpen -fuzztime $(FUZZTIME)
+	go test ./internal/transforms/excel -run '^$$' -fuzz FuzzInput -fuzztime $(FUZZTIME)
 
 ## bench: run the benchmarks (load probes, e.g. requests to an http trigger)
 bench:

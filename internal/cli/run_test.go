@@ -250,6 +250,33 @@ func TestRunCSVExample(t *testing.T) {
 	}
 }
 
+// TestRunExcelExample runs examples/pipelines/pipelines/excel-orders.pipeline.yaml (S67a):
+// the table below a title, the order with #N/A to the error link.
+func TestRunExcelExample(t *testing.T) {
+	chdirRepoRoot(t)
+	dir := t.TempDir()
+	target, rejected := filepath.Join(dir, "orders.csv"), filepath.Join(dir, "rejected.csv")
+	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "--param", "REJECTED="+rejected, "examples/pipelines/pipelines/excel-orders.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	if !strings.Contains(out, "[read] read 6 rows from sales/orders.xlsx, sheet Bestellungen, 1 with errors") {
+		t.Errorf("output:\n%s", out)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "\xEF\xBB\xBFNr;Kunde;Betrag;Datum;Bezahlt\r\n1001;Müller GmbH;1.234,50;19.11.2026;true\r\n1002;Schmidt & Söhne;89,90;19.11.2026;false\r\n" +
+		"1003;Weber, Anna;12.500,00;20.11.2026;true\r\n1005;Braun AG;15.800,00;21.11.2026;false\r\n1006;Neumann OHG;420,00;21.11.2026;true\r\n"
+	if string(b) != want {
+		t.Errorf("written file %q, want %q", b, want)
+	}
+	if b, err := os.ReadFile(rejected); err != nil || !strings.Contains(string(b), "1004;Klein KG;#N/A;2026-11-20;true;sales/orders.xlsx, sheet Bestellungen, cell C7: the cell shows the error #N/A;Betrag;read") {
+		t.Errorf("rejected %q %v", b, err)
+	}
+}
+
 // TestRunCalculateDedupeExample: core.calculate and core.dedupe (S16c) and core.sequence (S16d) in
 // examples/pipelines/pipelines/contacts.pipeline.yaml.
 func TestRunCalculateDedupeExample(t *testing.T) {
