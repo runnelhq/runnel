@@ -898,7 +898,8 @@ Windows, gRPC für andere Sprachen).
   Felder, `connection.test` testet sie.
 - Protokoll ab `protocolVersion: 1`, Änderungen darin nur additiv; `executable` je Betriebssystem; ein Plugin
   bearbeitet ohne Angabe von `concurrency` eine Anfrage nach der anderen.
-- SDKs in eigenen Repositorys: Go (Referenz, S51), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;
+- SDKs in eigenen Repositorys: Go (Referenz, `runnelhq/sdk-go`: Actions und Connection-Typen mit S51a, Transforms mit
+  S51b), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;
   verbindlich ist die Beschreibung des Protokolls in `docs/dev/PLUGINS.md`.
 
 ```yaml

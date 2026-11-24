@@ -461,3 +461,27 @@ Editor, Connections). Präzisierungen:
 - **Connections in der `config`:** Felder mit `format: runnel-connection` nehmen auch Connections der Typen von
   Plugins, wenn `x-runnel-connection` sie nennt; sie kommen aufgelöst und maskiert wie die eingebauten an.
 - `runnel plugins` zeigt die Connection-Typen eines Plugins mit `connection` neben den Actions.
+
+## Nachtrag 2026-11-24 (S51a): Go-SDK für Actions und Connection-Typen
+
+S51 ist geteilt: S51a (Actions und Connection-Typen, auf Wunsch des Maintainers vor S50), S51b (Transforms nach S50).
+Präzisierungen bei der Umsetzung in `runnelhq/sdk-go`:
+
+- **API:** `runnel.New(name, version)`, `runnel.AddAction` und `runnel.AddConnectionType` mit einem Struct je
+  Konfiguration (Go-Generics), `p.Main()`. Fehler in den Definitionen (Typ außerhalb des Namensraums, doppelt,
+  unbekannte Kategorie, ungültige Tags) sind Programmierfehler (`panic` beim Start, also im ersten Test).
+- **Schema aus Struct-Tags** wie bei eingebauten Actions (`json`, `doc`, `schema`, ADR 0014), damit Plugins und Kern
+  dieselben Schemas liefern. Zusätzlich: `connection=<typ>` an einem Struct-Feld ergibt im Schema einen Text mit
+  `format: runnel-connection`; das Feld bekommt die aufgelöste Connection. `schema:"-"` liest ein Feld, ohne es ins
+  Schema zu nehmen (`runnel.ConnectionInfo` mit `name` und `type`).
+- **Werte:** Texte in Feldern vom Typ Zahl oder `bool` wandelt das SDK um, weil aufgelöste Variablen als Text
+  ankommen; ein Wert, der nicht passt, scheitert mit `field "x": expected …` ohne Go-Typnamen.
+- **`concurrency`** ist im SDK 4, wenn das Plugin nichts anderes setzt; das SDK hält die Grenze selbst ein.
+- **Fehler:** Ein `error` der Action ist `-32000` mit seiner Meldung, ein `panic` ebenso (das Plugin läuft weiter, der
+  Stack steht im Log); abgebrochene Anfragen `-32800`, Anfragen vor `initialize` `-32002`, unbekannte Methoden
+  `-32601`. Ein Fehler in `connection.test` ist ein gescheiterter Test (`ok: false`), keine Fehlerantwort.
+- **Tests:** `runneltest` spricht das Protokoll im Testprozess; `runneltest.NewProject` baut das Plugin in ein
+  temporäres Projekt, gibt es frei (Freigaben im temporären Ordner) und startet `runnel`, wenn `RUNNEL_BIN` gesetzt
+  ist. Die CI der Repositorys des SDK und der Plugins baut dafür `runnel` aus `main`.
+- **Erste Plugins:** `runnelhq/plugin-iban` und `runnelhq/plugin-ldap` (Version 0.1.0) mit Release-Archiven nach
+  `docs/dev/PLUGINS.md` und `THIRD_PARTY_NOTICES`.
