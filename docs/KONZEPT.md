@@ -899,7 +899,7 @@ Windows, gRPC für andere Sprachen).
   Prüfung ihre Felder, mit `transform.detectFields` bieten sie „Felder ermitteln“ (S50b).
 - Protokoll ab `protocolVersion: 1`, Änderungen darin nur additiv; `executable` je Betriebssystem; ein Plugin
   bearbeitet ohne Angabe von `concurrency` eine Anfrage nach der anderen.
-- SDKs in eigenen Repositorys: Go (Referenz, S51), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;
+- SDKs in eigenen Repositorys: Go (Referenz, `runnelhq/sdk-go`, S51: Actions, Connection-Typen und Transforms), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;
   verbindlich ist die Beschreibung des Protokolls in `docs/dev/PLUGINS.md`.
 
 ```yaml

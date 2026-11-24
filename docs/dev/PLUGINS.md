@@ -8,6 +8,12 @@ Nachtrag 2026-11-24).
 Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S50b** – Ablage, `plugin.yaml`, Freigabe,
 Protokoll, Actions in Workflows, eigene Connection-Typen und Transforms in Pipelines mit Schema und „Felder ermitteln“.
 
+In Go schreibt man Plugins am einfachsten mit dem [Go-SDK](https://github.com/runnelhq/sdk-go) (S51); Beispiele sind
+die offiziellen Plugins [`plugin-iban`](https://github.com/runnelhq/plugin-iban) (Actions und ein Transform mit
+Fehler-Link) und [`plugin-ldap`](https://github.com/runnelhq/plugin-ldap) (Connection-Typ mit Test, Actions und eine
+Eingabe mit „Felder ermitteln“). Die Tests von Runnel nutzen kein SDK, sondern sprechen das
+Protokoll direkt (`internal/plugin/plugintest`).
+
 ## Ablage
 
 Ein Plugin ist ein Ordner unter `plugins/` im Projekt:
