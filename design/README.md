@@ -34,8 +34,8 @@ eine einzige exe, die Daten zuverlässig von A nach B fließen lässt.
 |---|---|
 | **Claim** | **Leicht. Lokal. Im Fluss.** |
 | Claim (EN) | Lightweight. Local. Flowing. |
-| Beschreibung | Workflows und Datenintegration für Windows – eine einzige exe, keine Runtime, keine Datenbank. |
-| Beschreibung (EN) | Workflows and data integration for Windows – one executable, no runtime, no database. |
+| Beschreibung | Workflows und Datenintegration für Windows – eine einzige exe, keine Runtime, kein Datenbank-Server. |
+| Beschreibung (EN) | Workflows and data integration for Windows – one executable, no runtime, no database server. |
 
 Drei Eigenschaften leiten jede Gestaltungsentscheidung:
 
