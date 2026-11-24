@@ -12,6 +12,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
+	"github.com/runnelhq/runnel/internal/history"
 	"github.com/runnelhq/runnel/internal/model"
 )
 
@@ -126,6 +127,9 @@ type Manager struct {
 	waiters map[chan struct{}]struct{}
 	// draining is set by Drain: no new runs are started.
 	draining bool
+	// store and rec keep the runs in the history (ADR 0026); nil: only in memory.
+	store *history.Store
+	rec   *historyWriter
 }
 
 type entry struct {
@@ -140,12 +144,43 @@ type entry struct {
 	history string
 	// done is closed when the run has ended (Wait).
 	done chan struct{}
+	// hash identifies the content of the file that runs; logSeq numbers the log lines
+	// in the history.
+	hash   string
+	logSeq int64
 }
 
 // NewManager creates a manager. Runs are cancelled by Shutdown.
 func NewManager() *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Manager{ctx: ctx, cancel: cancel, runs: map[string]*entry{}, waiters: map[chan struct{}]struct{}{}}
+}
+
+// SetHistory keeps the runs in a history (ADR 0026) besides memory: runs that are no
+// longer in memory are read from it. Write errors go to warn (once until a write works
+// again); runs are never held up by the history. Call it before the first run and
+// CloseHistory after Shutdown.
+func (m *Manager) SetHistory(store *history.Store, warn func(string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.store, m.rec = store, newHistoryWriter(store, warn)
+}
+
+// CloseHistory writes what is queued for the history and stops writing to it. It does
+// not close the store.
+func (m *Manager) CloseHistory() {
+	m.mu.Lock()
+	rec := m.rec
+	m.rec = nil
+	m.mu.Unlock()
+	if rec != nil {
+		rec.close()
+	}
+}
+
+// recording reports whether the runs of e go to the history. m.mu must be held.
+func (m *Manager) recording(e *entry) bool {
+	return m.rec != nil && e.history != HistoryNone
 }
 
 // ErrShutdown is returned by Start after Drain or Shutdown.
@@ -199,7 +234,7 @@ func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
 		steps[i] = [2]string{a.ID, a.Type}
 	}
 	run, err := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client},
-		p.Env, steps, limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns), spec.History, func(ctx context.Context) { p.Runner.Run(ctx) })
+		p.Env, steps, limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns), spec.History, fileHash(spec.Data), func(ctx context.Context) { p.Runner.Run(ctx) })
 	return run, p, err
 }
 
@@ -222,19 +257,19 @@ func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedP
 	}
 	run, err := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
 		LinkRows: make([]int64, len(p.Pipeline.Links))}, p.Env, steps, limitsOf(p.Project, 0),
-		spec.History, func(ctx context.Context) { p.Runner.Run(ctx) })
+		spec.History, fileHash(spec.Data), func(ctx context.Context) { p.Runner.Run(ctx) })
 	return run, p, err
 }
 
 // add registers a run with its steps (id and type of the actions or transforms) and
 // runs it in the background, unless a limit of runs at the same time is reached.
-func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, lim limits, history string, start func(context.Context)) (Run, error) {
+func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, lim limits, history, hash string, start func(context.Context)) (Run, error) {
 	ctx, cancel := context.WithCancel(m.ctx)
 	run.Status, run.Started = StatusRunning, time.Now()
 	if env != nil {
 		run.Environment = env.Name
 	}
-	e := &entry{run: run, byID: map[string]*ActionState{}, cancel: cancel, history: history, done: make(chan struct{})}
+	e := &entry{run: run, byID: map[string]*ActionState{}, cancel: cancel, history: history, hash: hash, done: make(chan struct{})}
 	for _, st := range steps {
 		s := &ActionState{ID: st[0], Type: st[1], Status: StatusPending}
 		e.actions = append(e.actions, s)
@@ -254,6 +289,9 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 	m.runs[id] = e
 	m.order = append(m.order, id)
 	m.prune()
+	if m.recording(e) {
+		m.rec.send(recOp{kind: recRun, run: snapshot(e), hash: e.hash})
+	}
 	out := e.run
 	out.LinkRows = slices.Clone(out.LinkRows) // the events change the entry's slice
 	m.mu.Unlock()
@@ -367,6 +405,9 @@ const (
 func (m *Manager) ended(e *entry) {
 	close(e.done)
 	drop := e.history == HistoryNone || (e.history == HistoryErrors && e.run.Status == workflow.Succeeded)
+	if m.recording(e) {
+		m.rec.send(recOp{kind: recEnd, run: snapshot(e), hash: e.hash, nodes: copyActions(e), del: drop})
+	}
 	if !drop {
 		return
 	}
@@ -417,6 +458,9 @@ func (m *Manager) apply(id string, we workflow.Event, counts *pipeline.Counts, r
 				ev.Status = workflow.Skipped
 			}
 			a.Counts = counts
+			if m.recording(e) {
+				m.rec.send(recOp{kind: recNode, run: Run{ID: id}, index: slices.Index(e.actions, a), node: *a})
+			}
 		}
 		ev.Counts, ev.LinkRows = counts, rows
 		for li, n := range rows {
@@ -431,6 +475,11 @@ func (m *Manager) apply(id string, we workflow.Event, counts *pipeline.Counts, r
 			e.logTruncated = true
 		}
 		e.log = append(e.log, LogLine{Time: we.Time, Level: ev.Level, ActionID: we.ActionID, Message: we.Message})
+		if m.recording(e) {
+			e.logSeq++
+			m.rec.send(recOp{kind: recLog, run: Run{ID: id},
+				line: history.LogLine{Seq: e.logSeq, Time: we.Time, Level: ev.Level, ActionID: we.ActionID, Message: we.Message}})
+		}
 	case workflow.RunFinished:
 		t := we.Time
 		e.run.Status, e.run.Finished, e.run.DurationMs, e.run.Error = we.Status, &t, ev.DurationMs, ev.Error
@@ -483,28 +532,56 @@ func (m *Manager) LastSeq() int64 {
 	return m.seq
 }
 
-// Runs returns all runs, newest first.
-func (m *Manager) Runs() []Run {
+// Runs returns the runs in memory and, with a history, the newest ones from it; newest
+// first, at most MaxRuns+MaxHTTPRuns. A history that cannot be read is reported as error
+// together with the runs in memory.
+func (m *Manager) Runs(ctx context.Context) ([]Run, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	out := make([]Run, 0, len(m.order))
 	for _, id := range slices.Backward(m.order) {
 		r := m.runs[id].run
 		r.LinkRows = slices.Clone(r.LinkRows)
 		out = append(out, r)
 	}
-	return out
+	store := m.store
+	m.mu.Unlock()
+	if store == nil {
+		return out, nil
+	}
+	limit := MaxRuns + MaxHTTPRuns
+	stored, err := store.List(ctx, limit)
+	if err != nil {
+		return out, err
+	}
+	runs := make([]Run, 0, len(stored))
+	for _, h := range stored {
+		r, err := fromHistory(h)
+		if err != nil {
+			return out, err
+		}
+		runs = append(runs, r)
+	}
+	return mergeRuns(out, runs, limit), nil
 }
 
-// Get returns a run with its actions and log.
-func (m *Manager) Get(id string) (Detail, bool) {
+// Get returns a run with its actions and log, from memory or else from the history.
+func (m *Manager) Get(ctx context.Context, id string) (Detail, bool, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	e := m.runs[id]
-	if e == nil {
-		return Detail{}, false
+	if e := m.runs[id]; e != nil {
+		defer m.mu.Unlock()
+		return detailOf(e), true, nil
 	}
-	return detailOf(e), true
+	store := m.store
+	m.mu.Unlock()
+	if store == nil {
+		return Detail{}, false, nil
+	}
+	h, ok, err := store.Get(ctx, id)
+	if !ok || err != nil {
+		return Detail{}, false, err
+	}
+	d, err := detailFromHistory(h)
+	return d, err == nil, err
 }
 
 // detailOf returns the state of a run. m.mu must be held.

@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/history"
 	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -46,6 +47,9 @@ type Options struct {
 	TriggerListen string
 	// TriggerTLS makes it serve HTTPS (S40a); nil: plain HTTP.
 	TriggerTLS *tls.Config
+	// HistoryDir is the folder with the run histories of projects (ADR 0026); the
+	// project's history is in a subfolder of it. Empty: runs are kept in memory only.
+	HistoryDir string
 }
 
 // Server serves the API for one project.
@@ -66,6 +70,9 @@ type Server struct {
 	stopOnce sync.Once
 	// testing holds the names of connections being tested (one test each at a time).
 	testing sync.Map
+	// history keeps the runs of the project (ADR 0026); nil: in memory only.
+	history *history.Store
+	warn    func(string)
 }
 
 // New opens the project directory. Close releases it.
@@ -78,8 +85,18 @@ func New(opts Options) (*Server, error) {
 	if ui == nil {
 		ui = webui.FS()
 	}
+	warn := opts.Warn
+	if warn == nil {
+		warn = opts.Log
+	}
+	if warn == nil {
+		warn = func(string) {}
+	}
 	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
-		stop: make(chan struct{})}
+		stop: make(chan struct{}), warn: warn}
+	if opts.HistoryDir != "" {
+		s.openHistory(opts.HistoryDir, opts.Log)
+	}
 	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Wait: s.waitRun, Running: s.running, Log: opts.Log, Warn: opts.Warn,
 		Listen: opts.TriggerListen, TLS: opts.TriggerTLS})
 	return s, nil
@@ -112,7 +129,28 @@ func (s *Server) Running() int {
 
 // Close releases the project directory.
 func (s *Server) Close() error {
+	s.runs.CloseHistory()
+	if s.history != nil {
+		_ = s.history.Close()
+	}
 	return s.root.Close()
+}
+
+// openHistory opens the project's run history in base. If it cannot be opened, the
+// server runs without it (runs in memory only) and says so in the server log.
+func (s *Server) openHistory(base string, log func(string)) {
+	dir, err := history.ProjectDir(base, s.dir)
+	if err == nil {
+		s.history, err = history.Open(context.Background(), dir)
+	}
+	if err != nil {
+		s.warn(fmt.Sprintf("the run history is off, runs are kept in memory only: %v", err))
+		return
+	}
+	s.runs.SetHistory(s.history, s.warn)
+	if log != nil {
+		log("run history: " + s.history.Path())
+	}
 }
 
 // Handler returns the HTTP handler with all endpoints.

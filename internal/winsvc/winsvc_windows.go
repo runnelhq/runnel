@@ -123,6 +123,16 @@ func Install(c Config) error {
 			return undo(err)
 		}
 	}
+	if c.HistoryDir != "" {
+		prepare := prepareTLSDir // the history holds outputs and errors of runs (ADR 0026)
+		if c.HistoryShared {
+			prepare = prepareLogDir
+		}
+		if err := prepare(c.HistoryDir, account); err != nil {
+			_ = eventlog.Remove(c.Name)
+			return undo(err)
+		}
+	}
 	return nil
 }
 
@@ -359,6 +369,12 @@ func IsService() (bool, error) {
 // LogDir returns the folder of the log files of services: %ProgramData%\runnel\logs.
 func LogDir() string {
 	return filepath.Join(programData(), "runnel", "logs")
+}
+
+// HistoryDir returns the folder of the run histories of services (ADR 0026):
+// %ProgramData%\runnel\history.
+func HistoryDir() string {
+	return filepath.Join(programData(), "runnel", "history")
 }
 
 // TLSDir returns the folder of the self-signed certificate of services:

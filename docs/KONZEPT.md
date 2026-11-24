@@ -340,7 +340,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | CLI | `spf13/cobra` |
 | HTTP-Router | `net/http` (Go 1.22+ Routing) |
 | Live-Events | Server-Sent Events mit `net/http` ([ADR 0016](adr/0016-live-events-sse.md)) |
-| SQLite (Connections seit S20a, Run-Historie mit S26) | `modernc.org/sqlite` (pure Go, kein CGO, BSD-3) |
+| SQLite (Connections seit S20a, Run-Historie seit S26a) | `modernc.org/sqlite` (pure Go, kein CGO, BSD-3) |
 | YAML | `goccy/go-yaml` (Fehlermeldungen mit Zeilennummer, zeilengenaues Bearbeiten über den AST) |
 | JSON Schema | eigenes Paket `internal/schema` (Schemas aus Konfigurations-Structs, ADR 0014); Validierung über Schemas bei Bedarf später |
 | Ausdrücke | `expr-lang/expr` (kompiliert, schnell, ohne Seiteneffekte) |
@@ -958,9 +958,8 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Daten | Ort | Format |
 |---|---|---|
 | Workflows, Pipelines, Trigger, Connections, Secret-Quellen, Plugins | Projektordner | YAML (Git); Plugins mit ausführbarer Datei |
-| Run-Historie, Status, Metriken, Samples | `data\runnel.db` | SQLite (WAL-Modus) |
+| Run-Historie: Läufe, Status je Action/Transform, Log (seit S26a, [ADR 0026](adr/0026-run-historie.md)) | `%ProgramData%\runnel\history\<projekt>-<hash>\runs.db` (Dienst) bzw. `%LOCALAPPDATA%\runnel\history\…` (`runnel serve`); anderer Ordner mit `--history-dir` | SQLite (WAL-Modus) |
 | Secrets (lokaler Store) | `%LOCALAPPDATA%\runnel\secrets.db` bzw. `%ProgramData%\runnel\secrets\` (Dienst), nie im Projekt (ADR 0022) | verschlüsselt |
-| Run-Logs | `data\logs\<jahr>\<run-id>.log` | JSON-Lines (slog) |
 | Dienst-Ereignisse | Windows-Ereignisanzeige (Anwendung) | Quelle = Dienstname (Standard `runnel`): Start, Stopp, Warnungen, Fehler (seit S41) |
 | Server-Log des Dienstes | `%ProgramData%\runnel\logs\<dienst>.log` | Text, Rotation bei 10 MB nach `<dienst>.log.1` (seit S41) |
 | Freigaben der Plugins | `<Konfigurationsordner>\runnel\trusted-plugins.json` (Benutzer) bzw. `%ProgramData%\runnel\trust\plugins.json` (Dienst, nur Administratoren), nie im Projekt (ADR 0019, Nachtrag) | JSON |
@@ -968,39 +967,15 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 
 Standardpfade: `%ProgramData%\runnel\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\` (Desktop) bzw. neben der exe (portabel).
 
-### 9.2 Datenmodell (SQLite, vereinfacht)
+### 9.2 Run-Historie (seit S26a)
 
-```sql
-CREATE TABLE runs (
-  id            TEXT PRIMARY KEY,          -- ULID (zeitlich sortierbar)
-  kind          TEXT NOT NULL,             -- workflow | pipeline
-  path          TEXT NOT NULL,             -- relativer Pfad im Projekt
-  file_hash     TEXT NOT NULL,             -- Version der ausgeführten Definition
-  environment   TEXT,
-  trigger       TEXT,                      -- manual | cron:<name> | interval:<name> | file:<name> | http:<name> | cli
-  parent_run_id TEXT REFERENCES runs(id),  -- Sub-Workflow, Pipeline aus Workflow, Mapping, Executor
-  status        TEXT NOT NULL,             -- queued|running|succeeded|failed|cancelled
-  params_json   TEXT,
-  client_info   TEXT,                      -- IP/Rechnername bei manuellen Starts
-  started_at    INTEGER, finished_at INTEGER,
-  error         TEXT
-);
-
-CREATE TABLE node_runs (
-  run_id     TEXT REFERENCES runs(id),
-  node_id    TEXT,                         -- Action- oder Transform-ID
-  attempt    INTEGER DEFAULT 1,
-  status     TEXT,
-  rows_in    INTEGER, rows_out INTEGER, rows_err INTEGER,
-  result_json TEXT,
-  started_at INTEGER, finished_at INTEGER,
-  PRIMARY KEY (run_id, node_id, attempt)
-);
-
-CREATE TABLE samples (run_id TEXT, link TEXT, seq INTEGER, record_json TEXT);
-```
-
-Aufbewahrung: konfigurierbare Retention (z. B. 30 Tage Historie, 7 Tage Samples), Bereinigung durch internen Job.
+Eine SQLite-Datei je Projekt im Datenordner, nie im Projektordner ([ADR 0026](adr/0026-run-historie.md)): Tabellen
+`runs` (Lauf mit Pfad, Trigger, Status, Zeiten, Fehler, Hash der Datei, Lebenszeichen und dem Lauf als JSON, wie die
+API ihn zeigt), `nodes` (Status je Action bzw. Transform) und `log` (höchstens 5.000 Zeilen je Lauf, je Zeile 8 KB).
+Version in `PRAGMA user_version`, Migrationen nur vorwärts. Geschrieben wird in einer eigenen Goroutine, gesammelt in
+Transaktionen; die Historie bremst und stoppt keinen Lauf, Schreibfehler stehen höchstens einmal je Minute im
+Server-Log. Server, Dienst und CLI dürfen dieselbe Datei öffnen; ein Lauf ohne Lebenszeichen seit 2 Minuten gilt als
+abgebrochen (`failed`, „runnel stopped while the run was running“). Samples (S45) und Aufbewahrung (S26c) folgen.
 
 ### 9.3 Observability
 
@@ -1025,7 +1000,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/variables` | Genutzte und definierte Variablen mit Fundstellen und Werten je Ebene (seit E18a) |
 | GET | `/expressions` · `/version` | Wurzeln, Funktionen und Variablen für den Ausdruckseditor · Version des Servers |
 | POST | `/runs` | Run starten `{ path, environment, params }`; später `runConfig`, `startAt`, `only`, `reuseResultsFrom` |
-| GET | `/runs?status=&path=` | Historie (seit E3 im Speicher, Filter folgen mit S26 – zurückgestellt) |
+| GET | `/runs?status=&path=` | Läufe: laufende aus dem Speicher, beendete aus der Run-Historie (seit S26a); Filter folgen mit S26b |
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern (`resume` mit S29, Backlog) |
 | POST | `/preview` | Pipeline-Vorschau bis Transform X (S44, `docs/dev/API.md`) |

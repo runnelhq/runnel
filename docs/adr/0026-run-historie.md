@@ -147,3 +147,18 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
 - Ein verschobenes Projekt beginnt mit einer neuen Historie.
 - Schreiben kostet etwas Zeit je Action. Der Nachweis kommt mit einem Benchmark in S26a (HTTP-Trigger mit und ohne
   Historie).
+
+## Nachtrag 2026-11-24 (S26a)
+
+- `--history-dir` nennt den Ordner **für alle Projekte**; die Historie eines Projekts liegt darin im Unterordner
+  `<projekt>-<hash>`, wie im Standardordner. Gilt für `runnel serve`, `runnel service install` (wird an den Dienst
+  weitergegeben) und später `runnel run`.
+- Rechte: Der Standardordner des Dienstes wird wie der TLS-Ordner geschützt. Ein eigener Ordner (`--history-dir`) kann
+  mit `runnel serve` eines Benutzers geteilt sein; dort bekommt das Dienstkonto nur Schreibrechte, die übrigen Rechte
+  bleiben. Der Ordner eines Benutzers wird mit Rechten nur für ihn angelegt.
+- Schreiben: Was in der Warteschlange liegt (höchstens 16.384 Einträge), wird in einer Transaktion geschrieben. Endet
+  ein Lauf im selben Schub, wird er nur einmal mit seinem Endstand geschrieben. Ist die Warteschlange voll, entfallen
+  Einträge (einmal gemeldet), der Lauf geht weiter. Schreibfehler stehen höchstens einmal je Minute im Server-Log, mit
+  der Zahl der Fehler seitdem.
+- Kann die Historie beim Start nicht geöffnet werden (z. B. kein Zugriff, Datei einer neueren Version), läuft der Server
+  ohne sie (Läufe nur im Speicher) und sagt das im Server-Log.

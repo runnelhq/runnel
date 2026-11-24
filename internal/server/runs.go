@@ -95,12 +95,22 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleListRuns(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string][]runs.Run{"runs": s.runs.Runs()})
+func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
+	list, err := s.runs.Runs(r.Context())
+	if err != nil {
+		// The runs in memory are still shown; the details go to the server log.
+		s.warn(fmt.Sprintf("cannot read the run history: %v", err))
+	}
+	writeJSON(w, http.StatusOK, map[string][]runs.Run{"runs": list})
 }
 
 func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.runs.Get(r.PathValue("id"))
+	d, ok, err := s.runs.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		s.warn(fmt.Sprintf("cannot read the run history: %v", err))
+		writeError(w, http.StatusInternalServerError, "the run history cannot be read; see the server log")
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusNotFound, "run not found")
 		return

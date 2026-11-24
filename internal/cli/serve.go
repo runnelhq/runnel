@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/history"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/server"
 	"github.com/runnelhq/runnel/internal/transforms"
@@ -25,6 +26,7 @@ func newServeCommand() *cobra.Command {
 	var port int
 	var stopTimeout time.Duration
 	var listen listenerOptions
+	var historyDir string
 	cmd := &cobra.Command{
 		Use:   "serve [project-dir]",
 		Short: "Start the server for a project (API for the editor)",
@@ -44,13 +46,20 @@ func newServeCommand() *cobra.Command {
 				dir = args[0]
 			}
 			logf := func(msg string) { cmd.Printf("%s %s\n", time.Now().Format("15:04:05"), msg) }
+			if historyDir == "" {
+				var err error
+				if historyDir, err = history.DefaultBase(); err != nil {
+					logf(fmt.Sprintf("the run history is off, runs are kept in memory only: %v", err))
+				}
+			}
 			return runServer(cmd.Context(), serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen, TLSDir: userTLSDir(),
-				Log: logf, Warn: logf, Print: func(msg string) { cmd.Println(msg) }, StopHint: "; press Ctrl+C to stop"})
+				HistoryDir: historyDir, Log: logf, Warn: logf, Print: func(msg string) { cmd.Println(msg) }, StopHint: "; press Ctrl+C to stop"})
 		},
 	}
 	cmd.Flags().IntVar(&port, "port", DefaultPort, "TCP port on 127.0.0.1 (0 picks a free port)")
 	listenerFlags(cmd, &listen)
 	cmd.Flags().DurationVar(&stopTimeout, "stop-timeout", 0, "time running runs get to end when stopping, before they are cancelled (e.g. 30s; 0: cancel at once)")
+	historyDirFlag(cmd, &historyDir, defaultHistoryHint)
 	return cmd
 }
 
@@ -70,6 +79,8 @@ type serveConfig struct {
 	// self-signed certificate.
 	Triggers listenerOptions
 	TLSDir   string
+	// HistoryDir is the folder with the run histories of projects (ADR 0026).
+	HistoryDir string
 }
 
 // findProject returns the project directory of dir: dir or the first directory above
@@ -105,7 +116,7 @@ func runServer(ctx context.Context, c serveConfig) error {
 		return err
 	}
 	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin(), Log: c.Log, Warn: c.Warn,
-		TriggerListen: c.Triggers.Address, TriggerTLS: tlsConfig})
+		TriggerListen: c.Triggers.Address, TriggerTLS: tlsConfig, HistoryDir: c.HistoryDir})
 	if err != nil {
 		return err
 	}
@@ -151,4 +162,13 @@ func runServer(ctx context.Context, c serveConfig) error {
 		return nil
 	}
 	return err
+}
+
+// defaultHistoryHint names the default folder of run histories in the help of serve.
+const defaultHistoryHint = `%LOCALAPPDATA%\runnel\history on Windows, ~/.local/state/runnel/history elsewhere`
+
+// historyDirFlag adds --history-dir: the folder with the run histories of projects
+// (ADR 0026); the project's history is in a subfolder named after the project folder.
+func historyDirFlag(cmd *cobra.Command, dir *string, def string) {
+	cmd.Flags().StringVar(dir, "history-dir", "", "folder for the run histories of projects (each in a subfolder); empty: "+def)
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/runnelhq/runnel/internal/actions"
@@ -13,10 +14,22 @@ import (
 )
 
 // BenchmarkHTTPTrigger measures requests to an http trigger with response: run (load
-// probe of S38b2): routing, parameters, preparing the run (cached) and the answer.
+// probe of S38b2): routing, parameters, preparing the run (cached) and the answer;
+// without keeping the run (history: none), kept in memory, and kept in the run history
+// (ADR 0026, S26a).
 //
 //	go test ./internal/server -run XXX -bench HTTPTrigger -benchmem
 func BenchmarkHTTPTrigger(b *testing.B) {
+	for _, c := range []struct{ name, history, dir string }{
+		{"none", "none", ""},
+		{"memory", "all", ""},
+		{"stored", "all", b.TempDir()},
+	} {
+		b.Run(c.name, func(b *testing.B) { benchHTTPTrigger(b, c.history, c.dir) })
+	}
+}
+
+func benchHTTPTrigger(b *testing.B, history, historyDir string) {
 	dir := b.TempDir()
 	for name, content := range map[string]string{
 		"project.yaml": "kind: Project\napiVersion: runnel/v1\nname: p\n",
@@ -25,7 +38,7 @@ func BenchmarkHTTPTrigger(b *testing.B) {
 			"  - { id: log, type: core.log, with: { message: \"answered {{ params.ID }}\" } }\n" +
 			"links:\n  - { from: start, to: reply }\n  - { from: reply, to: log }\n",
 		"triggers/w.yaml": "kind: Trigger\napiVersion: runnel/v1\nname: w\ntype: http\ntarget: workflows/w.workflow.yaml\n" +
-			"with: { method: GET, path: \"/w/{ID}\", auth: none, response: run, history: none }\n",
+			"with: { method: GET, path: \"/w/{ID}\", auth: none, response: run, history: " + history + " }\n",
 	} {
 		p := filepath.Join(dir, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -35,10 +48,22 @@ func BenchmarkHTTPTrigger(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-	s, err := New(Options{Dir: dir, Registry: actions.Builtin(), Transforms: transforms.Builtin()})
+	var warnings atomic.Int64 // e.g. "the run history cannot keep up"
+	s, err := New(Options{Dir: dir, Registry: actions.Builtin(), Transforms: transforms.Builtin(), HistoryDir: historyDir,
+		Warn: func(m string) {
+			if warnings.Add(1) <= 3 {
+				b.Log(m)
+			}
+		}})
 	if err != nil {
 		b.Fatal(err)
 	}
+	b.Cleanup(func() {
+		_ = s.Close() // writes what is queued for the history
+		if n := warnings.Load(); n > 0 {
+			b.Errorf("%d warnings of the server log", n)
+		}
+	})
 	s.triggers.Reload()
 	if p := s.triggers.Problems(); len(p) > 0 {
 		b.Fatal(p)

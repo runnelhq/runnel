@@ -187,7 +187,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 
 | Nr. | Schritt | Inhalt | Hängt ab von / Hinweis |
 |---|---|---|---|
-| S26a | Run-Historie: Speicher | Nach [ADR 0026](adr/0026-run-historie.md): Paket `internal/history` (SQLite je Projekt im Datenordner, WAL, Migrationen, Tabellen `runs`/`nodes`/`log`), Manager schreibt mit (Start, Ende je Knoten, Ende; Log gesammelt), `GET /runs` und `GET /runs/{id}` lesen beendete Läufe aus der Historie, Lebenszeichen und abgebrochene Läufe, `--history-dir` | bis dahin die letzten 100 Läufe im Speicher (dazu 100 von HTTP-Triggern, seit S38b2), nach einem Neustart weg |
+| S26a ✅ | Run-Historie: Speicher | Nach [ADR 0026](adr/0026-run-historie.md): Paket `internal/history` (SQLite je Projekt im Datenordner, WAL, Migrationen, Tabellen `runs`/`nodes`/`log`), Manager schreibt mit (Start, Ende je Knoten, Ende; Log gesammelt), `GET /runs` und `GET /runs/{id}` lesen beendete Läufe aus der Historie, Lebenszeichen und abgebrochene Läufe, `--history-dir` | bis dahin die letzten 100 Läufe im Speicher (dazu 100 von HTTP-Triggern, seit S38b2), nach einem Neustart weg |
 | S26b | Run-Historie: CLI und Filter | `runnel run` schreibt mit (Trigger `cli`; `settings.history.cli` im Projekt, `--history all|errors|none` je Aufruf), `runnel runs` (Liste, Details, `--json`), Filter und Seiten in `GET /runs` (`status`, `path`, `trigger`, `before`, `limit`) | S26a |
 | S26c | Run-Historie: Aufbewahrung | `settings.history` (`keepDays` 30, `maxRuns` 10.000), Bereinigung beim Öffnen, stündlich und nach `runnel run`; `history:` für alle Trigger-Arten | S26a |
 | S26d | Mockup: Liste der Läufe im Editor | Liste mit Filter, ein beendeter Lauf auf dem Canvas mit Status und Log | S26a |
