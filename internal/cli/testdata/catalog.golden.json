@@ -3195,6 +3195,88 @@
       },
       "example": "path: out/orders.json\nfields:\n  - { name: id }\n  - { name: day, format: dd.MM.yyyy }\n",
       "recordErrors": true
+    },
+    {
+      "type": "xml.input",
+      "kind": "transform",
+      "category": "input",
+      "label": "XML Input",
+      "description": "Reads the elements of an XML file as records",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "XML file to read, relative to the project folder or absolute; the encoding comes from the byte order mark or the declaration",
+            "examples": [
+              "data/orders.xml"
+            ]
+          },
+          "records": {
+            "type": "string",
+            "description": "Elements that are records: a path of element names with /, matched at the end of the path of an element (a leading / starts at the root); empty: the children of the root element",
+            "examples": [
+              "orders/order"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields to read, with path and type; empty: attributes as @name and child elements as they are (text, objects, lists)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Where the value is in the record element: a child like amount, a path like customer/name, an attribute like @id or customer/@id, or #text for its own text; empty: the child named like the field",
+                  "examples": [
+                    "customer/name"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type of the value; empty: as read (text, or objects and lists for elements with children)",
+                  "enum": [
+                    "string",
+                    "int",
+                    "decimal",
+                    "float",
+                    "bool",
+                    "date",
+                    "datetime",
+                    "json"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Number pattern like #.##0,00 or date pattern like dd.MM.yyyy for the text; empty: 1234.5 and ISO dates",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "path: data/orders.xml\nrecords: orders/order\nfields:\n  - { name: id, from: \"@id\", type: int }\n  - { name: customer, from: customer/name }\n  - { name: amount, type: decimal }\n",
+      "recordErrors": true,
+      "detectFields": true
     }
   ]
 }

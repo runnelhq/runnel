@@ -184,10 +184,10 @@ func TestValidatePipelines(t *testing.T) {
 		t.Errorf("invalid: exit code %d, stdout %q", code, out)
 	}
 	// Types and configurations of the transforms are checked like before a run (S13b).
-	types := write("types.pipeline.yaml", "transforms:\n  - { id: read, type: xml.input }\n  - { id: log, type: core.log, with: { level: loud } }\nlinks:\n  - { from: read, to: log }\n")
+	types := write("types.pipeline.yaml", "transforms:\n  - { id: read, type: fixed.input }\n  - { id: log, type: core.log, with: { level: loud } }\nlinks:\n  - { from: read, to: log }\n")
 	_, out, _ = run(t, "validate", types)
 	for _, want := range []string{
-		`types.pipeline.yaml:5:23: error: transform "read": unknown transform type "xml.input"`,
+		`types.pipeline.yaml:5:23: error: transform "read": unknown transform type "fixed.input"`,
 		`types.pipeline.yaml:6:40: error: transform "log" (core.log): invalid level "loud"`,
 	} {
 		if !strings.Contains(out, want) {

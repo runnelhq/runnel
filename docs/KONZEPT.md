@@ -1220,7 +1220,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 
 | Kategorie | Transforms |
 |---|---|
-| Eingabe | CSV, Excel (`excel.input`, seit S67a), JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL, `db.table-input` seit S20b), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
+| Eingabe | CSV, Excel (`excel.input`, seit S67a), JSON/NDJSON, XML (`xml.input`, seit S68a), Fixed-Width, Tabelleneingabe (SQL, `db.table-input` seit S20b), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
 | Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
@@ -1281,6 +1281,17 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   (`from: address.city`), und wandelt sie mit `type`/`format` um wie `core.convert`. Gelesen wird als Strom (große
   Dateien passen nicht in den Speicher); Kodierung wie bei CSV (UTF-16 von PowerShell 5 wird erkannt). „Detect fields“
   schlägt Typen aus den Werten vor.
+- **`xml.input`** liest die Elemente einer XML-Datei, die Datensätze sind (S68a): `records` ist ein Pfad aus
+  Elementnamen (`Bestellungen/Bestellung`), verglichen mit dem Ende des Pfads eines Elements (`/` am Anfang: ab der
+  Wurzel); leer sind es die Kinder der Wurzel. Ohne `fields` werden Attribute zu `@name`, Kind-Elemente mit Text zu
+  Text, solche mit Kindern oder Attributen zu Objekten, wiederholte zu Listen und der eigene Text zu `#text`. `fields`
+  wählt Werte mit `from` (`Kunde/Name`, `@nr`, `Kunde/@id`, `#text`) und wandelt sie mit `type`/`format` um wie
+  `csv.input`; ein Element mit Attributen (`<Betrag waehrung="EUR">12.50</Betrag>`) liefert dabei seinen Text. Ein
+  Wert, der nicht passt, schickt den Datensatz mit Zeile auf den Fehler-Link; kaputtes XML hält mit Zeile an.
+  Namensräume werden ohne Präfix verglichen. Die Kodierung kommt aus dem BOM oder der Deklaration (UTF-8, UTF-16,
+  Windows-1252, ISO-8859-1/-15). Gelesen wird als Strom; externe Entities werden nicht aufgelöst, ein Datensatz hat
+  höchstens 16 MiB und 256 Ebenen. „Detect fields“ schlägt Typen vor und nennt, wenn `records` leer ist und tiefer
+  liegende Elemente sich häufiger wiederholen, deren Pfad.
 - **`json.output`** schreibt ein Array mit einem Datensatz je Zeile oder NDJSON (Standard für `.ndjson`/`.jsonl`), UTF-8
   ohne BOM, Schlüssel in der Reihenfolge der Felder; Dezimalzahlen exakt, Daten in ISO 8601, mit `format` als Text.
   Wie `csv.output` über eine temporäre Datei, die die alte erst am Ende ersetzt (`ifExists: replace|fail`).

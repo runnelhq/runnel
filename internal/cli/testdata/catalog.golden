@@ -37,6 +37,7 @@ transforms / input
   excel.input         Excel Input    Reads the rows of a sheet of an Excel workbook (.xlsx) as records
   file.list           List Files     Reads the files of a folder as records: path, name, extension, size, modified and folder
   json.input          JSON Input     Reads the objects of a JSON or NDJSON file as records
+  xml.input           XML Input      Reads the elements of an XML file as records
 transforms / transform
   core.calculate      Calculate      Sets fields to the result of an expression for every record
   core.constant       Add Constants  Adds fields with the same value to every record
