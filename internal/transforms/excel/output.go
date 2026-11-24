@@ -39,7 +39,7 @@ type output struct {
 	Path     string     `json:"path" doc:"Workbook to write (.xlsx or .xlsm), relative to the project folder or absolute" schema:"required,example=out/orders.xlsx"`
 	Sheet    string     `json:"sheet" doc:"Name of the sheet; empty: Sheet1" schema:"example=Orders"`
 	Header   *bool      `json:"header" doc:"Whether the first row holds the names of the columns, bold and frozen" schema:"default=true"`
-	IfExists string     `json:"ifExists" doc:"If the workbook exists: replace it once all records are written, fail, or replace only the sheet and keep the other sheets, charts and formulas" schema:"enum=replace|fail|sheet,default=replace"`
+	IfExists string     `json:"ifExists" doc:"If the workbook exists: replace it once all records are written, fail, or replace only the sheet (sheet) and keep the other sheets, charts and formulas" schema:"enum=replace|fail|sheet,default=replace"`
 	Fields   []outField `json:"fields" doc:"Columns to write, in this order, with a number format; empty: all fields of the records"`
 
 	cols []string // columns known before the run (fields or a closed schema)

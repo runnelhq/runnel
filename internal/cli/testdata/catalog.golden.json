@@ -37,7 +37,7 @@
           },
           "ifExists": {
             "type": "string",
-            "description": "What happens if the archive exists: replace it once the new one is complete, or fail",
+            "description": "If the archive exists: replace it once the new one is complete, or fail",
             "enum": [
               "replace",
               "fail"
@@ -97,11 +97,11 @@
           },
           "ifExists": {
             "type": "string",
-            "description": "What happens to files that exist in the folder: fail before anything is written, replace them, or skip them",
+            "description": "If files exist in the folder: replace them, skip them, or fail before anything is written",
             "enum": [
-              "fail",
               "replace",
-              "skip"
+              "skip",
+              "fail"
             ],
             "default": "fail"
           },
@@ -494,10 +494,15 @@
               "D:\\archive"
             ]
           },
-          "overwrite": {
-            "type": "boolean",
-            "description": "Replace existing files in the target",
-            "default": false
+          "ifExists": {
+            "type": "string",
+            "description": "If a file exists in the target: replace it, skip it (it stays and is not in the output), or fail before anything is copied or moved",
+            "enum": [
+              "replace",
+              "skip",
+              "fail"
+            ],
+            "default": "fail"
           }
         },
         "required": [
@@ -506,7 +511,7 @@
         ],
         "additionalProperties": false
       },
-      "example": "source: inbox/*.csv\ntarget: archive/\noverwrite: true\n"
+      "example": "source: inbox/*.csv\ntarget: archive/\nifExists: replace\n"
     },
     {
       "type": "file.delete",
@@ -530,10 +535,14 @@
             "description": "Also delete folders with everything in them",
             "default": false
           },
-          "mustExist": {
-            "type": "boolean",
-            "description": "Fail if nothing matches the path",
-            "default": false
+          "ifMissing": {
+            "type": "string",
+            "description": "If nothing matches the path: skip (nothing is deleted) or fail",
+            "enum": [
+              "skip",
+              "fail"
+            ],
+            "default": "skip"
           }
         },
         "required": [
@@ -672,10 +681,15 @@
               "D:\\archive"
             ]
           },
-          "overwrite": {
-            "type": "boolean",
-            "description": "Replace existing files in the target",
-            "default": false
+          "ifExists": {
+            "type": "string",
+            "description": "If a file exists in the target: replace it, skip it (it stays and is not in the output), or fail before anything is copied or moved",
+            "enum": [
+              "replace",
+              "skip",
+              "fail"
+            ],
+            "default": "fail"
           }
         },
         "required": [
@@ -703,7 +717,7 @@
               "config/settings.json"
             ]
           },
-          "as": {
+          "format": {
             "type": "string",
             "description": "How the content is read: text, lines (a list without line ends) or json (a value, e.g. {{ results.read.output.value.customers }})",
             "enum": [
@@ -744,7 +758,7 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: config/customers.json\nas: json\n"
+      "example": "path: config/customers.json\nformat: json\n"
     },
     {
       "type": "file.wait",
@@ -811,9 +825,9 @@
             ]
           },
           "content": {
-            "description": "What to write: a text, or with as: json any value, e.g. {{ results.query.output.rows }}"
+            "description": "What to write: a text, or with format: json any value, e.g. {{ results.query.output.rows }}"
           },
-          "as": {
+          "format": {
             "type": "string",
             "description": "text writes the content as text (other values as JSON), json writes the value as formatted JSON",
             "enum": [
@@ -845,7 +859,7 @@
           },
           "ifExists": {
             "type": "string",
-            "description": "If the file exists: replace it (written completely, then renamed), append to it, or fail",
+            "description": "If the file exists: replace it once the content is written, append to it, or fail",
             "enum": [
               "replace",
               "append",
@@ -859,7 +873,7 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: out/status.json\nas: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n"
+      "example": "path: out/status.json\nformat: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n"
     },
     {
       "type": "http.request",
@@ -937,18 +951,18 @@
           },
           "saveTo": {
             "type": "string",
-            "description": "Saves a successful answer (status 2xx) as a file instead of reading it, e.g. a ZIP or PDF; relative to the project folder or absolute. Written to a temporary file first, so no half file remains; output: file and size instead of body",
+            "description": "Saves a successful answer (status 2xx) as a file instead of reading it, e.g. a ZIP or PDF; relative to the project folder or absolute. Written to a temporary file first, so no half file remains; output: path and size instead of body",
             "examples": [
               "inbox/export.zip"
             ]
           },
           "ifExists": {
             "type": "string",
-            "description": "With saveTo, if the file exists: replace it once the download is complete, fail before the request, or skip the request",
+            "description": "With saveTo, if the file exists: replace it once the download is complete, skip the request, or fail before the request",
             "enum": [
               "replace",
-              "fail",
-              "skip"
+              "skip",
+              "fail"
             ],
             "default": "replace"
           },
@@ -2400,7 +2414,7 @@
           },
           "ifExists": {
             "type": "string",
-            "description": "What happens if the file exists: replace it once all records are written, append to it, or fail",
+            "description": "If the file exists: replace it once all records are written, append to it, or fail",
             "enum": [
               "replace",
               "append",
@@ -2888,7 +2902,7 @@
           },
           "ifExists": {
             "type": "string",
-            "description": "If the workbook exists: replace it once all records are written, fail, or replace only the sheet and keep the other sheets, charts and formulas",
+            "description": "If the workbook exists: replace it once all records are written, fail, or replace only the sheet (sheet) and keep the other sheets, charts and formulas",
             "enum": [
               "replace",
               "fail",
@@ -3152,7 +3166,7 @@
           },
           "ifExists": {
             "type": "string",
-            "description": "What happens if the file exists: replace it once all records are written, or fail",
+            "description": "If the file exists: replace it once all records are written, or fail",
             "enum": [
               "replace",
               "fail"
@@ -3311,7 +3325,7 @@
           },
           "ifExists": {
             "type": "string",
-            "description": "What happens if the file exists: replace it once all records are written, or fail",
+            "description": "If the file exists: replace it once all records are written, or fail",
             "enum": [
               "replace",
               "fail"

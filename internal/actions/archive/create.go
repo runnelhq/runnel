@@ -36,7 +36,7 @@ type create struct {
 	Source   string `json:"source" doc:"File or folder to pack, relative to the project folder or absolute; wildcards are allowed in the name, e.g. out/*.csv" schema:"required,example=out/*.csv"`
 	Target   string `json:"target" doc:"Archive to write, e.g. archive/export.zip" schema:"required,example=archive/export.zip"`
 	Format   string `json:"format" doc:"Format of the archive; auto: by the ending of target (.zip, .tar, .tar.gz or .tgz)" schema:"enum=auto|zip|tar|tar.gz,default=auto"`
-	IfExists string `json:"ifExists" doc:"What happens if the archive exists: replace it once the new one is complete, or fail" schema:"enum=replace|fail,default=replace"`
+	IfExists string `json:"ifExists" doc:"If the archive exists: replace it once the new one is complete, or fail" schema:"enum=replace|fail,default=replace"`
 }
 
 func newCreate(with map[string]any) (action.Action, error) {

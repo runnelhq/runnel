@@ -25,7 +25,7 @@ const (
 // download saves a successful answer as the file target (saveTo, S63d): streamed into a
 // temporary file next to it and renamed once complete, so that a failed or cancelled
 // download leaves no half file. Error answers are read like without saveTo and are not
-// saved. Output: status, headers, file and size instead of body.
+// saved. Output: status, headers, path and size instead of body.
 func (c *call) download(ctx context.Context, u *url.URL, target string) (action.Result, error) {
 	where := c.where(u)
 	_, err := os.Stat(target)
@@ -36,7 +36,7 @@ func (c *call) download(ctx context.Context, u *url.URL, target string) (action.
 	switch {
 	case exists && c.a.IfExists == ifExistsSkip:
 		c.ec.Logf(slog.LevelInfo, "%s: not requested, %s exists (ifExists: skip)", where, target)
-		return action.Result{Output: map[string]any{"file": target, "skipped": true}}, nil
+		return action.Result{Output: map[string]any{"path": target, "skipped": true}}, nil
 	case exists && c.a.IfExists == ifExistsFail:
 		return action.Result{}, fmt.Errorf("saveTo: %s exists (ifExists: fail)", target)
 	}
@@ -63,7 +63,7 @@ func (c *call) download(ctx context.Context, u *url.URL, target string) (action.
 		_ = os.Remove(ans.file)
 		return action.Result{}, fmt.Errorf("saveTo: %w", err)
 	}
-	out["file"] = target
+	out["path"] = target
 	out["size"] = ans.size
 	c.ec.Logf(slog.LevelInfo, "%s: %s, saved %d bytes to %s in %s", where, ans.text, ans.size, target, ans.duration.Round(time.Millisecond))
 	return action.Result{Output: out}, nil

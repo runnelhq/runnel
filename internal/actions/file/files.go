@@ -117,9 +117,27 @@ func endsWithSeparator(path string) bool {
 
 // transfer copies or moves files and folders (file.copy, file.move).
 type transfer struct {
-	Source    string `json:"source" doc:"File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
-	Target    string `json:"target" doc:"Target folder, relative to the project folder or absolute; for a single file also a new file name" schema:"required,example=D:\\archive"`
-	Overwrite bool   `json:"overwrite" doc:"Replace existing files in the target" schema:"default=false"`
+	Source   string `json:"source" doc:"File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
+	Target   string `json:"target" doc:"Target folder, relative to the project folder or absolute; for a single file also a new file name" schema:"required,example=D:\\archive"`
+	IfExists string `json:"ifExists" doc:"If a file exists in the target: replace it, skip it (it stays and is not in the output), or fail before anything is copied or moved" schema:"enum=replace|skip|fail,default=fail"`
+}
+
+// errSkipped marks a file that exists in the target and is skipped (ifExists: skip).
+var errSkipped = errors.New("skipped")
+
+// renamedTransfer names the fields of file.copy and file.move renamed by ADR 0025.
+var renamedTransfer = map[string]string{"overwrite": "renamed to ifExists: overwrite: true is now ifExists: replace"}
+
+// checkIfExists checks the value of ifExists of file.copy and file.move.
+func (t *transfer) checkIfExists() error {
+	switch t.IfExists {
+	case "", "replace", "skip", "fail":
+		return nil
+	}
+	if strings.Contains(t.IfExists, "${") {
+		return nil
+	}
+	return fmt.Errorf("invalid ifExists %q (expected replace, skip or fail)", t.IfExists)
 }
 
 // targets pairs each source with its destination. Several sources (wildcards) and paths
@@ -165,8 +183,8 @@ func (t *transfer) check(pairs [][2]string, verb string) error {
 			return fmt.Errorf("cannot %s %q: %q already exists as a folder", verb, p[0], p[1])
 		case !info.IsDir() && srcIsFolder:
 			return fmt.Errorf("cannot %s %q: a file %q exists", verb, p[0], p[1])
-		case !info.IsDir() && !t.Overwrite:
-			return fmt.Errorf("cannot %s %q: %q already exists (set overwrite: true to replace it)", verb, p[0], p[1])
+		case !info.IsDir() && (t.IfExists == "" || t.IfExists == "fail"):
+			return fmt.Errorf("cannot %s %q: %q already exists (set ifExists: replace or skip)", verb, p[0], p[1])
 		}
 	}
 	return nil
@@ -179,13 +197,16 @@ func sameFile(a, b string) bool {
 }
 
 // copyPath copies a file, or a folder with everything in it; it returns the files written.
-func copyPath(ctx context.Context, src, dst string, overwrite bool) ([]string, error) {
+func copyPath(ctx context.Context, src, dst, ifExists string) ([]string, error) {
 	info, err := os.Stat(src)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %q: %w", src, plain(err))
 	}
 	if !info.IsDir() {
-		if err := copyFile(ctx, src, dst, info, overwrite); err != nil {
+		if err := copyFile(ctx, src, dst, info, ifExists); err != nil {
+			if errors.Is(err, errSkipped) {
+				return nil, nil
+			}
 			return nil, err
 		}
 		return []string{dst}, nil
@@ -213,7 +234,10 @@ func copyPath(ctx context.Context, src, dst string, overwrite bool) ([]string, e
 		if err != nil {
 			return fmt.Errorf("cannot read %q: %w", p, plain(err))
 		}
-		if err := copyFile(ctx, p, target, fi, overwrite); err != nil {
+		if err := copyFile(ctx, p, target, fi, ifExists); err != nil {
+			if errors.Is(err, errSkipped) {
+				return nil
+			}
 			return err
 		}
 		written = append(written, target)
@@ -230,7 +254,7 @@ func within(path, dir string) bool {
 
 // copyFile copies one file via a temporary file, keeps its modification time and
 // stops between blocks when the run is cancelled.
-func copyFile(ctx context.Context, src, dst string, info fs.FileInfo, overwrite bool) (err error) {
+func copyFile(ctx context.Context, src, dst string, info fs.FileInfo, ifExists string) (err error) {
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("cannot copy %q: not a regular file", src)
 	}
@@ -238,8 +262,10 @@ func copyFile(ctx context.Context, src, dst string, info fs.FileInfo, overwrite 
 		switch {
 		case t.IsDir():
 			return fmt.Errorf("cannot copy %q to %q: a folder with this name exists", src, dst)
-		case !overwrite:
-			return fmt.Errorf("cannot copy %q: %q already exists (set overwrite: true to replace it)", src, dst)
+		case ifExists == "skip":
+			return errSkipped
+		case ifExists != "replace":
+			return fmt.Errorf("cannot copy %q: %q already exists (set ifExists: replace or skip)", src, dst)
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {

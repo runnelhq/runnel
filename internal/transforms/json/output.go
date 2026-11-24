@@ -40,7 +40,7 @@ var outputDefinition = transform.Definition{
 type output struct {
 	Path     string     `json:"path" doc:"JSON or NDJSON file to write, relative to the project folder or absolute" schema:"required,example=out/orders.json"`
 	Format   string     `json:"format" doc:"json: an array with one record per line; ndjson: one object per line; auto: ndjson for .ndjson and .jsonl, else json" schema:"enum=auto|json|ndjson,default=auto"`
-	IfExists string     `json:"ifExists" doc:"What happens if the file exists: replace it once all records are written, or fail" schema:"enum=replace|fail,default=replace"`
+	IfExists string     `json:"ifExists" doc:"If the file exists: replace it once all records are written, or fail" schema:"enum=replace|fail,default=replace"`
 	Fields   []outField `json:"fields" doc:"Fields to write, in this order; empty: all fields of the records"`
 
 	codecs []*format.Codec

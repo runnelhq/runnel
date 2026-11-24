@@ -23,6 +23,7 @@ var moveDefinition = action.Definition{
 	Example:     "source: inbox/orders.csv\ntarget: done/\n",
 	Config:      transfer{},
 	New:         newMove,
+	Renamed:     renamedTransfer,
 }
 
 type moveAction struct{ transfer }
@@ -32,7 +33,7 @@ func newMove(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, &a.transfer); err != nil {
 		return nil, err
 	}
-	return a, nil
+	return a, a.checkIfExists()
 }
 
 func (a *moveAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
@@ -52,7 +53,11 @@ func (a *moveAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 			return action.Result{Output: list(moved)}, err
 		}
 		ec.Logf(slog.LevelDebug, "moving %s to %s", p[0], p[1])
-		if err := movePath(ctx, p[0], p[1], a.Overwrite); err != nil {
+		err := movePath(ctx, p[0], p[1], a.IfExists)
+		if errors.Is(err, errSkipped) {
+			continue
+		}
+		if err != nil {
 			return action.Result{Output: list(moved)}, err
 		}
 		moved = append(moved, p[1])
@@ -61,13 +66,15 @@ func (a *moveAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 	return action.Result{Output: list(moved)}, nil
 }
 
-func movePath(ctx context.Context, src, dst string, overwrite bool) error {
+func movePath(ctx context.Context, src, dst, ifExists string) error {
 	if info, err := os.Stat(dst); err == nil {
 		switch {
 		case info.IsDir():
 			return fmt.Errorf("cannot move %q: %q already exists as a folder", src, dst)
-		case !overwrite:
-			return fmt.Errorf("cannot move %q: %q already exists (set overwrite: true to replace it)", src, dst)
+		case ifExists == "skip":
+			return errSkipped // the source stays where it is
+		case ifExists != "replace":
+			return fmt.Errorf("cannot move %q: %q already exists (set ifExists: replace or skip)", src, dst)
 		}
 	}
 	if isFolder(src) && within(dst, src) {
@@ -84,7 +91,7 @@ func movePath(ctx context.Context, src, dst string, overwrite bool) error {
 		return fmt.Errorf("cannot move %q to %q: %w", src, dst, plain(err))
 	}
 	// Another drive or share: copy, then delete the source.
-	if _, err := copyPath(ctx, src, dst, overwrite); err != nil {
+	if _, err := copyPath(ctx, src, dst, ifExists); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(src); err != nil {

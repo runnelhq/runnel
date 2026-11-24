@@ -43,7 +43,7 @@ type output struct {
 	Path     string     `json:"path" doc:"XML file to write (UTF-8), relative to the project folder or absolute" schema:"required,example=out/orders.xml"`
 	Root     string     `json:"root" doc:"Name of the root element; empty: records" schema:"example=orders"`
 	Record   string     `json:"record" doc:"Name of the element of each record; empty: record" schema:"example=order"`
-	IfExists string     `json:"ifExists" doc:"What happens if the file exists: replace it once all records are written, or fail" schema:"enum=replace|fail,default=replace"`
+	IfExists string     `json:"ifExists" doc:"If the file exists: replace it once all records are written, or fail" schema:"enum=replace|fail,default=replace"`
 	Nulls    string     `json:"nulls" doc:"Empty values: skip writes no element, empty writes an empty one" schema:"enum=skip|empty,default=skip"`
 	Fields   []outField `json:"fields" doc:"Fields to write, in this order, with where they go; empty: all fields of the records as child elements"`
 

@@ -14,13 +14,19 @@ func TestMove(t *testing.T) {
 	archive := filepath.Join(dir, "archive")
 
 	_, err := run(t, moveDefinition, map[string]any{"source": filepath.Join(dir, "in", "*.csv"), "target": archive})
-	if err == nil || !strings.Contains(err.Error(), "already exists (set overwrite: true") {
+	if err == nil || !strings.Contains(err.Error(), "already exists (set ifExists: replace or skip)") {
 		t.Fatalf("err = %v", err)
 	}
 	if !present(filepath.Join(dir, "in", "a.csv")) {
 		t.Fatal("a.csv was moved although b.csv conflicts")
 	}
-	got, err := run(t, moveDefinition, map[string]any{"source": filepath.Join(dir, "in", "*.csv"), "target": archive, "overwrite": true})
+	// skip: b.csv stays in both places, a.csv is moved.
+	got, err := run(t, moveDefinition, map[string]any{"source": filepath.Join(dir, "in", "*.csv"), "target": archive, "ifExists": "skip"})
+	if err != nil || names(got) != "a.csv" || !present(filepath.Join(dir, "in", "b.csv")) || read(t, filepath.Join(archive, "b.csv")) != "old" {
+		t.Fatalf("skip: got %v, %v", got, err)
+	}
+	tree(t, dir, map[string]string{"in/a.csv": "A"})
+	got, err = run(t, moveDefinition, map[string]any{"source": filepath.Join(dir, "in", "*.csv"), "target": archive, "ifExists": "replace"})
 	if err != nil || names(got) != "a.csv,b.csv" {
 		t.Fatalf("got %v, %v", got, err)
 	}

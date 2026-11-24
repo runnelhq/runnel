@@ -1,6 +1,6 @@
 # Reads a small configuration and writes a status file (S66):
 #   runnel run -v examples/files/workflows/status.workflow.yaml
-# - "settings" reads config/settings.json as a value (as: json); later actions use its
+# - "settings" reads config/settings.json as a value (format: json); later actions use its
 #   fields, e.g. {{ results.settings.output.value.customers }}.
 # - "status" writes out/status.json as formatted JSON, replacing the file only once it is
 #   complete, so that another system never reads half of it.
@@ -15,7 +15,7 @@ actions:
     type: file.read
     with:
       path: config/settings.json
-      as: json
+      format: json
   - id: files
     type: file.list
     with:
@@ -25,7 +25,7 @@ actions:
     type: file.write
     with:
       path: out/status.json
-      as: json
+      format: json
       content: "{{ {'run': run.id, 'customers': results.settings.output.value.customers, 'files': len(results.files.output)} }}"
   - id: log
     type: file.write

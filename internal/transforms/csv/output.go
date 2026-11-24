@@ -34,7 +34,7 @@ type output struct {
 	Delimiter string     `json:"delimiter" doc:"Character between the values, e.g. ; or \\t for tab; empty: comma" schema:"example=;"`
 	Header    *bool      `json:"header" doc:"Whether the first row holds the names of the columns" schema:"default=true"`
 	Encoding  string     `json:"encoding" doc:"Encoding of the file; utf-8-bom lets Excel recognize umlauts" schema:"enum=utf-8-bom|utf-8|windows-1252,default=utf-8-bom"`
-	IfExists  string     `json:"ifExists" doc:"What happens if the file exists: replace it once all records are written, append to it, or fail" schema:"enum=replace|append|fail,default=replace"`
+	IfExists  string     `json:"ifExists" doc:"If the file exists: replace it once all records are written, append to it, or fail" schema:"enum=replace|append|fail,default=replace"`
 	Fields    []outField `json:"fields" doc:"Columns to write, in this order, with a format; empty: all fields of the records"`
 
 	codecs []codec
