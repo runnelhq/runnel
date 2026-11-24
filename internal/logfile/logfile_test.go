@@ -18,7 +18,7 @@ func read(t *testing.T, path string) string {
 
 func TestRotate(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs", "runnel.log")
-	l, err := Open(path, 20)
+	l, err := Open(path, 20, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestRotate(t *testing.T) {
 	}
 
 	// Reopening appends and counts the existing size; the older .1 is replaced.
-	l, err = Open(path, 20)
+	l, err = Open(path, 20, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestRotate(t *testing.T) {
 		t.Errorf("after reopening: %q, old %q", got, read(t, path+".1"))
 	}
 	// A line longer than the limit is written whole.
-	l, _ = Open(path, 4)
+	l, _ = Open(path, 4, 1)
 	_, _ = l.Write([]byte(strings.Repeat("x", 10)))
 	_ = l.Close()
 	if got := read(t, path); got != strings.Repeat("x", 10) {
@@ -59,5 +59,28 @@ func TestRotate(t *testing.T) {
 	}
 	if _, err := l.Write([]byte("x")); err == nil {
 		t.Error("write after close")
+	}
+}
+
+// Several old files are kept: .1 is the newest, the oldest beyond keep is removed (S71).
+func TestRotateKeep(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runnel.log")
+	l, err := Open(path, 10, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{"line A\n", "line B\n", "line C\n", "line D\n", "line E\n"} {
+		if _, err := l.Write([]byte(line)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = l.Close()
+	for suffix, want := range map[string]string{"": "line E\n", ".1": "line D\n", ".2": "line C\n", ".3": "line B\n"} {
+		if got := read(t, path+suffix); got != want {
+			t.Errorf("%s: %q, want %q", suffix, got, want)
+		}
+	}
+	if _, err := os.Stat(path + ".4"); !os.IsNotExist(err) {
+		t.Errorf(".4: %v", err)
 	}
 }

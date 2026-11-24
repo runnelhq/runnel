@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
@@ -27,6 +28,7 @@ func newServeCommand() *cobra.Command {
 	var stopTimeout time.Duration
 	var listen listenerOptions
 	var historyDir string
+	var logOpts logOptions
 	cmd := &cobra.Command{
 		Use:   "serve [project-dir]",
 		Short: "Start the server for a project (API for the editor)",
@@ -45,21 +47,25 @@ func newServeCommand() *cobra.Command {
 			if len(args) == 1 {
 				dir = args[0]
 			}
-			logf := func(msg string) { cmd.Printf("%s %s\n", time.Now().Format("15:04:05"), msg) }
+			logger, err := newLogger(cmd.OutOrStdout(), logOpts, "15:04:05")
+			if err != nil {
+				return err
+			}
 			if historyDir == "" {
-				var err error
 				if historyDir, err = history.DefaultBase(); err != nil {
-					logf(fmt.Sprintf("the run history is off, runs are kept in memory only: %v", err))
+					logger.Warn(fmt.Sprintf("the run history is off, runs are kept in memory only: %v", err))
 				}
 			}
 			return runServer(cmd.Context(), serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen, TLSDir: userTLSDir(),
-				HistoryDir: historyDir, Log: logf, Warn: logf, Print: func(msg string) { cmd.Println(msg) }, StopHint: "; press Ctrl+C to stop"})
+				HistoryDir: historyDir, Logger: logger, Log: func(m string) { logger.Info(m) }, Warn: func(m string) { logger.Warn(m) },
+				Print: func(msg string) { cmd.Println(msg) }, StopHint: "; press Ctrl+C to stop"})
 		},
 	}
 	cmd.Flags().IntVar(&port, "port", DefaultPort, "TCP port on 127.0.0.1 (0 picks a free port)")
 	listenerFlags(cmd, &listen)
 	cmd.Flags().DurationVar(&stopTimeout, "stop-timeout", 0, "time running runs get to end when stopping, before they are cancelled (e.g. 30s; 0: cancel at once)")
 	historyDirFlag(cmd, &historyDir, defaultHistoryHint)
+	logFlags(cmd, &logOpts)
 	return cmd
 }
 
@@ -81,6 +87,8 @@ type serveConfig struct {
 	TLSDir   string
 	// HistoryDir is the folder with the run histories of projects (ADR 0026).
 	HistoryDir string
+	// Logger gets a line per run that has ended (S71); nil: none.
+	Logger *slog.Logger
 }
 
 // findProject returns the project directory of dir: dir or the first directory above
@@ -116,7 +124,7 @@ func runServer(ctx context.Context, c serveConfig) error {
 		return err
 	}
 	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin(), Log: c.Log, Warn: c.Warn,
-		TriggerListen: c.Triggers.Address, TriggerTLS: tlsConfig, HistoryDir: c.HistoryDir})
+		TriggerListen: c.Triggers.Address, TriggerTLS: tlsConfig, HistoryDir: c.HistoryDir, Logger: c.Logger})
 	if err != nil {
 		return err
 	}

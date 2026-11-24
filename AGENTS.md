@@ -50,7 +50,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/proc/` | Programme starten für `shell.*` (ADR 0023): ohne Shell, Timeout mit Prozessbaum (Job Object/Prozessgruppe), Grenzen der Ausgabe, Kodierung, Prüfung von Batch-Argumenten |
 | `internal/xlsx/` | Excel-Arbeitsmappen (`.xlsx`) lesen für `excel.input` (S67a): Blätter, Zeilen als Strom mit Zelltypen und Datumsformaten, Grenzen für entpackte Teile (Schreiben: `excel.output` mit `excelize`, S67b) |
 | `internal/textenc/` | Kodierung von Eingabedateien (UTF-8 mit/ohne BOM, UTF-16, Windows-1252) für `csv.input` und `json.input` |
-| `internal/logfile/` | Log-Datei mit Rotation nach Größe (Dienst) |
+| `internal/logfile/` | Log-Datei mit Rotation nach Größe und mehreren alten Dateien (Dienst), Handler für das Server-Log im Format `text` oder `json` (S71) |
 | `internal/oauth/` | Tokens nach OAuth 2.0 Client Credentials für Connections (z. B. `smtp` mit Office 365): Abruf, Zwischenspeicher bis kurz vor Ablauf |
 | `internal/pagination/` | Seiten einer HTTP-API lesen (`link`, `url`, `cursor`, `page`, `offset`): Liste je Seite, nächste Adresse, Grenzen, gleicher Host (S63c; für `http.request`, später `http.input`) |
 | `internal/httpx/` | gemeinsame HTTP-Helfer von Server und Trigger-Listener (`IsLoopback`, JSON-Antworten) |

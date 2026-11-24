@@ -44,7 +44,8 @@ runnel run --env prod examples/hello/workflows/hello.workflow.yaml
 ```
 
 `runnel run <datei>` führt einen Workflow oder eine Pipeline aus (bei Pipelines mit den Zählern je Transform): `--env` wählt das Environment des Projekts, `--param KEY=VALUE` setzt
-Parameter, `-v` zeigt zusätzlich Debug-Meldungen und jeden Action-Start. Exit-Code: `0` erfolgreich, `1` fehlgeschlagen,
+Parameter, `-v` (oder `--log-level debug`) zeigt zusätzlich Debug-Meldungen und jeden Action-Start; `--log-level warn`
+zeigt nur Warnungen und Fehler, `--log-format json` gibt jede Zeile als JSON-Objekt aus (z. B. für Splunk oder ELK). Exit-Code: `0` erfolgreich, `1` fehlgeschlagen,
 `2` nicht gestartet (ungültiger Workflow oder Aufruf), `130` abgebrochen – passend für die Windows-Aufgabenplanung.
 Strg+C bricht einen Lauf sauber ab (laufende Actions werden gestoppt); ein zweites Strg+C beendet sofort.
 
@@ -69,6 +70,12 @@ runnel serve examples/hello
 die API für den Editor: Projektbaum, Dateien lesen und speichern mit Konfliktschutz, Katalog der Actions und
 Transforms, Prüfung von Workflows und Pipelines sowie Läufe starten, abbrechen und live verfolgen – beschrieben in
 [docs/dev/API.md](docs/dev/API.md). Mit `--stop-timeout` bekommen laufende Runs beim Beenden Zeit, fertig zu werden.
+
+Das Server-Log von `runnel serve` und des Dienstes (S71): `--log-level debug|info|warn|error` (Standard `info`) und
+`--log-format text|json`; je beendetem Lauf eine Zeile mit Lauf-ID, Pfad, Trigger, Status, Dauer und Fehler
+(gescheiterte als Warnung, Läufe mit `history: none` ohne Zeile). Beim Dienst zusätzlich `--log-file`,
+`--log-max-size` (Standard `10MB`) und `--log-files` (alte Dateien, Standard 5) bei `runnel service install`; geänderte
+Einstellungen gelten nach erneutem `service install`.
 
 ```bash
 runnel triggers examples/hello

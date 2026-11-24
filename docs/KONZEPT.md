@@ -961,7 +961,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Run-Historie: Läufe, Status je Action/Transform, Log (seit S26a, [ADR 0026](adr/0026-run-historie.md)) | `%ProgramData%\runnel\history\<projekt>-<hash>\runs.db` (Dienst) bzw. `%LOCALAPPDATA%\runnel\history\…` (`runnel serve`); anderer Ordner mit `--history-dir` | SQLite (WAL-Modus) |
 | Secrets (lokaler Store) | `%LOCALAPPDATA%\runnel\secrets.db` bzw. `%ProgramData%\runnel\secrets\` (Dienst), nie im Projekt (ADR 0022) | verschlüsselt |
 | Dienst-Ereignisse | Windows-Ereignisanzeige (Anwendung) | Quelle = Dienstname (Standard `runnel`): Start, Stopp, Warnungen, Fehler (seit S41) |
-| Server-Log des Dienstes | `%ProgramData%\runnel\logs\<dienst>.log` | Text, Rotation bei 10 MB nach `<dienst>.log.1` (seit S41) |
+| Server-Log des Dienstes | `%ProgramData%\runnel\logs\<dienst>.log` oder `--log-file` | Text oder JSON (`--log-format`, seit S71), Level mit `--log-level`; Rotation bei 10 MB (`--log-max-size`) nach `<dienst>.log.1` …, 5 alte Dateien (`--log-files`); je beendetem Lauf eine Zeile mit Lauf-ID, Pfad, Trigger, Status, Dauer, Fehler (seit S41, Optionen seit S71) |
 | Freigaben der Plugins | `<Konfigurationsordner>\runnel\trusted-plugins.json` (Benutzer) bzw. `%ProgramData%\runnel\trust\plugins.json` (Dienst, nur Administratoren), nie im Projekt (ADR 0019, Nachtrag) | JSON |
 | Selbst erzeugtes Zertifikat der HTTP-Trigger | `%ProgramData%\runnel\tls\` (Dienst) bzw. `%LOCALAPPDATA%\runnel\tls\` | `triggers.crt`, `triggers.key` (PEM, seit S40a) |
 

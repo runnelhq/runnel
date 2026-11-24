@@ -13,11 +13,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"sync"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/history"
 	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/runs"
@@ -47,6 +49,8 @@ type Options struct {
 	TriggerListen string
 	// TriggerTLS makes it serve HTTPS (S40a); nil: plain HTTP.
 	TriggerTLS *tls.Config
+	// Logger receives a line for each run that has ended and is kept (S71); nil: none.
+	Logger *slog.Logger
 	// HistoryDir is the folder with the run histories of projects (ADR 0026); the
 	// project's history is in a subfolder of it. Empty: runs are kept in memory only.
 	HistoryDir string
@@ -96,6 +100,9 @@ func New(opts Options) (*Server, error) {
 		stop: make(chan struct{}), warn: warn}
 	if opts.HistoryDir != "" {
 		s.openHistory(opts.HistoryDir, opts.Log)
+	}
+	if opts.Logger != nil {
+		s.runs.OnEnd(func(r runs.Run) { logRun(opts.Logger, r) })
 	}
 	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Wait: s.waitRun, Running: s.running, Log: opts.Log, Warn: opts.Warn,
 		Listen: opts.TriggerListen, TLS: opts.TriggerTLS})
@@ -241,4 +248,22 @@ func (e *httpError) Error() string { return e.msg }
 
 func errorf(status int, format string, args ...any) error {
 	return &httpError{status: status, msg: fmt.Sprintf(format, args...)}
+}
+
+// logRun writes a line for a run that has ended to the server log (S71): succeeded and
+// cancelled as info, failed as warning, with the fields tools filter on.
+func logRun(l *slog.Logger, r runs.Run) {
+	level := slog.LevelInfo
+	if r.Status == workflow.Failed {
+		level = slog.LevelWarn
+	}
+	attrs := []slog.Attr{slog.String("run", r.ID), slog.String("path", r.Path), slog.String("status", string(r.Status)),
+		slog.Int64("durationMs", r.DurationMs)}
+	if r.Trigger != "" {
+		attrs = append(attrs, slog.String("trigger", r.Trigger))
+	}
+	if r.Error != "" {
+		attrs = append(attrs, slog.String("error", r.Error))
+	}
+	l.LogAttrs(context.Background(), level, "run "+string(r.Status), attrs...)
 }
