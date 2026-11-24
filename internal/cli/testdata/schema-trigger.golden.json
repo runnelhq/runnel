@@ -190,7 +190,7 @@
         },
         "history": {
           "type": "string",
-          "description": "http: which ended runs are kept in the list of runs: all, errors or none; empty: all, with response: run only errors",
+          "description": "Which ended runs are kept in the run history and the list of runs: all, errors (only failed ones) or none; empty: all, for http with response: run only errors",
           "enum": [
             "all",
             "errors",

@@ -265,3 +265,48 @@ func TestFind(t *testing.T) {
 		}
 	}
 }
+
+// Prune removes ended runs older than keepDays and those beyond the newest maxRuns,
+// with their actions and log; running runs stay (S26c).
+func TestPrune(t *testing.T) {
+	ctx := context.Background()
+	s := open(t, t.TempDir())
+	now := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
+	put := func(id, status string, age time.Duration) {
+		t.Helper()
+		if err := s.PutRun(ctx, Run{ID: id, Path: "p", Kind: "workflow", Status: status, Started: now.Add(-age), Data: []byte(`{}`)}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.AddLog(ctx, id, []LogLine{{Seq: 1, Time: now, Level: "info", Message: id}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	day := 24 * time.Hour
+	put("0001", "succeeded", 40*day) // old
+	put("0002", "running", 40*day)   // old, but runs: stays
+	put("0003", "failed", 20*day)
+	for i := range 450 { // more than one batch
+		put(fmt.Sprintf("1%03d", i), "succeeded", time.Duration(i)*time.Minute)
+	}
+	n, err := s.Prune(ctx, 30, 300, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, _ := s.Find(ctx, Filter{Limit: 1000})
+	ids := map[string]bool{}
+	for _, r := range list {
+		ids[r.ID] = true
+	}
+	// 0001 is too old; of the rest only the newest 300 stay (0003 and 1000–1149 go), apart from 0002 (running).
+	if n != 1+151 || len(list) != 301 || ids["0001"] || !ids["0002"] || ids["0003"] || !ids["1449"] || !ids["1150"] || ids["1149"] {
+		t.Errorf("removed %d, %d left", n, len(list))
+	}
+	var lines int
+	_ = s.db.QueryRow(`SELECT count(*) FROM log`).Scan(&lines)
+	if lines != 301 {
+		t.Errorf("%d log lines left", lines)
+	}
+	if n, err := s.Prune(ctx, 30, 300, now); err != nil || n != 0 {
+		t.Errorf("again: %d %v", n, err)
+	}
+}

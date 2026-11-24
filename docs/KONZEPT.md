@@ -702,6 +702,7 @@ with:
 - **Historie und Last (seit S38b2):**
   - `history` bestimmt, welche Läufe nach dem Ende behalten werden: `all`, `errors` (nur gescheiterte) oder `none`
     (keine; der Lauf erzeugt auch keine Ereignisse für den Editor). Standard: `all` bei `accepted`, `errors` bei `run`.
+    Seit S26c gilt `history` auch für Cron-, Intervall- und Datei-Trigger (Standard `all`).
   - Läufe von HTTP-Triggern haben im Lauf-Speicher ein eigenes Limit (die letzten 100), damit viele Anfragen die Läufe
     aus Editor und Zeitplänen nicht verdrängen.
   - Geprüfte Workflows und Pipelines (nach Inhalt der Datei), das Projekt (nach Stand von `project.yaml` und
@@ -976,7 +977,10 @@ API ihn zeigt), `nodes` (Status je Action bzw. Transform) und `log` (höchstens 
 Version in `PRAGMA user_version`, Migrationen nur vorwärts. Geschrieben wird in einer eigenen Goroutine, gesammelt in
 Transaktionen; die Historie bremst und stoppt keinen Lauf, Schreibfehler stehen höchstens einmal je Minute im
 Server-Log. Server, Dienst und CLI dürfen dieselbe Datei öffnen; ein Lauf ohne Lebenszeichen seit 2 Minuten gilt als
-abgebrochen (`failed`, „runnel stopped while the run was running“). Samples (S45) und Aufbewahrung (S26c) folgen.
+abgebrochen (`failed`, „runnel stopped while the run was running“). **Aufbewahrung (seit S26c):** `settings.history`
+in `project.yaml` mit `keepDays` (Standard 30) und `maxRuns` (Standard 10.000 je Projekt); ältere bzw. überzählige
+beendete Läufe entfernt der Server beim Start und danach stündlich, `runnel run` nach seinem Lauf, in kleinen
+Transaktionen; laufende Läufe bleiben. `history: all|errors|none` gilt an allen Triggern. Samples (S45) folgen.
 
 ### 9.3 Observability
 

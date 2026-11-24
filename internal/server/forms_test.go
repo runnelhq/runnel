@@ -96,7 +96,8 @@ func TestTriggerSchemaVariants(t *testing.T) {
 		t.Fatal(err)
 	}
 	v := sc.Properties["with"].Variants
-	if len(v) != 4 || len(v["cron"].Properties) != 3 || v["cron"].Properties["schedule"].Group != "When" || v["http"].Properties["auth"].Group != "Sign-in" ||
+	// history for every type since S26c.
+	if len(v) != 4 || len(v["cron"].Properties) != 4 || v["cron"].Properties["history"].Group != "More" || v["cron"].Properties["schedule"].Group != "When" || v["http"].Properties["auth"].Group != "Sign-in" ||
 		strings.Join(v["http"].Required, ",") != "method,path,auth" {
 		t.Fatalf("%+v", v)
 	}

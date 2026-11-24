@@ -59,8 +59,32 @@ type ProjectSettings struct {
 	History HistorySettings `yaml:"history,omitempty" json:"history,omitzero" doc:"Run history of the project: which runs are kept"`
 }
 
-// HistorySettings control the run history of a project (ADR 0026, S26b).
+// Limits of the run history (ADR 0026, S26c).
+const (
+	DefaultHistoryDays = 30
+	DefaultHistoryRuns = 10000
+	MaxHistoryDays     = 3650
+	MaxHistoryRuns     = 1000000
+)
+
+// Retention returns how long and how many runs the history keeps, with the defaults.
+func (h HistorySettings) Retention() (days, runs int) {
+	days, runs = h.KeepDays, h.MaxRuns
+	if days <= 0 {
+		days = DefaultHistoryDays
+	}
+	if runs <= 0 {
+		runs = DefaultHistoryRuns
+	}
+	return days, runs
+}
+
+// HistorySettings control the run history of a project (ADR 0026, S26b, S26c).
 type HistorySettings struct {
+	// KeepDays and MaxRuns limit the history (S26c): older runs and those beyond the
+	// newest MaxRuns are removed. 0: the default.
+	KeepDays int `yaml:"keepDays,omitempty" json:"keepDays,omitempty" doc:"Days ended runs are kept in the run history; older ones are removed" schema:"default=30"`
+	MaxRuns  int `yaml:"maxRuns,omitempty" json:"maxRuns,omitempty" doc:"Most runs kept in the run history of the project; the oldest beyond it are removed" schema:"default=10000"`
 	// CLI chooses which runs of runnel run are kept: all, errors or none.
 	CLI string `yaml:"cli,omitempty" json:"cli,omitempty" doc:"Which ended runs of runnel run are kept in the run history: all, errors (only failed ones) or none; runnel run --history overrides it" schema:"enum=all|errors|none,default=all"`
 }
@@ -245,6 +269,12 @@ func (p *Project) validate() Errors {
 	}
 	if p.Settings.MaxConcurrentRuns < 0 {
 		errs = append(errs, p.src.errorf("$.settings.maxConcurrentRuns", "maxConcurrentRuns must not be negative"))
+	}
+	if h := p.Settings.History; h.KeepDays < 0 || h.KeepDays > MaxHistoryDays {
+		errs = append(errs, p.src.errorf("$.settings.history.keepDays", "keepDays must be between 1 and %d (0 or missing: %d)", MaxHistoryDays, DefaultHistoryDays))
+	}
+	if h := p.Settings.History; h.MaxRuns < 0 || h.MaxRuns > MaxHistoryRuns {
+		errs = append(errs, p.src.errorf("$.settings.history.maxRuns", "maxRuns must be between 1 and %d (0 or missing: %d)", MaxHistoryRuns, DefaultHistoryRuns))
 	}
 	switch p.Settings.History.CLI {
 	case "", HistoryAll, HistoryErrors, HistoryNone:

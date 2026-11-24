@@ -57,7 +57,7 @@ func TestParseTriggerErrors(t *testing.T) {
 	}{
 		{"type: cron", "type: http", `missing required field "method"`},
 		{"type: cron", "type: hourly", `unknown trigger type "hourly" (expected cron, interval, file or http)`},
-		{"type: cron", "type: interval", "schedule is not used by interval triggers (fields: every, overlap)"},
+		{"type: cron", "type: interval", "schedule is not used by interval triggers (fields: every, overlap, history)"},
 		{"type: cron", "type: interval", `missing required field "every" (e.g. 15m)`},
 		{"type: cron", "type: file", `missing required field "path"`},
 		{"type: cron", "type: file", `missing required field "param"`},

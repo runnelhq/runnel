@@ -171,3 +171,13 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
 - `runnel run` startet seinen Lauf über denselben Manager wie der Server, mit Trigger `cli`; ohne Projekt gibt es keine
   Historie. Läufe aus dem Editor haben weiterhin keinen Trigger (`runnel runs` zeigt `editor`).
 - `limit` der API und von `runnel runs`: höchstens 1.000.
+
+## Nachtrag 2026-11-24 (S26c)
+
+- `keepDays` und `maxRuns` unter `settings.history`: `0` oder fehlend bedeutet den Standard (30 bzw. 10.000), erlaubt
+  sind höchstens 3.650 Tage bzw. 1.000.000 Läufe. Es zählen die Startzeit (`keepDays`) und die Reihenfolge der Lauf-IDs
+  (`maxRuns`); laufende Läufe werden nie entfernt.
+- Der Server liest die Grenzen bei jeder Bereinigung neu aus `project.yaml` (geänderte Werte gelten ohne Neustart) und
+  meldet entfernte Läufe im Server-Log; Fehler der Bereinigung sind Warnungen, kein Lauf wartet darauf.
+- `history:` an Cron-, Intervall- und Datei-Triggern hat dieselbe Bedeutung wie an HTTP-Triggern; im Trigger-Formular
+  steht es unter „More“.

@@ -104,3 +104,17 @@ func TestRunsErrors(t *testing.T) {
 		}
 	}
 }
+
+// runnel run removes old runs after its own with settings.history (S26c).
+func TestRunPrunesHistory(t *testing.T) {
+	dir, hist := historyProject(t, "settings:\n  history:\n    maxRuns: 1\n")
+	ok := filepath.Join(dir, "workflows", "ok.workflow.yaml")
+	for range 3 {
+		if code, _, errOut := run(t, "run", "--history-dir", hist, ok); code != 0 {
+			t.Fatal(errOut)
+		}
+	}
+	if list := listJSON(t, "--history-dir", hist, dir); len(list) != 1 {
+		t.Errorf("%d runs kept, want 1", len(list))
+	}
+}

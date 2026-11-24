@@ -99,3 +99,24 @@ func TestScopeAndCheckVariables(t *testing.T) {
 	compareGolden(t, filepath.Join("testdata", "project", "ok-variables.golden"),
 		[]byte(w.CheckVariables(contexts).Error()+"\n"))
 }
+
+// settings.history limits the run history; 0 or missing means the defaults (S26c).
+func TestHistorySettings(t *testing.T) {
+	const head = "kind: Project\napiVersion: runnel/v1\nname: p\n"
+	p, err := ReadProject("project.yaml", []byte(head+"settings:\n  history:\n    keepDays: 7\n    maxRuns: 500\n    cli: errors\n"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d, r := p.Settings.History.Retention(); d != 7 || r != 500 || p.Settings.History.CLI != HistoryErrors {
+		t.Errorf("%d %d %+v", d, r, p.Settings.History)
+	}
+	if d, r := (HistorySettings{}).Retention(); d != DefaultHistoryDays || r != DefaultHistoryRuns {
+		t.Errorf("defaults %d %d", d, r)
+	}
+	_, err = ReadProject("project.yaml", []byte(head+"settings:\n  history:\n    keepDays: -1\n    maxRuns: 2000000\n"), nil)
+	for _, want := range []string{"project.yaml:6:15: keepDays must be between 1 and 3650", "project.yaml:7:14: maxRuns must be between 1 and 1000000"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%v, want %q", err, want)
+		}
+	}
+}
