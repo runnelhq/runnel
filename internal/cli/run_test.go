@@ -250,17 +250,19 @@ func TestRunCSVExample(t *testing.T) {
 	}
 }
 
-// TestRunExcelExample runs examples/pipelines/pipelines/excel-orders.pipeline.yaml (S67a):
+// TestRunExcelExample runs examples/pipelines/pipelines/excel-orders.pipeline.yaml (S67):
 // the table below a title, the order with #N/A to the error link.
 func TestRunExcelExample(t *testing.T) {
 	chdirRepoRoot(t)
 	dir := t.TempDir()
-	target, rejected := filepath.Join(dir, "orders.csv"), filepath.Join(dir, "rejected.csv")
-	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "--param", "REJECTED="+rejected, "examples/pipelines/pipelines/excel-orders.pipeline.yaml")
+	target, rejected, workbook := filepath.Join(dir, "orders.csv"), filepath.Join(dir, "rejected.csv"), filepath.Join(dir, "orders.xlsx")
+	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "--param", "REJECTED="+rejected, "--param", "WORKBOOK="+workbook,
+		"examples/pipelines/pipelines/excel-orders.pipeline.yaml")
 	if code != 0 {
 		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
 	}
-	if !strings.Contains(out, "[read] read 6 rows from sales/orders.xlsx, sheet Bestellungen, 1 with errors") {
+	if !strings.Contains(out, "[read] read 6 rows from sales/orders.xlsx, sheet Bestellungen, 1 with errors") ||
+		!strings.Contains(out, "[workbook] wrote 5 rows to "+workbook+", sheet Bestellungen") {
 		t.Errorf("output:\n%s", out)
 	}
 	b, err := os.ReadFile(target)

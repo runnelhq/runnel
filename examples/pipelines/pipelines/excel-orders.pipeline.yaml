@@ -1,4 +1,4 @@
-# Reads orders from an Excel workbook and writes them to a CSV file (S67a):
+# Reads orders from an Excel workbook and writes them to a CSV file and a new workbook (S67):
 #   runnel run examples/pipelines/pipelines/excel-orders.pipeline.yaml
 #   runnel run --param OUTPUT=C:\out\orders.csv examples/pipelines/pipelines/excel-orders.pipeline.yaml
 # - "read" reads the sheet "Bestellungen" of sales/orders.xlsx: the table starts in A3
@@ -7,6 +7,9 @@
 #   columns and checks their types. Betrag needs no number pattern like #.##0,00.
 # - Order 1004 shows #N/A in Betrag: it goes over the error link to out/excel-rejected.csv
 #   (REJECTED) with the cell named in _error, instead of stopping the pipeline.
+# - "workbook" writes the orders to out/excel-orders.xlsx (WORKBOOK): the header bold and
+#   frozen, the widths of the columns fitting, Betrag with an Excel number format; dates
+#   stay dates. ifExists: sheet would replace only this sheet in an existing workbook.
 kind: Pipeline
 apiVersion: runnel/v1
 name: excel-orders
@@ -17,6 +20,9 @@ parameters:
   - name: REJECTED
     description: CSV file for orders with errors
     default: out/excel-rejected.csv
+  - name: WORKBOOK
+    description: Excel workbook to write
+    default: out/excel-orders.xlsx
 transforms:
   - id: read
     type: excel.input
@@ -42,6 +48,17 @@ transforms:
         - { name: Betrag, format: "#.##0,00" }
         - { name: Datum, format: dd.MM.yyyy }
         - { name: Bezahlt }
+  - id: workbook
+    type: excel.output
+    with:
+      path: ${WORKBOOK}
+      sheet: Bestellungen
+      fields:
+        - { name: Nr }
+        - { name: Kunde }
+        - { name: Betrag, format: "#,##0.00 \"€\"" }
+        - { name: Datum }
+        - { name: Bezahlt }
   - id: rejected
     type: csv.output
     with:
@@ -49,4 +66,5 @@ transforms:
       delimiter: ";"
 links:
   - { from: read, to: write }
+  - { from: read, to: workbook }
   - { from: read, to: rejected, type: error }

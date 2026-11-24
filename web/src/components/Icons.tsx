@@ -329,8 +329,10 @@ const actionIcons: Record<string, ReactNode> = {
   // Transforms (design/mockups/s25a-pipeline.html); core.log and core.dummy as above.
   "csv.input": <path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6" />,
   "csv.output": <path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v7M9 15l3 3 3-3" />,
-  // Excel workbooks (S67a, variant A chosen by the maintainer): a page with a table.
+  // Excel workbooks (S67a/S67b, variant A chosen by the maintainer): a page with a table; writing
+  // with an arrow down, as json.output.
   "excel.input": <path d="M6 3h8l4 4v14H6zM14 3v4h4M8.5 11h7v7h-7zM8.5 14.5h7M12 11v7" />,
+  "excel.output": <path d="M14 3H6v18h6M14 3v4h4v4M8.5 10h5v5h-5zM8.5 12.5h5M11 10v5M18 14v7M15 18l3 3 3-3" />,
   // JSON files (S19, variant A chosen by the maintainer): a page with braces; writing with an arrow down, as csv.output.
   "json.input": (
     <path d="M6 3h8l4 4v14H6zM14 3v4h4M11 10.5c-1.2 0-1.7.5-1.7 1.6v.6c0 .7-.4 1.1-1.1 1.1.7 0 1.1.4 1.1 1.1v.6c0 1.1.5 1.6 1.7 1.6M13 10.5c1.2 0 1.7.5 1.7 1.6v.6c0 .7.4 1.1 1.1 1.1-.7 0-1.1.4-1.1 1.1v.6c0 1.1-.5 1.6-1.7 1.6" />
