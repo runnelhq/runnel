@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -51,7 +52,7 @@ type powershellAction struct {
 	Edition   string            `json:"edition" doc:"auto: PowerShell 7 (pwsh) if installed, else Windows PowerShell 5.1; pwsh or windows to choose one" schema:"enum=auto|pwsh|windows,default=auto"`
 	Workdir   string            `json:"workdir" doc:"Working folder, relative to the project folder; empty: the project folder"`
 	Env       map[string]string `json:"env" doc:"Further environment variables, e.g. secrets ($env:NAME in the script)" schema:"format=runnel-secret"`
-	MaxOutput int               `json:"maxOutput" doc:"Most bytes of stdout and of stderr kept; more is dropped (truncated)" schema:"default=1048576"`
+	MaxOutput string            `json:"maxOutput" doc:"Largest size of stdout and of stderr kept, e.g. 500KB or 10MB; more is dropped (truncated)" schema:"default=1MB"`
 	Timeout   string            `json:"timeout" doc:"Longest time the script may run; then it ends with all processes it started" schema:"format=runnel-duration,default=10m"`
 }
 
@@ -71,8 +72,10 @@ func newPowershell(with map[string]any) (action.Action, error) {
 	default:
 		return nil, fmt.Errorf("invalid edition %q (expected auto, pwsh or windows)", a.Edition)
 	}
-	if a.MaxOutput < 0 {
-		return nil, errors.New("maxOutput must not be negative")
+	if !strings.Contains(a.MaxOutput, "${") {
+		if _, err := outputLimit(a.MaxOutput); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := parseTimeout(a.Timeout); err != nil {
 		return nil, err
@@ -147,6 +150,10 @@ func (a *powershellAction) Execute(ctx context.Context, ec *action.ExecContext) 
 		return action.Result{}, fmt.Errorf("params: %w", err)
 	}
 	timeout, _ := parseTimeout(a.Timeout)
+	limit, err := outputLimit(a.MaxOutput)
+	if err != nil {
+		return action.Result{}, err
+	}
 	cmd := proc.Command{
 		Program:   program,
 		Args:      []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", runner, script},
@@ -154,7 +161,7 @@ func (a *powershellAction) Execute(ctx context.Context, ec *action.ExecContext) 
 		Input:     string(input),
 		HasInput:  true,
 		Encoding:  proc.EncodingUTF8,
-		MaxOutput: a.MaxOutput,
+		MaxOutput: limit,
 		Timeout:   timeout,
 	}
 	if a.Workdir != "" {

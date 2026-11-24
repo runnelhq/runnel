@@ -32,8 +32,8 @@ func selectOne(t *testing.T, with map[string]any) string {
 func TestSelectFields(t *testing.T) {
 	// Keep in this order, rename; a missing field is null.
 	got := selectOne(t, map[string]any{"fields": []any{
-		map[string]any{"name": "name", "rename": "companyName"},
-		map[string]any{"name": "kdnr", "rename": "externalId"},
+		map[string]any{"name": "name", "as": "companyName"},
+		map[string]any{"name": "kdnr", "as": "externalId"},
 		map[string]any{"name": "phone"},
 	}})
 	if want := `{companyName: "Müller GmbH", externalId: 4711, phone: null}`; got != want {
@@ -55,8 +55,8 @@ func TestSelectFieldsConfigErrors(t *testing.T) {
 		want string
 	}{
 		{map[string]any{"fields": []any{map[string]any{"name": "a"}}, "remove": []any{"b"}}, "use either fields (to keep) or remove, not both"},
-		{map[string]any{"fields": []any{map[string]any{"name": "a", "rename": "b"}, map[string]any{"name": "b"}}}, `fields[1]: the field "b" would exist twice`},
-		{map[string]any{"fields": []any{map[string]any{"rename": "b"}}}, `missing required field "fields[0].name"`},
+		{map[string]any{"fields": []any{map[string]any{"name": "a", "as": "b"}, map[string]any{"name": "b"}}}, `fields[1]: the field "b" would exist twice`},
+		{map[string]any{"fields": []any{map[string]any{"as": "b"}}}, `missing required field "fields[0].name"`},
 		{map[string]any{"remove": []any{""}}, "remove[0]: the name is empty"},
 	} {
 		if _, err := selectFieldsDefinition.New(tt.with); err == nil || !strings.Contains(err.Error(), tt.want) {
@@ -76,7 +76,7 @@ func TestSelectFieldsSchema(t *testing.T) {
 		}
 		return s, ic.Problems()
 	}
-	s, p := init(map[string]any{"fields": []any{map[string]any{"name": "name", "rename": "companyName"}, map[string]any{"name": "kdnr"}}}, in)
+	s, p := init(map[string]any{"fields": []any{map[string]any{"name": "name", "as": "companyName"}, map[string]any{"name": "kdnr"}}}, in)
 	if s.Open || len(p) != 0 || len(s.Fields) != 2 || s.Fields[0] != (record.FieldDef{Name: "companyName", Type: record.String}) || s.Fields[1] != (record.FieldDef{Name: "kdnr", Type: record.Int}) {
 		t.Errorf("keep: %+v %+v", s, p)
 	}

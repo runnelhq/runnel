@@ -27,7 +27,7 @@ transforms:
     type: core.map-values
     with:
       field: status
-      target: statusText
+      as: statusText
       values:
         - { from: A, to: Active }
         - { from: I, to: Inactive }

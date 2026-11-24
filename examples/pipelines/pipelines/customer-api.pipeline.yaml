@@ -37,10 +37,10 @@ transforms:
     type: core.select-fields
     with:
       fields:
-        - { name: kdnr, rename: id }
+        - { name: kdnr, as: id }
         - { name: name }
-        - { name: ort, rename: city }
-        - { name: umsatz, rename: revenue }
+        - { name: ort, as: city }
+        - { name: umsatz, as: revenue }
   - id: found
     type: http.response
     with:

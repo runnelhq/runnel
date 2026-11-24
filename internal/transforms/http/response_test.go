@@ -85,9 +85,9 @@ func TestResponse(t *testing.T) {
 		t.Errorf("whenEmpty with records %+v", sent[0])
 	}
 
-	// maxRows and status are checked when the pipeline runs.
-	if _, _, _, err := run(t, map[string]any{"maxRows": "1"}, rows...); err == nil || !strings.Contains(err.Error(), "more than 1 records for the answer") {
-		t.Errorf("maxRows: %v", err)
+	// maxRecords and status are checked when the pipeline runs.
+	if _, _, _, err := run(t, map[string]any{"maxRecords": "1"}, rows...); err == nil || !strings.Contains(err.Error(), "more than 1 records for the answer") {
+		t.Errorf("maxRecords: %v", err)
 	}
 	if _, _, _, err := run(t, map[string]any{"status": "abc"}); err == nil || !strings.Contains(err.Error(), `invalid status "abc"`) {
 		t.Errorf("status: %v", err)

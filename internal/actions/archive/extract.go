@@ -21,6 +21,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions/file"
+	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/paths"
 )
 
@@ -73,7 +74,7 @@ func newExtract(with map[string]any) (action.Action, error) {
 		return nil, errors.New("maxFiles: must not be negative")
 	}
 	if !strings.Contains(a.MaxSize, "${") {
-		if _, err := size("maxSize", a.MaxSize, defaultMaxSize); err != nil {
+		if _, err := format.ParseSize("maxSize", a.MaxSize, defaultMaxSize); err != nil {
 			return nil, err
 		}
 	}
@@ -94,7 +95,7 @@ func (a *extract) Execute(ctx context.Context, ec *action.ExecContext) (action.R
 	if err := ctx.Err(); err != nil {
 		return action.Result{}, err
 	}
-	maxSize, err := size("maxSize", a.MaxSize, defaultMaxSize)
+	maxSize, err := format.ParseSize("maxSize", a.MaxSize, defaultMaxSize)
 	if err != nil {
 		return action.Result{}, err
 	}

@@ -87,7 +87,7 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
 | Schritt | Inhalt |
 |---|---|
 | S70a | Datei-Actions: `file.copy`/`file.move` `ifExists`, `file.delete` `ifMissing`, `file.read`/`file.write` `format`, Ausgabe `path` bei `http.request`; Hinweise für umbenannte Felder (Mechanismus aus Abschnitt 4); Reihenfolge der Werte und Wortlaut der Beschreibungen von `ifExists` |
-| S70b | Grenzen und Felder: `maxRecords` bei `core.to-result` und `http.response`, `maxOutput` als Größe, `as` bei `core.select-fields` und `core.map-values`, `fields[].from` bei `csv.input`/`excel.input`, `fields[].as` bei `csv.output`, `excel.output`, `json.output`; `utf-16le` für `csv.output` |
+| S70b | Grenzen und Felder: `maxRecords` bei `core.to-result` und `http.response`, `maxOutput` als Größe, `as` bei `core.select-fields` und `core.map-values`, `fields[].from` bei `csv.input`/`excel.input`, `fields[].as` bei `csv.output`, `excel.output`, `json.output`; `utf-16` für `csv.output` (siehe Nachtrag) |
 | S70c | `excel.output`: Runnel-Muster in `format`, `excelFormat` für eigene Excel-Codes |
 
 `docs/dev/ACTIONS.md` und `docs/dev/TRANSFORMS.md` verweisen auf die Regeln dieser ADR.
@@ -105,3 +105,13 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
 - `excel.output` braucht eine Übersetzung der Runnel-Muster in Excel-Codes; nicht jedes Muster hat eine genaue
   Entsprechung (z. B. Wochentage in anderer Sprache). Was sich nicht übersetzen lässt, meldet die Prüfung.
 - Der Mechanismus für umbenannte Felder ist zusätzlicher Code in `action`/`transform`, der bis 1.0 gepflegt wird.
+
+## Nachtrag 2026-11-24 (S70b)
+
+- Die Kodierung UTF-16 heißt in `csv.output` wie in `csv.input` `utf-16` (Little Endian, mit BOM), nicht `utf-16le`:
+  ein Name für dieselbe Sache in Lesen und Schreiben.
+- `fields[].from` setzt eine Kopfzeile voraus; ohne Kopfzeile (`header: false`) werden Spalten über die Position
+  gelesen, und `from` ist ein Fehler.
+- `fields[].as` bei `json.output` ist ein Pfad mit Punkten wie `from` bei `json.input`; Felder mit gleichem Anfang
+  teilen sich ein Objekt. Zwei Felder auf demselben Schlüssel oder ein Schlüssel, der zugleich Wert und Objekt wäre,
+  sind ein Fehler.

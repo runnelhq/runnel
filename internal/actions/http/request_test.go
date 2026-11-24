@@ -190,12 +190,7 @@ func TestRequestCancelledAndUnreachable(t *testing.T) {
 	}
 }
 
-func TestSizeAndHeaders(t *testing.T) {
-	for text, want := range map[string]int64{"": defaultMaxSize, "500KB": 500 << 10, "1 mb": 1 << 20, "100": 100} {
-		if got, err := parseSize(text); err != nil || got != want {
-			t.Errorf("parseSize(%q) = %d, %v", text, got, err)
-		}
-	}
+func TestHeaders(t *testing.T) {
 	h := headers(http.Header{"Set-Cookie": {"a=1", "b=2"}, "Content-Type": {"text/plain"}})
 	if h["set-cookie"] != "a=1, b=2" || h["content-type"] != "text/plain" {
 		t.Errorf("headers %v", h)

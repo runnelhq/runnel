@@ -1252,9 +1252,9 @@
             }
           },
           "maxOutput": {
-            "type": "integer",
-            "description": "Most bytes of stdout and of stderr kept; more is dropped (truncated)",
-            "default": 1048576
+            "type": "string",
+            "description": "Largest size of stdout and of stderr kept, e.g. 500KB or 10MB; more is dropped (truncated)",
+            "default": "1MB"
           },
           "timeout": {
             "type": "string",
@@ -1333,9 +1333,9 @@
             "default": false
           },
           "maxOutput": {
-            "type": "integer",
-            "description": "Most bytes of stdout and of stderr kept; more is dropped (truncated)",
-            "default": 1048576
+            "type": "string",
+            "description": "Largest size of stdout and of stderr kept, e.g. 500KB or 10MB; more is dropped (truncated)",
+            "default": "1MB"
           },
           "timeout": {
             "type": "string",
@@ -1777,7 +1777,7 @@
               "status"
             ]
           },
-          "target": {
+          "as": {
             "type": "string",
             "description": "Field for the result; empty: the field itself"
           },
@@ -1819,7 +1819,7 @@
         ],
         "additionalProperties": false
       },
-      "example": "field: status\ntarget: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
+      "example": "field: status\nas: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
       "parallel": true
     },
     {
@@ -1921,7 +1921,7 @@
                     "kdnr"
                   ]
                 },
-                "rename": {
+                "as": {
                   "type": "string",
                   "description": "New name of the field; empty: the name stays",
                   "examples": [
@@ -1946,7 +1946,7 @@
         },
         "additionalProperties": false
       },
-      "example": "fields:\n  - { name: kdnr, rename: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
+      "example": "fields:\n  - { name: kdnr, as: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
       "parallel": true
     },
     {
@@ -2272,7 +2272,7 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "maxRows": {
+          "maxRecords": {
             "type": "string",
             "description": "Most records to return; more stop the pipeline, as they are held in memory",
             "default": "100000"
@@ -2280,7 +2280,7 @@
         },
         "additionalProperties": false
       },
-      "example": "maxRows: 1000\n"
+      "example": "maxRecords: 1000\n"
     },
     {
       "type": "csv.input",
@@ -2324,15 +2324,22 @@
           },
           "fields": {
             "type": "array",
-            "description": "Columns to read, with type and format, matched by name in the header or else by position; empty: all columns as text",
+            "description": "Columns to read, with type and format, matched by name (or from) in the header or else by position; empty: all columns as text",
             "items": {
               "type": "object",
               "properties": {
                 "name": {
                   "type": "string",
-                  "description": "Name of the field (and of the column in the header)",
+                  "description": "Name of the field",
                   "examples": [
                     "amount"
+                  ]
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Column in the header; empty: the column named like the field",
+                  "examples": [
+                    "Betrag"
                   ]
                 },
                 "type": {
@@ -2404,11 +2411,12 @@
           },
           "encoding": {
             "type": "string",
-            "description": "Encoding of the file; utf-8-bom lets Excel recognize umlauts",
+            "description": "Encoding of the file; utf-8-bom lets Excel recognize umlauts, utf-16 is little endian with byte order mark",
             "enum": [
               "utf-8-bom",
               "utf-8",
-              "windows-1252"
+              "windows-1252",
+              "utf-16"
             ],
             "default": "utf-8-bom"
           },
@@ -2430,10 +2438,17 @@
               "properties": {
                 "name": {
                   "type": "string",
-                  "description": "Name of the field to write (and of the column in the header)",
+                  "description": "Name of the field to write",
                   "format": "runnel-field",
                   "examples": [
                     "amount"
+                  ]
+                },
+                "as": {
+                  "type": "string",
+                  "description": "Name of the column in the header; empty: the name of the field",
+                  "examples": [
+                    "Betrag"
                   ]
                 },
                 "format": {
@@ -2822,15 +2837,22 @@
           },
           "fields": {
             "type": "array",
-            "description": "Columns to read, with type and format, matched by name in the header or else by position; empty: all columns with the values of their cells",
+            "description": "Columns to read, with type and format, matched by name (or from) in the header or else by position; empty: all columns with the values of their cells",
             "items": {
               "type": "object",
               "properties": {
                 "name": {
                   "type": "string",
-                  "description": "Name of the field (and of the column in the header)",
+                  "description": "Name of the field",
                   "examples": [
                     "amount"
+                  ]
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Column in the header; empty: the column named like the field",
+                  "examples": [
+                    "Betrag"
                   ]
                 },
                 "type": {
@@ -2918,10 +2940,17 @@
               "properties": {
                 "name": {
                   "type": "string",
-                  "description": "Name of the field to write (and of the column in the header)",
+                  "description": "Name of the field to write",
                   "format": "runnel-field",
                   "examples": [
                     "amount"
+                  ]
+                },
+                "as": {
+                  "type": "string",
+                  "description": "Name of the column in the header; empty: the name of the field",
+                  "examples": [
+                    "Betrag"
                   ]
                 },
                 "format": {
@@ -3027,7 +3056,7 @@
             "description": "Fallback: answer also without records, but only if no other http.response answers (e.g. 404)",
             "default": false
           },
-          "maxRows": {
+          "maxRecords": {
             "type": "string",
             "description": "Most records in the answer; more stop the pipeline, as they are held in memory",
             "default": "10000"
@@ -3181,10 +3210,17 @@
               "properties": {
                 "name": {
                   "type": "string",
-                  "description": "Name of the field to write (and of the key)",
+                  "description": "Name of the field to write",
                   "format": "runnel-field",
                   "examples": [
                     "amount"
+                  ]
+                },
+                "as": {
+                  "type": "string",
+                  "description": "Key in the object, with dots for nested objects, e.g. address.city; empty: the name of the field",
+                  "examples": [
+                    "address.city"
                   ]
                 },
                 "format": {

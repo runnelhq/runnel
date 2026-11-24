@@ -225,7 +225,7 @@ func TestOutputErrors(t *testing.T) {
 		with map[string]any
 		want string
 	}{
-		{map[string]any{"path": "x", "encoding": "utf-16"}, `invalid encoding "utf-16"`},
+		{map[string]any{"path": "x", "encoding": "utf-32"}, `invalid encoding "utf-32" (expected utf-8-bom, utf-8, windows-1252 or utf-16)`},
 		{map[string]any{"path": "x", "ifExists": "skip"}, `invalid ifExists "skip"`},
 		{map[string]any{"path": "x", "fields": []any{map[string]any{"name": "a", "format": "dd.QQ"}}}, `field "a"`},
 	} {

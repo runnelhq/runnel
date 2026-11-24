@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/textenc"
@@ -62,7 +63,7 @@ func newReadFile(with map[string]any) (action.Action, error) {
 		return nil, err
 	}
 	if !strings.Contains(a.MaxSize, "{{") && !strings.Contains(a.MaxSize, "${") {
-		if _, err := parseSize(a.MaxSize, defaultReadMax); err != nil {
+		if _, err := format.ParseSize("maxSize", a.MaxSize, defaultReadMax); err != nil {
 			return nil, err
 		}
 	}
@@ -76,7 +77,7 @@ func (a *readFile) Execute(ctx context.Context, ec *action.ExecContext) (action.
 	if a.Path == "" {
 		return action.Result{}, errors.New("no path given")
 	}
-	limit, err := parseSize(a.MaxSize, defaultReadMax)
+	limit, err := format.ParseSize("maxSize", a.MaxSize, defaultReadMax)
 	if err != nil {
 		return action.Result{}, err
 	}

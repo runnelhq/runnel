@@ -32,7 +32,9 @@ type Fact struct {
 
 // DetectedField is a proposed field.
 type DetectedField struct {
-	Name   string `json:"name"`
+	Name string `json:"name"`
+	// From is kept from a listed field that reads another column, key or path.
+	From   string `json:"from,omitempty"`
 	Type   string `json:"type"`
 	Format string `json:"format,omitempty"`
 	// Values are the first values read, as text ("" for an empty value).
@@ -57,7 +59,7 @@ const (
 )
 
 // MergeFields compares a detection with the fields of the configuration ("fields:" with
-// name, type and format): listed fields keep their type and format and stay selected,
+// name, from, type and format; a field with from matches the column of that name): listed fields keep their type and format and stay selected,
 // new ones are not selected, listed ones the input does not have are added as missing.
 // The order is that of the configuration, then the new fields in the order of the input.
 func MergeFields(d *Detection, configured any) error {
@@ -73,12 +75,12 @@ func MergeFields(d *Detection, configured any) error {
 	for i, l := range listed {
 		j := -1
 		for k, f := range d.Fields {
-			if !found[k] && ((d.ByPosition && k == i) || (!d.ByPosition && f.Name == l.Name)) {
+			if !found[k] && ((d.ByPosition && k == i) || (!d.ByPosition && f.Name == l.column())) {
 				j = k
 				break
 			}
 		}
-		f := DetectedField{Name: l.Name, Type: l.Type, Format: l.Format, State: FieldMissing, Selected: true,
+		f := DetectedField{Name: l.Name, From: l.From, Type: l.Type, Format: l.Format, State: FieldMissing, Selected: true,
 			Values: []string{}, Note: "Not in the input"}
 		if f.Type == "" {
 			f.Type = "string"
@@ -100,7 +102,15 @@ func MergeFields(d *Detection, configured any) error {
 }
 
 // field is an entry of "fields:" as MergeFields reads it.
-type field struct{ Name, Type, Format string }
+type field struct{ Name, From, Type, Format string }
+
+// column is the name of the field in the input: from, else the name.
+func (f field) column() string {
+	if f.From != "" {
+		return f.From
+	}
+	return f.Name
+}
 
 func fieldList(v any) ([]field, error) {
 	if v == nil {
@@ -117,7 +127,7 @@ func fieldList(v any) ([]field, error) {
 			return nil, fmt.Errorf("fields[%d] must be a mapping with name, type and format", i)
 		}
 		f := field{}
-		for key, dst := range map[string]*string{"name": &f.Name, "type": &f.Type, "format": &f.Format} {
+		for key, dst := range map[string]*string{"name": &f.Name, "from": &f.From, "type": &f.Type, "format": &f.Format} {
 			if s, ok := m[key].(string); ok {
 				*dst = strings.TrimSpace(s)
 			}

@@ -13,7 +13,8 @@ import (
 
 // field is a column of a field definition (fields:).
 type field struct {
-	Name string `json:"name" doc:"Name of the field (and of the column in the header)" schema:"required,example=amount"`
+	Name string `json:"name" doc:"Name of the field" schema:"required,example=amount"`
+	From string `json:"from" doc:"Column in the header; empty: the column named like the field" schema:"example=Betrag"`
 	Type string `json:"type" doc:"Type of the value; empty: text" schema:"enum=string|int|decimal|float|bool|date|datetime|json"`
 	// Format is a number pattern like #.##0,00 or a date pattern like dd.MM.yyyy.
 	Format string `json:"format" doc:"Number pattern like #.##0,00 or date pattern like dd.MM.yyyy; empty: 1234.5 and ISO dates" schema:"example=dd.MM.yyyy"`

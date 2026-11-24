@@ -169,19 +169,6 @@ func TestConfigErrors(t *testing.T) {
 	actiontest.New(t, extractDefinition, map[string]any{"source": "a.zip", "target": "b", "maxSize": "${limit}"})
 }
 
-func TestSize(t *testing.T) {
-	for text, want := range map[string]int64{"": 7, "1024": 1024, "2KB": 2048, "500 mb": 500 << 20, "10GB": 10 << 30, "3B": 3} {
-		if got, err := size("maxSize", text, 7); err != nil || got != want {
-			t.Errorf("size(%q) = %d, %v; want %d", text, got, err, want)
-		}
-	}
-	for _, text := range []string{"0", "-1MB", "1TB", "MB", "99999999999999999GB"} {
-		if _, err := size("maxSize", text, 7); err == nil {
-			t.Errorf("size(%q): no error", text)
-		}
-	}
-}
-
 // zipFile writes a ZIP with the entries (name → content) to path; flags are set on all.
 func zipFile(t testing.TB, path string, flags uint16, entries ...[2]string) {
 	t.Helper()

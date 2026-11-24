@@ -467,6 +467,8 @@ export function clipKind(text: string): GraphKind | null {
 /** A field proposed by "Detect fields" (POST /pipelines/fields, S46). */
 export interface DetectedField {
   name: string;
+  /** Column, key or path in the input of a listed field with another name (ADR 0025). */
+  from?: string;
   type: string;
   format?: string;
   /** The first values read, as text ("" for an empty value). */
@@ -510,9 +512,10 @@ export async function detectFields(path: string, content: string, transform: str
 }
 
 /** The entries of "fields:" for the selected fields: text needs no type, other types no empty format. */
-export function fieldsList(fields: { name: string; type: string; format?: string }[]): KeyValue[][] {
+export function fieldsList(fields: { name: string; from?: string; type: string; format?: string }[]): KeyValue[][] {
   return fields.map((f) => [
     { key: "name", value: f.name },
+    ...(f.from ? [{ key: "from", value: f.from }] : []),
     ...(f.type && f.type !== "string" ? [{ key: "type", value: f.type }] : []),
     ...(f.format ? [{ key: "format", value: f.format }] : []),
   ]);

@@ -44,10 +44,12 @@ type output struct {
 	Fields   []outField `json:"fields" doc:"Fields to write, in this order; empty: all fields of the records"`
 
 	codecs []*format.Codec
+	tree   []*keyNode // keys of the objects, with fields
 }
 
 type outField struct {
-	Name   string `json:"name" doc:"Name of the field to write (and of the key)" schema:"required,format=runnel-field,example=amount"`
+	Name   string `json:"name" doc:"Name of the field to write" schema:"required,format=runnel-field,example=amount"`
+	As     string `json:"as" doc:"Key in the object, with dots for nested objects, e.g. address.city; empty: the name of the field" schema:"example=address.city"`
 	Format string `json:"format" doc:"Writes the value as text with a number pattern like #.##0,00 or a date pattern like dd.MM.yyyy; empty: numbers as numbers, dates in ISO 8601" schema:"example=dd.MM.yyyy"`
 }
 
@@ -85,7 +87,61 @@ func newOutput(with map[string]any) (transform.Transform, error) {
 		}
 		t.codecs = append(t.codecs, c)
 	}
+	tree, err := keyTree(t.Fields)
+	if err != nil {
+		return nil, err
+	}
+	t.tree = tree
 	return t, nil
+}
+
+// keyNode is a key of an object written by json.output: a field (index into fields), or
+// a nested object with its keys in the order of the fields.
+type keyNode struct {
+	key      string
+	field    int
+	children []*keyNode
+}
+
+// keyTree builds the keys from fields[].as: fields sharing a prefix share one object.
+func keyTree(fields []outField) ([]*keyNode, error) {
+	var root []*keyNode
+	for i, f := range fields {
+		path := f.Name
+		if f.As != "" {
+			path = f.As
+		}
+		parts := []string{path}
+		if f.As != "" {
+			parts = strings.Split(f.As, ".")
+		}
+		level := &root
+		for j, part := range parts {
+			if part == "" {
+				return nil, fmt.Errorf("fields: field %q: as: %q has an empty part", f.Name, f.As)
+			}
+			var n *keyNode
+			for _, c := range *level {
+				if c.key == part {
+					n = c
+					break
+				}
+			}
+			last := j == len(parts)-1
+			switch {
+			case n == nil:
+				n = &keyNode{key: part, field: -1}
+				if last {
+					n.field = i
+				}
+				*level = append(*level, n)
+			case last || n.field >= 0:
+				return nil, fmt.Errorf("fields: field %q: the key %q is written twice; choose another as", f.Name, path)
+			}
+			level = &n.children
+		}
+	}
+	return root, nil
 }
 
 // Init checks the fields and passes the schema on: the records stay as they are.
@@ -221,15 +277,34 @@ func (t *output) object(b *bytes.Buffer, r record.Record) (string, error) {
 				return f.Name, err
 			}
 		}
-	} else {
-		for i, f := range t.Fields {
-			v, _ := r.Get(f.Name)
-			if err := write(i, f.Name, v, t.codecs[i]); err != nil {
-				return f.Name, err
-			}
-		}
+	} else if name, err := t.keys(b, r, t.tree, write); err != nil {
+		return name, err
 	}
 	b.WriteByte('}')
+	return "", nil
+}
+
+// keys writes the keys of an object from the fields, nested objects in braces.
+func (t *output) keys(b *bytes.Buffer, r record.Record, nodes []*keyNode, write func(int, string, any, *format.Codec) error) (string, error) {
+	for i, n := range nodes {
+		if n.field >= 0 {
+			f := t.Fields[n.field]
+			v, _ := r.Get(f.Name)
+			if err := write(i, n.key, v, t.codecs[n.field]); err != nil {
+				return f.Name, err
+			}
+			continue
+		}
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		writeString(b, n.key)
+		b.WriteString(":{")
+		if name, err := t.keys(b, r, n.children, write); err != nil {
+			return name, err
+		}
+		b.WriteByte('}')
+	}
 	return "", nil
 }
 

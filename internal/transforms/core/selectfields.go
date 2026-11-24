@@ -18,9 +18,10 @@ var selectFieldsDefinition = transform.Definition{
 	Category:    transform.CategoryTransform,
 	Label:       "Select Fields",
 	Description: "Keeps, orders and renames fields, or removes fields",
-	Example:     "fields:\n  - { name: kdnr, rename: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
+	Example:     "fields:\n  - { name: kdnr, as: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
 	Config:      selectFields{},
 	New:         newSelectFields,
+	Renamed:     map[string]string{"rename": "renamed to as"},
 }
 
 type selectFields struct {
@@ -29,8 +30,8 @@ type selectFields struct {
 }
 
 type selectField struct {
-	Name   string `json:"name" doc:"Name of the field in the incoming records" schema:"required,format=runnel-field,example=kdnr"`
-	Rename string `json:"rename" doc:"New name of the field; empty: the name stays" schema:"example=customerId"`
+	Name string `json:"name" doc:"Name of the field in the incoming records" schema:"required,format=runnel-field,example=kdnr"`
+	As   string `json:"as" doc:"New name of the field; empty: the name stays" schema:"example=customerId"`
 }
 
 func newSelectFields(with map[string]any) (transform.Transform, error) {
@@ -61,8 +62,8 @@ func newSelectFields(with map[string]any) (transform.Transform, error) {
 
 // out is the name of the field in the outgoing records.
 func (f selectField) out() string {
-	if f.Rename != "" {
-		return f.Rename
+	if f.As != "" {
+		return f.As
 	}
 	return f.Name
 }
