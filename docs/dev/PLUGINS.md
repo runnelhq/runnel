@@ -80,6 +80,10 @@ runnel plugins untrust D:\flows --plugin iban
   - Windows-Dienst: `%ProgramData%\runnel\trust\plugins.json`, mit `--service` in einer Konsole „als Administrator“;
     nur Administratoren und SYSTEM dürfen sie ändern.
 
+Im Editor (S52) zeigt der Explorer den Stand jedes Plugins; „Trust…“ zeigt Ordner, Programm und Hash und gibt das
+Plugin für das Konto frei, unter dem `runnel serve` läuft (API: [`/plugins`](API.md#plugins)). Die Freigabe für den
+Dienst bleibt `runnel plugins trust --service` vorbehalten.
+
 ## Namen und Veröffentlichung
 
 - **Offizielle Plugins** liegen in `runnelhq/plugin-<name>`, SDKs in `runnelhq/sdk-<sprache>` (z. B. `sdk-go`).
