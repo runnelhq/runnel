@@ -63,7 +63,7 @@ func New(typ record.Type, pattern string) (Codec, error) {
 // ForText returns the codec for writing values of any type as text with a pattern: a
 // pattern of only # 0 . , ' and space is a number pattern, any other a date pattern.
 func ForText(pattern string) (Codec, error) {
-	if pattern != "" && strings.Trim(pattern, "#0.,' ") == "" {
+	if IsNumberPattern(pattern) {
 		return New(record.Decimal, pattern)
 	}
 	return New(record.DateTime, pattern)
@@ -301,4 +301,18 @@ func (n numberFormat) format(d decimal.Decimal, fraction bool) string {
 		return sign + intPart + n.decimal + frac
 	}
 	return sign + intPart
+}
+
+// IsNumberPattern reports whether a pattern is a number pattern (only # 0 . , ' and
+// space) rather than a date pattern, as ForText decides.
+func IsNumberPattern(pattern string) bool {
+	return pattern != "" && strings.Trim(pattern, "#0.,' ") == ""
+}
+
+// NumberPattern reads a number pattern like #.##0,00: whether it groups thousands and
+// how many decimals it writes (for excel.output, which shows them in the language of
+// the user).
+func NumberPattern(pattern string) (grouped bool, decimals int, err error) {
+	n, err := parseNumberFormat(pattern)
+	return n.group != "", n.decimals, err
 }

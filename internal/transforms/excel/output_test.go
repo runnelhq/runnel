@@ -108,8 +108,8 @@ umbruch(string) C=0.1(decimal.Decimal) F=false(bool) G={"a":1}(string)
 func TestOutputFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "orders.xlsm")
 	_, _, err := write(t, map[string]any{"path": path, "header": false, "fields": []any{
-		map[string]any{"name": "Betrag", "format": "#,##0.00 \"€\""},
-		map[string]any{"name": "Datum", "format": "dd.mm.yyyy"},
+		map[string]any{"name": "Betrag", "excelFormat": "#,##0.00 \"€\""},
+		map[string]any{"name": "Datum", "format": "dd.MM.yyyy"},
 		map[string]any{"name": "Nr"},
 	}}, orderRecords()...)
 	if err != nil {
@@ -119,7 +119,8 @@ func TestOutputFields(t *testing.T) {
 	if got := readBack(t, path); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
-	if styles := part(t, path, "xl/styles.xml"); !strings.Contains(styles, `formatCode="#,##0.00 &#34;€&#34;"`) && !strings.Contains(styles, `formatCode="#,##0.00 &quot;€&quot;"`) {
+	if styles := part(t, path, "xl/styles.xml"); (!strings.Contains(styles, `formatCode="#,##0.00 &#34;€&#34;"`) && !strings.Contains(styles, `formatCode="#,##0.00 &quot;€&quot;"`)) ||
+		!strings.Contains(styles, `formatCode="dd.mm.yyyy"`) {
 		t.Errorf("styles:\n%s", styles)
 	}
 	if ct := part(t, path, "[Content_Types].xml"); !strings.Contains(ct, "sheet.macroEnabled.main+xml") {

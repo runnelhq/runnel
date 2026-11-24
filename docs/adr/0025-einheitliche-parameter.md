@@ -115,3 +115,15 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
 - `fields[].as` bei `json.output` ist ein Pfad mit Punkten wie `from` bei `json.input`; Felder mit gleichem Anfang
   teilen sich ein Objekt. Zwei Felder auf demselben Schlüssel oder ein Schlüssel, der zugleich Wert und Objekt wäre,
   sind ein Fehler.
+
+## Nachtrag 2026-11-24 (S70c)
+
+- Übersetzung in `excel.output`: Ein Zahlenmuster wird `0` bzw. `#,##0` (mit Tausendertrennung) mit so vielen
+  Nachkommastellen wie Nullen; welche Zeichen das Muster als Trenner nennt, bestimmt nur die Bedeutung, Excel zeigt die
+  Trenner des Benutzers. Datumsbuchstaben werden zu den Codes von Excel (`MM` → `mm`, `HH` → `hh`, `EEEE` → `dddd`,
+  `a` → `AM/PM`, `ss.SSS` → `ss.000`), Text in Anführungszeichen zeichenweise mit `\`.
+- Was Excel anders zeigen würde, ist ein Fehler mit Hinweis auf `excelFormat`: Zeitzonen (`XXX`, `Z`), Minuten ohne
+  Stunden davor oder Sekunden danach (Excel liest `mm` sonst als Monat) und umgekehrt, `hh` ohne `a` (Excel zeigt
+  24 Stunden), `HH` mit `a`, Millisekunden außer als `ss.SSS`.
+- `format` und `excelFormat` zusammen in einem Feld sind ein Fehler. Excel-Codes, die zugleich gültige Runnel-Muster
+  sind (`#,##0.00`, `0.00`), ergeben denselben Code; andere (`0.0%`, `dd.mm.yyyy`) meldet die Prüfung mit dem Hinweis.

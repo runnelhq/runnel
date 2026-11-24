@@ -30,7 +30,7 @@ var outputDefinition = transform.Definition{
 	Category:     transform.CategoryOutput,
 	Label:        "Excel Output",
 	Description:  "Writes records to a sheet of an Excel workbook (.xlsx) and passes them on",
-	Example:      "path: out/orders.xlsx\nsheet: Orders\nfields:\n  - { name: Nr }\n  - { name: Amount, format: \"#,##0.00\" }\n  - { name: Date }\n",
+	Example:      "path: out/orders.xlsx\nsheet: Orders\nfields:\n  - { name: Nr }\n  - { name: Amount, format: \"#.##0,00\" }\n  - { name: Date, format: dd.MM.yyyy }\n  - { name: Share, excelFormat: 0.0% }\n",
 	Config:       output{},
 	New:          newOutput,
 }
@@ -44,13 +44,16 @@ type output struct {
 
 	cols  []string // columns known before the run (fields or a closed schema)
 	heads []string // names in the header, with fields (as or name)
+	codes []string // number format codes of Excel, by field (from format or excelFormat)
 }
 
 // outField is a column of excel.output.
 type outField struct {
 	Name   string `json:"name" doc:"Name of the field to write" schema:"required,format=runnel-field,example=amount"`
 	As     string `json:"as" doc:"Name of the column in the header; empty: the name of the field" schema:"example=Betrag"`
-	Format string `json:"format" doc:"Number format of Excel as in English Excel, e.g. #,##0.00, 0.0% or dd.mm.yyyy hh:mm; empty: numbers as General, dates as short date" schema:"example=0.0%"`
+	Format string `json:"format" doc:"Number pattern like #.##0,00 or date pattern like dd.MM.yyyy HH:mm, as in the other outputs; Excel shows separators and names in the language of the user; empty: numbers as General, dates as short date" schema:"example=dd.MM.yyyy"`
+	// ExcelFormat is a number format code of Excel for what a Runnel pattern cannot say.
+	ExcelFormat string `json:"excelFormat" doc:"Number format of Excel as in English Excel instead of format, e.g. 0.0%, 0.0 \"kg\" or [Red]-#,##0.00" schema:"example=0.0%"`
 }
 
 // Limits of a sheet in Excel.
@@ -87,6 +90,17 @@ func newOutput(with map[string]any) (transform.Transform, error) {
 		heads[head] = true
 		t.cols = append(t.cols, f.Name)
 		t.heads = append(t.heads, head)
+		code := f.ExcelFormat
+		switch {
+		case f.Format != "" && f.ExcelFormat != "":
+			return nil, fmt.Errorf("fields: field %q: set format or excelFormat, not both", f.Name)
+		case f.Format != "":
+			var err error
+			if code, err = excelCode(f.Format); err != nil {
+				return nil, fmt.Errorf("fields: field %q: %w", f.Name, err)
+			}
+		}
+		t.codes = append(t.codes, code)
 	}
 	if len(t.cols) > maxColumns {
 		return nil, fmt.Errorf("fields: a sheet has at most %d columns", maxColumns)
@@ -232,7 +246,7 @@ func (t *output) open(file, sheet string) (*book, error) {
 		b.dateTime, err = f.NewStyle(&excelize.Style{NumFmt: 22})
 	}
 	for i := 0; err == nil && i < len(t.Fields); i++ {
-		if code := t.Fields[i].Format; code != "" && b.formats[code] == 0 {
+		if code := t.codes[i]; code != "" && b.formats[code] == 0 {
 			b.formats[code], err = f.NewStyle(&excelize.Style{CustomNumFmt: &code})
 			b.codes[b.formats[code]] = code
 		}
@@ -249,8 +263,8 @@ func (t *output) open(file, sheet string) (*book, error) {
 func (t *output) write(ctx context.Context, b *book, in <-chan transform.Batch, out *transform.Output) (int64, error) {
 	header := t.Header == nil || *t.Header
 	formats := map[string]string{}
-	for _, f := range t.Fields {
-		formats[f.Name] = f.Format
+	for i, f := range t.Fields {
+		formats[f.Name] = t.codes[i]
 	}
 	cols := t.cols
 	var sample []record.Record

@@ -291,6 +291,7 @@ var datePatterns = []struct{ pattern, layout string }{
 type dateToken struct {
 	literal bool
 	text    string // the literal text, or the Go layout of a pattern letter group
+	letters string // the pattern letters, e.g. MM
 }
 
 // tokens splits a pattern like "dd.MM.yyyy 'at' HH:mm" into pattern letters (as Go
@@ -316,7 +317,7 @@ func tokens(pattern string) ([]dateToken, error) {
 			found := false
 			for _, p := range datePatterns {
 				if strings.HasPrefix(pattern[i:], p.pattern) {
-					out = append(out, dateToken{text: p.layout})
+					out = append(out, dateToken{text: p.layout, letters: p.pattern})
 					i += len(p.pattern)
 					found = true
 					break
@@ -333,6 +334,30 @@ func tokens(pattern string) ([]dateToken, error) {
 		}
 	}
 	return out, nil
+}
+
+// DatePart is a part of a date pattern: pattern letters like MM, or literal text.
+type DatePart struct {
+	Letters string // e.g. yyyy, MM, HH; empty for literal text
+	Text    string // the literal text
+}
+
+// DateParts splits a date pattern like "dd.MM.yyyy 'at' HH:mm" into its parts, with the
+// rules of FormatDate (for excel.output, which translates them into Excel codes).
+func DateParts(pattern string) ([]DatePart, error) {
+	toks, err := tokens(pattern)
+	if err != nil {
+		return nil, err
+	}
+	parts := make([]DatePart, len(toks))
+	for i, t := range toks {
+		if t.literal {
+			parts[i] = DatePart{Text: t.text}
+		} else {
+			parts[i] = DatePart{Letters: t.letters}
+		}
+	}
+	return parts, nil
 }
 
 // FormatDate formats t with a pattern like "yyyy-MM-dd".

@@ -1340,8 +1340,10 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   vor.
 - **`excel.output`** schreibt die Datensätze in ein Blatt (`sheet`, Standard `Sheet1`) einer Arbeitsmappe (`.xlsx`,
   `.xlsm`; S67b) und gibt sie weiter. Spalten wie bei `csv.output` aus `fields:`, dem geschlossenen Schema oder dem ersten
-  Datensatz, `fields[].as` für einen anderen Namen in der Kopfzeile; `format` ist ein Zahlenformat von Excel in englischer Schreibweise (`#,##0.00`, `0.0%`, `dd.mm.yyyy`), das
-  Excel in der Sprache des Benutzers anzeigt. Zahlen, `true`/`false` und Datumswerte behalten ihren Typ (`date` als
+  Datensatz, `fields[].as` für einen anderen Namen in der Kopfzeile; `format` ist wie bei den anderen Ausgaben ein Runnel-Muster
+  (`#.##0,00`, `dd.MM.yyyy HH:mm`; S70c), das Runnel in ein Zahlenformat von Excel übersetzt (`#,##0.00`,
+  `dd.mm.yyyy hh:mm`); Excel zeigt Trenner und Monatsnamen in der Sprache des Benutzers. Eigene Excel-Codes (`0.0%`,
+  Farben, Einheiten) stehen in `excelFormat`. Zahlen, `true`/`false` und Datumswerte behalten ihren Typ (`date` als
   Kurzdatum, `datetime` mit Uhrzeit, als Wanduhrzeit ohne Zeitzone); Listen und Objekte werden JSON-Text; Text wird nie
   als Formel geschrieben (`=1+1` bleibt Text). Die Kopfzeile ist fett und fixiert, die Spaltenbreiten richten sich nach
   den ersten 100 Datensätzen. `ifExists: replace` schreibt über eine temporäre Datei, `fail` bricht ab, `sheet` ersetzt
