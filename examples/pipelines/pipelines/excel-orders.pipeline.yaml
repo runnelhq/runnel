@@ -1,0 +1,52 @@
+# Reads orders from an Excel workbook and writes them to a CSV file (S67a):
+#   runnel run examples/pipelines/pipelines/excel-orders.pipeline.yaml
+#   runnel run --param OUTPUT=C:\out\orders.csv examples/pipelines/pipelines/excel-orders.pipeline.yaml
+# - "read" reads the sheet "Bestellungen" of sales/orders.xlsx: the table starts in A3
+#   (a title is above it), and emptyRows: stop ends it before the sum below.
+# - Numbers, dates and true/false come as Excel stores them; fields: only chooses the
+#   columns and checks their types. Betrag needs no number pattern like #.##0,00.
+# - Order 1004 shows #N/A in Betrag: it goes over the error link to out/excel-rejected.csv
+#   (REJECTED) with the cell named in _error, instead of stopping the pipeline.
+kind: Pipeline
+apiVersion: runnel/v1
+name: excel-orders
+parameters:
+  - name: OUTPUT
+    description: CSV file to write
+    default: out/excel-orders.csv
+  - name: REJECTED
+    description: CSV file for orders with errors
+    default: out/excel-rejected.csv
+transforms:
+  - id: read
+    type: excel.input
+    with:
+      path: sales/orders.xlsx
+      sheet: Bestellungen
+      range: A3
+      emptyRows: stop
+      fields:
+        - { name: Nr, type: int }
+        - { name: Kunde }
+        - { name: Betrag, type: decimal }
+        - { name: Datum, type: date }
+        - { name: Bezahlt, type: bool }
+  - id: write
+    type: csv.output
+    with:
+      path: ${OUTPUT}
+      delimiter: ";"
+      fields:
+        - { name: Nr }
+        - { name: Kunde }
+        - { name: Betrag, format: "#.##0,00" }
+        - { name: Datum, format: dd.MM.yyyy }
+        - { name: Bezahlt }
+  - id: rejected
+    type: csv.output
+    with:
+      path: ${REJECTED}
+      delimiter: ";"
+links:
+  - { from: read, to: write }
+  - { from: read, to: rejected, type: error }

@@ -353,7 +353,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | PostgreSQL (seit S20c) | `jackc/pgx/v5` |
 | Oracle | `sijms/go-ora` (pure Go) |
 | ODBC (optional, Access, Legacy; auch MySQL/MariaDB bis auf Weiteres) | `alexbrainman/odbc` |
-| Excel | `xuri/excelize/v2` |
+| Excel | Lesen seit S67a mit eigenem Reader (`internal/xlsx`: `archive/zip`, `encoding/xml`), weil `excelize` beim Streamen nur Text ohne Zelltyp liefert; Schreiben (S67b) offen, z. B. `xuri/excelize/v2` |
 | CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
 | SFTP | `pkg/sftp` + `x/crypto/ssh` |
 | FTP/FTPS | offen; Auswahl mit S57 (Lizenz MIT-kompatibel) |
@@ -1220,7 +1220,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 
 | Kategorie | Transforms |
 |---|---|
-| Eingabe | CSV, Excel, JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL, `db.table-input` seit S20b), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
+| Eingabe | CSV, Excel (`excel.input`, seit S67a), JSON/NDJSON, XML, Fixed-Width, Tabelleneingabe (SQL, `db.table-input` seit S20b), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
 | Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
@@ -1302,6 +1302,19 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   (geschlossenes Schema). Spalten werden über die Kopfzeile gefunden, ohne Kopfzeile über die Position. Ein Wert, der
   nicht passt, hält die Pipeline mit Datei, Zeile und Spalte an. `encoding: auto` erkennt UTF-8 und UTF-16 am BOM und
   liest sonst UTF-8; ungültiges UTF-8 wird mit dem Hinweis auf `windows-1252` gemeldet.
+- **`excel.input`** liest ein Blatt einer Arbeitsmappe (`.xlsx`, `.xlsm`; S67a), nach Name (ohne Groß- und
+  Kleinschreibung, wie Excel) oder Nummer, sonst das erste. Die Tabelle beginnt bei `range` (`A3`; mit letzter Spalte
+  `A3:F`, mit letzter Zeile `B2:D100`) oder in der ersten Zeile mit Werten; ohne letzte Spalte endet sie mit der letzten
+  Zelle der ersten Zeile. Leere Zeilen werden übersprungen oder beenden die Tabelle (`emptyRows: stop`, z. B. vor einer
+  Summe darunter). Die Zellen behalten ihren Typ: Text, ganze Zahlen als `int`, andere exakt als `decimal` (mit
+  höchstens 15 gültigen Stellen wie in Excel, `0,30000000000000004` wird `0,3`), `true`/`false`, Datumswerte nach dem
+  Zellformat als `date` oder `datetime` (Ortszeit, Datumssystem 1900 oder 1904), reine Uhrzeiten als Text `08:30:00`.
+  Formeln liefern den Wert, den Excel zuletzt berechnet hat; Runnel rechnet nicht. Ein Fehlerwert wie `#N/A` schickt
+  die Zeile mit der Zelle in `_error` auf den Fehler-Link. `fields` wählt Spalten über die Kopfzeile (ohne Kopfzeile
+  über die Position) und wandelt sie um wie `core.convert`; Zahlen in einer Datumsspalte gelten als Datum nach Excel.
+  Gelesen wird als Strom; jeder Teil der Mappe hat eine Grenze für seine entpackte Größe (Blatt 4 GB, Texte 256 MB),
+  `.xls`, `.xlsb` und Mappen mit Passwort werden mit Hinweis abgelehnt. „Detect fields“ schlägt die Typen aus den Zellen
+  vor.
 - **`csv.output`** schreibt die Felder aus `fields:` (Reihenfolge, Format), sonst die des geschlossenen Schemas oder des
   ersten Records; Zeilenende CRLF, Standard-Kodierung UTF-8 mit BOM (damit Excel Umlaute erkennt). `ifExists: replace`
   schreibt in eine temporäre Datei und ersetzt die alte erst am Ende – bei einem Fehler bleibt sie unverändert;

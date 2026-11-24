@@ -2762,6 +2762,102 @@
       "recordErrors": true
     },
     {
+      "type": "excel.input",
+      "kind": "transform",
+      "category": "input",
+      "label": "Excel Input",
+      "description": "Reads the rows of a sheet of an Excel workbook (.xlsx) as records",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Workbook to read (.xlsx or .xlsm), relative to the project folder or absolute",
+            "examples": [
+              "data/orders.xlsx"
+            ]
+          },
+          "sheet": {
+            "type": "string",
+            "description": "Sheet to read: its name, or its number like 2; empty: the first sheet",
+            "examples": [
+              "Orders"
+            ]
+          },
+          "range": {
+            "type": "string",
+            "description": "Where the table is: its first cell like A3, with last column A3:F or with last row B2:D100; empty: from the first row with values",
+            "examples": [
+              "A3:F"
+            ]
+          },
+          "header": {
+            "type": "boolean",
+            "description": "Whether the first row of the table holds the names of the columns",
+            "default": true
+          },
+          "emptyRows": {
+            "type": "string",
+            "description": "Empty rows in the table: skip them, or stop at the first one, e.g. when notes follow the table",
+            "enum": [
+              "skip",
+              "stop"
+            ],
+            "default": "skip"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Columns to read, with type and format, matched by name in the header or else by position; empty: all columns with the values of their cells",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field (and of the column in the header)",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type of the value; empty: as in the cell (text, number, true/false, date)",
+                  "enum": [
+                    "string",
+                    "int",
+                    "decimal",
+                    "float",
+                    "bool",
+                    "date",
+                    "datetime",
+                    "json"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "For text in the cells: number pattern like #.##0,00 or date pattern like dd.MM.yyyy; numbers and dates of Excel need none",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "path: data/orders.xlsx\nsheet: Orders\nrange: A3\nfields:\n  - { name: Nr, type: int }\n  - { name: Date, type: date }\n  - { name: Amount, type: decimal }\n",
+      "recordErrors": true,
+      "detectFields": true
+    },
+    {
       "type": "file.list",
       "kind": "transform",
       "category": "input",
