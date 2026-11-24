@@ -8,9 +8,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/paths"
+	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
@@ -72,7 +74,7 @@ func (s *Server) handleDetectFields(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "the pipeline has no transform "+req.Transform)
 		return
 	}
-	def, ok := s.transforms.Lookup(t.Type)
+	def, ok := runs.WithPluginTransforms(s.transforms, s.dir).Lookup(t.Type)
 	if !ok || def.DetectFields == nil {
 		writeError(w, http.StatusBadRequest, "transform type "+t.Type+" cannot detect its fields")
 		return
@@ -100,8 +102,11 @@ func (s *Server) handleDetectFields(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res.Variables = hasVariables(t.With)
-	if res.Detection, err = def.DetectFields(paths.WithBase(r.Context(), s.dir), with, transform.DetectLimit); err != nil {
-		problem := fieldsProblem{Error: err.Error(), BaseDir: filepath.Clean(s.dir)}
+	// Transforms of plugins get the connections they name resolved (S50b).
+	resolve, mask := runs.ConnectionResolver(project, env)
+	ctx := connection.WithResolver(paths.WithBase(r.Context(), s.dir), resolve)
+	if res.Detection, err = def.DetectFields(ctx, with, transform.DetectLimit); err != nil {
+		problem := fieldsProblem{Error: mask.String(err.Error()), BaseDir: filepath.Clean(s.dir)}
 		writeJSON(w, http.StatusUnprocessableEntity, problem)
 		return
 	}

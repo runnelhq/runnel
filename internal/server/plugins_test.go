@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,4 +65,51 @@ func TestPluginConnection(t *testing.T) {
 	if res, _ := testConnection(t, s, "svc", ""); res.OK || res.Message != "login with *** refused" {
 		t.Errorf("%+v", res)
 	}
+}
+
+const countPipeline = `kind: Pipeline
+apiVersion: runnel/v1
+name: count
+transforms:
+  - id: count
+    type: demo.count
+    with:
+      count: 3
+      api: svc
+      fields:
+        - { name: n, type: int }
+  - id: out
+    type: core.dummy
+links:
+  - { from: count, to: out }
+`
+
+// "Detect fields" of a transform of a plugin asks the plugin (transform.detectFields)
+// with its connection resolved, compares with fields: and masks secrets in errors (S50b).
+func TestPluginDetectFields(t *testing.T) {
+	s := pipelineServer(t)
+	addDemoPlugin(t, s.dir, "db.example.com")
+	rec := do(t, s, "POST", "/api/v1/pipelines/fields", fieldsBody(t, countPipeline, "count"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var res struct {
+		Source []struct{ Name, Value string }
+		Fields []struct {
+			Name, Type, State, Note string
+			Selected                bool
+		}
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatal(err)
+	}
+	// The plugin gets the connection with its secret; this test plugin shows it.
+	if len(res.Source) != 1 || res.Source[0].Value != "svc db.example.com pw-98765" {
+		t.Errorf("source %+v", res.Source)
+	}
+	if len(res.Fields) != 2 || res.Fields[0].State != "listed" || !res.Fields[0].Selected || res.Fields[1].State != "new" || res.Fields[1].Note != "limit 1000" {
+		t.Errorf("fields %+v", res.Fields)
+	}
+	rec = do(t, s, "POST", "/api/v1/pipelines/fields", fieldsBody(t, strings.Replace(countPipeline, "api: svc", "api: nope", 1), "count"))
+	expect(t, rec, http.StatusUnprocessableEntity, `connection \"nope\"`)
 }

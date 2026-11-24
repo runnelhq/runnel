@@ -204,5 +204,19 @@ type Resolved struct {
 // Resolver returns the connection of a name for the current run and environment.
 type Resolver func(ctx context.Context, name string) (Resolved, error)
 
+type resolverKey struct{}
+
+// WithResolver returns ctx with a resolver for the connections of the project, for steps
+// that get no Output or ExecContext, e.g. "Detect fields" of a transform of a plugin.
+func WithResolver(ctx context.Context, r Resolver) context.Context {
+	return context.WithValue(ctx, resolverKey{}, r)
+}
+
+// ResolverFrom returns the resolver set by WithResolver; nil without one.
+func ResolverFrom(ctx context.Context) Resolver {
+	r, _ := ctx.Value(resolverKey{}).(Resolver)
+	return r
+}
+
 // ErrNotAvailable is returned where connections are not supported (e.g. without a project).
 var ErrNotAvailable = errors.New("connections are not available here (the workflow has no project)")
