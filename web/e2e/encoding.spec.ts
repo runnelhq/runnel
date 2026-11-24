@@ -34,11 +34,18 @@ async function open(page: Page) {
   await expect(page.getByTestId("yaml-editor")).toContainText("# Grüße – 5 € für Müller");
 }
 
-/** Types at the end of the line with the name of the workflow. */
+/** Types at the end of the line with the name of the workflow and waits until the editor shows it. */
 async function typeAfterName(page: Page, typed: string) {
-  await page.getByTestId("yaml-editor").locator(".cm-line", { hasText: "name: encoded" }).click();
+  const line = page.getByTestId("yaml-editor").locator(".cm-line", { hasText: "name: encoded" });
+  await line.click();
   await page.keyboard.press("End");
   await page.keyboard.type(typed);
+  await expect(line).toHaveText("name: encoded" + typed);
+}
+
+/** Compares bytes as hex, so that a difference shows where it is (and the text as Latin-1). */
+function expectBytes(got: Buffer, want: Buffer, label: string) {
+  expect(got.toString("hex"), `${label}: ${JSON.stringify(got.toString("latin1"))}`).toBe(want.toString("hex"));
 }
 
 for (const enc of encodings) {
@@ -49,8 +56,7 @@ for (const enc of encodings) {
     await typeAfterName(page, "-ä");
     await page.keyboard.press("Control+s");
     await expect(page.getByRole("tab", { name: /encoded\.workflow\.yaml/ })).not.toContainText("●");
-    const saved = Buffer.from(await (await request.get(fileURL)).body());
-    expect(saved.equals(enc.bytes(text("encoded-ä")))).toBe(true);
+    expectBytes(Buffer.from(await (await request.get(fileURL)).body()), enc.bytes(text("encoded-ä")), enc.label);
   });
 }
 
@@ -65,5 +71,5 @@ test("reports a character Windows-1252 cannot hold instead of saving", async ({ 
   );
   // The file stays as it was; the changes stay unsaved.
   await expect(page.getByRole("tab", { name: /encoded\.workflow\.yaml/ })).toContainText("●");
-  expect(Buffer.from(await (await request.get(fileURL)).body()).equals(original)).toBe(true);
+  expectBytes(Buffer.from(await (await request.get(fileURL)).body()), original, "Windows-1252");
 });
