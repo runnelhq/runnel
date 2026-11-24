@@ -492,3 +492,44 @@ func (s *Store) Get(ctx context.Context, id string) (Detail, bool, error) {
 	d.LogTruncated = len(d.Log) > 0 && d.Log[0].Seq > 1
 	return d, true, lines.Err()
 }
+
+// pruneBatch is the most runs removed in one transaction, so that writers do not wait long.
+const pruneBatch = 200
+
+// Prune removes ended runs older than keepDays and those beyond the newest maxRuns,
+// with their actions and log (S26c), in small transactions, and frees the space. It
+// returns the number of runs removed. Running runs are kept.
+func (s *Store) Prune(ctx context.Context, keepDays, maxRuns int, now time.Time) (int, error) {
+	cutoff := ms(now.AddDate(0, 0, -keepDays))
+	removed := 0
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`DELETE FROM runs WHERE id IN (SELECT id FROM runs WHERE status != 'running' AND started < ? LIMIT ?)`, []any{cutoff, pruneBatch}},
+		{`DELETE FROM runs WHERE id IN (SELECT id FROM runs WHERE status != 'running' AND id < (SELECT id FROM runs ORDER BY id DESC LIMIT 1 OFFSET ?) LIMIT ?)`,
+			[]any{maxRuns - 1, pruneBatch}},
+	} {
+		for {
+			if err := ctx.Err(); err != nil {
+				return removed, err
+			}
+			res, err := s.db.ExecContext(ctx, q.sql, q.args...)
+			if err != nil {
+				return removed, err
+			}
+			n, _ := res.RowsAffected()
+			removed += int(n)
+			if n < pruneBatch {
+				break
+			}
+		}
+	}
+	if removed > 0 {
+		// Give the space of the removed runs back to the file system (auto_vacuum = INCREMENTAL).
+		if _, err := s.db.ExecContext(ctx, `PRAGMA incremental_vacuum`); err != nil {
+			return removed, err
+		}
+	}
+	return removed, nil
+}

@@ -354,3 +354,22 @@ func TestSchedulerFileFolderAndReload(t *testing.T) {
 		t.Errorf("info %+v", info)
 	}
 }
+
+// history: of a cron trigger goes with its runs (S26c); without it all runs are kept.
+func TestSchedulerHistory(t *testing.T) {
+	_, f, s, now := setup(t, map[string]string{
+		"a.yaml": cronTrigger("a", "*/15 * * * *", "  history: errors\n"),
+		"b.yaml": cronTrigger("b", "*/15 * * * *", ""),
+	})
+	*now = s.Tick(*now)
+	s.Tick(*now)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	got := map[string]string{}
+	for i, name := range f.started {
+		got[name] = f.requests[i].History
+	}
+	if len(got) != 2 || got["a"] != "errors" || got["b"] != "all" {
+		t.Errorf("history %v", got)
+	}
+}

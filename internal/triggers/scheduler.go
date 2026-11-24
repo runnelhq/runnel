@@ -333,7 +333,7 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 	if busy {
 		f.Skipped = true
 		msg = fmt.Sprintf("trigger %q: skipped, the previous run %s is still running (overlap: skip)", t.Name, running)
-	} else if id, err := s.opts.Start(t, StartRequest{Params: params}); err != nil {
+	} else if id, err := s.opts.Start(t, StartRequest{Params: params, History: t.HistoryMode()}); err != nil {
 		f.Error = err.Error()
 		msg = fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, what, err)
 	} else {

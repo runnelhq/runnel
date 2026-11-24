@@ -17,11 +17,13 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/history"
 	"github.com/runnelhq/runnel/internal/httpx"
+	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/triggers"
@@ -77,6 +79,9 @@ type Server struct {
 	// history keeps the runs of the project (ADR 0026); nil: in memory only.
 	history *history.Store
 	warn    func(string)
+	// pruneStop ends the cleanup of the history (S26c); pruneDone is closed when it has.
+	pruneStop, pruneDone chan struct{}
+	pruneOnce            sync.Once
 }
 
 // New opens the project directory. Close releases it.
@@ -136,6 +141,12 @@ func (s *Server) Running() int {
 
 // Close releases the project directory.
 func (s *Server) Close() error {
+	if s.pruneStop != nil {
+		s.pruneOnce.Do(func() {
+			close(s.pruneStop)
+			<-s.pruneDone
+		})
+	}
 	s.runs.CloseHistory()
 	if s.history != nil {
 		_ = s.history.Close()
@@ -157,6 +168,49 @@ func (s *Server) openHistory(base string, log func(string)) {
 	s.runs.SetHistory(s.history, s.warn)
 	if log != nil {
 		log("run history: " + s.history.Path())
+	}
+	s.pruneStop, s.pruneDone = make(chan struct{}), make(chan struct{})
+	go s.pruneLoop(s.pruneStop, s.pruneDone, log)
+}
+
+// PruneEvery is how often the server removes old runs from the history (S26c).
+const PruneEvery = time.Hour
+
+// pruneLoop removes old runs from the history at the start and then every PruneEvery,
+// with the limits of project.yaml as they are at that time.
+func (s *Server) pruneLoop(stop <-chan struct{}, done chan<- struct{}, log func(string)) {
+	defer close(done)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		<-stop
+		cancel()
+	}()
+	t := time.NewTicker(PruneEvery)
+	defer t.Stop()
+	for {
+		s.prune(ctx, log)
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// prune removes old runs once; problems go to the server log.
+func (s *Server) prune(ctx context.Context, log func(string)) {
+	var settings model.HistorySettings
+	if p, err := model.LoadProject(s.dir); err == nil {
+		settings = p.Settings.History
+	}
+	days, maxRuns := settings.Retention()
+	n, err := s.history.Prune(ctx, days, maxRuns, time.Now())
+	switch {
+	case err != nil && ctx.Err() == nil:
+		s.warn(fmt.Sprintf("cannot remove old runs from the run history: %v", err))
+	case n > 0 && log != nil:
+		log(fmt.Sprintf("run history: removed %d old runs (keepDays %d, maxRuns %d)", n, days, maxRuns))
 	}
 }
 

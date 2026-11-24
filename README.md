@@ -86,7 +86,8 @@ runnel runs examples/hello
 Action bzw. Transform und Log. Filter: `--status`, `--path`, `--trigger`, `--limit`, nächste Seite mit `--before <lauf-id>`;
 `--json` gibt dasselbe aus wie die API. Welche Läufe von `runnel run` bleiben, steht in `project.yaml` unter
 `settings.history.cli` (`all`, `errors`, `none`; Standard `all`) und lässt sich mit `runnel run --history` je Aufruf
-setzen. Die Historie des Dienstes liegt unter `%ProgramData%\runnel\history` (lesen mit `--history-dir`, als
+setzen; bei Triggern mit `history:` unter `with:`. Wie lange Läufe bleiben, steht unter `settings.history.keepDays`
+(Standard 30 Tage) und `maxRuns` (Standard 10.000 je Projekt); Ältere entfernen Server und `runnel run` selbst. Die Historie des Dienstes liegt unter `%ProgramData%\runnel\history` (lesen mit `--history-dir`, als
 Administrator).
 
 ```bash

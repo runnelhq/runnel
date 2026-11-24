@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/history"
@@ -56,9 +57,10 @@ func runPath(file, projectDir string) string {
 // cliRun is a prepared run of "runnel run": its manager keeps it in the project's run
 // history (S26b).
 type cliRun struct {
-	m     *runs.Manager
-	pend  *runs.Pending
-	store *history.Store
+	m        *runs.Manager
+	pend     *runs.Pending
+	store    *history.Store
+	settings model.HistorySettings
 }
 
 // newCLIRun chooses which runs are kept (--history, else settings.history.cli, else
@@ -66,6 +68,9 @@ type cliRun struct {
 // none, opens nothing; a history that cannot be opened is a warning, the run goes on.
 func newCLIRun(m *runs.Manager, pend *runs.Pending, errOut io.Writer, opts runOptions, projectDir string, project *model.Project) *cliRun {
 	r := &cliRun{m: m, pend: pend}
+	if project != nil {
+		r.settings = project.Settings.History
+	}
 	mode := opts.history
 	if mode == "" && project != nil {
 		mode = project.Settings.History.CLI
@@ -118,11 +123,13 @@ func (r *cliRun) execute(ctx context.Context, errOut io.Writer) error {
 	return errExitCode(exitRunFailed)
 }
 
-// close writes the run to the history and closes it.
+// close writes the run to the history, removes old runs (S26c) and closes it.
 func (r *cliRun) close() {
 	_ = r.m.Shutdown(context.Background())
 	r.m.CloseHistory()
 	if r.store != nil {
+		days, maxRuns := r.settings.Retention()
+		_, _ = r.store.Prune(context.Background(), days, maxRuns, time.Now()) // best effort: the next run tries again
 		_ = r.store.Close()
 	}
 }

@@ -139,7 +139,7 @@ type TriggerSettings struct {
 	// Timeout is how long the caller waits with response: run (default 30s). History
 	// is all, errors or none: which runs are kept when they have ended.
 	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty" doc:"http: how long the caller waits for the answer with response: run" schema:"format=runnel-duration,default=30s,group=More"`
-	History string   `yaml:"history,omitempty" json:"history,omitempty" doc:"http: which ended runs are kept in the list of runs: all, errors or none; empty: all, with response: run only errors" schema:"enum=all|errors|none,group=More"`
+	History string   `yaml:"history,omitempty" json:"history,omitempty" doc:"Which ended runs are kept in the run history and the list of runs: all, errors (only failed ones) or none; empty: all, for http with response: run only errors" schema:"enum=all|errors|none,group=More"`
 }
 
 // EveryValue returns the time between two runs of an interval trigger.
@@ -284,6 +284,11 @@ func (t *Trigger) validate() error {
 	if t.Type == TriggerCron || t.Type == TriggerInterval || t.Type == TriggerFile {
 		errs = append(errs, t.checkOverlap()...)
 	}
+	switch t.With.History {
+	case "", HistoryAll, HistoryErrors, HistoryNone:
+	default:
+		errs = append(errs, s.errorf("$.with.history", "invalid history %q (expected all, errors or none)", t.With.History))
+	}
 	if fieldsOf[t.Type] != nil {
 		errs = append(errs, t.unusedFields()...)
 	}
@@ -295,9 +300,9 @@ func (t *Trigger) validate() error {
 
 // fieldsOf are the fields under with: each type uses.
 var fieldsOf = map[string][]string{
-	TriggerCron:     {"schedule", "timezone", "overlap"},
-	TriggerInterval: {"every", "overlap"},
-	TriggerFile:     {"path", "pattern", "interval", "param", "mode", "existing", "overlap"},
+	TriggerCron:     {"schedule", "timezone", "overlap", "history"},
+	TriggerInterval: {"every", "overlap", "history"},
+	TriggerFile:     {"path", "pattern", "interval", "param", "mode", "existing", "overlap", "history"},
 	TriggerHTTP:     {"method", "path", "auth", "response", "timeout", "maxConcurrent", "history"},
 }
 

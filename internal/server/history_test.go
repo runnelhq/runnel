@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/history"
@@ -133,5 +136,50 @@ func TestRunsFilter(t *testing.T) {
 		if rec := do(t, s, "GET", "/api/v1/runs"+q, ""); rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid limit") {
 			t.Errorf("%s: %d %s", q, rec.Code, rec.Body)
 		}
+	}
+}
+
+// The server removes old runs from the history when it starts, with the limits of
+// project.yaml (S26c), and says so in the server log.
+func TestPruneAtStart(t *testing.T) {
+	dir, _ := newRunProject(t)
+	writeFile(t, filepath.Join(dir, "project.yaml"), "kind: Project\napiVersion: runnel/v1\nname: demo\nsettings:\n  history:\n    keepDays: 10\n")
+	base := t.TempDir()
+	hdir, _ := history.ProjectDir(base, dir)
+	store, err := history.Open(context.Background(), hdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, age := range map[string]time.Duration{"01OLD": 11 * 24 * time.Hour, "01NEW": time.Hour} {
+		if err := store.PutRun(context.Background(), history.Run{ID: id, Path: "workflows/wait.workflow.yaml", Kind: "workflow",
+			Status: "succeeded", Started: time.Now().Add(-age), Data: []byte(`{"id":"` + id + `"}`)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = store.Close()
+
+	var mu sync.Mutex
+	var logs []string
+	s, err := New(Options{Dir: dir, Registry: actions.Builtin(), UI: fstest.MapFS{}, HistoryDir: base,
+		Log: func(m string) { mu.Lock(); logs = append(logs, m); mu.Unlock() }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Shutdown(context.Background()); _ = s.Close() })
+	removed := func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Contains(logs, "run history: removed 1 old runs (keepDays 10, maxRuns 10000)")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for !removed() && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !removed() {
+		t.Fatalf("logs %v", logs)
+	}
+	list, err := s.runs.Runs(context.Background())
+	if err != nil || len(list) != 1 || list[0].ID != "01NEW" {
+		t.Errorf("%+v %v", list, err)
 	}
 }
