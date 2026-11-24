@@ -282,3 +282,97 @@ Rahmen der eingebauten Icons. Bis dahin zeigt der Editor das allgemeine Symbol.
 - S49 enthält die Freigabe mit `runnel plugins` (CLI).
 - S50 enthält Ziele statt Ports und `transform.init`.
 - S52 enthält den Hinweis mit „Trust“ im Editor (Mockup vorher).
+
+## Nachtrag 2026-11-24 (vor S49): Connections, Parallelität, Betriebssysteme, SDKs, Version
+
+Abgestimmt mit dem Maintainer. Seit der ADR sind Connections und Secrets (ADR 0022) hinzugekommen; außerdem ist
+festgelegt, wie Plugins gebaut, verteilt und versioniert werden.
+
+### 1. Connections und Secrets
+
+„Keine Dienste des Hosts“ bleibt: Ein Plugin fragt den Host nie nach Connections oder Secrets. Der Host löst sie
+vorher auf, wie bei eingebauten Bausteinen.
+
+- **Eingebaute Connection-Typen:** Ein Feld mit `format: runnel-connection` (und `x-runnel-connection` mit den
+  erlaubten Typen) im Schema eines Plugin-Bausteins nimmt den Namen einer Connection des Projekts. In der `config`
+  steht sie **aufgelöst**: `{"name": "erp", "type": "sqlserver", …Felder der Connection…}`, Secrets im Klartext.
+- **Eigene Connection-Typen:** `describe` darf zusätzlich `connectionTypes` liefern, je Typ `type`, `label`,
+  `description` und `schema` (wie bei eingebauten, ADR 0022). Der Name des Typs ist der Namensraum des Plugins oder
+  beginnt mit `<namensraum>-` (z. B. `ldap` oder `ldap-ad`). Connection-Dateien mit diesem Typ prüft der Host gegen
+  das Schema; Secrets nur in Feldern mit `format: runnel-secret`, sonst gelten dieselben Regeln wie für eingebaute
+  Typen. Ohne Freigabe des Plugins ist der Typ unbekannt (Fehler mit Hinweis auf `runnel plugins trust`).
+- **Testen einer Connection** (S39c1): optional mit der Methode `connection.test` (`type`, aufgelöste Connection →
+  `{ok, message, version}`), angekündigt in `connectionTypes` mit `"test": true`; sonst bietet der Editor keinen Test an.
+- **Maskierung:** Secrets, die der Host einem Plugin übergibt, maskiert er in allem, was vom Plugin zurückkommt: Zeilen
+  auf stderr, Fehlermeldungen, `outputs`. So landen sie weder im Log noch in der Run-Historie.
+
+### 2. Parallele Anfragen in einem Prozess
+
+- Die Antwort auf `initialize` darf `"concurrency": n` nennen: so viele Anfragen (`action.execute`, `transform.init`,
+  `transform.detectFields`, `connection.test`) bearbeitet das Plugin gleichzeitig. **Ohne Angabe gilt 1**, und der
+  Host reiht weitere Anfragen ein. Ein einfaches Plugin muss also keine Parallelität beherrschen; das SDK meldet einen
+  höheren Wert.
+- Offene Ströme von Transforms zählen nicht mit: Eine Pipeline braucht alle ihre Ströme gleichzeitig, deren Menge
+  regeln die Kredite.
+
+### 3. Ausführbare Datei je Betriebssystem
+
+`executable` ist ein Text (für alle Systeme) oder eine Zuordnung nach Betriebssystem:
+
+```yaml
+executable:
+  windows: bin/iban-plugin.exe
+  linux: bin/iban-plugin
+```
+
+Schlüssel sind die Namen von Go (`windows`, `linux`, `darwin`). Fehlt der Eintrag für das laufende System, wird das
+Plugin mit Meldung nicht geladen. Der Hash der Freigabe umfasst weiter den ganzen Ordner, also alle Varianten.
+
+### 4. SDKs in eigenen Repositorys
+
+Das Go-SDK kommt nicht als `pkg/sdk` in dieses Repository, sondern in ein **eigenes Repository** (z. B.
+`runnelhq/runnel-sdk-go`) mit eigenen Versionen; SDKs für Python, C#/.NET, Rust oder Node folgen nach demselben
+Muster. Verbindlich ist das Protokoll, nicht ein SDK:
+
+- Die **Beschreibung des Protokolls** liegt in diesem Repository (`docs/dev/PLUGINS.md`, mit S49) und gilt für alle SDKs.
+- Die Tests und das Beispiel-Plugin in diesem Repository nutzen **kein SDK**, sondern sprechen das Protokoll direkt
+  (ein kleines Go-Programm unter `testdata`). Damit prüft Runnel das Protokoll und nicht ein SDK.
+- Das Repository des SDK legt der Maintainer an; S51 setzt es dort um.
+
+### 5. Version und Kompatibilität
+
+- Das Protokoll startet direkt mit **`protocolVersion: 1`**, ohne Vorschauphase.
+- Innerhalb von Version 1 sind Änderungen nur **additiv**: neue optionale Felder, neue optionale Methoden, die ein
+  Plugin in `initialize` oder `describe` ankündigt (wie `init`, `detectFields`, `test`, `concurrency`). Beide Seiten
+  **ignorieren unbekannte Felder**. Ein Plugin, das eine Methode nicht kennt, antwortet mit dem JSON-RPC-Fehler
+  `-32601`; der Host behandelt das wie „nicht angeboten“.
+- Eine inkompatible Änderung erhöht `protocolVersion`. Der Host kann dann mehrere Versionen anbieten
+  (`initialize` mit `protocolVersions: [1, 2]`); ein Plugin, dessen Version er nicht kennt, wird mit Meldung nicht
+  geladen.
+- Eine **Mindestversion von Runnel** in `plugin.yaml` gibt es vorerst nicht (Backlog). Bis dahin erkennt ein Plugin
+  die Version des Hosts an `runnel.version` in `initialize`.
+
+### Sicherheit
+
+- **Secrets** gehen nur aufgelöst in die `config` von Bausteinen, die die Connection nennen. Der Host maskiert sie in
+  allem, was vom Plugin zurückkommt (Punkt 1).
+- **Eigene Connection-Typen** gibt es nur von freigegebenen Plugins. Ihr Schema prüft der Host, und die Namen sind auf
+  den Namensraum des Plugins beschränkt.
+- **Parallelität:** Ohne Angabe schickt der Host höchstens eine Anfrage gleichzeitig, damit ein einfaches Plugin nicht
+  überlastet wird (Punkt 2).
+- **Tests mit S49:**
+  - Maskierung eines Secrets in stderr und Fehlern,
+  - `executable` ohne Eintrag für das System,
+  - Einreihen ohne `concurrency`,
+  - unbekannte Methode (`-32601`).
+
+### Folgen für die Roadmap
+
+- **S49:**
+  - `executable` je System, `concurrency`, Maskierung, Connections eingebauter Typen in der `config`.
+  - Die Beschreibung des Protokolls `docs/dev/PLUGINS.md`.
+- **S49b (neu):** Connection-Typen aus Plugins mit `connection.test`.
+- **S51:** Go-SDK im eigenen Repository.
+- **Backlog:**
+  - Mindestversion von Runnel in `plugin.yaml`,
+  - SDKs für Python, C#/.NET, Rust und Node in eigenen Repositorys.
