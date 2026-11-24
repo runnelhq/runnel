@@ -31,7 +31,6 @@ var readDefinition = action.Definition{
 	Example:     "path: config/customers.json\nformat: json\n",
 	Config:      readFile{},
 	New:         newReadFile,
-	Renamed:     map[string]string{"as": "renamed to format"},
 }
 
 type readFile struct {

@@ -22,10 +22,6 @@ func TestDelete(t *testing.T) {
 	if _, err := run(t, deleteDefinition, map[string]any{"path": filepath.Join(dir, "*.tmp"), "ifMissing": "fail"}); err == nil || !strings.Contains(err.Error(), "no file or folder matches") {
 		t.Errorf("ifMissing: %v", err)
 	}
-	if err := configError(deleteDefinition, map[string]any{"path": "a", "mustExist": true}); err == nil ||
-		err.Error() != `unknown field "mustExist" (renamed to ifMissing: mustExist: true is now ifMissing: fail)` {
-		t.Errorf("mustExist: %v", err)
-	}
 	if err := configError(deleteDefinition, map[string]any{"path": "a", "ifMissing": "empty"}); err == nil || !strings.Contains(err.Error(), `invalid ifMissing "empty" (expected skip or fail)`) {
 		t.Errorf("empty: %v", err)
 	}

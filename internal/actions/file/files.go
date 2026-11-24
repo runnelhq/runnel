@@ -124,9 +124,6 @@ type transfer struct {
 // errSkipped marks a file that exists in the target and is skipped (ifExists: skip).
 var errSkipped = errors.New("skipped")
 
-// renamedTransfer names the fields of file.copy and file.move renamed by ADR 0025.
-var renamedTransfer = map[string]string{"overwrite": "renamed to ifExists: overwrite: true is now ifExists: replace"}
-
 // checkIfExists checks the value of ifExists of file.copy and file.move.
 func (t *transfer) checkIfExists() error {
 	switch t.IfExists {

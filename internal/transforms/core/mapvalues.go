@@ -23,7 +23,6 @@ var mapValuesDefinition = transform.Definition{
 	Example:     "field: status\nas: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
 	Config:      mapValues{},
 	New:         newMapValues,
-	Renamed:     map[string]string{"target": "renamed to as"},
 }
 
 type mapValues struct {

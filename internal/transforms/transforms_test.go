@@ -171,23 +171,3 @@ func checkExample(t *testing.T, def transform.Definition, s *schema.Schema) {
 		t.Errorf("example was rejected: %v", err)
 	}
 }
-
-// Renamed fields (ADR 0025) are errors that name the new field, also inside lists.
-func TestRenamedFields(t *testing.T) {
-	r := Builtin()
-	for _, tt := range []struct {
-		typ  string
-		with map[string]any
-		want string
-	}{
-		{"core.to-result", map[string]any{"maxRows": "10"}, `unknown field "maxRows" (renamed to maxRecords)`},
-		{"http.response", map[string]any{"maxRows": "10"}, `unknown field "maxRows" (renamed to maxRecords)`},
-		{"core.select-fields", map[string]any{"fields": []any{map[string]any{"name": "a", "rename": "b"}}}, `unknown field "rename" (renamed to as)`},
-		{"core.map-values", map[string]any{"field": "a", "target": "b", "values": []any{}}, `unknown field "target" (renamed to as)`},
-	} {
-		def, _ := r.Lookup(tt.typ)
-		if _, err := def.New(tt.with); err == nil || err.Error() != tt.want {
-			t.Errorf("%s: %v, want %q", tt.typ, err, tt.want)
-		}
-	}
-}

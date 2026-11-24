@@ -237,8 +237,6 @@ type Definition struct {
 	Config any
 	// New creates a transform from its "with" configuration (variables resolved).
 	New func(with map[string]any) (Transform, error)
-	// Renamed names fields that were renamed (ADR 0025), as in action.Definition.
-	Renamed map[string]string
 	// RecordErrors is set for transforms that pass records they cannot process to an
 	// error link (Output.Fail); an error link from another transform is never used.
 	RecordErrors bool
@@ -305,13 +303,6 @@ func (r *Registry) Register(d Definition) {
 	s, err := schema.For(d.Config)
 	if err != nil {
 		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
-	}
-	if len(d.Renamed) > 0 {
-		newFn := d.New
-		d.New = func(with map[string]any) (Transform, error) {
-			t, err := newFn(with)
-			return t, action.RenamedHint(err, d.Renamed)
-		}
 	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, Example: d.Example, RecordErrors: d.RecordErrors, Parallel: d.Parallel,

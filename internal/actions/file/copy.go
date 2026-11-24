@@ -19,7 +19,6 @@ var copyDefinition = action.Definition{
 	Example:     "source: inbox/*.csv\ntarget: archive/\nifExists: replace\n",
 	Config:      transfer{},
 	New:         newCopy,
-	Renamed:     renamedTransfer,
 }
 
 type copyAction struct{ transfer }

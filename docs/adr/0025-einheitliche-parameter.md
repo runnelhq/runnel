@@ -72,6 +72,8 @@ einen eigenen Excel-Code braucht (Farben, Bedingungen, Einheiten wie `0.0 "kg"`)
 
 ### 4. Übergang
 
+> Die Hinweise für umbenannte Felder sind entfernt, siehe Nachtrag 2026-11-24 (Hinweise entfernt).
+
 Runnel ist vor Version 1.0; die alten Namen werden **nicht** weiter angenommen, damit es für jede Sache nur einen Namen
 gibt. Damit bestehende Dateien leicht anzupassen sind:
 
@@ -104,7 +106,8 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
   `runnel validate` zeigt jede Stelle mit dem neuen Namen. Für Projekte vor 1.0 ist das vertretbar.
 - `excel.output` braucht eine Übersetzung der Runnel-Muster in Excel-Codes; nicht jedes Muster hat eine genaue
   Entsprechung (z. B. Wochentage in anderer Sprache). Was sich nicht übersetzen lässt, meldet die Prüfung.
-- Der Mechanismus für umbenannte Felder ist zusätzlicher Code in `action`/`transform`, der bis 1.0 gepflegt wird.
+- Der Mechanismus für umbenannte Felder ist zusätzlicher Code in `action`/`transform`, der bis 1.0 gepflegt wird
+  (entfallen, siehe Nachtrag „Hinweise entfernt“).
 
 ## Nachtrag 2026-11-24 (S70b)
 
@@ -127,3 +130,10 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
   24 Stunden), `HH` mit `a`, Millisekunden außer als `ss.SSS`.
 - `format` und `excelFormat` zusammen in einem Feld sind ein Fehler. Excel-Codes, die zugleich gültige Runnel-Muster
   sind (`#,##0.00`, `0.00`), ergeben denselben Code; andere (`0.0%`, `dd.mm.yyyy`) meldet die Prüfung mit dem Hinweis.
+
+## Nachtrag 2026-11-24 (Hinweise entfernt)
+
+- Auf Entscheidung des Maintainers sind die Hinweise für umbenannte Felder (Abschnitt 4) nach S70c entfernt, nicht
+  erst mit Version 1.0: `Definition.Renamed` in `action` und `transform` und die Einträge der Bausteine entfallen.
+- Ein altes Feld wie `overwrite` oder `maxRows` ist weiterhin ein Fehler mit Position, jetzt wie jedes unbekannte
+  Feld (`unknown field "maxRows"`). Die neuen Namen stehen in der Tabelle in Abschnitt 1 und in der Roadmap (S70a–c).

@@ -74,9 +74,6 @@ func TestReadFile(t *testing.T) {
 		t.Errorf("folder: %v", err)
 	}
 	actiontest.ConfigError(t, readDefinition, map[string]any{"path": "a", "format": "xml"}, `invalid format "xml"`)
-	if err := configError(readDefinition, map[string]any{"path": "a", "as": "json"}); err == nil || err.Error() != `unknown field "as" (renamed to format)` {
-		t.Errorf("as: %v", err)
-	}
 	actiontest.ConfigError(t, readDefinition, map[string]any{"path": "a", "encoding": "latin9"}, "invalid encoding")
 	actiontest.ConfigError(t, readDefinition, map[string]any{"path": "a", "maxSize": "huge"}, "is not a size")
 }

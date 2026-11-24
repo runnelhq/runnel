@@ -32,7 +32,6 @@ var writeDefinition = action.Definition{
 	Example:     "path: out/status.json\nformat: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n",
 	Config:      writeFile{},
 	New:         newWriteFile,
-	Renamed:     map[string]string{"as": "renamed to format"},
 }
 
 type writeFile struct {

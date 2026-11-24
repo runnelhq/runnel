@@ -23,7 +23,6 @@ var moveDefinition = action.Definition{
 	Example:     "source: inbox/orders.csv\ntarget: done/\n",
 	Config:      transfer{},
 	New:         newMove,
-	Renamed:     renamedTransfer,
 }
 
 type moveAction struct{ transfer }
