@@ -76,6 +76,69 @@ export function decode(bytes: Uint8Array): { text: string; encoding: string } {
   }
 }
 
+/** Characters of Windows-1252 in 0x80–0x9F that differ from Latin-1 (WHATWG), by character. */
+const cp1252: Record<string, number> = Object.fromEntries(
+  [..."€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"].map((c, i) => [c, [0x80, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8e, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9e, 0x9f][i]]),
+);
+
+/** A character the encoding of a file cannot hold, with its place. */
+export class EncodeError extends Error {
+  constructor(char: string, line: number, column: number, encoding: string) {
+    const code = `U+${char.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`;
+    super(`the character "${char}" (${code}) in line ${line}, column ${column} cannot be saved in ${encoding}; remove it, or convert the file to UTF-8 in another editor`);
+  }
+}
+
+/**
+ * Encodes text in the encoding it was read with (see decode), so that saving keeps the
+ * encoding of the file (K13): UTF-8 with or without BOM, UTF-16 LE/BE with BOM or
+ * Windows-1252. A character Windows-1252 cannot hold is an EncodeError, not replaced.
+ */
+export function encode(text: string, encoding: string): Uint8Array<ArrayBuffer> {
+  switch (encoding) {
+    case "UTF-8 with BOM":
+      return concat([0xef, 0xbb, 0xbf], new TextEncoder().encode(text));
+    case "UTF-16 LE":
+    case "UTF-16 BE": {
+      const out = new Uint8Array(2 + text.length * 2);
+      const le = encoding === "UTF-16 LE";
+      const put = (i: number, u: number) => {
+        out[i] = le ? u & 0xff : u >> 8;
+        out[i + 1] = le ? u >> 8 : u & 0xff;
+      };
+      put(0, 0xfeff);
+      for (let i = 0; i < text.length; i++) put(2 + i * 2, text.charCodeAt(i));
+      return out;
+    }
+    case "Windows-1252": {
+      const out = new Uint8Array(text.length);
+      let n = 0;
+      let line = 1;
+      let column = 1;
+      for (const c of text) {
+        const u = c.codePointAt(0)!;
+        // Bytes 0x81, 0x8D, 0x8F, 0x90 and 0x9D are read as the control characters of the same code.
+        const b = u < 0x80 || (u >= 0xa0 && u <= 0xff) || [0x81, 0x8d, 0x8f, 0x90, 0x9d].includes(u) ? u : cp1252[c];
+        if (b === undefined) throw new EncodeError(c, line, column, encoding);
+        out[n++] = b;
+        if (c === "\n") {
+          line++;
+          column = 1;
+        } else column++;
+      }
+      return out.subarray(0, n);
+    }
+  }
+  return new TextEncoder().encode(text);
+}
+
+function concat(head: number[], body: Uint8Array): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(head.length + body.length);
+  out.set(head);
+  out.set(body, head.length);
+  return out;
+}
+
 /** Kind of a file by its path, as the server classifies it. */
 export function kindOf(path: string): FileKind {
   if (path.endsWith(".workflow.yaml")) return "workflow";
@@ -115,12 +178,15 @@ export function fullPath(dir: string, path: string): string {
 }
 
 /**
- * Saves a file. etag is the ETag the text was loaded with ("*" overwrites without check).
- * A file changed in the meantime fails with APIError status 412. Returns the new ETag.
+ * Saves a file in its encoding (see encode; a character it cannot hold is an EncodeError
+ * before anything is sent). etag is the ETag the text was loaded with ("*" overwrites
+ * without check). A file changed in the meantime fails with APIError status 412. Returns
+ * the new ETag.
  */
-export async function saveFile(path: string, text: string, etag: string): Promise<string> {
+export async function saveFile(path: string, text: string, etag: string, encoding = "UTF-8"): Promise<string> {
+  const body = encode(text, encoding);
   const res = await check(
-    await fetch(fileURL(path), { method: "PUT", headers: { "If-Match": etag, "Content-Type": "application/octet-stream" }, body: text }),
+    await fetch(fileURL(path), { method: "PUT", headers: { "If-Match": etag, "Content-Type": "application/octet-stream" }, body }),
   );
   return res.headers.get("ETag") ?? "*";
 }

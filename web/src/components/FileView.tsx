@@ -551,7 +551,7 @@ export function FileView(props: {
       if (!current) return false;
       if (current.text === current.saved && !overwrite) return true;
       try {
-        const etag = await saveFile(path, current.text, overwrite ? "*" : current.etag);
+        const etag = await saveFile(path, current.text, overwrite ? "*" : current.etag, current.encoding);
         setState((s) => (s.status === "loaded" ? { status: "loaded", doc: { ...s.doc, saved: current.text, etag } } : s));
         setConflict(false);
         return true;
