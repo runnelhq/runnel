@@ -252,7 +252,7 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S37 (Teil) | Run-Queue | Starts über dem Limit warten (Status `queued`) statt abgelehnt zu werden, Prioritäten (manuell > HTTP > zeitgesteuert), `overlap: queue` | S37 |
 | S37 (Teil) | Verpasste Läufe nachholen | `catchUp` für Cron-Trigger: verpasste Zeitpunkte beim Start des Servers nachholen | S26 (letzter Lauf je Trigger) |
 | S47 | Desktop-Modus | `runnel desktop` mit WebView2-Fenster; vorher Mockup | – |
-| S48 | Installer | MSI (WiX) mit Dienst-Option (ZIP und `THIRD_PARTY_NOTICES` bereits mit S01a) | bis dahin ZIP |
+| S48 | Installer | MSI (WiX) mit Dienst-Option. **Für 1.0 nicht vorgesehen** (Entscheidung des Maintainers 2026-11-24): Runnel wird als ZIP verteilt (portabel, seit S01a mit `THIRD_PARTY_NOTICES`), der Dienst wird mit `runnel service install` eingerichtet (S41) | nur bei Bedarf |
 | E15 | Referenz der Bausteine | Beschreibung aller Actions und Transforms für Anwender, erzeugt aus den Descriptoren (Felder, Typen, Standardwerte, Beispiele): im Editor (z. B. Hilfe zum ausgewählten Baustein) und als Dokument unter `docs/`. Bis dahin `runnel catalog <typ>` und die Beispiele unter `examples/` | Beispiele im Descriptor (ADR 0014) |
 
 ### Fehlerbehebungen
