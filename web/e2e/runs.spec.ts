@@ -85,7 +85,11 @@ test("shows new runs without reloading and counts running ones in the header", a
   const view = page.getByTestId("runs-view");
   await view.getByRole("combobox", { name: "File" }).selectOption(path);
   const rows = view.getByRole("table", { name: "Runs" }).getByRole("row").filter({ hasText: "runs-list.workflow.yaml" });
-  const before = await rows.count();
+  // The runs of the earlier tests, from the API: counting the rows at once could be too
+  // early, before the list has loaded them. Then wait until the list shows them.
+  const list = await request.get(`/api/v1/runs?${new URLSearchParams({ path, limit: "200" })}`);
+  const before = ((await list.json()) as { runs?: unknown[] }).runs?.length ?? 0;
+  await expect(rows).toHaveCount(before);
 
   const res = await request.post("/api/v1/runs", { data: { path, params: { WAIT: "3s" } } });
   expect(res.status()).toBe(201);
