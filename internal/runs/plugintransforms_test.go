@@ -229,3 +229,57 @@ func BenchmarkPluginTransform(b *testing.B) {
 	}
 	b.ReportMetric(float64(records)/b.Elapsed().Seconds(), "records/s")
 }
+
+const initPipeline = `kind: Pipeline
+apiVersion: runnel/v1
+name: init
+transforms:
+  - id: count
+    type: demo.count
+    with:
+      count: 2
+      password: ${secret:crm-token}
+  - id: up
+    type: demo.upper
+    with:
+      field: name
+  - id: out
+    type: core.dummy
+links:
+  - { from: count, to: up }
+  - { from: up, to: out }
+`
+
+// transform.init gives the schema of the output and problems of the configuration at
+// validate, in the editor and before the run (S50b); secrets are sent empty.
+func TestPluginTransformInit(t *testing.T) {
+	dir := pluginProject(t)
+	trustDemo(t, dir)
+	p, err := PreparePipeline(PipelineSpec{Name: "pipelines/p.pipeline.yaml", Data: []byte(initPipeline), ProjectDir: dir, Registry: transforms.Builtin()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := p.Warnings.Error(); !strings.Contains(got, `transform "count": init got {"count":2,"password":""}, targets [up]`) {
+		t.Errorf("warnings %s", got)
+	}
+	project, err := model.LoadProject(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := WithPluginTransforms(transforms.Builtin(), dir)
+	pl, err := model.ReadPipeline("p.pipeline.yaml", []byte(initPipeline))
+	if err != nil {
+		t.Fatal(err)
+	}
+	schemas := pipeline.Schemas(pl, pipeline.Options{Registry: reg})
+	if out := schemas["up"].Output; out.Open || len(out.Fields) != 10 || out.Fields[1] != (record.FieldDef{Name: "amount", Type: record.Decimal}) {
+		t.Errorf("schema of up %+v", out)
+	}
+	bad, err := model.ReadPipeline("p.pipeline.yaml", []byte(strings.Replace(initPipeline, "field: name", "field: nope", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := CheckPipeline(bad, nil, transforms.Builtin(), project).Error(); !strings.Contains(got, `13:14: transform "up": field "nope" is not in the input`) {
+		t.Errorf("validate %s", got)
+	}
+}

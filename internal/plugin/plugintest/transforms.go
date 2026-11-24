@@ -21,7 +21,7 @@ func transformDescriptors() []any {
 	return []any{
 		map[string]any{
 			"type": "demo.upper", "category": "transform", "label": "Upper", "description": "Writes a field in capitals",
-			"recordErrors": true, "parallel": true,
+			"recordErrors": true, "parallel": true, "init": true,
 			"schema": map[string]any{"type": "object", "required": []string{"field"}, "additionalProperties": false, "properties": map[string]any{
 				"field": map[string]any{"type": "string"},
 				"to":    map[string]any{"type": "string", "format": "runnel-target"},
@@ -29,8 +29,12 @@ func transformDescriptors() []any {
 		},
 		map[string]any{
 			"type": "demo.count", "category": "input", "label": "Count", "description": "Emits numbered records",
+			"init": true, "detectFields": true,
 			"schema": map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{
-				"count": map[string]any{"type": "integer"},
+				"count":    map[string]any{"type": "integer"},
+				"api":      map[string]any{"type": "string", "format": "runnel-connection", "x-runnel-connection": []string{"demo"}},
+				"password": map[string]any{"type": "string", "format": "runnel-secret"},
+				"fields":   map[string]any{"type": "array"},
 			}},
 		},
 	}
@@ -209,16 +213,67 @@ func (s *streams) run(id int64, st *pstream) {
 	}
 }
 
+// countFields are the fields of demo.count.
+var countFields = []any{
+	map[string]any{"name": "n", "type": "int"}, map[string]any{"name": "amount", "type": "decimal"},
+	map[string]any{"name": "day", "type": "date"}, map[string]any{"name": "at", "type": "datetime"},
+	map[string]any{"name": "raw", "type": "binary"}, map[string]any{"name": "doc", "type": "json"},
+	map[string]any{"name": "ok", "type": "bool"}, map[string]any{"name": "ratio", "type": "float"},
+	map[string]any{"name": "name", "type": "string"}, map[string]any{"name": "any"},
+}
+
+// initSchema answers transform.init: demo.count has its fields; demo.upper passes its
+// input on and needs the field it writes (an error at "field" if a closed input lacks it).
+// The configuration comes back in a warning, to show what init gets.
+func initSchema(params json.RawMessage) any {
+	var p struct {
+		Type   string         `json:"type"`
+		Config map[string]any `json:"config"`
+		Input  struct {
+			Fields []map[string]any `json:"fields"`
+			Open   bool             `json:"open"`
+		} `json:"input"`
+		Targets []string `json:"targets"`
+	}
+	_ = json.Unmarshal(params, &p)
+	config, _ := json.Marshal(p.Config)
+	problems := []any{map[string]any{"path": "", "message": fmt.Sprintf("init got %s, targets %v", config, p.Targets), "warning": true}}
+	if p.Type == "demo.count" {
+		return map[string]any{"output": map[string]any{"fields": countFields}, "problems": problems}
+	}
+	field, _ := p.Config["field"].(string)
+	found := false
+	for _, f := range p.Input.Fields {
+		found = found || f["name"] == field
+	}
+	if !found && !p.Input.Open {
+		problems = append(problems, map[string]any{"path": "field", "message": fmt.Sprintf("field %q is not in the input", field)})
+	}
+	return map[string]any{"output": map[string]any{"fields": p.Input.Fields, "open": p.Input.Open}, "problems": problems}
+}
+
+// detect answers transform.detectFields of demo.count with the connection it got.
+func detect(params json.RawMessage) any {
+	var p struct {
+		Config map[string]any `json:"config"`
+		Limit  int            `json:"limit"`
+	}
+	_ = json.Unmarshal(params, &p)
+	api, _ := p.Config["api"].(map[string]any)
+	return map[string]any{
+		"source": []any{map[string]any{"name": "Connection", "value": fmt.Sprintf("%v %v %v", api["name"], api["host"], api["password"])}},
+		"rows":   3, "complete": true,
+		"fields": []any{
+			map[string]any{"name": "n", "type": "int", "values": []string{"1", "2", "3"}},
+			map[string]any{"name": "name", "type": "string", "values": []string{"row 1", "row 2", "row 3"}, "note": fmt.Sprintf("limit %d", p.Limit)},
+		},
+	}
+}
+
 // count emits the records of demo.count in batches of 100, with a value of every type.
 func (s *streams) count(id int64, st *pstream) {
 	n, _ := st.config["count"].(float64)
-	fields := []any{
-		map[string]any{"name": "n", "type": "int"}, map[string]any{"name": "amount", "type": "decimal"},
-		map[string]any{"name": "day", "type": "date"}, map[string]any{"name": "at", "type": "datetime"},
-		map[string]any{"name": "raw", "type": "binary"}, map[string]any{"name": "doc", "type": "json"},
-		map[string]any{"name": "ok", "type": "bool"}, map[string]any{"name": "ratio", "type": "float"},
-		map[string]any{"name": "name", "type": "string"}, map[string]any{"name": "any"},
-	}
+	fields := countFields
 	var rows [][]any
 	for i := 1; i <= int(n); i++ {
 		rows = append(rows, []any{i, "12.50", "2026-11-24", "2026-11-24T10:30:00+01:00", "aGk=",

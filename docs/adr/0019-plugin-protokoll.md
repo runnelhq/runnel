@@ -501,3 +501,24 @@ bei der Umsetzung von S50a:
 - **Leistung:** Benchmark `BenchmarkPluginTransform` (200.000 Records mit fünf Feldern durch das Test-Plugin und
   zurück, mit Start des Plugins) erreicht 310.000–330.000 Records/s auf vier Kernen, mit einem bewusst einfachen
   Test-Plugin ohne SDK. Das Ziel ist erreicht, ein Binärformat ist nicht nötig.
+
+## Nachtrag 2026-11-24 (S50b): `transform.init` und `transform.detectFields`
+
+- **Ankündigung** je Transform in `describe`: `"init": true`, `"detectFields": true`. Ohne `init` ist das Schema
+  hinter dem Transform offen; ohne `detectFields` bietet der Editor „Detect fields“ nicht an.
+- **`transform.init`** (Anfrage): `type`, `config`, `input` (Schema des Eingangs, `{"fields": [{"name", "type"}],
+  "open"}`; ohne Eingang leer und geschlossen), `targets` (IDs der Transforms, zu denen Daten-Links führen). Antwort:
+  `output` (Schema wie `input`; fehlt es, ist der Ausgang offen) und `problems` (`path` in `with`, `message`,
+  `warning`). Fehler stehen mit Position im Feld der Datei, wie bei eingebauten Transforms; Felder des Schemas haben
+  Namen, jeden einmal, und Typen nach ADR 0007.
+  - **Ohne Secrets:** Felder mit `runnel-secret` kommen leer, Connections als Name – `init` prüft, verbindet aber
+    nicht. Variablen sind beim Prüfen ohne Lauf noch nicht aufgelöst.
+  - **Eigener Prozess:** Runnel startet das Plugin dafür kurz (Freigabe erneut geprüft) und beendet es, Zeitgrenze
+    10 s. Die Antwort wird je Plugin (Dateien und Freigaben) und Anfrage zwischengespeichert (höchstens 1.024
+    Einträge), damit Editor, `validate` und Lauf das Plugin nicht bei jeder Prüfung starten.
+  - Ein Fehler beim Start oder in `init` ist ein Fehler der Prüfung am Transform; der Lauf startet nicht.
+- **`transform.detectFields`** (Anfrage): `type`, `config` (Variablen mit den Vorgaben aufgelöst, **Connections
+  aufgelöst** wie im Lauf, mit Secrets), `limit` (1.000). Antwort wie bei eingebauten Eingaben (S46): `source`
+  (`[{"name", "value"}]`), `rows`, `complete`, `fields` (`name`, `type`, optional `format`, `values`, `note`,
+  `warning`). Runnel prüft Namen und Typen und vergleicht mit `fields:` der Konfiguration. Zeitgrenze 1 Minute;
+  Secrets der Connections sind in Fehlermeldungen maskiert.

@@ -5,9 +5,8 @@ Programm in beliebiger Sprache, das Runnel als Kindprozess startet und über JSO
 ([ADR 0019](../adr/0019-plugin-protokoll.md) mit Nachträgen; Namen nach [ADR 0013](../adr/0013-typnamen-namensraeume.md),
 Nachtrag 2026-11-24).
 
-Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S50a** – Ablage, `plugin.yaml`, Freigabe,
-Protokoll, Actions in Workflows, eigene Connection-Typen und Transforms als Strom in Pipelines. `transform.init` und
-`transform.detectFields` folgen mit S50b.
+Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S50b** – Ablage, `plugin.yaml`, Freigabe,
+Protokoll, Actions in Workflows, eigene Connection-Typen und Transforms in Pipelines mit Schema und „Felder ermitteln“.
 
 ## Ablage
 
@@ -173,7 +172,7 @@ Ein Transform eines Plugins bekommt die Records seines Eingangs als Strom und sc
 ```
 
 `recordErrors` erlaubt einen Fehler-Link, `parallel` erlaubt `copies`. Eine Kategorie, die Runnel nicht kennt, wird
-`transform`.
+`transform`. `init` und `detectFields` kündigen die Methoden unter [Schema und Felder](#schema-und-felder) an.
 
 ### Ablauf
 
@@ -211,6 +210,24 @@ Nur `transform.open` ist eine Anfrage mit Antwort; alles andere sind Notificatio
   ordnet die Nachrichten zu. Nachrichten verschiedener Ströme dürfen sich mischen.
 - **Fehler:** Ein falscher Wert, ein unbekanntes Ziel oder ein Absturz beenden den Transform und die Pipeline mit
   einer Meldung; Zeilen von stderr stehen im Log des Transforms.
+
+### Schema und Felder
+
+Optional, je Transform in `describe` angekündigt:
+
+| Methode | Anfrage | Antwort |
+|---|---|---|
+| `transform.init` (`"init": true`) | `type`, `config`, `input` (`{"fields":[{"name","type"}],"open":false}`), `targets` | `output` (Schema wie `input`, ohne: offen), `problems` (`[{"path":"field","message":"…","warning":false}]`) |
+| `transform.detectFields` (`"detectFields": true`) | `type`, `config`, `limit` | `source` (`[{"name","value"}]`), `rows`, `complete`, `fields` (`name`, `type`, `format`, `values`, `note`, `warning`) |
+
+- **`init`** prüft die Konfiguration und sagt, welche Felder herauskommen. Runnel ruft es beim Prüfen (`validate`,
+  Editor) und vor dem Lauf, in einem kurz gestarteten Prozess, höchstens 10 s, und merkt sich die Antwort, solange
+  sich Plugin und Anfrage nicht ändern. Felder mit Secrets kommen leer, Connections als Name, Variablen eventuell
+  noch als `${…}`: `init` soll nur prüfen, nicht verbinden. `path` in `problems` ist der Pfad in `with` (z. B.
+  `field` oder `fields[2].name`); der Editor zeigt die Meldung dort.
+- **`detectFields`** liest die ersten Datensätze einer Eingabe für „Detect fields“ im Editor (höchstens `limit`,
+  1 Minute). Connections kommen aufgelöst mit Secrets, wie im Lauf. Runnel vergleicht die Felder mit `fields:` der
+  Konfiguration (vorhanden, neu, fehlt).
 
 ## Connection-Typen
 
@@ -260,8 +277,8 @@ links:
 ```
 
 Wie bei Actions: nicht freigegebene Plugins meldet die Prüfung am Transform, die `config` wird gegen das Schema
-geprüft, Connections kommen aufgelöst an. Das Schema der Felder hinter einem Plugin-Transform ist offen, bis S50b
-`transform.init` bringt.
+geprüft, Connections kommen aufgelöst an. Ohne `transform.init` ist das Schema der Felder hinter einem
+Plugin-Transform offen.
 
 ## Testen
 

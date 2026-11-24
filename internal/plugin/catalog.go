@@ -171,7 +171,7 @@ func lookup(ctx context.Context, projectDir string, p *model.Plugin, store plugi
 	case st.State == plugintrust.Changed:
 		e.hint = fmt.Sprintf(`plugin %q changed since it was trusted; check it and run "runnel plugins trust" again`, p.Name)
 	default:
-		if err = describe(ctx, projectDir, p, &e); err != nil {
+		if err = describe(ctx, projectDir, p, store, &e); err != nil {
 			e.hint = err.Error()
 		}
 	}
@@ -212,7 +212,7 @@ func fingerprint(dir string, store plugintrust.Store) string {
 }
 
 // describe starts a trusted plugin, reads its types into e and ends it again.
-func describe(ctx context.Context, projectDir string, p *model.Plugin, e *entry) error {
+func describe(ctx context.Context, projectDir string, p *model.Plugin, store plugintrust.Store, e *entry) error {
 	pr, err := Start(ctx, p, Options{ProjectDir: projectDir, RunnelVersion: version.Version, Env: environ(projectDir)})
 	if err != nil {
 		return err
@@ -226,7 +226,7 @@ func describe(ctx context.Context, projectDir string, p *model.Plugin, e *entry)
 		e.defs = append(e.defs, definition(p.Name, a))
 	}
 	for _, t := range d.Transforms {
-		e.tdefs = append(e.tdefs, transformDefinition(p.Name, t))
+		e.tdefs = append(e.tdefs, transformDefinition(projectDir, p, store, t))
 	}
 	e.tests = map[string]bool{}
 	for _, c := range d.Connections {
@@ -305,17 +305,26 @@ func withConnections(ctx context.Context, sc *schema.Schema, with map[string]any
 // transformDefinition is the transform type of a plugin: the configuration is checked
 // against the schema of describe, the transform runs as a stream in the process of the
 // plugin for the run (S50a).
-func transformDefinition(plugin string, d transform.Descriptor) transform.Definition {
-	return transform.Definition{
+func transformDefinition(projectDir string, p *model.Plugin, store plugintrust.Store, tt TransformType) transform.Definition {
+	d := tt.Descriptor
+	def := transform.Definition{
 		Type: d.Type, Category: d.Category, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
 		RecordErrors: d.RecordErrors, Parallel: d.Parallel,
 		New: func(with map[string]any) (transform.Transform, error) {
 			if err := schema.CheckConfig(d.Schema, with); err != nil {
 				return nil, err
 			}
-			return &pluginTransform{plugin: plugin, typ: d.Type, with: with, schema: d.Schema}, nil
+			return &pluginTransform{plugin: p.Name, typ: d.Type, with: with, schema: d.Schema,
+				probe: prober{projectDir: projectDir, plugin: p, store: store}, init: tt.Init}, nil
 		},
 	}
+	if d.DetectFields {
+		pb := prober{projectDir: projectDir, plugin: p, store: store}
+		def.DetectFields = func(ctx context.Context, with map[string]any, limit int) (*transform.Detection, error) {
+			return pb.detectFields(ctx, d.Type, d.Schema, with, limit)
+		}
+	}
+	return def
 }
 
 // pluginTransform is a configured transform of a plugin.
@@ -324,6 +333,8 @@ type pluginTransform struct {
 	typ    string
 	with   map[string]any
 	schema *schema.Schema
+	probe  prober
+	init   bool // the plugin answers transform.init
 }
 
 // Process runs the transform as a stream in the plugin, with the connections it names

@@ -218,9 +218,16 @@ func (pr *Process) ended() error {
 // Description is the answer of a plugin to describe: its action types and its
 // connection types (S49c).
 type Description struct {
-	Actions     []action.Descriptor    `json:"actions"`
-	Transforms  []transform.Descriptor `json:"transforms"`
-	Connections []ConnectionType       `json:"connectionTypes"`
+	Actions     []action.Descriptor `json:"actions"`
+	Transforms  []TransformType     `json:"transforms"`
+	Connections []ConnectionType    `json:"connectionTypes"`
+}
+
+// TransformType is a transform type of a plugin: its descriptor and whether it answers
+// transform.init (S50b); detectFields is in the descriptor.
+type TransformType struct {
+	transform.Descriptor
+	Init bool `json:"init"`
 }
 
 // ConnectionType is a connection type of a plugin (ADR 0019, Nachtrag 2026-11-24).
@@ -269,7 +276,7 @@ func (pr *Process) Describe(ctx context.Context) (Description, error) {
 		}
 	}
 	for i := range res.Transforms {
-		d := &res.Transforms[i]
+		d := &res.Transforms[i].Descriptor
 		switch {
 		case !model.ValidTypeName(d.Type):
 			return fail("invalid type name %q", d.Type)
@@ -284,7 +291,7 @@ func (pr *Process) Describe(ctx context.Context) (Description, error) {
 		}
 		seen["transform:"+d.Type] = true
 		d.Kind = "transform"
-		d.DetectFields, d.InfoInput = false, false // S50b and later
+		d.InfoInput = false // info links of plugins follow later
 		if d.Label == "" {
 			d.Label = d.Type
 		}

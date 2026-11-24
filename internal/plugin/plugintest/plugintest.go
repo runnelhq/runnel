@@ -141,6 +141,10 @@ func serve(mode string) {
 					answer(id, map[string]any{"output": out})
 				}
 			}(req.ID)
+		case "transform.init":
+			answer(req.ID, initSchema(req.Params))
+		case "transform.detectFields":
+			answer(req.ID, detect(req.Params))
 		case "transform.open":
 			answer(req.ID, ts.open(req.Params))
 		case "transform.batch", "transform.end":
