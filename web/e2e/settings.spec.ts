@@ -69,3 +69,23 @@ test("edits project.yaml", async ({ page }) => {
   expect(text).toContain("settings:\n  maxConcurrentRuns: 3\n");
   expect(text).toContain("workflow:\n  defaultJoin: first\n");
 });
+
+test("sets how long the run history keeps runs in project.yaml", async ({ page }) => {
+  const form = await open(page, "project.yaml");
+  await form.getByRole("button", { name: "Run history" }).click();
+  await form.locator('[data-field="settings.history.cli"]').getByRole("combobox").selectOption("errors");
+  const days = form.locator('[data-field="settings.history.keepDays"]').getByRole("textbox");
+  await days.fill("7");
+  await days.press("Tab");
+  await expect.poll(() => yaml(page)).toContain("settings:\n  history:\n    cli: errors\n    keepDays: 7\n");
+  // A value out of range is not written.
+  const most = form.locator('[data-field="settings.history.maxRuns"]').getByRole("textbox");
+  await most.fill("0");
+  await most.press("Tab");
+  await expect(page.getByRole("alert").filter({ hasText: "Most runs: enter a whole number from 1 to 1,000,000" })).toBeVisible();
+  // Empty values remove the mapping.
+  await form.locator('[data-field="settings.history.cli"]').getByRole("combobox").selectOption("");
+  await days.fill("");
+  await days.press("Tab");
+  await expect.poll(() => yaml(page)).not.toContain("history:");
+});

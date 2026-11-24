@@ -3,7 +3,7 @@ import wordmark from "../../../design/logo/runnel-wordmark.svg";
 import wordmarkInverse from "../../../design/logo/runnel-wordmark-inverse.svg";
 import type { ProjectInfo } from "../api";
 import type { ThemeChoice } from "../theme";
-import { MonitorIcon, MoonIcon, SunIcon } from "./Icons";
+import { HistoryIcon, MonitorIcon, MoonIcon, SunIcon } from "./Icons";
 
 const themes: { value: ThemeChoice; label: string; title: string; Icon: typeof SunIcon }[] = [
   { value: "system", label: "System", title: "Follow Windows setting", Icon: MonitorIcon },
@@ -15,6 +15,10 @@ export function Header(props: {
   project: ProjectInfo | null;
   theme: ThemeChoice;
   onTheme: (t: ThemeChoice) => void;
+  /** Runs of the project running now, shown on the button "Runs" (mockup S26d). */
+  running: number;
+  runsOpen: boolean;
+  onRuns: () => void;
 }) {
   return (
     <header className="flex items-center gap-4 border-b border-border bg-background px-4">
@@ -30,6 +34,21 @@ export function Header(props: {
         <span className="truncate font-mono text-xs text-muted-foreground">{props.project?.dir}</span>
       </div>
       <div className="flex-1" />
+      <button
+        type="button"
+        title="Runs of the project"
+        aria-pressed={props.runsOpen}
+        onClick={props.onRuns}
+        className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+      >
+        <HistoryIcon width={14} height={14} />
+        Runs
+        {props.running > 0 && (
+          <span title={`${props.running} running`} className="inline-grid h-4 min-w-[18px] place-items-center rounded-full bg-status-running/15 px-1.5 text-[10px] font-semibold text-status-running">
+            {props.running}
+          </span>
+        )}
+      </button>
       <div
         role="group"
         aria-label="Theme"

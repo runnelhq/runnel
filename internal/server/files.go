@@ -40,15 +40,25 @@ type projectInfo struct {
 	Environments []string `json:"environments"`
 	// DefaultEnvironment is used when a run names no environment; empty if none is set.
 	DefaultEnvironment string `json:"defaultEnvironment,omitempty"`
+	// History is how long ended runs are kept (S26c), for the list of runs (S26e1).
+	History historyInfo `json:"history"`
+}
+
+type historyInfo struct {
+	KeepDays int `json:"keepDays"`
+	MaxRuns  int `json:"maxRuns"`
 }
 
 func (s *Server) handleProject(w http.ResponseWriter, _ *http.Request) {
 	info := projectInfo{Dir: s.dir, Environments: []string{}}
+	var history model.HistorySettings
 	if p, _ := model.LoadProject(s.dir); p != nil {
 		info.Name = p.Name
 		info.Environments = p.EnvironmentNames()
 		info.DefaultEnvironment = p.DefaultEnvironment
+		history = p.Settings.History
 	}
+	info.History.KeepDays, info.History.MaxRuns = history.Retention()
 	writeJSON(w, http.StatusOK, info)
 }
 

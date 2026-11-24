@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { kindOf } from "../files";
+import { kindOf, tabName } from "../files";
 import { ChevronIcon, CloseIcon, KindIcon } from "./Icons";
 import { OpenFilesList, TabMenu } from "./OpenFiles";
 
@@ -83,13 +83,13 @@ export function Tabs(props: {
         {props.paths.map((path) => {
           const active = path === props.active;
           const dirty = props.dirty?.has(path) ?? false;
-          const name = path.slice(path.lastIndexOf("/") + 1);
+          const name = tabName(path);
           return (
             <div
               key={path}
               role="tab"
               aria-selected={active}
-              title={dirty ? `${path} – unsaved changes` : path}
+              title={dirty ? `${path} – unsaved changes` : name === path ? undefined : path}
               data-dirty={dirty || undefined}
               tabIndex={0}
               onClick={() => props.onSelect(path)}

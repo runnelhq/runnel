@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { kindOf } from "../files";
+import { kindOf, tabName } from "../files";
 import { CloseIcon, CopyIcon, FolderIcon, KindIcon, SaveIcon, SearchIcon } from "./Icons";
 
 /**
@@ -26,7 +26,7 @@ function useDismiss(ref: React.RefObject<HTMLElement | null>, onClose: () => voi
   }, [ref, except]);
 }
 
-const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1);
+const nameOf = tabName;
 const dirOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
 
 /** B: all open files in the order of the tabs; typing filters by name and path. */
@@ -231,9 +231,13 @@ export function TabMenu(props: {
         disabled: saved.length === 0,
       })}
       {item("Close all", () => props.onCloseMany(paths))}
-      <hr className="my-1 border-0 border-t border-border" />
-      {item("Copy path", () => props.onCopyPath(path), { icon: <CopyIcon width={14} height={14} /> })}
-      {item("Reveal in explorer", () => props.onReveal(path), { icon: <FolderIcon width={14} height={14} /> })}
+      {kindOf(path) !== "runs" && (
+        <>
+          <hr className="my-1 border-0 border-t border-border" />
+          {item("Copy path", () => props.onCopyPath(path), { icon: <CopyIcon width={14} height={14} /> })}
+          {item("Reveal in explorer", () => props.onReveal(path), { icon: <FolderIcon width={14} height={14} /> })}
+        </>
+      )}
     </div>
   );
 }

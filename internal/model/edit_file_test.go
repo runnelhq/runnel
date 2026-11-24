@@ -188,6 +188,9 @@ func TestEditFileEnvironmentAndProject(t *testing.T) {
 		{FileField{Field: "defaultEnvironment", Value: "dev"}, "name: orders\ndefaultEnvironment: dev\nvariables:\n"},
 		{FileField{Field: "settings.maxConcurrentRuns", Value: 4}, "  BASE: C:\\data\nsettings:\n  maxConcurrentRuns: 4\n"},
 		{FileField{Field: "workflow.defaultJoin", Value: "first"}, "workflow:\n  defaultJoin: first\n"},
+		// The run history as a mapping from the form, numbers from JSON (S26e1).
+		{FileField{Field: "settings.history", Map: []KeyValue{{Key: "cli", Value: "errors"}, {Key: "keepDays", Value: float64(7)}}},
+			"settings:\n  history:\n    cli: errors\n    keepDays: 7\n"},
 	} {
 		out, _, err := EditFile(KindProject, "project.yaml", []byte(proj), c.f)
 		if err != nil || !strings.Contains(string(out), c.want) {

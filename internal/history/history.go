@@ -382,11 +382,15 @@ func scanRun(row interface{ Scan(...any) error }) (Run, error) {
 	return r, nil
 }
 
+// TriggerEditor in a Filter selects the runs without trigger: those started in the editor
+// or with POST /runs (S26e1). Triggers are "type:name" or "cli", so no trigger has this name.
+const TriggerEditor = "editor"
+
 // Filter selects runs for List; empty fields select all.
 type Filter struct {
 	Status  string // e.g. failed
 	Path    string // the file of the workflow or pipeline, as in the project ("workflows/a.workflow.yaml")
-	Trigger string // e.g. cron:nightly, http:orders, cli
+	Trigger string // e.g. cron:nightly, http:orders, cli; TriggerEditor: runs without trigger
 	// Before lists the runs started before the one with this id (pages: the id of the
 	// last run of the page before).
 	Before string
@@ -410,6 +414,9 @@ func (s *Store) Find(ctx context.Context, f Filter) ([]Run, error) {
 	} {
 		if c.val != "" {
 			where = append(where, c.col+" "+c.op+" ?")
+			if c.col == "trigger" && c.val == TriggerEditor {
+				c.val = ""
+			}
 			args = append(args, c.val)
 		}
 	}

@@ -11,7 +11,7 @@ import type { FieldValue } from "./components/PropertiesPanel";
 export interface FieldChange {
   field: string;
   value?: FieldValue;
-  map?: { key: string; value: string }[];
+  map?: { key: string; value: string | number }[];
 }
 
 /** A connection as the form reads it. */

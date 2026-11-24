@@ -130,7 +130,7 @@ func TestProject(t *testing.T) {
 	rec := do(t, s, "GET", "/api/v1/projects/current", "")
 	var info projectInfo
 	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil || info.Name != "demo" || info.Dir != dir ||
-		strings.Join(info.Environments, ",") != "dev" {
+		strings.Join(info.Environments, ",") != "dev" || info.History != (historyInfo{KeepDays: 30, MaxRuns: 10000}) {
 		t.Errorf("project %+v, err %v", info, err)
 	}
 }

@@ -119,7 +119,7 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
 | S26b | `runnel run` schreibt mit (`settings.history.cli`, `--history`), `runnel runs`, Filter und Seiten in `GET /runs` |
 | S26c | Aufbewahrung (`settings.history`), `history:` für alle Trigger-Arten |
 | S26d | Mockup: Liste der Läufe im Editor (Filter, alter Lauf auf dem Canvas mit Status und Log) |
-| S26e | Umsetzung nach freigegebenem Mockup |
+| S26e | Umsetzung nach freigegebenem Mockup, geteilt in S26e1 (Liste) und S26e2 (Lauf auf dem Canvas) |
 
 ## Sicherheit
 
@@ -181,3 +181,12 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
   meldet entfernte Läufe im Server-Log; Fehler der Bereinigung sind Warnungen, kein Lauf wartet darauf.
 - `history:` an Cron-, Intervall- und Datei-Triggern hat dieselbe Bedeutung wie an HTTP-Triggern; im Trigger-Formular
   steht es unter „More“.
+
+## Nachtrag 2026-11-24 (S26e1)
+
+- Filter `trigger=editor` (API und `runnel runs --trigger editor`) wählt die Läufe ohne Trigger, also die aus dem Editor
+  und mit `POST /runs`. Trigger heißen `<typ>:<name>` oder `cli`, ein Trigger `editor` kann es nicht geben.
+- `GET /projects/current` nennt die Aufbewahrung (`history.keepDays`, `history.maxRuns`, mit Standardwerten), damit die
+  Liste der Läufe sie zeigen kann.
+- Der Editor lädt die Liste neu, wenn ein Lauf startet oder endet (Ereignisse `run.started`, `run.finished`, `reset` des
+  Stroms `/events`, höchstens alle 0,5 s), nicht auf jedes Ereignis eines Laufs.
