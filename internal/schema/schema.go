@@ -526,3 +526,26 @@ func isTextMap(values any) bool {
 	v, ok := values.(*Schema)
 	return ok && v.Type == "string"
 }
+
+// CheckConfig checks a configuration as written against a schema that does not come
+// from a struct (actions of plugins, ADR 0019): the required fields and, with
+// additionalProperties false, no unknown ones. Types are checked by the plugin, because
+// values may still hold variables.
+func CheckConfig(s *Schema, with map[string]any) error {
+	if s == nil {
+		return nil
+	}
+	for _, name := range s.Required {
+		if _, ok := with[name]; !ok {
+			return fmt.Errorf("missing required field %q", name)
+		}
+	}
+	if closed, ok := s.AdditionalProperties.(bool); ok && !closed {
+		for _, name := range slices.Sorted(maps.Keys(with)) {
+			if _, known := s.Properties.Lookup(name); !known {
+				return fmt.Errorf("unknown field %q", name)
+			}
+		}
+	}
+	return nil
+}

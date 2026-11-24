@@ -328,7 +328,7 @@ func (s *Server) actionSchema(typ string) *schema.Schema {
 	if s.registry == nil {
 		return nil
 	}
-	d, _ := s.registry.Descriptor(typ)
+	d, _ := runs.WithPlugins(s.registry, s.dir).Descriptor(typ)
 	return d.Schema
 }
 

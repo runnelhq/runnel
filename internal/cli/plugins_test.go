@@ -144,3 +144,37 @@ func TestPluginTypes(t *testing.T) {
 		t.Errorf("refused types:\n%s", out)
 	}
 }
+
+// runnel validate names a plugin that is not trusted at its action; once trusted, runnel
+// run runs the action in the plugin (S49b2).
+func TestPluginValidateAndRun(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(plugintest.ModeEnv, "normal")
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "project.yaml"), "kind: Project\napiVersion: runnel/v1\nname: demo\n")
+	writeFile(t, filepath.Join(dir, "plugins", "demo", "plugin.yaml"),
+		"kind: Plugin\napiVersion: runnel/v1\nname: demo\nversion: 1.0.0\nnamespace: demo\nexecutable: '"+exe+"'\n")
+	wf := filepath.Join(dir, "workflows", "echo.workflow.yaml")
+	writeFile(t, wf, "kind: Workflow\napiVersion: runnel/v1\nname: echo\nactions:\n  - id: start\n    type: core.start\n  - id: say\n    type: demo.echo\n    with:\n      text: hello\nlinks:\n  - { from: start, to: say }\n")
+
+	code, out, _ := run(t, "validate", dir)
+	if code != 1 || !strings.Contains(out, `echo.workflow.yaml:8:11: error: action "say": plugin "demo" is not trusted on this computer; check it and run "runnel plugins trust"`) {
+		t.Errorf("validate untrusted: %d\n%s", code, out)
+	}
+	if code, _, errOut := run(t, "run", wf, "--history", "none"); code != 2 || !strings.Contains(errOut, `plugin "demo" is not trusted`) {
+		t.Errorf("run untrusted: %d %s", code, errOut)
+	}
+	if code, _, errOut := run(t, "plugins", "trust", dir, "--yes"); code != 0 {
+		t.Fatal(errOut)
+	}
+	if code, out, _ := run(t, "validate", dir); code != 0 {
+		t.Errorf("validate trusted: %d\n%s", code, out)
+	}
+	code, out, errOut := run(t, "run", "-v", wf, "--history", "none")
+	if code != 0 || !strings.Contains(out+errOut, "demo: echo hello with s3cret") || !strings.Contains(out+errOut, `workflow "echo" succeeded`) {
+		t.Errorf("run trusted: %d\n%s%s", code, out, errOut)
+	}
+}

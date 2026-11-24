@@ -191,3 +191,25 @@ func TestProgram(t *testing.T) {
 		t.Errorf("%s %v", program, args)
 	}
 }
+
+// BenchmarkExecute measures one action.execute round trip to a running plugin.
+func BenchmarkExecute(b *testing.B) {
+	exe, err := os.Executable()
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Setenv(plugintest.ModeEnv, "normal")
+	p := &model.Plugin{Name: "demo", Namespace: "demo", Dir: b.TempDir(), Executable: exe}
+	pr, err := Start(context.Background(), p, Options{ProjectDir: b.TempDir()})
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = pr.Close() }()
+	config := map[string]any{"text": "bench"}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := pr.Execute(context.Background(), "demo.echo", config, ExecContext{RunID: "R"}); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

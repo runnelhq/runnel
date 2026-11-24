@@ -95,6 +95,7 @@ type Prepared struct {
 // environment or parameters as plain errors.
 func Prepare(spec Spec) (*Prepared, error) {
 	p := &Prepared{}
+	spec.Registry = WithPlugins(spec.Registry, spec.ProjectDir) // actions of plugins (S49b2)
 	w, diags, err := parseWorkflow(spec.Name, spec.Data)
 	if err != nil {
 		return p, err
@@ -146,6 +147,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 		Scope:       scope,
 		Mask:        mask,
 		Connections: conns,
+		Plugins:     pluginSession(spec.ProjectDir, envName, mask),
 		Observer:    spec.Observer,
 		RunID:       spec.RunID,
 		Environment: envName,

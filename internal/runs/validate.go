@@ -34,6 +34,7 @@ type WorkflowCheck struct {
 // so far (e.g. those of w.Validate); the result holds them and the new ones, sorted.
 // The error is set for problems unrelated to the content (e.g. an unknown environment).
 func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (model.Errors, error) {
+	c.Registry = WithPlugins(c.Registry, c.ProjectDir) // actions of plugins (S49b2)
 	if c.Variables {
 		contexts, err := model.VarContexts(w, c.Project, c.Env, c.Params)
 		if err != nil {
