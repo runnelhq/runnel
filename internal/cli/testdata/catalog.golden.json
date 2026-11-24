@@ -2955,7 +2955,14 @@
                 },
                 "format": {
                   "type": "string",
-                  "description": "Number format of Excel as in English Excel, e.g. #,##0.00, 0.0% or dd.mm.yyyy hh:mm; empty: numbers as General, dates as short date",
+                  "description": "Number pattern like #.##0,00 or date pattern like dd.MM.yyyy HH:mm, as in the other outputs; Excel shows separators and names in the language of the user; empty: numbers as General, dates as short date",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                },
+                "excelFormat": {
+                  "type": "string",
+                  "description": "Number format of Excel as in English Excel instead of format, e.g. 0.0%, 0.0 \"kg\" or [Red]-#,##0.00",
                   "examples": [
                     "0.0%"
                   ]
@@ -2973,7 +2980,7 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: out/orders.xlsx\nsheet: Orders\nfields:\n  - { name: Nr }\n  - { name: Amount, format: \"#,##0.00\" }\n  - { name: Date }\n",
+      "example": "path: out/orders.xlsx\nsheet: Orders\nfields:\n  - { name: Nr }\n  - { name: Amount, format: \"#.##0,00\" }\n  - { name: Date, format: dd.MM.yyyy }\n  - { name: Share, excelFormat: 0.0% }\n",
       "recordErrors": true
     },
     {

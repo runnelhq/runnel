@@ -56,8 +56,8 @@ transforms:
       fields:
         - { name: Nr }
         - { name: Kunde }
-        - { name: Betrag, format: "#,##0.00 \"€\"" }
-        - { name: Datum }
+        - { name: Betrag, excelFormat: "#,##0.00 \"€\"" }
+        - { name: Datum, format: dd.MM.yyyy }
         - { name: Bezahlt }
   - id: rejected
     type: csv.output
