@@ -58,6 +58,7 @@ type installOptions struct {
 	port                 int
 	stopTimeout          time.Duration
 	historyDir           string
+	log                  logOptions
 }
 
 // serviceConfig checks the options and works out the service for the project in root,
@@ -78,6 +79,16 @@ func serviceConfig(o installOptions, root, exe string) (winsvc.Config, error) {
 	if err := o.listener.check(); err != nil {
 		return winsvc.Config{}, err
 	}
+	if _, _, err := o.log.check(); err != nil {
+		return winsvc.Config{}, err
+	}
+	logFile := ""
+	if o.log.file != "" {
+		var err error
+		if logFile, err = filepath.Abs(o.log.file); err != nil {
+			return winsvc.Config{}, err
+		}
+	}
 	listener, err := o.listener.absolute()
 	if err != nil {
 		return winsvc.Config{}, err
@@ -95,6 +106,11 @@ func serviceConfig(o installOptions, root, exe string) (winsvc.Config, error) {
 		}
 		args = append(args, "--history-dir", historyDir)
 	}
+	args = append(args, o.log.serviceArgs(logFile)...)
+	logDir := winsvc.LogDir()
+	if logFile != "" {
+		logDir = filepath.Dir(logFile)
+	}
 	c := winsvc.Config{
 		Name:        o.name,
 		DisplayName: display,
@@ -103,7 +119,7 @@ func serviceConfig(o installOptions, root, exe string) (winsvc.Config, error) {
 		Args:        append(args, root),
 		Account:     winsvc.NormalizeAccount(o.account),
 		Start:       o.start,
-		LogDir:      winsvc.LogDir(),
+		LogDir:      logDir,
 		HistoryDir:  historyDir,
 		// The default folder is protected like the certificate; an own one may be shared
 		// with runnel serve of a user (ADR 0026), so the account only gets write access.
@@ -164,7 +180,7 @@ func newServiceInstallCommand() *cobra.Command {
 			}
 			cmd.Printf("Installed service %s for the project %s\n", o.name, root)
 			cmd.Printf("  account %s, start %s, http://127.0.0.1:%d, stop timeout %s\n", c.Account, o.start, o.port, o.stopTimeout)
-			cmd.Printf("  log %s\n", filepath.Join(c.LogDir, o.name+".log"))
+			cmd.Printf("  log %s (%s, level %s)\n", serviceLogFile(o.name, o.log.file), o.log.format, o.log.level)
 			cmd.Printf("  run history in %s\n", c.HistoryDir)
 			cmd.Printf("Start it with: runnel service start%s\n", nameOpt(o.name))
 			return nil
@@ -177,6 +193,8 @@ func newServiceInstallCommand() *cobra.Command {
 	cmd.Flags().StringVar(&o.start, "start", winsvc.StartDelayed, "start type: auto, delayed (auto, shortly after Windows has started) or manual")
 	cmd.Flags().DurationVar(&o.stopTimeout, "stop-timeout", DefaultStopTimeout, "time running runs get to end when the service stops, before they are cancelled")
 	historyDirFlag(cmd, &o.historyDir, `%ProgramData%\runnel\history`)
+	logFlags(cmd, &o.log)
+	logFileFlags(cmd, &o.log, `%ProgramData%\runnel\logs\<name>.log`)
 	return cmd
 }
 
@@ -279,6 +297,7 @@ func newServiceRunCommand() *cobra.Command {
 	var port int
 	var stopTimeout time.Duration
 	var historyDir string
+	var logOpts logOptions
 	cmd := &cobra.Command{
 		Use:    "run project-dir",
 		Short:  "Run as the service (started by Windows)",
@@ -292,7 +311,7 @@ func newServiceRunCommand() *cobra.Command {
 				if historyDir == "" {
 					historyDir = winsvc.HistoryDir()
 				}
-				return runService(ctx, events, name, args[0], port, stopTimeout, listen, historyDir)
+				return runService(ctx, events, name, args[0], port, stopTimeout, listen, historyDir, logOpts)
 			})
 		},
 	}
@@ -301,29 +320,50 @@ func newServiceRunCommand() *cobra.Command {
 	listenerFlags(cmd, &listen)
 	cmd.Flags().DurationVar(&stopTimeout, "stop-timeout", DefaultStopTimeout, "time running runs get to end when stopping")
 	historyDirFlag(cmd, &historyDir, `%ProgramData%\runnel\history`)
+	logFlags(cmd, &logOpts)
+	logFileFlags(cmd, &logOpts, `%ProgramData%\runnel\logs\<name>.log`)
 	return cmd
+}
+
+// serviceLogFile returns the log file of a service: file, or <name>.log in the log folder.
+func serviceLogFile(name, file string) string {
+	if file != "" {
+		if abs, err := filepath.Abs(file); err == nil {
+			return abs
+		}
+		return file
+	}
+	return filepath.Join(winsvc.LogDir(), name+".log")
 }
 
 // runService serves the project for the service: the whole log goes to the log file,
 // start, stop, warnings and errors also to the Event Viewer.
-func runService(ctx context.Context, events winsvc.Logger, name, dir string, port int, stopTimeout time.Duration, listen listenerOptions, historyDir string) error {
-	path := filepath.Join(winsvc.LogDir(), name+".log")
-	lf, err := logfile.Open(path, 0)
+func runService(ctx context.Context, events winsvc.Logger, name, dir string, port int, stopTimeout time.Duration, listen listenerOptions,
+	historyDir string, logOpts logOptions) error {
+	_, maxSize, err := logOpts.check()
+	if err != nil {
+		events.Error(err.Error())
+		return err
+	}
+	path := serviceLogFile(name, logOpts.file)
+	lf, err := logfile.Open(path, maxSize, logOpts.files)
 	if err != nil {
 		events.Error(fmt.Sprintf("%s: %v", path, err))
 		return err
 	}
 	defer func() { _ = lf.Close() }()
-	line := func(level, msg string) {
-		_, _ = fmt.Fprintf(lf, "%s %-5s %s\n", time.Now().Format("2006-01-02 15:04:05"), level, msg)
+	logger, err := newLogger(lf, logOpts, time.DateTime)
+	if err != nil {
+		return err
 	}
 	err = runServer(ctx, serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen, TLSDir: winsvc.TLSDir(), HistoryDir: historyDir,
-		Log:   func(msg string) { line("INFO", msg) },
-		Warn:  func(msg string) { line("WARN", msg); events.Warn(msg) },
-		Print: func(msg string) { line("INFO", msg); events.Info(msg) },
+		Logger: logger,
+		Log:    func(msg string) { logger.Info(msg) },
+		Warn:   func(msg string) { logger.Warn(msg); events.Warn(msg) },
+		Print:  func(msg string) { logger.Info(msg); events.Info(msg) },
 	})
 	if err != nil {
-		line("ERROR", err.Error())
+		logger.Error(err.Error())
 	}
 	return err
 }

@@ -36,6 +36,9 @@ func preparePipelineRun(out, errOut io.Writer, file string, opts runOptions) (*p
 	if err != nil {
 		return nil, err
 	}
+	if _, err := newRunLogger(out, opts, "", nil); err != nil {
+		return nil, err
+	}
 	data, projectDir, err := readRunFile(file, opts.env)
 	if err != nil {
 		return nil, err
@@ -65,7 +68,8 @@ func preparePipelineRun(out, errOut io.Writer, file string, opts runOptions) (*p
 		_, _ = fmt.Fprintf(errOut, "warning: parameter %q is not declared in pipeline %q; it is available as variable ${%s}\n",
 			name, p.Pipeline.Name, name)
 	}
-	logger = &pipelineLogger{runLogger: runLogger{out: out, verbose: opts.verbose, workflow: p.Pipeline.Name, env: p.Env}}
+	rl, _ := newRunLogger(out, opts, p.Pipeline.Name, p.Env)
+	logger = &pipelineLogger{runLogger: *rl}
 	return p.Runner, nil
 }
 

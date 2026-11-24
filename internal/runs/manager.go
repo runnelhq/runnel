@@ -130,6 +130,8 @@ type Manager struct {
 	// store and rec keep the runs in the history (ADR 0026); nil: only in memory.
 	store *history.Store
 	rec   *historyWriter
+	// onEnd receives each run that ended and is kept (history), e.g. for the server log.
+	onEnd func(Run)
 }
 
 type entry struct {
@@ -164,6 +166,15 @@ func (m *Manager) SetHistory(store *history.Store, warn func(string)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.store, m.rec = store, newHistoryWriter(store, warn)
+}
+
+// OnEnd calls fn for each run that has ended and is kept by its history (all, or with
+// errors only the failed ones), e.g. for a line in the server log (S71). Call it before
+// the first run.
+func (m *Manager) OnEnd(fn func(Run)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onEnd = fn
 }
 
 // CloseHistory writes what is queued for the history and stops writing to it. It does
@@ -300,8 +311,12 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 		defer cancel()
 		start(ctx)
 		m.mu.Lock()
-		m.ended(e)
+		kept := m.ended(e)
+		onEnd, run := m.onEnd, snapshot(e)
 		m.mu.Unlock()
+		if onEnd != nil && kept {
+			onEnd(run)
+		}
 	})
 	return out, nil
 }
@@ -401,19 +416,21 @@ const (
 	HistoryNone   = "none"
 )
 
-// ended applies the history of a run that has ended. m.mu must be held.
-func (m *Manager) ended(e *entry) {
+// ended applies the history of a run that has ended and reports whether it is kept.
+// m.mu must be held.
+func (m *Manager) ended(e *entry) bool {
 	close(e.done)
 	drop := e.history == HistoryNone || (e.history == HistoryErrors && e.run.Status == workflow.Succeeded)
 	if m.recording(e) {
 		m.rec.send(recOp{kind: recEnd, run: snapshot(e), hash: e.hash, nodes: copyActions(e), del: drop})
 	}
 	if !drop {
-		return
+		return true
 	}
 	if i := slices.Index(m.order, e.run.ID); i >= 0 {
 		m.remove(i)
 	}
+	return false
 }
 
 // record applies an event of the engine to the run state and publishes it.

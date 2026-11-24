@@ -1,6 +1,8 @@
 package server
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/logfile"
 	"github.com/runnelhq/runnel/internal/transforms"
 )
 
@@ -20,16 +23,20 @@ import (
 //
 //	go test ./internal/server -run XXX -bench HTTPTrigger -benchmem
 func BenchmarkHTTPTrigger(b *testing.B) {
-	for _, c := range []struct{ name, history, dir string }{
-		{"none", "none", ""},
-		{"memory", "all", ""},
-		{"stored", "all", b.TempDir()},
+	for _, c := range []struct {
+		name, history, dir string
+		log                bool
+	}{
+		{"none", "none", "", false},
+		{"memory", "all", "", false},
+		{"stored", "all", b.TempDir(), false},
+		{"logged", "all", "", true}, // a line per run in the server log, as JSON (S71)
 	} {
-		b.Run(c.name, func(b *testing.B) { benchHTTPTrigger(b, c.history, c.dir) })
+		b.Run(c.name, func(b *testing.B) { benchHTTPTrigger(b, c.history, c.dir, c.log) })
 	}
 }
 
-func benchHTTPTrigger(b *testing.B, history, historyDir string) {
+func benchHTTPTrigger(b *testing.B, history, historyDir string, log bool) {
 	dir := b.TempDir()
 	for name, content := range map[string]string{
 		"project.yaml": "kind: Project\napiVersion: runnel/v1\nname: p\n",
@@ -49,7 +56,11 @@ func benchHTTPTrigger(b *testing.B, history, historyDir string) {
 		}
 	}
 	var warnings atomic.Int64 // e.g. "the run history cannot keep up"
-	s, err := New(Options{Dir: dir, Registry: actions.Builtin(), Transforms: transforms.Builtin(), HistoryDir: historyDir,
+	var logger *slog.Logger
+	if log {
+		logger = slog.New(logfile.NewHandler(io.Discard, logfile.Options{Format: logfile.FormatJSON}))
+	}
+	s, err := New(Options{Dir: dir, Registry: actions.Builtin(), Transforms: transforms.Builtin(), HistoryDir: historyDir, Logger: logger,
 		Warn: func(m string) {
 			if warnings.Add(1) <= 3 {
 				b.Log(m)

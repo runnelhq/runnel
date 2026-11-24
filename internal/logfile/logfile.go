@@ -1,6 +1,7 @@
 // Package logfile writes a log file that is rotated by size (roadmap S41): when the
-// file would grow beyond its limit, it is renamed to <name>.1 (replacing an older one)
-// and a new file is started. The Windows service writes its server log with it.
+// file would grow beyond its limit, it is renamed to <name>.1, older ones move on to
+// <name>.2 … up to the number of old files kept (S71), and a new file is started. The
+// Windows service writes its server log with it; NewHandler formats its lines.
 package logfile
 
 import (
@@ -10,13 +11,18 @@ import (
 	"sync"
 )
 
-// DefaultMaxSize is the size from which a log file is rotated.
-const DefaultMaxSize = 10 << 20
+// DefaultMaxSize is the size from which a log file is rotated; DefaultKeep is the number
+// of old files kept.
+const (
+	DefaultMaxSize = 10 << 20
+	DefaultKeep    = 5
+)
 
 // File is a log file; it is safe for use by several goroutines.
 type File struct {
 	path string
 	max  int64
+	keep int
 
 	mu   sync.Mutex
 	f    *os.File
@@ -24,15 +30,19 @@ type File struct {
 }
 
 // Open opens the log file at path for appending, creating it and its folder if
-// needed. limit is the size from which it is rotated (DefaultMaxSize if 0).
-func Open(path string, limit int64) (*File, error) {
+// needed. limit is the size from which it is rotated (DefaultMaxSize if 0), keep the
+// number of old files kept (DefaultKeep if 0).
+func Open(path string, limit int64, keep int) (*File, error) {
 	if limit <= 0 {
 		limit = DefaultMaxSize
+	}
+	if keep <= 0 {
+		keep = DefaultKeep
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("cannot create the log folder: %w", err)
 	}
-	l := &File{path: path, max: limit}
+	l := &File{path: path, max: limit, keep: keep}
 	if err := l.open(); err != nil {
 		return nil, err
 	}
@@ -71,15 +81,19 @@ func (l *File) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// rotate renames the file to <path>.1 and starts a new one. Windows cannot rename an
-// open file, so it is closed first.
+// rotate moves the old files on (<path>.1 to .2 …, the oldest is removed), renames the
+// file to <path>.1 and starts a new one. Windows cannot rename an open file, so it is
+// closed first.
 func (l *File) rotate() error {
 	if err := l.f.Close(); err != nil {
 		return err
 	}
 	l.f = nil
+	_ = os.Remove(fmt.Sprintf("%s.%d", l.path, l.keep))
+	for i := l.keep - 1; i >= 1; i-- {
+		_ = os.Rename(fmt.Sprintf("%s.%d", l.path, i), fmt.Sprintf("%s.%d", l.path, i+1))
+	}
 	old := l.path + ".1"
-	_ = os.Remove(old)
 	if err := os.Rename(l.path, old); err != nil {
 		// Keep writing to the full file rather than losing messages.
 		_ = l.open()

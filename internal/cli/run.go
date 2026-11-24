@@ -18,6 +18,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
+	"github.com/runnelhq/runnel/internal/logfile"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transforms"
@@ -35,6 +36,7 @@ type runOptions struct {
 	env     string
 	params  []string
 	verbose bool
+	log     logOptions
 }
 
 func newRunCommand() *cobra.Command {
@@ -59,7 +61,8 @@ func newRunCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.env, "env", "", "environment of the project to use")
 	cmd.Flags().StringArrayVar(&opts.params, "param", nil, "parameter `KEY=VALUE` (repeatable)")
-	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "also log debug messages and every action or transform start and end")
+	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "also log debug messages and every action or transform start and end (--log-level debug)")
+	logFlags(cmd, &opts.log)
 	return cmd
 }
 
@@ -87,6 +90,9 @@ func runWorkflow(ctx context.Context, out, errOut io.Writer, file string, opts r
 func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.Runner, error) {
 	params, err := parseParams(opts.params)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := newRunLogger(out, opts, "", nil); err != nil {
 		return nil, err
 	}
 	if info, err := os.Stat(file); err == nil && info.IsDir() {
@@ -123,7 +129,7 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*workflow.
 		_, _ = fmt.Fprintf(errOut, "warning: parameter %q is not declared in workflow %q; it is available as variable ${%s}\n",
 			name, p.Workflow.Name, name)
 	}
-	logger = &runLogger{out: out, verbose: opts.verbose, workflow: p.Workflow.Name, env: p.Env}
+	logger, _ = newRunLogger(out, opts, p.Workflow.Name, p.Env)
 	return p.Runner, nil
 }
 
@@ -154,9 +160,27 @@ func printDiags(errOut io.Writer, diags model.Errors) {
 // runLogger prints the events of a run as log lines.
 type runLogger struct {
 	out      io.Writer
-	verbose  bool
+	level    slog.Level
+	json     slog.Handler // --log-format json; nil: text
 	workflow string
 	env      *model.Environment
+}
+
+// newRunLogger returns the logger of the run log of "runnel run" (S71): --log-level
+// (-v is debug) and --log-format.
+func newRunLogger(out io.Writer, opts runOptions, name string, env *model.Environment) (*runLogger, error) {
+	level, _, err := opts.log.check()
+	if err != nil {
+		return nil, err
+	}
+	if opts.verbose {
+		level = min(level, slog.LevelDebug)
+	}
+	l := &runLogger{out: out, level: level, workflow: name, env: env}
+	if opts.log.format == logfile.FormatJSON {
+		l.json = slog.NewJSONHandler(out, &slog.HandlerOptions{Level: level})
+	}
+	return l, nil
 }
 
 func (l *runLogger) event(e workflow.Event) {
@@ -177,14 +201,25 @@ func (l *runLogger) envName() string {
 	return l.env.Name
 }
 
-// show prints a line of the run; details only with -v.
+// show prints a line of the run; details (debug) only with -v or --log-level debug.
 func (l *runLogger) show(t time.Time, line runs.Line) {
-	if !line.Detail || l.verbose {
+	if !line.Detail || l.level <= slog.LevelDebug {
 		l.line(t, line.Level, line.Step, line.Msg)
 	}
 }
 
 func (l *runLogger) line(t time.Time, level slog.Level, actionID, msg string) {
+	if level < l.level {
+		return
+	}
+	if l.json != nil {
+		r := slog.NewRecord(t, level, msg, 0)
+		if actionID != "" {
+			r.AddAttrs(slog.String("action", actionID))
+		}
+		_ = l.json.Handle(context.Background(), r)
+		return
+	}
 	prefix := ""
 	if actionID != "" {
 		prefix = "[" + actionID + "] "
