@@ -5,3 +5,4 @@ testdata/project/invalid/project.yaml:4:21: default environment "staging" not fo
 testdata/project/invalid/project.yaml:6:16: invalid defaultJoin "any" (expected all, first or each)
 testdata/project/invalid/project.yaml:9:13: invalid variable name "bad-name" (letters, digits and _, not starting with a digit)
 testdata/project/invalid/project.yaml:10:11: unclosed "${" at position 1
+testdata/project/invalid/project.yaml:13:10: invalid history "always" (expected all, errors or none)

@@ -221,3 +221,47 @@ func TestDefaultBase(t *testing.T) {
 		t.Errorf("%s %v", base, err)
 	}
 }
+
+// Find filters by status, path and trigger and pages with before (S26b).
+func TestFind(t *testing.T) {
+	ctx := context.Background()
+	s := open(t, t.TempDir())
+	for _, r := range []Run{
+		{ID: "01", Path: "a", Trigger: "cli", Status: "succeeded"},
+		{ID: "02", Path: "b", Trigger: "cron:n", Status: "failed"},
+		{ID: "03", Path: "a", Trigger: "cron:n", Status: "failed"},
+		{ID: "04", Path: "a", Trigger: "cli", Status: "failed"},
+	} {
+		r.Kind, r.Started, r.Data = "workflow", time.Now(), []byte(`{}`)
+		if err := s.PutRun(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ids := func(f Filter) string {
+		list, err := s.Find(ctx, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, r := range list {
+			out = append(out, r.ID)
+		}
+		return strings.Join(out, ",")
+	}
+	for _, tt := range []struct {
+		f    Filter
+		want string
+	}{
+		{Filter{}, "04,03,02,01"},
+		{Filter{Status: "failed"}, "04,03,02"},
+		{Filter{Path: "a", Status: "failed"}, "04,03"},
+		{Filter{Trigger: "cron:n"}, "03,02"},
+		{Filter{Limit: 2}, "04,03"},
+		{Filter{Limit: 2, Before: "03"}, "02,01"},
+		{Filter{Path: "x"}, ""},
+	} {
+		if got := ids(tt.f); got != tt.want {
+			t.Errorf("%+v: %s, want %s", tt.f, got, tt.want)
+		}
+	}
+}

@@ -162,3 +162,12 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
   der Zahl der Fehler seitdem.
 - Kann die Historie beim Start nicht geöffnet werden (z. B. kein Zugriff, Datei einer neueren Version), läuft der Server
   ohne sie (Läufe nur im Speicher) und sagt das im Server-Log.
+
+## Nachtrag 2026-11-24 (S26b)
+
+- `runnel runs [projektordner] [lauf-id]`: ohne Lauf-ID die Liste (Tabelle oder `--json` wie die API), mit Lauf-ID ein
+  Lauf mit Knoten und Log. Eine Lauf-ID allein (26 Zeichen, kein Ordner dieses Namens) gilt für das Projekt im aktuellen
+  Ordner. Gibt es noch keine Historie, legt `runnel runs` nichts an.
+- `runnel run` startet seinen Lauf über denselben Manager wie der Server, mit Trigger `cli`; ohne Projekt gibt es keine
+  Historie. Läufe aus dem Editor haben weiterhin keinen Trigger (`runnel runs` zeigt `editor`).
+- `limit` der API und von `runnel runs`: höchstens 1.000.

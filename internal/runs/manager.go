@@ -226,50 +226,108 @@ func (m *Manager) newID() (string, error) {
 	return workflow.NewRunID(time.Now()), nil
 }
 
-// Start prepares and starts a run in the background and returns its state. The
-// spec's Observer and RunID are set by the manager. Errors are those of Prepare.
+// Pending is a prepared run that has not started yet (PrepareRun, PreparePipelineRun);
+// Launch starts it. In between, the caller can set up what the run's events need, e.g.
+// the console log of runnel run, and choose its History.
+type Pending struct {
+	// History is all (default), errors or none: which ended runs are kept (S38b2, ADR 0026).
+	History string
+	id      string
+	run     Run
+	env     *model.Environment
+	steps   [][2]string
+	lim     limits
+	hash    string
+	start   func(context.Context)
+}
+
+// ID returns the id of the run.
+func (p *Pending) ID() string { return p.id }
+
+// Start prepares and starts a run in the background and returns its state. The spec's
+// RunID is set by the manager; its Observer, if any, gets the events after the manager.
+// Errors are those of Prepare.
 func (m *Manager) Start(path string, spec Spec) (Run, *Prepared, error) {
-	id, err := m.newID()
-	if err != nil {
-		return Run{}, nil, err
-	}
-	spec.RunID = id
-	spec.Observer = func(e workflow.Event) { m.record(id, e) }
-	p, err := Prepare(spec)
+	pend, p, err := m.PrepareRun(path, spec)
 	if err != nil {
 		return Run{}, p, err
 	}
+	run, err := m.Launch(pend)
+	return run, p, err
+}
 
+// PrepareRun prepares a workflow run like Start, without starting it.
+func (m *Manager) PrepareRun(path string, spec Spec) (*Pending, *Prepared, error) {
+	id, err := m.newID()
+	if err != nil {
+		return nil, nil, err
+	}
+	spec.RunID = id
+	observer := spec.Observer
+	spec.Observer = func(e workflow.Event) {
+		m.record(id, e)
+		if observer != nil {
+			observer(e)
+		}
+	}
+	p, err := Prepare(spec)
+	if err != nil {
+		return nil, p, err
+	}
 	steps := make([][2]string, len(p.Workflow.Actions))
 	for i, a := range p.Workflow.Actions {
 		steps[i] = [2]string{a.ID, a.Type}
 	}
-	run, err := m.add(id, Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client},
-		p.Env, steps, limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns), spec.History, fileHash(spec.Data), func(ctx context.Context) { p.Runner.Run(ctx) })
-	return run, p, err
+	return &Pending{History: spec.History, id: id, env: p.Env, steps: steps, hash: fileHash(spec.Data),
+		run:   Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client},
+		lim:   limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns),
+		start: func(ctx context.Context) { p.Runner.Run(ctx) }}, p, nil
 }
 
 // StartPipeline prepares and starts a pipeline run in the background, like Start (S25a3).
 // Its transforms are reported as actions, with their counts when they have finished.
 func (m *Manager) StartPipeline(path string, spec PipelineSpec) (Run, *PreparedPipeline, error) {
-	id, err := m.newID()
-	if err != nil {
-		return Run{}, nil, err
-	}
-	spec.RunID = id
-	spec.Observer = func(e pipeline.Event) { m.recordPipeline(id, e) }
-	p, err := PreparePipeline(spec)
+	pend, p, err := m.PreparePipelineRun(path, spec)
 	if err != nil {
 		return Run{}, p, err
+	}
+	run, err := m.Launch(pend)
+	return run, p, err
+}
+
+// PreparePipelineRun prepares a pipeline run like StartPipeline, without starting it.
+func (m *Manager) PreparePipelineRun(path string, spec PipelineSpec) (*Pending, *PreparedPipeline, error) {
+	id, err := m.newID()
+	if err != nil {
+		return nil, nil, err
+	}
+	spec.RunID = id
+	observer := spec.Observer
+	spec.Observer = func(e pipeline.Event) {
+		m.recordPipeline(id, e)
+		if observer != nil {
+			observer(e)
+		}
+	}
+	p, err := PreparePipeline(spec)
+	if err != nil {
+		return nil, p, err
 	}
 	steps := make([][2]string, len(p.Pipeline.Transforms))
 	for i, t := range p.Pipeline.Transforms {
 		steps[i] = [2]string{t.ID, t.Type}
 	}
-	run, err := m.add(id, Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
-		LinkRows: make([]int64, len(p.Pipeline.Links))}, p.Env, steps, limitsOf(p.Project, 0),
-		spec.History, fileHash(spec.Data), func(ctx context.Context) { p.Runner.Run(ctx) })
-	return run, p, err
+	return &Pending{History: spec.History, id: id, env: p.Env, steps: steps, hash: fileHash(spec.Data),
+		run: Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
+			LinkRows: make([]int64, len(p.Pipeline.Links))},
+		lim:   limitsOf(p.Project, 0),
+		start: func(ctx context.Context) { p.Runner.Run(ctx) }}, p, nil
+}
+
+// Launch starts a prepared run in the background, unless a limit of runs at the same
+// time is reached or the manager is shutting down.
+func (m *Manager) Launch(p *Pending) (Run, error) {
+	return m.add(p.id, p.run, p.env, p.steps, p.lim, p.History, p.hash, p.start)
 }
 
 // add registers a run with its steps (id and type of the actions or transforms) and
@@ -553,20 +611,40 @@ func (m *Manager) LastSeq() int64 {
 // first, at most MaxRuns+MaxHTTPRuns. A history that cannot be read is reported as error
 // together with the runs in memory.
 func (m *Manager) Runs(ctx context.Context) ([]Run, error) {
+	return m.Find(ctx, history.Filter{})
+}
+
+// MaxList is the most runs Find returns; DefaultList those without a limit.
+const (
+	MaxList     = 1000
+	DefaultList = MaxRuns + MaxHTTPRuns
+)
+
+// Find returns the runs that match f (S26b), from memory and the history, newest first,
+// at most f.Limit (DefaultList if 0, at most MaxList).
+func (m *Manager) Find(ctx context.Context, f history.Filter) ([]Run, error) {
+	if f.Limit <= 0 {
+		f.Limit = DefaultList
+	}
+	f.Limit = min(f.Limit, MaxList)
 	m.mu.Lock()
 	out := make([]Run, 0, len(m.order))
 	for _, id := range slices.Backward(m.order) {
 		r := m.runs[id].run
-		r.LinkRows = slices.Clone(r.LinkRows)
-		out = append(out, r)
+		if matches(r, f) {
+			r.LinkRows = slices.Clone(r.LinkRows)
+			out = append(out, r)
+		}
 	}
 	store := m.store
 	m.mu.Unlock()
 	if store == nil {
+		if len(out) > f.Limit {
+			out = out[:f.Limit]
+		}
 		return out, nil
 	}
-	limit := MaxRuns + MaxHTTPRuns
-	stored, err := store.List(ctx, limit)
+	stored, err := store.Find(ctx, f)
 	if err != nil {
 		return out, err
 	}
@@ -578,7 +656,13 @@ func (m *Manager) Runs(ctx context.Context) ([]Run, error) {
 		}
 		runs = append(runs, r)
 	}
-	return mergeRuns(out, runs, limit), nil
+	return mergeRuns(out, runs, f.Limit), nil
+}
+
+// matches reports whether a run in memory matches a filter.
+func matches(r Run, f history.Filter) bool {
+	return (f.Status == "" || string(r.Status) == f.Status) && (f.Path == "" || r.Path == f.Path) &&
+		(f.Trigger == "" || r.Trigger == f.Trigger) && (f.Before == "" || r.ID < f.Before)
 }
 
 // Get returns a run with its actions and log, from memory or else from the history.

@@ -84,6 +84,23 @@
           "type": "integer",
           "description": "Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit",
           "default": 0
+        },
+        "history": {
+          "type": "object",
+          "description": "Run history of the project: which runs are kept",
+          "properties": {
+            "cli": {
+              "type": "string",
+              "description": "Which ended runs of runnel run are kept in the run history: all, errors (only failed ones) or none; runnel run --history overrides it",
+              "enum": [
+                "all",
+                "errors",
+                "none"
+              ],
+              "default": "all"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

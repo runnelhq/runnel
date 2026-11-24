@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/history"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/runs"
@@ -96,7 +97,17 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
-	list, err := s.runs.Runs(r.Context())
+	q := r.URL.Query()
+	f := history.Filter{Status: q.Get("status"), Path: q.Get("path"), Trigger: q.Get("trigger"), Before: q.Get("before")}
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > runs.MaxList {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid limit %q (expected 1–%d)", v, runs.MaxList))
+			return
+		}
+		f.Limit = n
+	}
+	list, err := s.runs.Find(r.Context(), f)
 	if err != nil {
 		// The runs in memory are still shown; the details go to the server log.
 		s.warn(fmt.Sprintf("cannot read the run history: %v", err))
