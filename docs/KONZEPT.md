@@ -1225,7 +1225,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
 | Kombination | Stream-Lookup (`core.stream-lookup`, seit S23b1), DB-Lookup (`db.lookup`, seit S23a), HTTP-Lookup, Merge-Join (`core.merge-join`, inner/left/full, seit S23c), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
-| Ausgabe | CSV, Excel (`excel.output`, seit S67b), JSON, XML, Tabellenausgabe (`db.table-output`, seit S21), Insert/Update (`db.upsert`, seit S21), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
+| Ausgabe | CSV, Excel (`excel.output`, seit S67b), JSON, XML (`xml.output`, seit S68b), Tabellenausgabe (`db.table-output`, seit S21), Insert/Update (`db.upsert`, seit S21), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
 Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
 `core.constant`, `core.convert`, `core.calculate`, `core.sequence`, `core.map-values`, `core.split-field`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
@@ -1292,6 +1292,14 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   Windows-1252, ISO-8859-1/-15). Gelesen wird als Strom; externe Entities werden nicht aufgelöst, ein Datensatz hat
   höchstens 16 MiB und 256 Ebenen. „Detect fields“ schlägt Typen vor und nennt, wenn `records` leer ist und tiefer
   liegende Elemente sich häufiger wiederholen, deren Pfad.
+- **`xml.output`** schreibt die Datensätze als Elemente (S68b): `<root>` (Standard `records`) mit einem `<record>` je
+  Datensatz (Standard `record`), UTF-8 mit Deklaration, eingerückt, gestreamt; wie `json.output` über eine temporäre
+  Datei (`ifExists: replace|fail`). Ohne `fields` wird jedes Feld ein Kind-Element, mit `fields` bestimmt `as` den
+  Ort: ein Kind, ein Pfad (`Kunde/Name` und `Kunde/@id` teilen sich ein `<Kunde>`), ein Attribut (`@nr`) oder `#text`.
+  Dezimalzahlen exakt, Datumswerte in ISO 8601 oder mit `format` als Text; Listen werden wiederholte Elemente, Objekte
+  verschachtelt (`@x` als Attribut, `#text` als Text). Leere Werte entfallen oder werden mit `nulls: empty` leere
+  Elemente. Namen ohne Namensraum-Präfix; ungültige Namen (z. B. mit Leerzeichen), Steuerzeichen und doppelte Attribute
+  schicken den Datensatz auf den Fehler-Link.
 - **`json.output`** schreibt ein Array mit einem Datensatz je Zeile oder NDJSON (Standard für `.ndjson`/`.jsonl`), UTF-8
   ohne BOM, Schlüssel in der Reihenfolge der Felder; Dezimalzahlen exakt, Daten in ISO 8601, mit `format` als Text.
   Wie `csv.output` über eine temporäre Datei, die die alte erst am Ende ersetzt (`ifExists: replace|fail`).

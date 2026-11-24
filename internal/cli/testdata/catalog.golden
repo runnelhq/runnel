@@ -68,3 +68,4 @@ transforms / output
   excel.output     Excel Output      Writes records to a sheet of an Excel workbook (.xlsx) and passes them on
   http.response    HTTP Response     Answers the caller of an HTTP trigger with the records as JSON and passes them on
   json.output      JSON Output       Writes records to a JSON or NDJSON file and passes them on
+  xml.output       XML Output        Writes records as elements of an XML file and passes them on
