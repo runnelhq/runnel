@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
-	"github.com/runnelhq/runnel/internal/connections"
+	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
@@ -43,7 +43,7 @@ func (s *Server) handleCatalog(w http.ResponseWriter, _ *http.Request) {
 
 // handleSchema returns the JSON Schema of a file kind (project, environment, trigger;
 // roadmap S58), for the help of the editor and for other editors.
-func (*Server) handleSchema(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 	format, ok := model.FileFormat(r.PathValue("kind"))
 	if !ok {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("no schema for %q (kinds: %s)", r.PathValue("kind"), strings.Join(model.FileFormats(), ", ")))
@@ -56,7 +56,7 @@ func (*Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.PathValue("kind") {
 	case "connection":
-		connectionVariants(sc)
+		connectionVariants(sc, runs.ConnectionTypes(s.dir))
 	case "trigger":
 		triggerVariants(sc)
 	}
@@ -64,9 +64,9 @@ func (*Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 }
 
 // connectionVariants adds the connection types to the schema of connection files: the
-// allowed values of type and the fields under with: for each type.
-func connectionVariants(sc *schema.Schema) {
-	reg := connections.Builtin()
+// allowed values of type and the fields under with: for each type, the built-in ones and
+// those of the trusted plugins of the project (S49c).
+func connectionVariants(sc *schema.Schema, reg *connection.Registry) {
 	for _, p := range sc.Properties {
 		switch p.Name {
 		case "type":

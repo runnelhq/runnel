@@ -2,11 +2,12 @@
 // ServeIfPlugin in its TestMain becomes a plugin when started with ModeEnv set, and speaks
 // the protocol without SDK with the behaviour of the mode:
 //
-//	normal      describes demo.echo; echo returns its text, logs on stderr
+//	normal      describes demo.echo and connection type demo; echo returns its text, logs on stderr
 //	parallel    as normal, with concurrency 4
 //	v2          answers initialize with protocol version 2
 //	other-name  answers initialize as plugin "other"
 //	outside     describes core.echo (outside its namespace)
+//	conn-outside describes connection type sql (outside its namespace)
 //
 // The text "fail" fails, "sleep" takes 300 ms, "crash" ends the process, "hang" waits for
 // $/cancelRequest.
@@ -74,17 +75,37 @@ func serve(mode string) {
 			}
 			answer(req.ID, map[string]any{"protocolVersion": version, "encoding": "json", "name": name, "version": "1.0.0", "concurrency": concurrency})
 		case "describe":
-			typ := "demo.echo"
-			if mode == "outside" {
+			typ, connType := "demo.echo", "demo"
+			switch mode {
+			case "outside":
 				typ = "core.echo"
+			case "conn-outside":
+				connType = "sql"
 			}
 			answer(req.ID, map[string]any{"actions": []any{map[string]any{
 				"type": typ, "category": "general", "label": "Echo", "description": "Returns its text",
 				"schema": map[string]any{"type": "object", "required": []string{"text"}, "additionalProperties": false, "properties": map[string]any{
 					"text": map[string]any{"type": "string"},
-					"api":  map[string]any{"type": "string", "format": "runnel-connection", "x-runnel-connection": []string{"http"}},
+					"api":  map[string]any{"type": "string", "format": "runnel-connection", "x-runnel-connection": []string{"http", "demo"}},
+				}},
+			}}, "connectionTypes": []any{map[string]any{
+				"type": connType, "label": "Demo", "description": "A demo service", "test": true,
+				"schema": map[string]any{"type": "object", "required": []string{"host"}, "additionalProperties": false, "properties": map[string]any{
+					"host":     map[string]any{"type": "string"},
+					"password": map[string]any{"type": "string", "format": "runnel-secret"},
 				}},
 			}}})
+		case "connection.test":
+			var p struct {
+				Type       string         `json:"type"`
+				Connection map[string]any `json:"connection"`
+			}
+			_ = json.Unmarshal(req.Params, &p)
+			if host, _ := p.Connection["host"].(string); host == "down" {
+				answer(req.ID, map[string]any{"ok": false, "message": fmt.Sprintf("login with %v refused", p.Connection["password"])})
+				break
+			}
+			answer(req.ID, map[string]any{"ok": true, "message": fmt.Sprintf("connected to %v as %v", p.Connection["host"], p.Connection["password"]), "version": "demo 1.0"})
 		case "action.execute":
 			var p struct {
 				Config  map[string]any    `json:"config"`

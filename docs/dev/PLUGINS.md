@@ -5,8 +5,8 @@ Programm in beliebiger Sprache, das Runnel als Kindprozess startet und über JSO
 ([ADR 0019](../adr/0019-plugin-protokoll.md) mit Nachträgen; Namen nach [ADR 0013](../adr/0013-typnamen-namensraeume.md),
 Nachtrag 2026-11-24).
 
-Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S49b2** – Ablage, `plugin.yaml`, Freigabe,
-Protokoll und Actions aus Plugins in Workflows. Transforms folgen mit S50, eigene Connection-Typen mit S49c.
+Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S49c** – Ablage, `plugin.yaml`, Freigabe,
+Protokoll, Actions aus Plugins in Workflows und eigene Connection-Typen. Transforms folgen mit S50.
 
 ## Ablage
 
@@ -120,8 +120,9 @@ Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
 | Methode | Antwort | Regeln |
 |---|---|---|
 | `initialize` | `protocolVersion` (1), `encoding` (`json`), `name` (wie in `plugin.yaml`), `version`, optional `concurrency` | Zeitgrenze 10 s; andere Version oder anderer Name: Plugin wird nicht genutzt |
-| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
+| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`); optional `connectionTypes` (siehe [Connection-Typen](#connection-typen)) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
 | `action.execute` | `{"output": …}` (Text, Zahl, Liste, Objekt; im Workflow `result.output`) | `config` ist geprüft und aufgelöst (Variablen, Ausdrücke); ein Fehler ist eine Fehlerantwort, ihre `message` die Meldung der Action |
+| `connection.test` | `{"ok": true, "message": "…", "version": "…"}` | nur für Typen mit `"test": true`; `ok: false` mit `message` ist ein gescheiterter Test |
 | `shutdown` | `null` | danach schließt der Host stdin; nach 5 s beendet er den Prozess mit allen Kindprozessen |
 
 - **Parallelität:** Ohne `concurrency` schickt der Host eine Anfrage nach der anderen. Mit `concurrency: n` bis zu n
@@ -157,6 +158,37 @@ actions:
 - Je Lauf ein Prozess je Plugin, gestartet beim ersten Aufruf, beendet am Ende des Laufs. Zeilen auf stderr stehen im
   Log der Action; Secrets des Laufs sind darin und in Fehlern und `output` maskiert.
 - Die Umgebung enthält keine Variablen mit Tokens der HTTP-Trigger des Projekts.
+
+## Connection-Typen
+
+Ein Plugin kann eigene Connection-Typen anbieten, z. B. für ein ERP oder ein DMS. `describe` liefert sie unter
+`connectionTypes`:
+
+```json
+{"actions": […], "connectionTypes": [{
+  "type": "iban", "label": "IBAN service", "description": "Account of the IBAN service", "test": true,
+  "schema": {"type": "object", "required": ["url"], "additionalProperties": false, "properties": {
+    "url": {"type": "string"},
+    "apiKey": {"type": "string", "format": "runnel-secret"}}}}]}
+```
+
+- **Name:** der Namensraum des Plugins oder `<namensraum>-…` (z. B. `iban`, `iban-test`); eingebaute Typen kann ein
+  Plugin nicht ersetzen.
+- **Connection-Dateien** dieses Typs prüft Runnel gegen `schema` (Pflichtfelder, bei `additionalProperties: false`
+  unbekannte Felder); `${secret:…}` nur in Feldern mit `format: runnel-secret`. Im Editor erscheinen Typ und Felder im
+  Formular der Connection. Ist das Plugin nicht freigegeben, nennt die Prüfung den Grund an `type`.
+- **In Actions:** Ein Feld mit `format: runnel-connection` und `x-runnel-connection: ["iban"]` nimmt eine Connection
+  des Typs; sie kommt aufgelöst an (`{"name", "type", …Felder}`), Secrets im Klartext und in allem Zurückgegebenen
+  maskiert.
+- **Test:** Mit `"test": true` ruft „Test connection“ im Editor `connection.test` auf:
+
+```text
+→ {"jsonrpc":"2.0","id":3,"method":"connection.test","params":{"type":"iban","connection":{"name":"bank","type":"iban","url":"https://…","apiKey":"…"}}}
+← {"jsonrpc":"2.0","id":3,"result":{"ok":true,"message":"signed in","version":"API 2.1"}}
+```
+
+  Runnel startet das Plugin dafür, wartet höchstens 15 s und beendet es danach. Nichts soll dabei geschrieben oder
+  gesendet werden außer der Anmeldung.
 
 ## Testen
 

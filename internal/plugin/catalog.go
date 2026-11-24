@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -31,6 +32,8 @@ func DefaultStore() (plugintrust.Store, error) {
 type entry struct {
 	fingerprint string
 	defs        []action.Definition
+	conns       []connection.Definition
+	tests       map[string]bool // connection types the plugin can test
 	hint        string
 }
 
@@ -64,6 +67,56 @@ func Registry(ctx context.Context, base *action.Registry, projectDir string, sto
 	return base.With(defs, hints)
 }
 
+// ConnectionTypes returns base with the connection types of the trusted plugins of the
+// project in projectDir and hints for the namespaces of plugins that cannot be used (S49c).
+func ConnectionTypes(ctx context.Context, base *connection.Registry, projectDir string, store plugintrust.Store) *connection.Registry {
+	if projectDir == "" {
+		return base
+	}
+	plugins, _ := model.LoadPlugins(projectDir)
+	if len(plugins) == 0 {
+		return base
+	}
+	var defs []connection.Definition
+	hints := map[string]string{}
+	for _, name := range slices.Sorted(mapKeys(plugins)) {
+		e := lookup(ctx, projectDir, plugins[name], store)
+		defs = append(defs, e.conns...)
+		if e.hint != "" {
+			hints[plugins[name].Namespace] = e.hint
+		}
+	}
+	return base.With(defs, hints)
+}
+
+// TestConnection tests a resolved connection of a type of a plugin with connection.test:
+// the plugin of the type starts (after checking its approval again) and ends afterwards.
+func TestConnection(ctx context.Context, projectDir string, store plugintrust.Store, c connection.Resolved, mask func(string) string) (string, error) {
+	plugins, _ := model.LoadPlugins(projectDir)
+	for _, name := range slices.Sorted(mapKeys(plugins)) {
+		p := plugins[name]
+		if c.Type != p.Namespace && !strings.HasPrefix(c.Type, p.Namespace+"-") {
+			continue
+		}
+		e := lookup(ctx, projectDir, p, store)
+		if e.hint != "" {
+			return "", errors.New(e.hint)
+		}
+		if !e.tests[c.Type] {
+			return "", fmt.Errorf("connections of type %s cannot be tested (plugin %s offers no test)", c.Type, p.Name)
+		}
+		pr, err := Start(ctx, p, Options{ProjectDir: projectDir, RunnelVersion: version.Version, Env: environ(projectDir), Mask: mask})
+		if err != nil {
+			return "", err
+		}
+		defer func() { _ = pr.Close() }()
+		resolved := map[string]any{"name": c.Name, "type": c.Type}
+		maps.Copy(resolved, c.With)
+		return pr.TestConnection(ctx, resolved)
+	}
+	return "", fmt.Errorf("connections of type %s cannot be tested yet", c.Type)
+}
+
 func mapKeys[V any](m map[string]V) func(func(string) bool) {
 	return func(yield func(string) bool) {
 		for k := range m {
@@ -94,8 +147,7 @@ func lookup(ctx context.Context, projectDir string, p *model.Plugin, store plugi
 	case st.State == plugintrust.Changed:
 		e.hint = fmt.Sprintf(`plugin %q changed since it was trusted; check it and run "runnel plugins trust" again`, p.Name)
 	default:
-		e.defs, err = describe(ctx, projectDir, p)
-		if err != nil {
+		if err = describe(ctx, projectDir, p, &e); err != nil {
 			e.hint = err.Error()
 		}
 	}
@@ -135,22 +187,26 @@ func fingerprint(dir string, store plugintrust.Store) string {
 	return b.String()
 }
 
-// describe starts a trusted plugin, reads its action types and ends it again.
-func describe(ctx context.Context, projectDir string, p *model.Plugin) ([]action.Definition, error) {
+// describe starts a trusted plugin, reads its types into e and ends it again.
+func describe(ctx context.Context, projectDir string, p *model.Plugin, e *entry) error {
 	pr, err := Start(ctx, p, Options{ProjectDir: projectDir, RunnelVersion: version.Version, Env: environ(projectDir)})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { _ = pr.Close() }()
-	ds, err := pr.Describe(ctx)
+	d, err := pr.Describe(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defs := make([]action.Definition, len(ds))
-	for i, d := range ds {
-		defs[i] = definition(p.Name, d)
+	for _, a := range d.Actions {
+		e.defs = append(e.defs, definition(p.Name, a))
 	}
-	return defs, nil
+	e.tests = map[string]bool{}
+	for _, c := range d.Connections {
+		e.conns = append(e.conns, connection.Definition{Type: c.Type, Label: c.Label, Description: c.Description, Schema: c.Schema, Plugin: p.Name})
+		e.tests[c.Type] = c.Test
+	}
+	return nil
 }
 
 // definition is the action type of a plugin: the configuration is checked against the

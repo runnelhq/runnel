@@ -200,3 +200,105 @@ func TestPluginConfig(t *testing.T) {
 		}
 	}
 }
+
+// writeFile writes a file of the project in dir.
+func writeFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	path := filepath.Join(dir, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+const demoConnection = "kind: Connection\napiVersion: runnel/v1\nname: svc\ntype: demo\nwith:\n  host: %s\n  password: ${secret:svc-pass}\n"
+
+// demoProject is pluginProject with a connection svc of the plugin's type demo.
+func demoProject(t *testing.T, host string) string {
+	t.Helper()
+	dir := pluginProject(t)
+	writeFile(t, dir, "project.yaml", "kind: Project\napiVersion: runnel/v1\nname: p\nvariables:\n  GREETING: hi\nsecretStore: inline\nsecrets:\n  crm-token: tok-12345\n  svc-pass: pw-98765\n")
+	writeFile(t, dir, "connections/svc.yaml", strings.Replace(demoConnection, "%s", host, 1))
+	return dir
+}
+
+func checkSvc(t *testing.T, dir string) string {
+	t.Helper()
+	p, err := model.LoadProject(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return CheckConnection(p.Connections["svc"], p, "").Error()
+}
+
+// A connection of a type of a plugin is checked against the schema of describe, with its
+// secret fields; without approval the check names the reason at type (S49c).
+func TestPluginConnectionType(t *testing.T) {
+	dir := demoProject(t, "db.example.com")
+	if got := checkSvc(t, dir); !strings.Contains(got, `4:7: plugin "demo" is not trusted on this computer`) {
+		t.Errorf("not trusted: %q", got)
+	}
+	trustDemo(t, dir)
+	if got := checkSvc(t, dir); got != "" {
+		t.Errorf("trusted: %q", got)
+	}
+	for _, tt := range []struct{ old, new, want string }{
+		{"  host: db.example.com\n", "", `demo connection: missing required field "host"`},
+		{"  host: db.example.com\n", "  host: db.example.com\n  port: 1\n", `demo connection: unknown field "port"`},
+		{"  host: db.example.com\n", "  host: ${secret:svc-pass}\n", "secret"},
+		{"type: demo\n", "type: demo-other\n", `unknown connection type "demo-other"`},
+	} {
+		writeFile(t, dir, "connections/svc.yaml", strings.Replace(strings.Replace(demoConnection, "%s", "db.example.com", 1), tt.old, tt.new, 1))
+		if got := checkSvc(t, dir); !strings.Contains(got, tt.want) {
+			t.Errorf("%q: %q", tt.want, got)
+		}
+	}
+}
+
+// connection.test of the plugin tests a connection of its type; secrets are masked.
+func TestPluginConnectionTest(t *testing.T) {
+	ctx := context.Background()
+	for _, tt := range []struct{ host, want, err string }{
+		{"db.example.com", "connected to db.example.com as *** demo 1.0", ""},
+		{"down", "", "login with *** refused"},
+	} {
+		dir := demoProject(t, tt.host)
+		p, err := model.LoadProject(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := ResolveConnection(ctx, p, "", "svc"); err == nil || !strings.Contains(err.Error(), "not trusted") {
+			t.Errorf("not trusted: %v", err)
+		}
+		trustDemo(t, dir)
+		c, mask, err := ResolveConnection(ctx, p, "", "svc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := TestConnection(ctx, dir, c, mask)
+		if got != tt.want || (tt.err == "") != (err == nil) || (err != nil && err.Error() != tt.err) {
+			t.Errorf("%s: %q %v", tt.host, got, err)
+		}
+	}
+}
+
+// An action of a plugin gets a connection of the plugin's type resolved, its secret masked.
+func TestPluginActionWithPluginConnection(t *testing.T) {
+	dir := demoProject(t, "db.example.com")
+	trustDemo(t, dir)
+	writeFile(t, dir, "workflows/plugin.workflow.yaml", strings.Replace(pluginWorkflow, "api: crm", "api: svc", 1))
+	p, err := prepareDemo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := p.Runner.Run(context.Background())
+	if res.Status != workflow.Succeeded {
+		t.Fatalf("run %s: %v", res.Status, res.Err)
+	}
+	got, _ := res.Outputs["OUT"].(string)
+	if want := `"api":{"host":"db.example.com","name":"svc","password":"***","type":"demo"}`; !strings.Contains(got, want) {
+		t.Errorf("missing %s in %s", want, got)
+	}
+}

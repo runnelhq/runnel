@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 	"github.com/runnelhq/runnel/internal/jsonrpc"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/proc"
+	"github.com/runnelhq/runnel/internal/schema"
 )
 
 // ProtocolVersion is the version of the protocol this host speaks (ADR 0019, Nachtrag 2026-11-24).
@@ -201,41 +203,99 @@ func (pr *Process) call(ctx context.Context, method string, params, result any) 
 	}
 }
 
-// Describe returns the action types of the plugin (describe), checked: types in the
-// namespace of the plugin, kind action, a schema of the configuration. Transforms follow
-// with S50 and are ignored until then.
-func (pr *Process) Describe(ctx context.Context) ([]action.Descriptor, error) {
+// Description is the answer of a plugin to describe: its action types and its
+// connection types (S49c).
+type Description struct {
+	Actions     []action.Descriptor `json:"actions"`
+	Connections []ConnectionType    `json:"connectionTypes"`
+}
+
+// ConnectionType is a connection type of a plugin (ADR 0019, Nachtrag 2026-11-24).
+type ConnectionType struct {
+	Type        string         `json:"type"`
+	Label       string         `json:"label"`
+	Description string         `json:"description"`
+	Schema      *schema.Schema `json:"schema"`
+	// Test tells whether the plugin answers connection.test for the type.
+	Test bool `json:"test"`
+}
+
+// Describe returns the types of the plugin (describe), checked: action types in the
+// namespace of the plugin, kind action, a schema of the configuration; connection types
+// named like the namespace or "<namespace>-…", with a schema. Transforms follow with S50
+// and are ignored until then.
+func (pr *Process) Describe(ctx context.Context) (Description, error) {
 	ctx, cancel := context.WithTimeout(ctx, StartTimeout)
 	defer cancel()
-	var res struct {
-		Actions []action.Descriptor `json:"actions"`
+	var res Description
+	fail := func(format string, args ...any) (Description, error) {
+		return Description{}, fmt.Errorf("plugin %s: "+format, append([]any{pr.plugin.Name}, args...)...)
 	}
 	if err := pr.call(ctx, "describe", struct{}{}, &res); err != nil {
-		return nil, fmt.Errorf("plugin %s: describe: %w", pr.plugin.Name, err)
+		return fail("describe: %w", err)
 	}
 	seen := map[string]bool{}
 	for i := range res.Actions {
 		d := &res.Actions[i]
 		switch {
 		case !model.ValidTypeName(d.Type):
-			return nil, fmt.Errorf("plugin %s: invalid type name %q", pr.plugin.Name, d.Type)
+			return fail("invalid type name %q", d.Type)
 		case model.TypeNamespace(d.Type) != pr.plugin.Namespace:
-			return nil, fmt.Errorf("plugin %s: type %s is outside its namespace %q", pr.plugin.Name, d.Type, pr.plugin.Namespace)
+			return fail("type %s is outside its namespace %q", d.Type, pr.plugin.Namespace)
 		case seen[d.Type]:
-			return nil, fmt.Errorf("plugin %s: type %s is described twice", pr.plugin.Name, d.Type)
+			return fail("type %s is described twice", d.Type)
 		case d.Kind != "" && d.Kind != "action":
-			return nil, fmt.Errorf("plugin %s: %s has kind %q in actions", pr.plugin.Name, d.Type, d.Kind)
+			return fail("%s has kind %q in actions", d.Type, d.Kind)
+		case d.Schema == nil:
+			return fail("%s has no schema", d.Type)
 		}
 		seen[d.Type] = true
 		d.Kind = "action"
-		if d.Schema == nil {
-			return nil, fmt.Errorf("plugin %s: %s has no schema", pr.plugin.Name, d.Type)
-		}
 		if d.Label == "" {
 			d.Label = d.Type
 		}
 	}
-	return res.Actions, nil
+	ns := pr.plugin.Namespace
+	for i := range res.Connections {
+		c := &res.Connections[i]
+		switch {
+		case c.Type != ns && (!strings.HasPrefix(c.Type, ns+"-") || !pluginTypePattern.MatchString(c.Type)):
+			return fail("connection type %q is outside its namespace (expected %s or %s-…)", c.Type, ns, ns)
+		case seen["connection:"+c.Type]:
+			return fail("connection type %s is described twice", c.Type)
+		case c.Schema == nil:
+			return fail("connection type %s has no schema", c.Type)
+		}
+		seen["connection:"+c.Type] = true
+		if c.Label == "" {
+			c.Label = c.Type
+		}
+	}
+	return res, nil
+}
+
+// pluginTypePattern is a connection type of a plugin: lowercase letters, digits and "-".
+var pluginTypePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+// TestConnection asks the plugin to test a resolved connection of one of its types
+// (connection.test) and returns what it found, e.g. the version of the server.
+func (pr *Process) TestConnection(ctx context.Context, c map[string]any) (string, error) {
+	var res struct {
+		OK      bool   `json:"ok"`
+		Message string `json:"message"`
+		Version string `json:"version"`
+	}
+	if err := pr.call(ctx, "connection.test", map[string]any{"type": c["type"], "connection": c}, &res); err != nil {
+		return "", err
+	}
+	msg := pr.mask(strings.TrimSpace(res.Message + " " + res.Version))
+	if !res.OK {
+		if msg == "" {
+			msg = "the test failed"
+		}
+		return "", errors.New(msg)
+	}
+	return msg, nil
 }
 
 // ExecContext is what an action of a plugin learns about its run.
