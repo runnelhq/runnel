@@ -104,3 +104,14 @@ func TestLoadPlugins(t *testing.T) {
 		t.Errorf("project plugins %v", p)
 	}
 }
+
+// FuzzReadPlugin checks that no plugin.yaml makes ReadPlugin panic.
+func FuzzReadPlugin(f *testing.F) {
+	f.Add([]byte(pluginHead + "namespace: iban\nexecutable:\n  windows: bin/iban.exe\nargs: [a]\n"))
+	f.Add([]byte(pluginHead + "namespace: iban\nexecutable: [1, {a: b}]\n"))
+	f.Fuzz(func(_ *testing.T, data []byte) {
+		if p, err := ReadPlugin("plugins/iban/plugin.yaml", data); err == nil {
+			_, _ = p.ExecutableFor("windows")
+		}
+	})
+}

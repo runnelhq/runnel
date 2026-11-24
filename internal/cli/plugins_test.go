@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/runnelhq/runnel/internal/plugin/plugintest"
 )
 
 func pluginProject(t *testing.T) string {
@@ -113,5 +115,32 @@ func TestPluginsErrors(t *testing.T) {
 	}
 	if code, _, errOut := run(t, "plugins", t.TempDir()); code == 0 || !strings.Contains(errOut, "no project (project.yaml) found") {
 		t.Errorf("no project: %d %s", code, errOut)
+	}
+}
+
+// Trusted plugins are started to list their types; untrusted ones are not (S49b1).
+func TestPluginTypes(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(plugintest.ModeEnv, "normal")
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "project.yaml"), "kind: Project\napiVersion: runnel/v1\nname: demo\n")
+	writeFile(t, filepath.Join(dir, "plugins", "demo", "plugin.yaml"),
+		"kind: Plugin\napiVersion: runnel/v1\nname: demo\nversion: 1.0.0\nnamespace: demo\nexecutable: '"+exe+"'\n")
+	if _, out, _ := run(t, "plugins", dir); strings.Contains(out, "Types of") {
+		t.Errorf("untrusted plugin started:\n%s", out)
+	}
+	if code, _, errOut := run(t, "plugins", "trust", dir, "--yes"); code != 0 {
+		t.Fatal(errOut)
+	}
+	_, out, _ := run(t, "plugins", dir)
+	if !strings.Contains(out, "Types of demo:\n  demo.echo  action  Returns its text\n") {
+		t.Errorf("types:\n%s", out)
+	}
+	t.Setenv(plugintest.ModeEnv, "outside")
+	if _, out, _ := run(t, "plugins", dir); !strings.Contains(out, `  error: plugin demo: type core.echo is outside its namespace "demo"`) {
+		t.Errorf("refused types:\n%s", out)
 	}
 }

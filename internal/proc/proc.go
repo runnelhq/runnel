@@ -242,3 +242,24 @@ func Valid(encoding string) bool {
 	}
 	return false
 }
+
+// Tree is a started program that can be ended with all processes it started (plugins,
+// ADR 0019): in a job object on Windows, in a process group elsewhere.
+type Tree struct{ t tree }
+
+// StartTree starts cmd so that Kill ends it with its child processes; the caller sets
+// stdin, stdout and stderr before. Release frees the job object after the program ended.
+func StartTree(cmd *exec.Cmd) (*Tree, error) {
+	prepare(cmd)
+	t, err := startTree(cmd)
+	if err != nil {
+		return nil, err
+	}
+	return &Tree{t: t}, nil
+}
+
+// Kill ends the program and all processes it started.
+func (t *Tree) Kill() { t.t.kill() }
+
+// Release frees what StartTree holds (the job object on Windows).
+func (t *Tree) Release() { t.t.release() }

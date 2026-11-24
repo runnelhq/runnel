@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,8 +16,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/plugin"
 	"github.com/runnelhq/runnel/internal/plugintrust"
+	"github.com/runnelhq/runnel/internal/version"
 	"github.com/runnelhq/runnel/internal/winsvc"
 )
 
@@ -33,10 +37,11 @@ func newPluginsCommand() *cobra.Command {
 		Long: "Lists the plugins of the project in project-dir (or the current directory): the folders\n" +
 			"plugins/<name>/ with a plugin.yaml (ADR 0019). A plugin is a program that runs with the\n" +
 			"rights of Runnel; it only starts once it is trusted on this computer for this project\n" +
-			"(\"runnel plugins trust\"). Any change in its folder voids the approval.",
+			"(\"runnel plugins trust\"). Any change in its folder voids the approval. Trusted plugins\n" +
+			"are started to list the types they offer.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listPlugins(cmd.OutOrStdout(), dirArg(args))
+			return listPlugins(cmd.Context(), cmd.OutOrStdout(), dirArg(args))
 		},
 	}
 	var o pluginsOptions
@@ -115,7 +120,7 @@ func trustStore() (plugintrust.Store, error) {
 	return plugintrust.DefaultStore(winsvc.TrustDir())
 }
 
-func listPlugins(out io.Writer, dir string) error {
+func listPlugins(ctx context.Context, out io.Writer, dir string) error {
 	root, plugins, err := projectPlugins(out, dir, nil)
 	if err != nil {
 		return err
@@ -130,14 +135,49 @@ func listPlugins(out io.Writer, dir string) error {
 	}
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(tw, "NAME\tVERSION\tNAMESPACE\tPROGRAM\tSTATUS")
+	var trusted []*model.Plugin
 	for _, p := range plugins {
 		program, ok := p.ExecutableFor("")
 		if !ok {
 			program = "– (none for " + runtime.GOOS + ")"
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Version, p.Namespace, program, statusText(store, root, p))
+		status := statusText(store, root, p)
+		if strings.HasPrefix(status, string(plugintrust.Trusted)) {
+			trusted = append(trusted, p)
+		}
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", p.Name, p.Version, p.Namespace, program, status)
 	}
-	return tw.Flush()
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	// Trusted plugins are started to show their types (describe, S49b1).
+	for _, p := range trusted {
+		_, _ = fmt.Fprintf(out, "\nTypes of %s:\n", p.Name)
+		types, err := describePlugin(ctx, root, p)
+		if err != nil {
+			_, _ = fmt.Fprintf(out, "  error: %v\n", err)
+			continue
+		}
+		tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+		for _, d := range types {
+			_, _ = fmt.Fprintf(tw, "  %s\taction\t%s\n", d.Type, d.Description)
+		}
+		if len(types) == 0 {
+			_, _ = fmt.Fprintln(tw, "  (none)")
+		}
+		_ = tw.Flush()
+	}
+	return nil
+}
+
+// describePlugin starts a trusted plugin, asks for its types and ends it again.
+func describePlugin(ctx context.Context, root string, p *model.Plugin) ([]action.Descriptor, error) {
+	pr, err := plugin.Start(ctx, p, plugin.Options{ProjectDir: root, RunnelVersion: version.Version})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = pr.Close() }()
+	return pr.Describe(ctx)
 }
 
 // statusText describes the approval of a plugin for the list.

@@ -395,3 +395,24 @@ Nachtrag davor „S49b“ genannt). Präzisierungen bei der Umsetzung von S49a:
   Schreiben). Unter Linux gibt es nur die Datei des Benutzers (`$XDG_CONFIG_HOME/runnel/trusted-plugins.json`).
 - **Rückfrage:** `runnel plugins trust` zeigt Name, Version, Namensraum, Ordner, Programm und Hash und fragt je Plugin;
   nur `y`/`yes` gibt frei. Ohne Eingabe (z. B. in Skripten) bleibt das Plugin gesperrt; dort gilt `--yes`.
+
+## Nachtrag 2026-11-24 (S49b1): Host
+
+S49b ist geteilt: S49b1 (Host als Bibliothek, `runnel plugins` zeigt die Typen), S49b2 (Actions in Workflows, Prüfung,
+Editor, Connections). Präzisierungen:
+
+- **`action.execute`** antwortet mit `{"output": …}` (Text, Zahl, Liste, Objekt; im Workflow `result.output`). Ein Fehler
+  der Action ist eine JSON-RPC-Fehlerantwort; ihre `message` ist die Meldung der Action.
+- **Abbruch:** Endet der Kontext einer Anfrage (Abbruch, Timeout), schickt der Host `$/cancelRequest` und wartet nicht
+  auf die Antwort. Das Plugin kann sie mit `-32800` beantworten; der Host verwirft sie.
+- **Ende:** `shutdown`, dann schließt der Host stdin; nach 5 s beendet er den Prozessbaum. Endet ein Plugin während
+  einer Anfrage, scheitert sie mit „the plugin ended unexpectedly; last lines: …“ (die letzten fünf Zeilen von stderr,
+  maskiert).
+- **stderr:** je Zeile ein Eintrag im Log mit `<plugin>: ` davor; `DEBUG`, `INFO`, `WARN` oder `ERROR` am Anfang (mit
+  Leerzeichen oder `:` danach) setzen die Stufe. Zeilen über 64 KiB werden abgeschnitten (`…`).
+- **Anfragen des Plugins** an den Host beantwortet er mit `-32601`; Notifications ohne bekannte Methode verwirft er.
+- **Prüfung von `describe`:** gültige Typnamen im Namensraum des Plugins, jeder Typ einmal, `kind` (fehlend oder
+  `action`), ein `schema`; sonst wird das Plugin nicht genutzt. `initialize` muss den Namen aus `plugin.yaml` nennen.
+- **`runnel plugins`** startet freigegebene Plugins, um ihre Typen zu zeigen; nicht freigegebene nie.
+- **Tests:** Das Test-Binary ist selbst das Plugin (`internal/plugin/plugintest`, gestartet mit `RUNNEL_TEST_PLUGIN`);
+  so prüfen die Tests das Protokoll ohne SDK und ohne `go build` auf Linux und Windows.
