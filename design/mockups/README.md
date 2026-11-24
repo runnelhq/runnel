@@ -29,6 +29,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s39-connections.html`](s39-connections.html) | S39b/S39f – Connections und Secrets im Editor | `form`, `test`, `new`, `field`, `plaintext`, `secrets`, `set` | freigegeben mit PR #173; `form` und `test` umgesetzt mit S39c2a, `new`, `field` und `plaintext` (ohne „Store as secret…“) mit S39c2b; `secrets` und `set` folgen mit S39g |
 | [`e20-forms.html`](e20-forms.html) | E20 – Formulare für Trigger, Environments und `project.yaml` | `cron`, `http`, `type`, `environment`, `project`, `new` | freigegeben mit PR #178; `cron`, `http`, `type` und `new` umgesetzt mit E20a, `environment` und `project` mit E20b |
 | [`e21-tabs.html`](e21-tabs.html) | E21 – Viele offene Dateien: Liste und Menü der Tabs | `many`, `list`, `search`, `menu` | freigegeben mit PR #184, umgesetzt mit E21 |
+| [`s26d-runs.html`](s26d-runs.html) | S26d – Liste der Läufe im Editor | `list`, `filter`, `run`, `changed`, `empty` | zur Freigabe; Umsetzung mit S26e |
 
 ## Entscheidungen
 
