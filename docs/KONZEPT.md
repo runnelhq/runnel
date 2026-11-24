@@ -353,7 +353,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | PostgreSQL (seit S20c) | `jackc/pgx/v5` |
 | Oracle | `sijms/go-ora` (pure Go) |
 | ODBC (optional, Access, Legacy; auch MySQL/MariaDB bis auf Weiteres) | `alexbrainman/odbc` |
-| Excel | Lesen mit eigenem Reader (`internal/xlsx`: `archive/zip`, `encoding/xml`, seit S67a), Schreiben mit `xuri/excelize/v2` (S67b) – [ADR 0024](adr/0024-excel-lesen-schreiben.md) |
+| Excel | Lesen mit eigenem Reader (`internal/xlsx`: `archive/zip`, `encoding/xml`, seit S67a), Schreiben mit `xuri/excelize/v2` (seit S67b) – [ADR 0024](adr/0024-excel-lesen-schreiben.md) |
 | CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
 | SFTP | `pkg/sftp` + `x/crypto/ssh` |
 | FTP/FTPS | offen; Auswahl mit S57 (Lizenz MIT-kompatibel) |
@@ -1225,7 +1225,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
 | Kombination | Stream-Lookup (`core.stream-lookup`, seit S23b1), DB-Lookup (`db.lookup`, seit S23a), HTTP-Lookup, Merge-Join (`core.merge-join`, inner/left/full, seit S23c), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |
-| Ausgabe | CSV, Excel, JSON, XML, Tabellenausgabe (`db.table-output`, seit S21), Insert/Update (`db.upsert`, seit S21), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
+| Ausgabe | CSV, Excel (`excel.output`, seit S67b), JSON, XML, Tabellenausgabe (`db.table-output`, seit S21), Insert/Update (`db.upsert`, seit S21), Löschen, REST-Ausgabe, HTTP-Antwort (`http.response`, seit S38c), Log |
 
 Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.filter`, `core.select-fields`,
 `core.constant`, `core.convert`, `core.calculate`, `core.sequence`, `core.map-values`, `core.split-field`, `core.switch`, `core.sort`, `core.group-by`, `core.dedupe`,
@@ -1315,6 +1315,17 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   Gelesen wird als Strom; jeder Teil der Mappe hat eine Grenze für seine entpackte Größe (Blatt 4 GB, Texte 256 MB),
   `.xls`, `.xlsb` und Mappen mit Passwort werden mit Hinweis abgelehnt. „Detect fields“ schlägt die Typen aus den Zellen
   vor.
+- **`excel.output`** schreibt die Datensätze in ein Blatt (`sheet`, Standard `Sheet1`) einer Arbeitsmappe (`.xlsx`,
+  `.xlsm`; S67b) und gibt sie weiter. Spalten wie bei `csv.output` aus `fields:`, dem geschlossenen Schema oder dem ersten
+  Datensatz; `format` ist ein Zahlenformat von Excel in englischer Schreibweise (`#,##0.00`, `0.0%`, `dd.mm.yyyy`), das
+  Excel in der Sprache des Benutzers anzeigt. Zahlen, `true`/`false` und Datumswerte behalten ihren Typ (`date` als
+  Kurzdatum, `datetime` mit Uhrzeit, als Wanduhrzeit ohne Zeitzone); Listen und Objekte werden JSON-Text; Text wird nie
+  als Formel geschrieben (`=1+1` bleibt Text). Die Kopfzeile ist fett und fixiert, die Spaltenbreiten richten sich nach
+  den ersten 100 Datensätzen. `ifExists: replace` schreibt über eine temporäre Datei, `fail` bricht ab, `sheet` ersetzt
+  nur das Blatt einer vorhandenen Mappe (andere Blätter, Diagramme und Formeln bleiben; Excel rechnet beim Öffnen neu).
+  Was Excel nicht fassen kann (mehr als 32.767 Zeichen in einer Zelle, Datum vor 1900, `NaN`), geht auf den Fehler-Link;
+  mehr als 1.048.576 Zeilen brechen ab. Hat Excel die Datei geöffnet, meldet Windows das beim Ersetzen mit Hinweis.
+  Die Blattdaten werden über temporäre Dateien gestreamt, die fertige Mappe (gepackt) entsteht am Ende im Speicher.
 - **`csv.output`** schreibt die Felder aus `fields:` (Reihenfolge, Format), sonst die des geschlossenen Schemas oder des
   ersten Records; Zeilenende CRLF, Standard-Kodierung UTF-8 mit BOM (damit Excel Umlaute erkennt). `ifExists: replace`
   schreibt in eine temporäre Datei und ersetzt die alte erst am Ende – bei einem Fehler bleibt sie unverändert;

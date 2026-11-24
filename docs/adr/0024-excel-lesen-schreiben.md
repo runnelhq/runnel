@@ -49,7 +49,9 @@ Betrachtete Varianten:
   `richardlehane/msoleps` (Apache 2.0, ohne NOTICE-Datei) und `tiendc/go-deepcopy` (MIT). Alle sind nach ADR 0004 mit MIT
   vereinbar und landen über `scripts/third-party-notices.sh` in `THIRD_PARTY_NOTICES.txt`.
 - `golang.org/x/crypto` und `golang.org/x/net` (schon indirekt im Projekt) steigen auf neuere Versionen.
-- Die `runnel.exe` wird etwa 1,5 MB größer (gemessen: 25,9 → 27,4 MB für Windows).
+- Die `runnel.exe` wird etwa 3,6 MB größer (gemessen mit `excel.output` in S67b: 26,0 → 29,6 MB für Windows; ein
+  erster Probe-Build mit nur wenigen Funktionen von `excelize` hatte 1,5 MB ergeben). Das Ziel des Konzepts (< 40 MB)
+  bleibt eingehalten.
 - `excelize` wird **nur zum Schreiben** verwendet. Das Lesen bleibt beim eigenen Reader. Tests lesen die geschriebenen
   Dateien mit dem eigenen Reader wieder ein, so prüfen sich beide gegenseitig.
 

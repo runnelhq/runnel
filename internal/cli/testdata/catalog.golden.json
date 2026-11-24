@@ -2858,6 +2858,82 @@
       "detectFields": true
     },
     {
+      "type": "excel.output",
+      "kind": "transform",
+      "category": "output",
+      "label": "Excel Output",
+      "description": "Writes records to a sheet of an Excel workbook (.xlsx) and passes them on",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Workbook to write (.xlsx or .xlsm), relative to the project folder or absolute",
+            "examples": [
+              "out/orders.xlsx"
+            ]
+          },
+          "sheet": {
+            "type": "string",
+            "description": "Name of the sheet; empty: Sheet1",
+            "examples": [
+              "Orders"
+            ]
+          },
+          "header": {
+            "type": "boolean",
+            "description": "Whether the first row holds the names of the columns, bold and frozen",
+            "default": true
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "If the workbook exists: replace it once all records are written, fail, or replace only the sheet and keep the other sheets, charts and formulas",
+            "enum": [
+              "replace",
+              "fail",
+              "sheet"
+            ],
+            "default": "replace"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Columns to write, in this order, with a number format; empty: all fields of the records",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field to write (and of the column in the header)",
+                  "format": "runnel-field",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Number format of Excel as in English Excel, e.g. #,##0.00, 0.0% or dd.mm.yyyy hh:mm; empty: numbers as General, dates as short date",
+                  "examples": [
+                    "0.0%"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "path: out/orders.xlsx\nsheet: Orders\nfields:\n  - { name: Nr }\n  - { name: Amount, format: \"#,##0.00\" }\n  - { name: Date }\n",
+      "recordErrors": true
+    },
+    {
       "type": "file.list",
       "kind": "transform",
       "category": "input",

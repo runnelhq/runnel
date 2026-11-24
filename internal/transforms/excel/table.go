@@ -1,5 +1,6 @@
 // Package excel contains the transforms of the namespace "excel" (roadmap S67):
-// excel.input reads a sheet of a workbook (.xlsx, .xlsm). Each transform lives in a file
+// excel.input reads a sheet of a workbook (.xlsx, .xlsm) with its own reader
+// (internal/xlsx), excel.output writes one with excelize. Each transform lives in a file
 // of its own; this file holds the reading of a table that excel.input and its field
 // detection share.
 package excel
