@@ -330,8 +330,8 @@ Plugin mit Meldung nicht geladen. Der Hash der Freigabe umfasst weiter den ganze
 
 ### 4. SDKs in eigenen Repositorys
 
-Das Go-SDK kommt nicht als `pkg/sdk` in dieses Repository, sondern in ein **eigenes Repository** (z. B.
-`runnelhq/runnel-sdk-go`) mit eigenen Versionen; SDKs für Python, C#/.NET, Rust oder Node folgen nach demselben
+Das Go-SDK kommt nicht als `pkg/sdk` in dieses Repository, sondern in ein **eigenes Repository** (`runnelhq/sdk-go`,
+Namen nach ADR 0013, Nachtrag 2026-11-24) mit eigenen Versionen; SDKs für Python, C#/.NET, Rust oder Node folgen nach demselben
 Muster. Verbindlich ist das Protokoll, nicht ein SDK:
 
 - Die **Beschreibung des Protokolls** liegt in diesem Repository (`docs/dev/PLUGINS.md`, mit S49) und gilt für alle SDKs.
