@@ -27,6 +27,14 @@ func TestParse(t *testing.T) {
 		{"${env:}", nil, "invalid environment variable name"},
 		{"${secret:a b}", nil, "invalid secret name"},
 		{"${foo:bar}", nil, `unknown reference type "foo"`},
+		// Defaults (K1).
+		{`${TEMP_DIR:-C:\temp} ${env:TEMP:-/tmp} ${X:-}`, []string{`${TEMP_DIR:-C:\temp}`, "${env:TEMP:-/tmp}", "${X:-}"}, ""},
+		{"${GREETING:-Hello, world: hi}", []string{"${GREETING:-Hello, world: hi}"}, ""},
+		{"${secret:pw:-x}", nil, "a secret has no default"},
+		{"${secret:env/pw:-x}", nil, "a secret has no default"},
+		{"${A:-${B}}", nil, "cannot contain a reference"},
+		{"${A:-$${B}", nil, "cannot contain a reference"},
+		{"${1A:-x}", nil, `invalid variable name "1A" in "${1A:-x}"`},
 	}
 	for _, tt := range tests {
 		refs, err := Parse(tt.text)
@@ -85,6 +93,7 @@ func TestExpand(t *testing.T) {
 			"LOOP_A":  "${LOOP_B}",
 			"LOOP_B":  "${LOOP_A}",
 			"MISSING": "${NOPE}",
+			"EMPTY":   "",
 		}},
 	)
 	s.LookupEnv = func(n string) (string, bool) { v, ok := env[n]; return v, ok }
@@ -101,6 +110,14 @@ func TestExpand(t *testing.T) {
 		{"${MISSING}", "", `variable "NOPE" is undefined`},
 		{"${env:NOPE}", "", `environment variable "NOPE" is undefined`},
 		{"${secret:pw}", "", "${secret:pw}: secrets (${secret:…}) are only allowed in fields for secrets"},
+		// Defaults (K1): when not set or empty, as in a shell; a set value wins.
+		{"${NOPE:-fallback}", "fallback", ""},
+		{"${EMPTY:-fallback}", "fallback", ""},
+		{"${BASE:-x}", `D:\data`, ""},
+		{"${env:NOPE:-/tmp}/out", "/tmp/out", ""},
+		{"${env:COMPUTERNAME:-this computer}", "SRV01", ""},
+		{"[${NOPE:-}]", "[]", ""},
+		{"${MISSING:-x}", "", `variable "NOPE" is undefined`},
 	}
 	for _, tt := range tests {
 		got, err := s.Expand(tt.text)

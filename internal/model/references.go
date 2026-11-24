@@ -93,8 +93,8 @@ func checkVarRefs(s *source, contexts []VarContext) Errors {
 			continue
 		}
 		for _, r := range refs {
-			if r.Kind != vars.KindVar {
-				continue
+			if r.Kind != vars.KindVar || r.HasDefault {
+				continue // ${NAME:-text} has its default (K1)
 			}
 			var missing []string
 			for _, c := range contexts {

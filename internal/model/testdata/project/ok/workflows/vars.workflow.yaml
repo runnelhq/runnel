@@ -11,7 +11,7 @@ actions:
     type: core.log
     with:
       message: |
-        Hello ${TARGET} on ${env:COMPUTERNAME}
+        Hello ${TARGET} on ${env:COMPUTERNAME} in ${UNDEFINED_REGION:-eu}
         Prices in $${CURRENCY} stay literal
       file: ${INBOX}\${IMPORT_DATE}.csv
       url: ${API_URL}/import

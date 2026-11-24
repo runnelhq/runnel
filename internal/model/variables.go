@@ -11,6 +11,8 @@ import (
 type VarUse struct {
 	Name string
 	Pos  Position
+	// Default is set for ${NAME:-text} (K1): the use needs no variable.
+	Default bool
 }
 
 // SecretUse is a reference ${secret:[STORE/]NAME} in a file, at the position of its value.
@@ -58,7 +60,7 @@ func ScanVariables(name string, data []byte) (uses []VarUse, params []string, er
 		}
 		for _, r := range refs {
 			if r.Kind == vars.KindVar {
-				uses = append(uses, VarUse{Name: r.Name, Pos: sc.pos})
+				uses = append(uses, VarUse{Name: r.Name, Pos: sc.pos, Default: r.HasDefault})
 			}
 		}
 	}

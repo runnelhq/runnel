@@ -514,3 +514,11 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
 - **Stand der Secrets:** `GET /api/v1/secrets` nennt jedes `${secret:…}` des Projekts mit Fundstellen und je Environment
   die Quelle und den Stand (`set`, `missing`, `unavailable` für Quellen, die es noch nicht gibt). Werte verlassen den
   Server nie; `env` meldet nur, ob die Variable gesetzt ist.
+
+## Nachtrag 2026-11-24 (K1): Standardwerte für Variablen
+
+- `${NAME:-text}` und `${env:NAME:-text}` setzen `text` ein, wenn die Variable nicht gesetzt oder leer ist (wie `:-` in
+  der Shell). Der Standardwert ist wörtlicher Text ohne `}` und ohne weitere Verweise; die Prüfung meldet einen Verweis
+  mit Standardwert nicht als fehlende Variable.
+- `${secret:NAME:-text}` ist ein Fehler: Ein Standardwert für ein Secret stünde im Klartext in einer Datei des Projekts,
+  was diese ADR gerade vermeidet. Ein fehlendes Secret bleibt ein Fehler beim Start des Laufs.

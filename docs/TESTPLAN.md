@@ -135,7 +135,7 @@ Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe fe
 
 | # | Einschränkung | Umgehung / Plan |
 |---|---|---|
-| K1 | Keine Standardwerte in Variablen (`${env:X:-fallback}`); `examples/hello` braucht `COMPUTERNAME` und `TEMP` und schlägt daher unter Linux fehl | Variablen im Projekt setzen; Standardwert-Syntax als Kandidat für eine spätere Erweiterung |
+| K1 | ~~Keine Standardwerte in Variablen (`${env:X:-fallback}`); `examples/hello` braucht `COMPUTERNAME` und `TEMP` und schlägt daher unter Linux fehl~~ – behoben: `${NAME:-text}` und `${env:NAME:-text}`; `examples/hello` läuft ohne die beiden Umgebungsvariablen | – |
 | K2 | Zeitangaben (`timeout`, `joinTimeout`, `retry.backoff`, `settings.timeout`) können keine Variablen enthalten | feste Werte; Variablen in Zeitangaben sind ein Kandidat für später (Stand S38c weiterhin nicht möglich) |
 | K3 | `join: all` startet auch, wenn ein Zweig fehlgeschlagen ist (so in ADR 0003 festgelegt) | Fehlerpfade separat modellieren; ggf. später Modus „alle erfolgreich“ |
 | K4 | In Schleifen wirken Zwischenergebnisse bereits auf Joins außerhalb der Schleife | für Wiederholungen `retry` statt Schleife verwenden (ADR 0003, „Umsetzung“) |

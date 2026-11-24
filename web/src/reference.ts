@@ -90,7 +90,7 @@ export interface VariableInfo {
   name: string;
   project: VariableValue | null;
   environments: Record<string, VariableValue>;
-  uses: { file: string; line: number; column: number; parameter?: boolean }[];
+  uses: { file: string; line: number; column: number; parameter?: boolean; default?: boolean }[];
 }
 
 export interface VariableValue {
@@ -123,7 +123,7 @@ export function useVariables(key: unknown): VariablesInfo | null {
 
 /** Whether a variable is used without being set for an environment (warning ⚠). */
 export function missingIn(v: VariableInfo, env: string): boolean {
-  return !v.project && !v.environments[env] && v.uses.some((u) => !u.parameter);
+  return !v.project && !v.environments[env] && v.uses.some((u) => !u.parameter && !u.default);
 }
 
 /** Trigger types: fields under with: name the types they belong to (S58 descriptions). */

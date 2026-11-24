@@ -53,6 +53,8 @@ type variableUse struct {
 	// Parameter is set when the file declares a parameter of this name: the use is
 	// covered by the parameter and needs no project variable.
 	Parameter bool `json:"parameter,omitempty"`
+	// Default is set for ${NAME:-text} (K1): the use has a default and needs no variable.
+	Default bool `json:"default,omitempty"`
 }
 
 func (s *Server) handleVariables(w http.ResponseWriter, _ *http.Request) {
@@ -88,7 +90,7 @@ func (s *Server) handleVariables(w http.ResponseWriter, _ *http.Request) {
 		}
 		for _, u := range uses {
 			v := get(u.Name)
-			v.Uses = append(v.Uses, variableUse{File: p, Line: u.Pos.Line, Column: u.Pos.Column, Parameter: slices.Contains(params, u.Name)})
+			v.Uses = append(v.Uses, variableUse{File: p, Line: u.Pos.Line, Column: u.Pos.Column, Parameter: slices.Contains(params, u.Name), Default: u.Default})
 		}
 	})
 	if err != nil {
