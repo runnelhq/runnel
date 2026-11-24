@@ -371,8 +371,27 @@ Muster. Verbindlich ist das Protokoll, nicht ein SDK:
 - **S49:**
   - `executable` je System, `concurrency`, Maskierung, Connections eingebauter Typen in der `config`.
   - Die Beschreibung des Protokolls `docs/dev/PLUGINS.md`.
-- **S49b (neu):** Connection-Typen aus Plugins mit `connection.test`.
+- **S49c (neu, zuerst S49b genannt):** Connection-Typen aus Plugins mit `connection.test`.
 - **S51:** Go-SDK im eigenen Repository.
 - **Backlog:**
   - Mindestversion von Runnel in `plugin.yaml`,
   - SDKs für Python, C#/.NET, Rust und Node in eigenen Repositorys.
+
+## Nachtrag 2026-11-24 (S49a): Datei und Freigabe
+
+S49 ist geteilt: S49a (Datei `plugin.yaml` und Freigabe), S49b (Protokoll und Actions), S49c (Connection-Typen; im
+Nachtrag davor „S49b“ genannt). Präzisierungen bei der Umsetzung von S49a:
+
+- **`plugin.yaml`:** `name` wie der Ordner, `version` nach SemVer, `namespace` und `name` aus Kleinbuchstaben, Ziffern
+  und `-`; ein Namensraum, den zwei Plugins nennen, ist bei beiden ein Fehler, keines wird geladen. Ein Fehler in einer
+  Plugin-Datei ist ein Fehler des Projekts, wie bei Connections.
+- **`executable`:** ein Pfad im Ordner des Plugins (ohne `..`), ein absoluter Pfad oder ein Befehl des Rechners (z. B.
+  `python`); Befehle und absolute Pfade außerhalb des Ordners zählen nicht zum Hash.
+- **Hash:** SHA-256 über alle Dateien des Ordners in fester Reihenfolge, je Datei Pfad (mit `/`), Länge und Inhalt;
+  Verknüpfungen und andere besondere Dateien lehnt Runnel ab. Ohne Cache: Ab S49b wird er beim Laden des Projekts
+  zwischengespeichert, solange sich Größe und Änderungszeit der Dateien nicht ändern.
+- **Datei des Dienstes:** `%ProgramData%\runnel\trust\plugins.json`. Ändern dürfen sie nur Administratoren und SYSTEM;
+  lesen dürfen sie alle angemeldeten Benutzer und das Dienstkonto (die Freigaben sind kein Geheimnis, Schutz gilt dem
+  Schreiben). Unter Linux gibt es nur die Datei des Benutzers (`$XDG_CONFIG_HOME/runnel/trusted-plugins.json`).
+- **Rückfrage:** `runnel plugins trust` zeigt Name, Version, Namensraum, Ordner, Programm und Hash und fragt je Plugin;
+  nur `y`/`yes` gibt frei. Ohne Eingabe (z. B. in Skripten) bleibt das Plugin gesperrt; dort gilt `--yes`.

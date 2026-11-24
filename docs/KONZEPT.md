@@ -310,9 +310,9 @@ flowchart LR
 | Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
 | Läufe anzeigen | `runnel runs [projektordner] [lauf-id] [--status] [--path] [--trigger] [--before] [--limit] [--json]` (seit S26b) | Läufe aus der Run-Historie (Server, Dienst, `runnel run`), einer mit Knoten und Log |
 | Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
-| Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments und Triggern (seit S58), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
+| Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments, Triggern, Connections und `plugin.yaml` (seit S58 bzw. S49a), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
-| Plugins (geplant) | `runnel plugins [trust\|untrust] [projektordner] [--service]` | Plugins anzeigen und für das Projekt freigeben (S49, [ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag) |
+| Plugins | `runnel plugins [trust\|untrust] [projektordner] [--plugin <name>] [--yes] [--service]` (seit S49a) | Plugins anzeigen und für das Projekt auf diesem Rechner freigeben ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag; [docs/dev/PLUGINS.md](dev/PLUGINS.md)) |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
@@ -892,7 +892,7 @@ Windows, gRPC für andere Sprachen).
 - Weitere Ausgänge wie bei `core.switch` (Ziel-IDs in der `config`), optional `transform.init` für das Schema und
   `transform.detectFields`; Arbeitsverzeichnis des Plugins ist der Projektordner.
 - Connections eingebauter Typen stehen aufgelöst in der `config`; Plugins können eigene Connection-Typen anbieten
-  (S49b). Secrets, die ein Plugin bekommt, maskiert der Host in allem, was zurückkommt.
+  (S49c). Secrets, die ein Plugin bekommt, maskiert der Host in allem, was zurückkommt.
 - Protokoll ab `protocolVersion: 1`, Änderungen darin nur additiv; `executable` je Betriebssystem; ein Plugin
   bearbeitet ohne Angabe von `concurrency` eine Anfrage nach der anderen.
 - SDKs in eigenen Repositorys: Go (Referenz, S51), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;

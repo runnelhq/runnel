@@ -14,7 +14,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	for _, name := range []string{"XDG_STATE_HOME", "LOCALAPPDATA"} {
+	for _, name := range []string{"XDG_STATE_HOME", "LOCALAPPDATA", "XDG_CONFIG_HOME", "APPDATA"} {
 		_ = os.Setenv(name, dir)
 	}
 	code := m.Run()

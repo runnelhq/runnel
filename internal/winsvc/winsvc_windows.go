@@ -383,6 +383,57 @@ func TLSDir() string {
 	return filepath.Join(programData(), "runnel", "tls")
 }
 
+// TrustDir returns the folder of the plugin approvals of services (ADR 0019):
+// %ProgramData%\runnel\trust.
+func TrustDir() string {
+	return filepath.Join(programData(), "runnel", "trust")
+}
+
+// PrepareTrustDir creates the folder of the plugin approvals of services and protects it:
+// Administrators and SYSTEM may change it, everyone else (also the service account) may
+// only read it. Inherited permissions are removed, so a user cannot approve a plugin for
+// the service by writing the file.
+func PrepareTrustDir(dir string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("cannot create the folder %s: %w", dir, err)
+	}
+	access := []struct {
+		sid  string
+		mask windows.ACCESS_MASK
+	}{
+		{"S-1-5-32-544", windows.GENERIC_ALL},                        // Administrators
+		{"S-1-5-18", windows.GENERIC_ALL},                            // SYSTEM
+		{"S-1-5-11", windows.GENERIC_READ | windows.GENERIC_EXECUTE}, // Authenticated Users
+		{"S-1-5-19", windows.GENERIC_READ | windows.GENERIC_EXECUTE}, // LocalService
+	}
+	entries := make([]windows.EXPLICIT_ACCESS, len(access))
+	for i, a := range access {
+		sid, err := windows.StringToSid(a.sid)
+		if err != nil {
+			return err
+		}
+		entries[i] = windows.EXPLICIT_ACCESS{
+			AccessPermissions: a.mask,
+			AccessMode:        windows.SET_ACCESS,
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+			Trustee: windows.TRUSTEE{
+				TrusteeForm:  windows.TRUSTEE_IS_SID,
+				TrusteeType:  windows.TRUSTEE_IS_UNKNOWN,
+				TrusteeValue: windows.TrusteeValueFromSID(sid),
+			},
+		}
+	}
+	acl, err := windows.ACLFromEntries(entries, nil)
+	if err != nil {
+		return fmt.Errorf("cannot set the permissions of %s: %w", dir, err)
+	}
+	info := windows.SECURITY_INFORMATION(windows.DACL_SECURITY_INFORMATION | windows.PROTECTED_DACL_SECURITY_INFORMATION)
+	if err := windows.SetNamedSecurityInfo(dir, windows.SE_FILE_OBJECT, info, nil, nil, acl, nil); err != nil {
+		return fmt.Errorf("cannot set the permissions of %s: %w", dir, err)
+	}
+	return nil
+}
+
 func programData() string {
 	if base := os.Getenv("ProgramData"); base != "" {
 		return base

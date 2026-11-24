@@ -39,3 +39,9 @@ func HistoryDir() string { return "" }
 
 // TLSDir returns the folder of the self-signed certificate of services.
 func TLSDir() string { return "" }
+
+// TrustDir returns the folder of the plugin approvals of services.
+func TrustDir() string { return "" }
+
+// PrepareTrustDir creates the folder of the plugin approvals of services.
+func PrepareTrustDir(string) error { return ErrNotSupported }
