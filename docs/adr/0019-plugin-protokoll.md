@@ -461,3 +461,43 @@ Editor, Connections). Präzisierungen:
 - **Connections in der `config`:** Felder mit `format: runnel-connection` nehmen auch Connections der Typen von
   Plugins, wenn `x-runnel-connection` sie nennt; sie kommen aufgelöst und maskiert wie die eingebauten an.
 - `runnel plugins` zeigt die Connection-Typen eines Plugins mit `connection` neben den Actions.
+
+## Nachtrag 2026-11-24 (S50a): Transforms als Strom
+
+S50 ist geteilt: S50a (Strom, dieser Nachtrag) und S50b (`transform.init`, `transform.detectFields`). Präzisierungen
+bei der Umsetzung von S50a:
+
+- **`describe`** liefert `transforms` mit Descriptoren wie die eingebauten (`type`, `category`, `label`,
+  `description`, `schema`, optional `example`, `recordErrors`, `parallel`). Typen nur im eigenen Namensraum, jeder
+  einmal, mit `schema`; unbekannte Kategorie wird `transform`. Ein Typ darf zugleich Action und Transform sein.
+- **`transform.open`** (Anfrage): `stream`, `type`, `config` (geprüft und aufgelöst wie bei Actions, Connections als
+  Objekt), `context` (`runId`, `transformId`, `projectDir`, `environment`) und `emitWindow`. Antwort `{"window": n}`
+  (1 bis 64, ohne Angabe 1). `inputs` mit dem Schema des Eingangs entfällt bis S50b: Der Feldkopf kommt mit den Batches.
+- **`transform.batch`** (Notification): `stream`, `rows` und `fields` (Name und Typ), wenn sich die Felder gegenüber
+  dem letzten Batch geändert haben. Records mit anderen Feldern beginnen einen neuen Batch. Je Batch ein Kredit; der
+  Plugin gibt sie mit `$/ack {"stream", "batches"}` zurück.
+- **`transform.end`** (Notification) nach dem letzten Batch. Ein Eingabe-Transform (ohne eingehende Links) bekommt
+  es sofort nach `open`; er schreibt, bis er fertig ist, und schließt dann.
+- **`transform.emit`** (Notification vom Plugin): `stream`, `to`, `fields`, `rows`. Ohne `fields` gelten die des
+  letzten `emit` (nicht des Ziels). `to` ist
+  - `main` (oder leer): alle Daten-Links, die nicht zu einem Ziel der Konfiguration führen;
+  - `error`: der Fehler-Link; die Records tragen `_error` und `_errorField`, `_errorTransform` setzt der Host. Ohne
+    Fehler-Link scheitert der Transform mit der Meldung des ersten Records (wie eingebaute Transforms);
+  - die ID eines Transforms aus einem Feld mit `format: runnel-target` der Konfiguration. Ein anderes Ziel ist ein
+    Fehler des Plugins.
+  Je `emit` ein Kredit des Hosts (`emitWindow`, 4); der Host gibt ihn mit `$/ack` zurück, sobald die Records bei den
+  folgenden Transforms sind. Mehr `emit` als Kredite beenden den Strom mit Fehler.
+- **`transform.closed`** (Notification vom Plugin): `stream`, optional `error.message`. Mit Fehler scheitert der
+  Transform und mit ihm die Pipeline (Meldung maskiert).
+- **Werte** nach ADR 0007 statt der Namen aus der ADR: `string`, `int`, `decimal` (Text), `float`, `bool`, `date`
+  (`2026-11-24`), `datetime` (RFC 3339), `binary` (Base64), `json`; ohne Typ der JSON-Wert. Ein Wert, der nicht zum
+  Typ passt, beendet den Strom mit Fehler (`row 3, field "amount": … is not a value of type decimal`).
+- **Records sind Daten:** Der Host maskiert Log-Zeilen und Fehlermeldungen, nicht die Werte der Records (wie bei
+  eingebauten Transforms).
+- **Prozess:** wie bei Actions einer je Plugin und Lauf; alle Transforms und Kopien (`copies`) des Plugins in einer
+  Pipeline teilen ihn mit eigenen `stream`-Nummern. Endet der Prozess, scheitern seine Ströme mit den letzten Zeilen
+  von stderr.
+- **Abbruch:** Bricht der Lauf ab, sendet der Host nichts mehr und beendet den Prozess mit dem Lauf.
+- **Leistung:** Benchmark `BenchmarkPluginTransform` (200.000 Records mit fünf Feldern durch das Test-Plugin und
+  zurück, mit Start des Plugins) erreicht 310.000–330.000 Records/s auf vier Kernen, mit einem bewusst einfachen
+  Test-Plugin ohne SDK. Das Ziel ist erreicht, ein Binärformat ist nicht nötig.

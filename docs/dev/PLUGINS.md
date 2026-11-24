@@ -5,8 +5,9 @@ Programm in beliebiger Sprache, das Runnel als Kindprozess startet und über JSO
 ([ADR 0019](../adr/0019-plugin-protokoll.md) mit Nachträgen; Namen nach [ADR 0013](../adr/0013-typnamen-namensraeume.md),
 Nachtrag 2026-11-24).
 
-Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S49c** – Ablage, `plugin.yaml`, Freigabe,
-Protokoll, Actions aus Plugins in Workflows und eigene Connection-Typen. Transforms folgen mit S50.
+Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S50a** – Ablage, `plugin.yaml`, Freigabe,
+Protokoll, Actions in Workflows, eigene Connection-Typen und Transforms als Strom in Pipelines. `transform.init` und
+`transform.detectFields` folgen mit S50b.
 
 ## Ablage
 
@@ -120,7 +121,7 @@ Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
 | Methode | Antwort | Regeln |
 |---|---|---|
 | `initialize` | `protocolVersion` (1), `encoding` (`json`), `name` (wie in `plugin.yaml`), `version`, optional `concurrency` | Zeitgrenze 10 s; andere Version oder anderer Name: Plugin wird nicht genutzt |
-| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`); optional `connectionTypes` (siehe [Connection-Typen](#connection-typen)) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
+| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`); optional `transforms` (siehe [Transforms](#transforms)) und `connectionTypes` (siehe [Connection-Typen](#connection-typen)) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
 | `action.execute` | `{"output": …}` (Text, Zahl, Liste, Objekt; im Workflow `result.output`) | `config` ist geprüft und aufgelöst (Variablen, Ausdrücke); ein Fehler ist eine Fehlerantwort, ihre `message` die Meldung der Action |
 | `connection.test` | `{"ok": true, "message": "…", "version": "…"}` | nur für Typen mit `"test": true`; `ok: false` mit `message` ist ein gescheiterter Test |
 | `shutdown` | `null` | danach schließt der Host stdin; nach 5 s beendet er den Prozess mit allen Kindprozessen |
@@ -135,7 +136,7 @@ Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
   die Anfrage mit den letzten Zeilen von stderr; der Lauf behandelt das wie jeden Fehler.
 - **Secrets**, die der Host in der `config` übergibt, maskiert er in stderr, Fehlermeldungen und `output` (mit S49b2).
 
-Ströme für Transforms (`transform.open`, `.batch`, `.end`, Kredite) folgen mit S50 nach [ADR 0019](../adr/0019-plugin-protokoll.md).
+Transforms laufen als Strom mit eigenen Nachrichten, siehe [Transforms](#transforms).
 
 ## In Workflows
 
@@ -158,6 +159,58 @@ actions:
 - Je Lauf ein Prozess je Plugin, gestartet beim ersten Aufruf, beendet am Ende des Laufs. Zeilen auf stderr stehen im
   Log der Action; Secrets des Laufs sind darin und in Fehlern und `output` maskiert.
 - Die Umgebung enthält keine Variablen mit Tokens der HTTP-Trigger des Projekts.
+
+## Transforms
+
+Ein Transform eines Plugins bekommt die Records seines Eingangs als Strom und schreibt Records auf seine Ausgänge.
+`describe` liefert ihn unter `transforms`, mit denselben Angaben wie eingebaute (`runnel catalog`):
+
+```json
+{"type": "iban.check-all", "category": "transform", "label": "Check IBANs", "description": "Checks the IBAN of every record",
+ "recordErrors": true, "parallel": true,
+ "schema": {"type": "object", "required": ["field"], "properties": {"field": {"type": "string"},
+   "invalid": {"type": "string", "format": "runnel-target"}}}}
+```
+
+`recordErrors` erlaubt einen Fehler-Link, `parallel` erlaubt `copies`. Eine Kategorie, die Runnel nicht kennt, wird
+`transform`.
+
+### Ablauf
+
+```text
+→ transform.open   {"stream":1,"type":"iban.check-all","config":{"field":"iban"},"context":{"runId":"01M…","transformId":"check","projectDir":"D:\\flows"},"emitWindow":4}
+← (Antwort)        {"window":4}
+→ transform.batch  {"stream":1,"fields":[{"name":"id","type":"int"},{"name":"iban","type":"string"}],"rows":[[1,"DE02…"],[2,"XX"]]}
+← transform.emit   {"stream":1,"to":"main","fields":[{"name":"id","type":"int"},{"name":"iban","type":"string"}],"rows":[[1,"DE02…"]]}
+← transform.emit   {"stream":1,"to":"error","fields":[…,{"name":"_error","type":"string"},{"name":"_errorField","type":"string"}],"rows":[[2,"XX","invalid IBAN","iban"]]}
+← $/ack            {"stream":1,"batches":1}
+→ $/ack            {"stream":1,"batches":2}
+→ transform.end    {"stream":1}
+← transform.closed {"stream":1}
+```
+
+Nur `transform.open` ist eine Anfrage mit Antwort; alles andere sind Notifications (ohne `id`).
+
+| Nachricht | Richtung | Inhalt |
+|---|---|---|
+| `transform.open` | Host → Plugin | `stream` (Nummer, eindeutig im Prozess), `type`, `config` (geprüft und aufgelöst), `context`, `emitWindow`; Antwort `window` (1–64) |
+| `transform.batch` | Host → Plugin | `rows`; `fields` nur beim ersten Batch und wenn sich die Felder ändern |
+| `transform.end` | Host → Plugin | keine weiteren Batches; ein Eingabe-Transform bekommt es gleich nach `open` |
+| `transform.emit` | Plugin → Host | `to`, `rows`; `fields` beim ersten `emit` und wenn sie sich ändern |
+| `transform.closed` | Plugin → Host | Ende des Stroms; mit `error: {"message"}` scheitert der Transform |
+| `$/ack` | beide | `batches`: so viele Kredite gibt die Seite zurück |
+
+- **Kredite:** Der Host schickt höchstens `window` Batches, bevor das Plugin mit `$/ack` neue freigibt; das Plugin
+  schickt höchstens `emitWindow` `emit`, bevor der Host neue freigibt. Mehr `emit` beenden den Strom mit Fehler. So
+  bleibt der Speicher auf beiden Seiten begrenzt, und ein langsamer Transform dahinter bremst das Plugin.
+- **Ziele (`to`):** `main` (alle Daten-Links, die nicht zu einem Ziel der Konfiguration führen), `error` (Fehler-Link;
+  Records mit `_error` und `_errorField`) oder die ID eines Transforms aus einem Feld mit `format: runnel-target`.
+- **Werte** nach Typ: `string`, `int` (Zahl), `decimal` (Text, exakt), `float`, `bool`, `date` (`"2026-11-24"`),
+  `datetime` (RFC 3339 mit Offset), `binary` (Base64), `json`; ohne Typ der JSON-Wert; `null` immer.
+- **Mehrere Ströme:** Alle Transforms des Plugins in einer Pipeline (auch Kopien) teilen einen Prozess; `stream`
+  ordnet die Nachrichten zu. Nachrichten verschiedener Ströme dürfen sich mischen.
+- **Fehler:** Ein falscher Wert, ein unbekanntes Ziel oder ein Absturz beenden den Transform und die Pipeline mit
+  einer Meldung; Zeilen von stderr stehen im Log des Transforms.
 
 ## Connection-Typen
 
@@ -189,6 +242,26 @@ Ein Plugin kann eigene Connection-Typen anbieten, z. B. für ein ERP oder ein DM
 
   Runnel startet das Plugin dafür, wartet höchstens 15 s und beendet es danach. Nichts soll dabei geschrieben oder
   gesendet werden außer der Anmeldung.
+
+## In Pipelines
+
+```yaml
+transforms:
+  - id: check
+    type: iban.check-all
+    with:
+      field: iban
+      invalid: rejected   # Ziel: Records an diesen Transform
+links:
+  - { from: read, to: check }
+  - { from: check, to: write }
+  - { from: check, to: rejected }
+  - { from: check, to: errors, type: error }
+```
+
+Wie bei Actions: nicht freigegebene Plugins meldet die Prüfung am Transform, die `config` wird gegen das Schema
+geprüft, Connections kommen aufgelöst an. Das Schema der Felder hinter einem Plugin-Transform ist offen, bis S50b
+`transform.init` bringt.
 
 ## Testen
 

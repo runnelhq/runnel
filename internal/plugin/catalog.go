@@ -18,6 +18,7 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/plugintrust"
 	"github.com/runnelhq/runnel/internal/schema"
+	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/version"
 	"github.com/runnelhq/runnel/internal/winsvc"
 )
@@ -32,6 +33,7 @@ func DefaultStore() (plugintrust.Store, error) {
 type entry struct {
 	fingerprint string
 	defs        []action.Definition
+	tdefs       []transform.Definition
 	conns       []connection.Definition
 	tests       map[string]bool // connection types the plugin can test
 	hint        string
@@ -60,6 +62,28 @@ func Registry(ctx context.Context, base *action.Registry, projectDir string, sto
 	for _, name := range slices.Sorted(mapKeys(plugins)) {
 		e := lookup(ctx, projectDir, plugins[name], store)
 		defs = append(defs, e.defs...)
+		if e.hint != "" {
+			hints[plugins[name].Namespace] = e.hint
+		}
+	}
+	return base.With(defs, hints)
+}
+
+// Transforms returns base with the transform types of the trusted plugins of the project
+// in projectDir and hints for the namespaces of plugins that cannot be used (S50a).
+func Transforms(ctx context.Context, base *transform.Registry, projectDir string, store plugintrust.Store) *transform.Registry {
+	if projectDir == "" {
+		return base
+	}
+	plugins, _ := model.LoadPlugins(projectDir)
+	if len(plugins) == 0 {
+		return base
+	}
+	var defs []transform.Definition
+	hints := map[string]string{}
+	for _, name := range slices.Sorted(mapKeys(plugins)) {
+		e := lookup(ctx, projectDir, plugins[name], store)
+		defs = append(defs, e.tdefs...)
 		if e.hint != "" {
 			hints[plugins[name].Namespace] = e.hint
 		}
@@ -201,6 +225,9 @@ func describe(ctx context.Context, projectDir string, p *model.Plugin, e *entry)
 	for _, a := range d.Actions {
 		e.defs = append(e.defs, definition(p.Name, a))
 	}
+	for _, t := range d.Transforms {
+		e.tdefs = append(e.tdefs, transformDefinition(p.Name, t))
+	}
 	e.tests = map[string]bool{}
 	for _, c := range d.Connections {
 		e.conns = append(e.conns, connection.Definition{Type: c.Type, Label: c.Label, Description: c.Description, Schema: c.Schema, Plugin: p.Name})
@@ -241,26 +268,91 @@ func (a *pluginAction) Execute(ctx context.Context, ec *action.ExecContext) (act
 	if ec.Plugins == nil {
 		return action.Result{}, fmt.Errorf("actions of plugins cannot run here")
 	}
-	config := maps.Clone(a.with)
-	for _, prop := range a.schema.Properties {
-		name, ok := config[prop.Name].(string)
-		if prop.Schema == nil || prop.Schema.Format != "runnel-connection" || !ok || name == "" {
-			continue
-		}
-		if ec.Connection == nil {
-			return action.Result{}, connection.ErrNotAvailable
-		}
-		c, err := ec.Connection(ctx, name)
-		if err != nil {
-			return action.Result{}, err
-		}
-		resolved := map[string]any{"name": c.Name, "type": c.Type}
-		maps.Copy(resolved, c.With)
-		config[prop.Name] = resolved
+	config, err := withConnections(ctx, a.schema, a.with, ec.Connection)
+	if err != nil {
+		return action.Result{}, err
 	}
 	out, err := ec.Plugins.Execute(ctx, a.plugin, a.typ, config, ec)
 	if err != nil {
 		return action.Result{}, err
 	}
 	return action.Result{Output: out}, nil
+}
+
+// withConnections returns the configuration with the connections it names resolved:
+// fields of format runnel-connection get {"name", "type", …fields} (ADR 0019).
+func withConnections(ctx context.Context, sc *schema.Schema, with map[string]any, resolve connection.Resolver) (map[string]any, error) {
+	config := maps.Clone(with)
+	for _, prop := range sc.Properties {
+		name, ok := config[prop.Name].(string)
+		if prop.Schema == nil || prop.Schema.Format != schema.FormatConnection || !ok || name == "" {
+			continue
+		}
+		if resolve == nil {
+			return nil, connection.ErrNotAvailable
+		}
+		c, err := resolve(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		resolved := map[string]any{"name": c.Name, "type": c.Type}
+		maps.Copy(resolved, c.With)
+		config[prop.Name] = resolved
+	}
+	return config, nil
+}
+
+// transformDefinition is the transform type of a plugin: the configuration is checked
+// against the schema of describe, the transform runs as a stream in the process of the
+// plugin for the run (S50a).
+func transformDefinition(plugin string, d transform.Descriptor) transform.Definition {
+	return transform.Definition{
+		Type: d.Type, Category: d.Category, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
+		RecordErrors: d.RecordErrors, Parallel: d.Parallel,
+		New: func(with map[string]any) (transform.Transform, error) {
+			if err := schema.CheckConfig(d.Schema, with); err != nil {
+				return nil, err
+			}
+			return &pluginTransform{plugin: plugin, typ: d.Type, with: with, schema: d.Schema}, nil
+		},
+	}
+}
+
+// pluginTransform is a configured transform of a plugin.
+type pluginTransform struct {
+	plugin string
+	typ    string
+	with   map[string]any
+	schema *schema.Schema
+}
+
+// Process runs the transform as a stream in the plugin, with the connections it names
+// resolved; it may emit to the transforms named in fields of format runnel-target.
+func (t *pluginTransform) Process(ctx context.Context, in <-chan transform.Batch, out *transform.Output) error {
+	if out.Plugins() == nil {
+		return fmt.Errorf("transforms of plugins cannot run here")
+	}
+	config, err := withConnections(ctx, t.schema, t.with, out.Connection)
+	if err != nil {
+		return err
+	}
+	var targets []string
+	for _, prop := range t.schema.Properties {
+		if prop.Schema == nil || prop.Schema.Format != schema.FormatTarget {
+			continue
+		}
+		switch v := t.with[prop.Name].(type) {
+		case string:
+			if v != "" {
+				targets = append(targets, v)
+			}
+		case []any:
+			for _, x := range v {
+				if s, ok := x.(string); ok && s != "" {
+					targets = append(targets, s)
+				}
+			}
+		}
+	}
+	return out.Plugins().Stream(ctx, t.plugin, t.typ, config, targets, in, out)
 }

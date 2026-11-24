@@ -70,6 +70,9 @@ type Options struct {
 	Mask *vars.Mask
 	// Connections resolves the connections named by transforms (ADR 0022); nil: none.
 	Connections connection.Resolver
+	// Plugins runs transforms of plugins (ADR 0019, S50a) and is closed when the run
+	// ends; nil: none.
+	Plugins transform.PluginRunner
 }
 
 // errInputLimit ends an input that has emitted Options.InputLimit records.
@@ -214,6 +217,10 @@ func build(p *model.Pipeline, opts Options) (*Runner, model.Errors) {
 	for i, t := range p.Transforms {
 		path := fmt.Sprintf("$.transforms[%d]", i)
 		def, ok := opts.Registry.Lookup(t.Type)
+		if hint := opts.Registry.Hint(t.Type); !ok && hint != "" {
+			errs = append(errs, p.ErrorAt(path+".type", "transform %q: %s", t.ID, hint))
+			continue
+		}
 		if !ok {
 			errs = append(errs, p.ErrorAt(path+".type", "transform %q: unknown transform type %q (available: %v)",
 				t.ID, t.Type, opts.Registry.Types()))
@@ -608,6 +615,9 @@ func (r *Runner) emit(e Event) {
 // Run executes the pipeline and returns when all transforms have finished.
 func (r *Runner) Run(parent context.Context) Result {
 	parent = paths.WithBase(parent, r.opts.BaseDir)
+	if r.opts.Plugins != nil {
+		defer r.opts.Plugins.Close() // the processes of the plugins end with the run
+	}
 	now := r.opts.Now
 	started := now()
 	runID := r.opts.RunID
@@ -781,7 +791,7 @@ func (r *Runner) Run(parent context.Context) Result {
 						return add(p, rec)
 					}
 					return add(all, rec)
-				}, log).WithValues(values).WithResults(r.opts.Rows, addResult).WithRespond(r.opts.Respond).WithConnections(r.opts.Connections)
+				}, log).WithValues(values).WithResults(r.opts.Rows, addResult).WithRespond(r.opts.Respond).WithConnections(r.opts.Connections).WithPlugins(r.opts.Plugins)
 				if li, ok := info[i]; ok {
 					out.WithInfo(r.p.Links[li].From, links[li])
 				}
@@ -794,7 +804,7 @@ func (r *Runner) Run(parent context.Context) Result {
 						return add(errs, rec)
 					})
 				}
-				out.WithTargets(func(target string, rec record.Record) error {
+				out.WithTargetIDs(slices.Sorted(maps.Keys(byTarget))).WithTargets(func(target string, rec record.Record) error {
 					p := byTarget[target]
 					if p == nil {
 						return fmt.Errorf("no data link leads to %q", target)

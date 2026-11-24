@@ -65,6 +65,9 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 // types, configurations and fields of its transforms (ADR 0007), only if diags (the
 // problems found so far) has no errors and registry is set. The result is sorted.
 func CheckPipeline(p *model.Pipeline, diags model.Errors, registry *transform.Registry, project *model.Project) model.Errors {
+	if project != nil {
+		registry = WithPluginTransforms(registry, project.Dir) // transforms of plugins (S50a)
+	}
 	diags = append(diags, p.CheckSecrets(TransformSecretField(registry), nil)...)
 	diags = append(diags, p.CheckSQL(TransformSQLField(registry))...)
 	if project != nil {

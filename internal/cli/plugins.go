@@ -161,10 +161,13 @@ func listPlugins(ctx context.Context, out io.Writer, dir string) error {
 		for _, d := range types.Actions {
 			_, _ = fmt.Fprintf(tw, "  %s\taction\t%s\n", d.Type, d.Description)
 		}
+		for _, d := range types.Transforms {
+			_, _ = fmt.Fprintf(tw, "  %s\ttransform\t%s\n", d.Type, d.Description)
+		}
 		for _, c := range types.Connections {
 			_, _ = fmt.Fprintf(tw, "  %s\tconnection\t%s\n", c.Type, c.Description)
 		}
-		if len(types.Actions)+len(types.Connections) == 0 {
+		if len(types.Actions)+len(types.Transforms)+len(types.Connections) == 0 {
 			_, _ = fmt.Fprintln(tw, "  (none)")
 		}
 		_ = tw.Flush()

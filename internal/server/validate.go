@@ -38,7 +38,7 @@ func NewCatalog(actions *action.Registry, transforms *transform.Registry) Catalo
 }
 
 func (s *Server) handleCatalog(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, NewCatalog(runs.WithPlugins(s.registry, s.dir), s.transforms))
+	writeJSON(w, http.StatusOK, NewCatalog(runs.WithPlugins(s.registry, s.dir), runs.WithPluginTransforms(s.transforms, s.dir)))
 }
 
 // handleSchema returns the JSON Schema of a file kind (project, environment, trigger;
@@ -268,7 +268,7 @@ func (s *Server) validatePipeline(name string, data []byte) (*model.Pipeline, ma
 	diags = append(diags, p.Validate()...)
 	var schemas map[string]pipeline.TransformSchemas
 	if !diags.HasErrors() && s.transforms != nil {
-		schemas = pipeline.Schemas(p, pipeline.Options{Registry: s.transforms})
+		schemas = pipeline.Schemas(p, pipeline.Options{Registry: runs.WithPluginTransforms(s.transforms, s.dir)})
 	}
 	project, _ := model.LoadProject(s.dir) // for the connections; a project with errors still counts
 	return p, schemas, runs.CheckPipeline(p, diags, s.transforms, project), nil
