@@ -1,6 +1,6 @@
 // Package xml contains the transforms of the namespace "xml" (roadmap S68): xml.input
-// reads the elements of an XML file as records. Each transform lives in a file of its
-// own; read.go holds the reading of the elements.
+// reads the elements of an XML file as records, xml.output writes records as elements.
+// Each transform lives in a file of its own; read.go holds the reading of the elements.
 package xml
 
 import (
@@ -14,6 +14,7 @@ import (
 // Register adds all transforms of the namespace "xml" to a registry.
 func Register(r *transform.Registry) {
 	r.Register(inputDefinition)
+	r.Register(outputDefinition)
 }
 
 const levelInfo = slog.LevelInfo

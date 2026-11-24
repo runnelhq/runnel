@@ -3277,6 +3277,99 @@
       "example": "path: data/orders.xml\nrecords: orders/order\nfields:\n  - { name: id, from: \"@id\", type: int }\n  - { name: customer, from: customer/name }\n  - { name: amount, type: decimal }\n",
       "recordErrors": true,
       "detectFields": true
+    },
+    {
+      "type": "xml.output",
+      "kind": "transform",
+      "category": "output",
+      "label": "XML Output",
+      "description": "Writes records as elements of an XML file and passes them on",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "XML file to write (UTF-8), relative to the project folder or absolute",
+            "examples": [
+              "out/orders.xml"
+            ]
+          },
+          "root": {
+            "type": "string",
+            "description": "Name of the root element; empty: records",
+            "examples": [
+              "orders"
+            ]
+          },
+          "record": {
+            "type": "string",
+            "description": "Name of the element of each record; empty: record",
+            "examples": [
+              "order"
+            ]
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "What happens if the file exists: replace it once all records are written, or fail",
+            "enum": [
+              "replace",
+              "fail"
+            ],
+            "default": "replace"
+          },
+          "nulls": {
+            "type": "string",
+            "description": "Empty values: skip writes no element, empty writes an empty one",
+            "enum": [
+              "skip",
+              "empty"
+            ],
+            "default": "skip"
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields to write, in this order, with where they go; empty: all fields of the records as child elements",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field to write",
+                  "format": "runnel-field",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "as": {
+                  "type": "string",
+                  "description": "Where the value goes in the record element: a child like amount, a path like customer/name, an attribute like @id or customer/@id, or #text; empty: a child named like the field",
+                  "examples": [
+                    "customer/name"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Writes the value with a number pattern like #.##0,00 or a date pattern like dd.MM.yyyy; empty: numbers like 1234.5, dates in ISO 8601",
+                  "examples": [
+                    "dd.MM.yyyy"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "path: out/orders.xml\nroot: orders\nrecord: order\nfields:\n  - { name: id, as: \"@id\" }\n  - { name: customer, as: customer/name }\n  - { name: amount }\n",
+      "recordErrors": true
     }
   ]
 }

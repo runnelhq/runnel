@@ -1,4 +1,4 @@
-# Reads orders from an XML export and writes them to a CSV file (S68a):
+# Reads orders from an XML export and writes them to a CSV file and another XML file (S68):
 #   runnel run examples/pipelines/pipelines/xml-orders.pipeline.yaml
 # - "read" reads the elements <Bestellung> of sales/orders.xml as records; the prefix
 #   erp: of the namespace is not written (names are compared without namespaces).
@@ -6,6 +6,8 @@
 #   attribute of one (Kunde/@id); Betrag gives its text, not its attribute waehrung.
 # - Order 1004 has "k. A." as Betrag: it goes over the error link to REJECTED, with the
 #   line of the order in _error, instead of stopping the pipeline.
+# - "export" writes the orders to EXPORT in the structure a partner expects: the number
+#   as attribute, the customer nested with its id as attribute, the amount exact.
 kind: Pipeline
 apiVersion: runnel/v1
 name: xml-orders
@@ -16,6 +18,9 @@ parameters:
   - name: REJECTED
     description: CSV file for orders with errors
     default: out/xml-rejected.csv
+  - name: EXPORT
+    description: XML file to write
+    default: out/xml-orders-export.xml
 transforms:
   - id: read
     type: xml.input
@@ -41,6 +46,19 @@ transforms:
         - { name: Betrag, format: "#.##0,00" }
         - { name: Datum, format: dd.MM.yyyy }
         - { name: Bezahlt }
+  - id: export
+    type: xml.output
+    with:
+      path: ${EXPORT}
+      root: orders
+      record: order
+      fields:
+        - { name: Nr, as: "@number" }
+        - { name: KundenNr, as: customer/@id }
+        - { name: Kunde, as: customer/name }
+        - { name: Betrag, as: amount }
+        - { name: Datum, as: date }
+        - { name: Bezahlt, as: paid }
   - id: rejected
     type: csv.output
     with:
@@ -48,4 +66,5 @@ transforms:
       delimiter: ";"
 links:
   - { from: read, to: write }
+  - { from: read, to: export }
   - { from: read, to: rejected, type: error }
