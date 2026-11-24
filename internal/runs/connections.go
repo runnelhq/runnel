@@ -17,8 +17,17 @@ import (
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
-// connectionTypes are the built-in connection types (ADR 0022); plugins bring none.
-var connectionTypes = connections.Builtin()
+// builtinConnectionTypes are the connection types built into Runnel (ADR 0022).
+var builtinConnectionTypes = connections.Builtin()
+
+// connectionTypes are the connection types of a project: the built-in ones and those of
+// its trusted plugins (S49c); the built-in ones without a project.
+func connectionTypes(p *model.Project) *connection.Registry {
+	if p == nil {
+		return builtinConnectionTypes
+	}
+	return ConnectionTypes(p.Dir)
+}
 
 // connectionResolver resolves the connections of a run for its environment: variables of
 // the project and environment, secrets from the stores of the environment (added to the
@@ -32,7 +41,8 @@ func connectionResolver(p *model.Project, env *model.Environment, mask *vars.Mas
 		if c == nil {
 			return connection.Resolved{}, fmt.Errorf("%s", model.UnknownConnection(p, name))
 		}
-		if err := connectionTypes.Check(c.Type, c.With); err != nil {
+		types := connectionTypes(p)
+		if err := types.Check(c.Type, c.With); err != nil {
 			return connection.Resolved{}, fmt.Errorf("connection %s: %w", name, err)
 		}
 		scope := model.ConnectionScope(p, env).Scope
@@ -40,7 +50,7 @@ func connectionResolver(p *model.Project, env *model.Environment, mask *vars.Mas
 		with := make(map[string]any, len(c.With))
 		for field, v := range c.With {
 			expand := scope.Expand
-			if connectionTypes.SecretField(c.Type, field) {
+			if types.SecretField(c.Type, field) {
 				expand = scope.ExpandSecret
 			}
 			one := func(key, text string) (string, error) {
@@ -125,18 +135,22 @@ func CheckConnections(p *model.Project, env string) model.Errors {
 // CheckConnection checks one connection against its type and the project (p may be nil).
 func CheckConnection(c *model.Connection, p *model.Project, env string) model.Errors {
 	var errs model.Errors
-	if _, ok := connectionTypes.Descriptor(c.Type); !ok {
-		return model.Errors{c.ErrorAt("$.type", "unknown connection type %q (available: %s)", c.Type, strings.Join(connectionTypes.Types(), ", "))}
+	types := connectionTypes(p)
+	if _, ok := types.Descriptor(c.Type); !ok {
+		if hint := types.Hint(c.Type); hint != "" {
+			return model.Errors{c.ErrorAt("$.type", "%s", hint)}
+		}
+		return model.Errors{c.ErrorAt("$.type", "unknown connection type %q (available: %s)", c.Type, strings.Join(types.Types(), ", "))}
 	}
-	if err := connectionTypes.Check(c.Type, c.With); err != nil {
+	if err := types.Check(c.Type, c.With); err != nil {
 		path := "$.with"
 		if f := fieldOf(err.Error()); f != "" && c.With[f] != nil {
 			path += "." + f
 		}
 		errs = append(errs, c.ErrorAt(path, "%s connection: %v", c.Type, err))
 	}
-	errs = append(errs, c.CheckSecrets(func(field string) bool { return connectionTypes.SecretField(c.Type, field) }, model.SecretStoresOf(p, env))...)
-	warnings := connectionTypes.Warnings(c.Type, c.With)
+	errs = append(errs, c.CheckSecrets(func(field string) bool { return types.SecretField(c.Type, field) }, model.SecretStoresOf(p, env))...)
+	warnings := types.Warnings(c.Type, c.With)
 	for _, field := range slices.Sorted(maps.Keys(warnings)) {
 		errs = append(errs, c.WarningAt("$.with."+field, "%s", warnings[field]))
 	}

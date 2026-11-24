@@ -30,6 +30,11 @@ type Definition struct {
 	// Warn returns warnings about the fields under with: by field, e.g. a switched off
 	// certificate check (ADR 0022); nil: none.
 	Warn func(with map[string]any) map[string]string
+	// Schema is the schema of the fields under with: where there is no Config, as for the
+	// connection types of plugins (ADR 0019, S49c).
+	Schema *schema.Schema
+	// Plugin names the plugin that provides the type; empty for built-in types.
+	Plugin string
 }
 
 // Descriptor is the description of a connection type for checks and the editor.
@@ -44,6 +49,8 @@ type Descriptor struct {
 type Registry struct {
 	defs map[string]Definition
 	desc map[string]Descriptor
+	// hints explain, by namespace of a plugin, why its connection types are missing.
+	hints map[string]string
 }
 
 // NewRegistry returns an empty registry.
@@ -57,12 +64,51 @@ func (r *Registry) Register(d Definition) {
 	if _, dup := r.defs[d.Type]; dup || d.Type == "" || strings.ContainsAny(d.Type, " ./") {
 		panic("invalid or duplicate connection type " + d.Type)
 	}
-	s, err := schema.For(d.Config)
-	if err != nil {
-		panic(fmt.Sprintf("connection type %s: %v", d.Type, err))
+	s := d.Schema
+	if s == nil {
+		var err error
+		if s, err = schema.For(d.Config); err != nil {
+			panic(fmt.Sprintf("connection type %s: %v", d.Type, err))
+		}
 	}
 	r.defs[d.Type] = d
 	r.desc[d.Type] = Descriptor{Type: d.Type, Label: d.Label, Description: d.Description, Schema: s}
+}
+
+// With returns a copy of the registry with the connection types of the plugins of a
+// project and hints by namespace for plugins whose types are missing (e.g. not trusted).
+// Types that exist already are left out.
+func (r *Registry) With(defs []Definition, hints map[string]string) *Registry {
+	out := &Registry{defs: maps.Clone(r.defs), desc: maps.Clone(r.desc), hints: maps.Clone(r.hints)}
+	for _, d := range defs {
+		if _, dup := out.defs[d.Type]; !dup {
+			out.Register(d)
+		}
+	}
+	for ns, h := range hints {
+		if out.hints == nil {
+			out.hints = map[string]string{}
+		}
+		out.hints[ns] = h
+	}
+	return out
+}
+
+// Lookup returns the definition of a type.
+func (r *Registry) Lookup(typ string) (Definition, bool) {
+	d, ok := r.defs[typ]
+	return d, ok
+}
+
+// Hint explains why an unknown type is missing, if it belongs to a plugin of the project
+// that cannot be used (its namespace, or the namespace and "-…"); empty otherwise.
+func (r *Registry) Hint(typ string) string {
+	for ns, h := range r.hints {
+		if typ == ns || strings.HasPrefix(typ, ns+"-") {
+			return h
+		}
+	}
+	return ""
 }
 
 // Descriptor returns the description of a type.
@@ -96,10 +142,16 @@ func (r *Registry) SecretField(typ, field string) bool {
 func (r *Registry) Check(typ string, with map[string]any) error {
 	d, ok := r.defs[typ]
 	if !ok {
+		if hint := r.Hint(typ); hint != "" {
+			return errors.New(hint)
+		}
 		return fmt.Errorf("unknown connection type %q (available: %s)", typ, strings.Join(r.Types(), ", "))
 	}
 	if with == nil {
 		with = map[string]any{}
+	}
+	if d.Config == nil {
+		return schema.CheckConfig(r.desc[typ].Schema, with) // a type of a plugin: it checks the values itself
 	}
 	return decode(r.asText(typ, with), newConfig(d.Config))
 }

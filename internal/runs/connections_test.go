@@ -173,7 +173,7 @@ func TestConnectionMappings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if errs := c.CheckSecrets(func(field string) bool { return connectionTypes.SecretField(c.Type, field) }, nil); len(errs) > 0 {
+	if errs := c.CheckSecrets(func(field string) bool { return builtinConnectionTypes.SecretField(c.Type, field) }, nil); len(errs) > 0 {
 		t.Fatalf("secret in headers refused: %v", errs)
 	}
 	p.Connections["app"] = c
@@ -194,7 +194,7 @@ func TestConnectionMappings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if errs := bad.CheckSecrets(func(field string) bool { return connectionTypes.SecretField(bad.Type, field) }, nil); len(errs) != 1 || !strings.Contains(errs.Error(), "is not allowed here") {
+	if errs := bad.CheckSecrets(func(field string) bool { return builtinConnectionTypes.SecretField(bad.Type, field) }, nil); len(errs) != 1 || !strings.Contains(errs.Error(), "is not allowed here") {
 		t.Errorf("%v", errs)
 	}
 }

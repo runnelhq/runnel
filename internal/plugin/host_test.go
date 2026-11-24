@@ -59,7 +59,8 @@ func TestPlugin(t *testing.T) {
 	if pr.Info.Version != "1.0.0" || pr.Info.Concurrency != 0 {
 		t.Errorf("info %+v", pr.Info)
 	}
-	ds, err := pr.Describe(ctx)
+	d, err := pr.Describe(ctx)
+	ds := d.Actions
 	if err != nil || len(ds) != 1 || ds[0].Type != "demo.echo" || ds[0].Kind != "action" || ds[0].Schema.Properties == nil {
 		t.Fatalf("describe %+v %v", ds, err)
 	}
@@ -131,6 +132,14 @@ func TestPluginRefused(t *testing.T) {
 	}
 	if _, err := pr.Describe(context.Background()); err == nil || !strings.Contains(err.Error(), `type core.echo is outside its namespace "demo"`) {
 		t.Errorf("outside: %v", err)
+	}
+	_ = pr.Close()
+	p, o, _ = testPlugin(t, "conn-outside")
+	if pr, err = Start(context.Background(), p, o); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pr.Describe(context.Background()); err == nil || !strings.Contains(err.Error(), `connection type "sql" is outside its namespace (expected demo or demo-…)`) {
+		t.Errorf("connection outside: %v", err)
 	}
 	_ = pr.Close()
 

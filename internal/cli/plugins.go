@@ -16,7 +16,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/plugin"
 	"github.com/runnelhq/runnel/internal/plugintrust"
@@ -159,10 +158,13 @@ func listPlugins(ctx context.Context, out io.Writer, dir string) error {
 			continue
 		}
 		tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-		for _, d := range types {
+		for _, d := range types.Actions {
 			_, _ = fmt.Fprintf(tw, "  %s\taction\t%s\n", d.Type, d.Description)
 		}
-		if len(types) == 0 {
+		for _, c := range types.Connections {
+			_, _ = fmt.Fprintf(tw, "  %s\tconnection\t%s\n", c.Type, c.Description)
+		}
+		if len(types.Actions)+len(types.Connections) == 0 {
 			_, _ = fmt.Fprintln(tw, "  (none)")
 		}
 		_ = tw.Flush()
@@ -171,10 +173,10 @@ func listPlugins(ctx context.Context, out io.Writer, dir string) error {
 }
 
 // describePlugin starts a trusted plugin, asks for its types and ends it again.
-func describePlugin(ctx context.Context, root string, p *model.Plugin) ([]action.Descriptor, error) {
+func describePlugin(ctx context.Context, root string, p *model.Plugin) (plugin.Description, error) {
 	pr, err := plugin.Start(ctx, p, plugin.Options{ProjectDir: root, RunnelVersion: version.Version})
 	if err != nil {
-		return nil, err
+		return plugin.Description{}, err
 	}
 	defer func() { _ = pr.Close() }()
 	return pr.Describe(ctx)

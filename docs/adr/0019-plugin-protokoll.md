@@ -439,3 +439,25 @@ Editor, Connections). Präzisierungen:
 - **Umgebung:** Variablen, die Tokens der HTTP-Trigger des Projekts enthalten (`auth: { token: ${env:NAME} }`), fehlen
   in der Umgebung der Plugins.
 - **Pipelines** können noch keine Plugins nutzen (Transforms folgen mit S50).
+
+## Nachtrag 2026-11-24 (S49c): Connection-Typen aus Plugins
+
+- **`describe`** liefert neben `actions` optional `connectionTypes`: je Typ `type`, `label`, `description`, `schema` und
+  `test`. Der Host prüft: Name gleich dem Namensraum oder `<namensraum>-…` (Kleinbuchstaben, Ziffern, `-`), jeder
+  einmal, mit `schema`; sonst wird das Plugin nicht genutzt (wie bei Actions außerhalb des Namensraums).
+- **Registry je Projekt:** Wie bei Actions ergänzt Runnel die eingebauten Connection-Typen um die der freigegebenen
+  Plugins (derselbe Zwischenspeicher je Plugin). Eingebaute Typen gehen vor; ein Plugin kann keinen überschreiben.
+- **Prüfung der Dateien:** gegen das Schema aus `describe` – Pflichtfelder und, bei `additionalProperties: false`,
+  unbekannte Felder; Secrets nur in Feldern mit `format: runnel-secret`. Typen der Werte prüft das Plugin, weil sie
+  Variablen enthalten können. Ist das Plugin nicht freigegeben oder geändert, steht der Grund an `type`, z. B.
+  `plugin "demo" is not trusted on this computer; check it and run "runnel plugins trust"`.
+- **Editor:** Das Schema der Connection-Dateien (`/schemas/connection`) enthält die Typen der Plugins als Auswahl und
+  ihre Felder als Variante; das Formular zeigt sie damit ohne eigenes Mockup.
+- **`connection.test`:** Params `{"type", "connection"}` mit der aufgelösten Connection (`{"name", "type", …Felder}`),
+  Antwort `{"ok", "message", "version"}`. `POST /connections/{name}/test` startet dafür das Plugin (Freigabe erneut
+  geprüft), ruft die Methode auf und beendet es; Zeitgrenze wie bei eingebauten Typen (15 s). Secrets der Connection
+  sind in der Meldung maskiert. Ohne `"test": true` antwortet der Server mit `ok: false` und dem Hinweis, dass der Typ
+  nicht getestet werden kann; der Knopf im Formular bleibt (wie bei eingebauten Typen ohne Test).
+- **Connections in der `config`:** Felder mit `format: runnel-connection` nehmen auch Connections der Typen von
+  Plugins, wenn `x-runnel-connection` sie nennt; sie kommen aufgelöst und maskiert wie die eingebauten an.
+- `runnel plugins` zeigt die Connection-Typen eines Plugins mit `connection` neben den Actions.

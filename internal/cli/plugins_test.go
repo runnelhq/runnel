@@ -136,7 +136,7 @@ func TestPluginTypes(t *testing.T) {
 		t.Fatal(errOut)
 	}
 	_, out, _ := run(t, "plugins", dir)
-	if !strings.Contains(out, "Types of demo:\n  demo.echo  action  Returns its text\n") {
+	if !strings.Contains(out, "Types of demo:\n  demo.echo  action      Returns its text\n  demo       connection  A demo service\n") {
 		t.Errorf("types:\n%s", out)
 	}
 	t.Setenv(plugintest.ModeEnv, "outside")

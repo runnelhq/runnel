@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/runnelhq/runnel/internal/conntest"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/runs"
@@ -72,7 +71,7 @@ func (s *Server) handleTestConnection(w http.ResponseWriter, r *http.Request) {
 	res := testResult{Environment: env}
 	c, mask, err := runs.ResolveConnection(ctx, p, env, name)
 	if err == nil {
-		res.Message, err = conntest.Run(ctx, c)
+		res.Message, err = runs.TestConnection(ctx, s.dir, c, mask)
 	}
 	res.DurationMS = time.Since(start).Milliseconds()
 	switch {
