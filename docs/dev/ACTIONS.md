@@ -102,6 +102,9 @@ Regeln:
   für ein Textfeld eine Zahl oder ein Datum, erhält die Action den Wert als Text. Ebenso wird eine Zahl oder
   `true`/`false` in der Datei (`status: 404`) für ein Textfeld als Text übergeben – vor dem Lauf wie bei der
   Ausführung, wie in Pipelines.
+- **Namen der Parameter** nach [ADR 0025](../adr/0025-einheitliche-parameter.md): `ifExists`, `ifMissing`, `format`,
+  `as`, `from`, `maxRows`/`maxRecords`, Größen als Text (`10MB`), `timeout` als Dauer, Ausgabe `path`. Gibt es für eine
+  Sache schon einen Namen, wird er übernommen; Abweichungen werden im PR begründet.
 - **`DecodeConfig`** verwenden – es lehnt unbekannte Felder ab (Tippfehler im Workflow werden gemeldet; Vertragstest
   prüft das) und prüft Pflichtfelder.
 - **Freie Werte** (`any`, `map[string]any`, `[]any`, z. B. ein Body oder Parameter) erhält die Action von
@@ -200,6 +203,7 @@ Pflicht:
 - [ ] Typname im passenden, reservierten Namensraum; bei neuem Namensraum: `namespaces.go`, `register.go`, `actions.go`
 - [ ] Eine Datei je Action, Tests daneben, Eintrag in `register.go`
 - [ ] `Category`, `Label`, `Description`, `Config` gesetzt; jedes Feld mit `doc`, Pflichtfelder mit `required` und `example`
+- [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name)
 - [ ] `Example` (die `with:`-Werte in YAML) für den Abschnitt „Help“ im Editor; der Vertragstest prüft es
 - [ ] Konfiguration über `DecodeConfig`; `New` prüft nur Struktur, Werte werden in `Execute` geprüft
 - [ ] `ctx` wird beachtet (Abbruch, Timeout); keine Panics; keine Secrets im Log

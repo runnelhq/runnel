@@ -22,6 +22,8 @@ internal/transforms/<namensraum>/
   eingetragen.
 - **Kategorie** (`transform.Category…`): `input`, `transform`, `flow`, `execution`, `combine`, `output`
   (KONZEPT Kap. 12.2).
+- **Namen der Parameter** nach [ADR 0025](../adr/0025-einheitliche-parameter.md), wie bei Actions; in Pipelines
+  `maxRecords`, bei Dateien `fields[].from` (Lesen) und `fields[].as` (Schreiben), `fields[].format` als Runnel-Muster.
 - **Konfiguration** wie bei Actions mit `transform.DecodeConfig` und Tags (`doc`, `schema`). Felder, die `${…}` enthalten
   dürfen, als `string` anlegen – auch Zahlen (z. B. `rows`); die Engine schreibt eine Zahl in so einem Feld als Text.
   Der Wert wird in `Process` geprüft, nicht in `New`: `runnel validate` ruft `New` mit den Variablen, wie sie in der Datei
@@ -111,6 +113,7 @@ func TestUpper(t *testing.T) {
 ## 5. Checkliste für den PR
 
 - [ ] Eine Datei je Transform, Eintrag in `register.go`, Kategorie, Label, Beschreibung, `doc` für jedes Feld
+- [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name)
 - [ ] Feldnamen mit `format=runnel-field`, Link-Ziele mit `format=runnel-target`; ein `Example`
 - [ ] Werte mit Variablen werden in `Process` geprüft; `Emit`-Fehler werden zurückgegeben
 - [ ] `Init` meldet das Ausgabeschema und alle gelesenen Felder (`ic.Use`), mit Tests
