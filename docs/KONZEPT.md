@@ -353,7 +353,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | PostgreSQL (seit S20c) | `jackc/pgx/v5` |
 | Oracle | `sijms/go-ora` (pure Go) |
 | ODBC (optional, Access, Legacy; auch MySQL/MariaDB bis auf Weiteres) | `alexbrainman/odbc` |
-| Excel | Lesen seit S67a mit eigenem Reader (`internal/xlsx`: `archive/zip`, `encoding/xml`), weil `excelize` beim Streamen nur Text ohne Zelltyp liefert; Schreiben (S67b) offen, z. B. `xuri/excelize/v2` |
+| Excel | Lesen mit eigenem Reader (`internal/xlsx`: `archive/zip`, `encoding/xml`, seit S67a), Schreiben mit `xuri/excelize/v2` (S67b) – [ADR 0024](adr/0024-excel-lesen-schreiben.md) |
 | CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
 | SFTP | `pkg/sftp` + `x/crypto/ssh` |
 | FTP/FTPS | offen; Auswahl mit S57 (Lizenz MIT-kompatibel) |
