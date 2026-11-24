@@ -12,6 +12,7 @@ import (
 	"github.com/runnelhq/runnel/internal/transforms/file"
 	"github.com/runnelhq/runnel/internal/transforms/http"
 	"github.com/runnelhq/runnel/internal/transforms/json"
+	"github.com/runnelhq/runnel/internal/transforms/xml"
 )
 
 var namespaces = []func(*transform.Registry){
@@ -22,6 +23,7 @@ var namespaces = []func(*transform.Registry){
 	file.Register,
 	json.Register,
 	http.Register,
+	xml.Register,
 }
 
 // Builtin returns a new registry with all built-in transforms.

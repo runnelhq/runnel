@@ -250,6 +250,33 @@ func TestRunCSVExample(t *testing.T) {
 	}
 }
 
+// TestRunXMLExample runs examples/pipelines/pipelines/xml-orders.pipeline.yaml (S68a):
+// orders from an XML export with a namespace, the order without amount to the error link.
+func TestRunXMLExample(t *testing.T) {
+	chdirRepoRoot(t)
+	dir := t.TempDir()
+	target, rejected := filepath.Join(dir, "orders.csv"), filepath.Join(dir, "rejected.csv")
+	code, out, errOut := run(t, "run", "--param", "OUTPUT="+target, "--param", "REJECTED="+rejected, "examples/pipelines/pipelines/xml-orders.pipeline.yaml")
+	if code != 0 {
+		t.Fatalf("exit code %d:\n%s%s", code, out, errOut)
+	}
+	if !strings.Contains(out, "[read] read 5 records from sales/orders.xml, 1 with errors") {
+		t.Errorf("output:\n%s", out)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "\xEF\xBB\xBFNr;Kunde;KundenNr;Betrag;Datum;Bezahlt\r\n1001;Müller GmbH;K-17;1.234,50;19.11.2026;true\r\n1002;Schmidt & Söhne;K-3;89,90;19.11.2026;false\r\n" +
+		"1003;Weber, Anna;K-8;12.500,00;20.11.2026;true\r\n1005;Braun AG;K-5;15.800,00;21.11.2026;false\r\n"
+	if string(b) != want {
+		t.Errorf("written file %q, want %q", b, want)
+	}
+	if b, err := os.ReadFile(rejected); err != nil || !strings.Contains(string(b), `sales/orders.xml:23: record 4, field ""Betrag"": ""k. A."" is not a number`) {
+		t.Errorf("rejected %q %v", b, err)
+	}
+}
+
 // TestRunExcelExample runs examples/pipelines/pipelines/excel-orders.pipeline.yaml (S67):
 // the table below a title, the order with #N/A to the error link.
 func TestRunExcelExample(t *testing.T) {

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Orders as an ERP exports them -->
+<b:Bestellungen xmlns:b="urn:example:orders" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" erstellt="2026-11-24">
+  <b:Bestellung nr="1001">
+    <b:Kunde id="K-17">
+      <b:Name>Müller &amp; Söhne</b:Name>
+      <b:Ort>Köln</b:Ort>
+    </b:Kunde>
+    <b:Betrag waehrung="EUR">1234.50</b:Betrag>
+    <b:Datum>2026-11-19</b:Datum>
+    <b:Position artikel="A1" menge="2"/>
+    <b:Position artikel="B7" menge="1"/>
+    <b:Notiz><![CDATA[Bitte <vor> 12 Uhr liefern]]></b:Notiz>
+  </b:Bestellung>
+  <b:Bestellung nr="1002">
+    <b:Kunde id="K-3">
+      <b:Name>Weber, Anna</b:Name>
+      <b:Ort>Bonn</b:Ort>
+    </b:Kunde>
+    <b:Betrag waehrung="EUR">89.90</b:Betrag>
+    <b:Datum>2026-11-20</b:Datum>
+    <b:Position artikel="C2" menge="5"/>
+  </b:Bestellung>
+  <b:Bestellung nr="1003">
+    <b:Kunde id="K-9"><b:Name>Klein KG</b:Name></b:Kunde>
+    <b:Betrag waehrung="EUR">k. A.</b:Betrag>
+    <b:Datum>2026-11-21</b:Datum>
+  </b:Bestellung>
+</b:Bestellungen>
