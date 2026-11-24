@@ -47,8 +47,15 @@ export function OpenFilesList(props: {
     const q = query.trim().toLowerCase();
     return q ? props.paths.filter((p) => p.toLowerCase().includes(q)) : props.paths;
   }, [props.paths, query]);
-  const [index, setIndex] = useState(0);
-  useEffect(() => setIndex(query ? 0 : Math.max(0, props.paths.indexOf(props.active ?? ""))), [query, props.paths, props.active]);
+  // The selected entry: the active file, the first match while typing. Set at once when
+  // typing (not in an effect after rendering), so that Enter right after typing opens the
+  // match; kept inside the shown entries.
+  const activeIndex = () => Math.max(0, props.paths.indexOf(props.active ?? ""));
+  const [index, setIndex] = useState(activeIndex);
+  useEffect(() => {
+    if (!query) setIndex(activeIndex());
+  }, [props.paths, props.active]); // eslint-disable-line react-hooks/exhaustive-deps
+  const selected = Math.min(index, shown.length - 1);
   const choose = (path: string | undefined) => {
     if (!path) return;
     props.onSelect(path);
@@ -81,11 +88,14 @@ export function OpenFilesList(props: {
           aria-label="Go to an open file"
           placeholder="Go to an open file"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIndex(e.target.value.trim() ? 0 : activeIndex());
+          }}
           onKeyDown={(e) => {
-            if (e.key === "ArrowDown") setIndex((i) => Math.min(i + 1, shown.length - 1));
-            else if (e.key === "ArrowUp") setIndex((i) => Math.max(i - 1, 0));
-            else if (e.key === "Enter") choose(shown[index]);
+            if (e.key === "ArrowDown") setIndex(Math.min(selected + 1, shown.length - 1));
+            else if (e.key === "ArrowUp") setIndex(Math.max(selected - 1, 0));
+            else if (e.key === "Enter") choose(shown[selected]);
             else return;
             e.preventDefault();
           }}
@@ -103,13 +113,13 @@ export function OpenFilesList(props: {
           <li
             key={p}
             role="option"
-            aria-selected={i === index}
+            aria-selected={i === selected}
             aria-current={p === props.active || undefined}
             onMouseEnter={() => setIndex(i)}
             onClick={() => choose(p)}
             className={
               "flex h-[30px] cursor-default items-center gap-2 rounded-sm pr-1.5 pl-2 " +
-              (i === index ? "bg-accent text-accent-foreground " : "") +
+              (i === selected ? "bg-accent text-accent-foreground " : "") +
               (p === props.active ? "font-semibold" : "")
             }
           >

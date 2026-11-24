@@ -44,6 +44,27 @@ test("tabs stay readable and the list goes to any open file", async ({ page }) =
   await expect(tabs(page)).toHaveCount(files.length - 1);
 });
 
+// Enter right after typing opens the first match: the selection follows the typing at
+// once, not only after the list has been drawn again.
+test("Enter right after typing opens the first match", async ({ page }) => {
+  await openAll(page);
+  const list = page.getByRole("dialog", { name: "Open files" });
+  for (const [typed, name] of [["hel", "hello.workflow.yaml"], ["dev", "dev.yaml"], ["morn", "morning.yaml"]]) {
+    await page.keyboard.press("Control+Shift+L");
+    await page.keyboard.type(typed, { delay: 0 });
+    await page.keyboard.press("Enter");
+    await expect(list).toHaveCount(0);
+    await expect(tab(page, name)).toHaveAttribute("aria-selected", "true");
+  }
+  // No match: Enter keeps the list open; Escape closes it.
+  await page.keyboard.press("Control+Shift+L");
+  await page.keyboard.type("nothing");
+  await page.keyboard.press("Enter");
+  await expect(list).toContainText("No open file matches");
+  await page.keyboard.press("Escape");
+  await expect(list).toHaveCount(0);
+});
+
 test("the menu of a tab closes others, those to the right and all", async ({ page }) => {
   await openAll(page);
   await tab(page, "greet.yaml").click({ button: "right" });
