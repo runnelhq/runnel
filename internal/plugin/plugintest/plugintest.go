@@ -80,7 +80,10 @@ func serve(mode string) {
 			}
 			answer(req.ID, map[string]any{"actions": []any{map[string]any{
 				"type": typ, "category": "general", "label": "Echo", "description": "Returns its text",
-				"schema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string"}}},
+				"schema": map[string]any{"type": "object", "required": []string{"text"}, "additionalProperties": false, "properties": map[string]any{
+					"text": map[string]any{"type": "string"},
+					"api":  map[string]any{"type": "string", "format": "runnel-connection", "x-runnel-connection": []string{"http"}},
+				}},
 			}}})
 		case "action.execute":
 			var p struct {
@@ -105,7 +108,13 @@ func serve(mode string) {
 				default:
 					fmt.Fprintln(os.Stderr, "WARN echo "+text+" with s3cret")
 					fmt.Fprintln(os.Stderr, "plain line")
-					answer(id, map[string]any{"output": map[string]any{"echo": text, "run": p.Context["runId"], "dir": p.Context["projectDir"], "token": "s3cret", "list": []any{"s3cret"}}})
+					out := map[string]any{"echo": text, "run": p.Context["runId"], "dir": p.Context["projectDir"], "token": "s3cret", "list": []any{"s3cret"}}
+					if api, ok := p.Config["api"]; ok {
+						out["api"] = api
+						out["env"] = p.Context["environment"]
+						out["hookToken"] = os.Getenv("HOOK_TOKEN")
+					}
+					answer(id, map[string]any{"output": out})
 				}
 			}(req.ID)
 		case "$/cancelRequest":

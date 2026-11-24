@@ -38,7 +38,7 @@ func NewCatalog(actions *action.Registry, transforms *transform.Registry) Catalo
 }
 
 func (s *Server) handleCatalog(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, NewCatalog(s.registry, s.transforms))
+	writeJSON(w, http.StatusOK, NewCatalog(runs.WithPlugins(s.registry, s.dir), s.transforms))
 }
 
 // handleSchema returns the JSON Schema of a file kind (project, environment, trigger;

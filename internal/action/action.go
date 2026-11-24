@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -46,6 +47,16 @@ type ExecContext struct {
 	// Respond answers the waiting caller of an http trigger (http.response, S38b1); nil
 	// if the run has no waiting caller.
 	Respond Responder
+	// Plugins runs actions of plugins in their processes of this run (ADR 0019); nil
+	// where plugins are not supported.
+	Plugins PluginRunner
+}
+
+// PluginRunner runs the actions of plugins in the processes of one run (ADR 0019): one
+// process per plugin, started on first use and ended by Close at the end of the run.
+type PluginRunner interface {
+	Execute(ctx context.Context, plugin, typ string, config map[string]any, ec *ExecContext) (any, error)
+	Close()
 }
 
 // Response is the answer of a run to the waiting caller of an http trigger.
@@ -161,6 +172,9 @@ type Definition struct {
 	// nil for actions without configuration. The JSON Schema of the action is derived
 	// from it (package schema).
 	Config any
+	// Schema is the schema of the configuration where it does not come from Config, as
+	// for actions of plugins (describe, ADR 0019).
+	Schema *schema.Schema
 	// New creates an action from its "with" configuration. It is called once before
 	// the run with the configuration as written (to report unknown or missing fields
 	// early) and again before each execution with variables resolved. New must only
@@ -186,6 +200,8 @@ type Descriptor struct {
 type Registry struct {
 	defs        map[string]Definition
 	descriptors map[string]Descriptor
+	// hints explain, by namespace, why types of a plugin are missing (e.g. not trusted).
+	hints map[string]string
 }
 
 // NewRegistry creates an empty registry.
@@ -202,9 +218,12 @@ func (r *Registry) Register(d Definition) {
 	if _, dup := r.defs[d.Type]; dup {
 		panic("action type registered twice: " + d.Type)
 	}
-	s, err := schema.For(d.Config)
-	if err != nil {
-		panic(fmt.Sprintf("action type %s: %v", d.Type, err))
+	s := d.Schema
+	if s == nil {
+		var err error
+		if s, err = schema.For(d.Config); err != nil {
+			panic(fmt.Sprintf("action type %s: %v", d.Type, err))
+		}
 	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{
@@ -216,6 +235,31 @@ func (r *Registry) Register(d Definition) {
 		Schema:      s,
 		Example:     d.Example,
 	}
+}
+
+// With returns a copy of the registry with more action types (those of the plugins of a
+// project) and hints by namespace for types that are missing, e.g. of a plugin that is
+// not trusted. The definitions must be valid (checked by the caller).
+func (r *Registry) With(defs []Definition, hints map[string]string) *Registry {
+	out := &Registry{defs: maps.Clone(r.defs), descriptors: maps.Clone(r.descriptors), hints: maps.Clone(r.hints)}
+	for _, d := range defs {
+		if _, dup := out.defs[d.Type]; !dup {
+			out.Register(d)
+		}
+	}
+	for ns, h := range hints {
+		if out.hints == nil {
+			out.hints = map[string]string{}
+		}
+		out.hints[ns] = h
+	}
+	return out
+}
+
+// Hint explains why an unknown type is missing, if its namespace belongs to a plugin
+// of the project that cannot be used; empty otherwise.
+func (r *Registry) Hint(typ string) string {
+	return r.hints[model.TypeNamespace(typ)]
 }
 
 // Lookup returns the definition of an action type.

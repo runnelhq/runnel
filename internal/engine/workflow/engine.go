@@ -60,6 +60,8 @@ type Options struct {
 	Mask *vars.Mask
 	// Connections resolves the connections named by actions (ADR 0022); nil: none.
 	Connections connection.Resolver
+	// Plugins runs actions of plugins (ADR 0019) and is closed when the run ends; nil: none.
+	Plugins action.PluginRunner
 }
 
 // Status is the final state of a run.
@@ -152,7 +154,9 @@ func Prepare(w *model.Workflow, opts Options) (*Runner, error) {
 			r.start = a.ID
 		}
 		def, ok := opts.Registry.Lookup(a.Type)
-		if !ok {
+		if hint := opts.Registry.Hint(a.Type); !ok && hint != "" {
+			errs = append(errs, w.ErrorAt(path+".type", "action %q: %s", a.ID, hint))
+		} else if !ok {
 			errs = append(errs, w.ErrorAt(path+".type", "action %q: unknown action type %q (available: %v)",
 				a.ID, a.Type, opts.Registry.Types()))
 		} else if _, err := def.New(asText(a.With, opts.Registry, a.Type)); err != nil {
@@ -200,6 +204,9 @@ func Check(w *model.Workflow, opts Options) model.Errors {
 
 // Run executes the workflow and returns when it has finished.
 func (r *Runner) Run(ctx context.Context) Result {
+	if r.opts.Plugins != nil {
+		defer r.opts.Plugins.Close() // the processes of the plugins end with the run
+	}
 	ctx = paths.WithBase(ctx, r.opts.BaseDir)
 	now := r.opts.Now
 	started := now()
@@ -324,6 +331,7 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 		Log:        func(level slog.Level, msg string) { r.log(runID, a, level, prefix+msg) },
 		Respond:    r.opts.Respond,
 		Connection: r.opts.Connections,
+		Plugins:    r.opts.Plugins,
 	}
 	if r.opts.Workflows != nil {
 		ec.RunWorkflow = func(ctx context.Context, path string, params map[string]string) (map[string]any, error) {

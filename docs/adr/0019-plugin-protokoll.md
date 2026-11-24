@@ -416,3 +416,26 @@ Editor, Connections). Präzisierungen:
 - **`runnel plugins`** startet freigegebene Plugins, um ihre Typen zu zeigen; nicht freigegebene nie.
 - **Tests:** Das Test-Binary ist selbst das Plugin (`internal/plugin/plugintest`, gestartet mit `RUNNEL_TEST_PLUGIN`);
   so prüfen die Tests das Protokoll ohne SDK und ohne `go build` auf Linux und Windows.
+
+## Nachtrag 2026-11-24 (S49b2): Actions in Workflows
+
+- **Registry je Projekt:** Vor jeder Prüfung und jedem Lauf ergänzt Runnel die eingebauten Actions um die der
+  freigegebenen Plugins des Projekts (`describe`). Das Ergebnis je Plugin wird zwischengespeichert, solange sich Namen,
+  Größen und Änderungszeiten seiner Dateien und die Dateien der Freigaben nicht ändern; erst dann bildet Runnel den Hash
+  neu und startet `describe` erneut. Der Katalog des Editors (`/catalog`) enthält die Actions der Plugins, die Palette
+  zeigt sie damit ohne eigenes Mockup in ihrer Kategorie (unbekannte Kategorie: `general`).
+- **Nicht nutzbare Plugins:** Ist ein Plugin nicht freigegeben, seit der Freigabe geändert oder startet es nicht, melden
+  `validate`, Editor und Lauf seine Typen an der Action mit dem Grund, z. B.
+  `action "say": plugin "demo" is not trusted on this computer; check it and run "runnel plugins trust"`; ein Lauf
+  startet nicht.
+- **Prüfung der `config`:** vor dem Lauf gegen das Schema aus `describe` – Pflichtfelder und, bei
+  `additionalProperties: false`, unbekannte Felder. Typen prüft das Plugin, weil Werte noch Variablen enthalten können.
+- **Prozess je Lauf:** Der erste Aufruf eines Plugins in einem Lauf prüft die Freigabe erneut und startet es; am Ende
+  des Laufs endet es (`shutdown`). Aufgerufene Workflows (`core.run-workflow`) haben eigene Prozesse. Die Zeilen von
+  stderr erscheinen im Log der Action, die das Plugin zuletzt aufgerufen hat.
+- **Connections:** Ein Feld mit `format: runnel-connection` erhält die aufgelöste Connection
+  (`{"name", "type", …Felder}`); ihre Secrets und alle anderen Secrets des Laufs maskiert der Host in Log, Fehlern
+  und `output`.
+- **Umgebung:** Variablen, die Tokens der HTTP-Trigger des Projekts enthalten (`auth: { token: ${env:NAME} }`), fehlen
+  in der Umgebung der Plugins.
+- **Pipelines** können noch keine Plugins nutzen (Transforms folgen mit S50).

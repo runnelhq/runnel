@@ -5,8 +5,8 @@ Programm in beliebiger Sprache, das Runnel als Kindprozess startet und über JSO
 ([ADR 0019](../adr/0019-plugin-protokoll.md) mit Nachträgen; Namen nach [ADR 0013](../adr/0013-typnamen-namensraeume.md),
 Nachtrag 2026-11-24).
 
-Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S49b1** – Ablage, `plugin.yaml`, Freigabe
-und Protokoll für Actions. Actions aus Plugins in Workflows folgen mit S49b2, Transforms mit S50.
+Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S49b2** – Ablage, `plugin.yaml`, Freigabe,
+Protokoll und Actions aus Plugins in Workflows. Transforms folgen mit S50, eigene Connection-Typen mit S49c.
 
 ## Ablage
 
@@ -135,6 +135,28 @@ Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
 - **Secrets**, die der Host in der `config` übergibt, maskiert er in stderr, Fehlermeldungen und `output` (mit S49b2).
 
 Ströme für Transforms (`transform.open`, `.batch`, `.end`, Kredite) folgen mit S50 nach [ADR 0019](../adr/0019-plugin-protokoll.md).
+
+## In Workflows
+
+Die Actions eines freigegebenen Plugins stehen in Workflows des Projekts wie eingebaute bereit (auch in der Palette des
+Editors):
+
+```yaml
+actions:
+  - id: check
+    type: iban.check
+    with:
+      iban: ${IBAN}
+      api: erp            # Feld mit format: runnel-connection: das Plugin bekommt die aufgelöste Connection
+```
+
+- Ist das Plugin nicht freigegeben oder seit der Freigabe geändert, melden `runnel validate` und der Editor das an der
+  Action; ein Lauf startet nicht.
+- Runnel prüft die `config` vor dem Lauf gegen das Schema aus `describe` (Pflichtfelder, bei
+  `additionalProperties: false` unbekannte Felder) und löst Variablen, Ausdrücke und Connections auf.
+- Je Lauf ein Prozess je Plugin, gestartet beim ersten Aufruf, beendet am Ende des Laufs. Zeilen auf stderr stehen im
+  Log der Action; Secrets des Laufs sind darin und in Fehlern und `output` maskiert.
+- Die Umgebung enthält keine Variablen mit Tokens der HTTP-Trigger des Projekts.
 
 ## Testen
 
