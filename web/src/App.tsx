@@ -46,6 +46,9 @@ export function App() {
   const variables = useVariables(varsKey);
   const [run, setRun] = useState<RunView | null>(null);
   const triggers = useTriggers(`${epoch}:${varsKey}`);
+  // A run of the history to open on the canvas, and a filter for the list of runs (S26e2).
+  const [showRun, setShowRun] = useState<{ path: string; id: string; seq: number } | null>(null);
+  const [runsRequest, setRunsRequest] = useState<{ filter: { path?: string }; seq: number } | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   // Files with unsaved changes waiting for "Save changes?", one after the other (E21).
   const [closingQueue, setClosingQueue] = useState<string[]>([]);
@@ -261,6 +264,11 @@ export function App() {
                       keepDays={project?.history?.keepDays}
                       maxRuns={project?.history?.maxRuns}
                       onOpenFile={open}
+                      onOpenRun={(path, id) => {
+                        open(path);
+                        setShowRun((r) => ({ path, id, seq: (r?.seq ?? 0) + 1 }));
+                      }}
+                      request={runsRequest}
                       onSummary={setSummary}
                     />
                   </ErrorBoundary>
@@ -289,6 +297,11 @@ export function App() {
                     onReloadExplorer={loadTree}
                     files={files}
                     onOpenFile={open}
+                    showRun={showRun?.path === path ? showRun : null}
+                    onRunsOf={(p) => {
+                      open(runsTab);
+                      setRunsRequest((r) => ({ filter: { path: p }, seq: (r?.seq ?? 0) + 1 }));
+                    }}
                   />
                 </ErrorBoundary>
               ))}

@@ -13,6 +13,7 @@ import {
   PencilIcon,
   ReloadIcon,
   TerminalIcon,
+  WorkflowIcon,
 } from "./Icons";
 
 /**
@@ -32,9 +33,17 @@ export function RunsView(props: {
   keepDays?: number;
   maxRuns?: number;
   onOpenFile: (path: string) => void;
+  /** Opens the run on the canvas of its file (S26e2). */
+  onOpenRun: (path: string, id: string) => void;
   onSummary: (text: string | null) => void;
+  /** Sets the filter, e.g. "All runs of this file" from the canvas; seq changes with every request. */
+  request?: { filter: RunFilter; seq: number } | null;
 }) {
   const [filter, setFilter] = useState<RunFilter>({});
+  const { request } = props;
+  useEffect(() => {
+    if (request) setFilter(request.filter);
+  }, [request]);
   const [runs, setRuns] = useState<RunInfo[] | null>(null);
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,7 +204,7 @@ export function RunsView(props: {
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
           {detail && selected === detail.id ? (
-            <Details run={detail} triggers={props.triggers} onOpenFile={props.onOpenFile} />
+            <Details run={detail} triggers={props.triggers} onOpenFile={props.onOpenFile} onOpenRun={() => props.onOpenRun(detail.path, detail.id)} />
           ) : (
             <p className="m-4 text-xs text-muted-foreground">Select a run to see its details.</p>
           )}
@@ -228,7 +237,7 @@ export function RunStatusLabel({ status }: { status: RunStatus }) {
 }
 
 /** The trigger as a chip: schedule, http call, runnel run or the editor. */
-function TriggerChip({ trigger }: { trigger?: string }) {
+export function TriggerChip({ trigger }: { trigger?: string }) {
   const Icon = !trigger ? PencilIcon : trigger === "cli" ? TerminalIcon : trigger.startsWith("http:") ? GlobeIcon : ClockIcon;
   return (
     <span className={"inline-flex h-5 max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2 text-[10px] font-medium text-secondary-foreground " + (trigger ? "font-mono" : "")}>
@@ -356,7 +365,7 @@ function FilterSelect(props: { label: string; value: string; all?: string; optio
 }
 
 /** The selected run (GET /runs/{id}): error, where it came from, its parameters, the status of each action and its log. */
-function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (path: string) => void }) {
+function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (path: string) => void; onOpenRun: () => void }) {
   const r = props.run;
   const [log, setLog] = useState(false);
   const failed = r.actions.filter((a) => a.status === "failed").length;
@@ -381,6 +390,14 @@ function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (
         </div>
       </div>
       <div className="flex gap-2 px-4 pb-3">
+        <button
+          type="button"
+          onClick={props.onOpenRun}
+          className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-primary bg-primary px-2.5 text-xs font-medium text-primary-foreground"
+        >
+          <WorkflowIcon width={14} height={14} />
+          Open on canvas
+        </button>
         <button
           type="button"
           title="Copy run ID"
