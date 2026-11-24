@@ -22,7 +22,6 @@ var toResultDefinition = transform.Definition{
 	Example:     "maxRecords: 1000\n",
 	Config:      toResult{},
 	New:         newToResult,
-	Renamed:     map[string]string{"maxRows": "renamed to maxRecords"},
 }
 
 // DefaultMaxResultRows limits the result records held in memory (ADR 0008).

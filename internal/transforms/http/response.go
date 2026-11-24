@@ -33,7 +33,6 @@ var responseDefinition = transform.Definition{
 	Example:     "status: 200\nsingle: true\n",
 	Config:      response{},
 	New:         newResponse,
-	Renamed:     map[string]string{"maxRows": "renamed to maxRecords"},
 }
 
 // DefaultMaxRows limits the records held in memory for an answer.

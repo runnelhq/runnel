@@ -21,7 +21,6 @@ var deleteDefinition = action.Definition{
 	Example:     "path: out/*.tmp\n",
 	Config:      deleteAction{},
 	New:         newDelete,
-	Renamed:     map[string]string{"mustExist": "renamed to ifMissing: mustExist: true is now ifMissing: fail"},
 }
 
 type deleteAction struct {

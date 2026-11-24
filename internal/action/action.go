@@ -166,10 +166,6 @@ type Definition struct {
 	// early) and again before each execution with variables resolved. New must only
 	// check the structure; values that may contain variables are checked in Execute.
 	New func(with map[string]any) (Action, error)
-	// Renamed names fields that were renamed (ADR 0025): old name → hint, e.g.
-	// "overwrite" → "renamed to ifExists: overwrite: true is now ifExists: replace".
-	// An old field is still an error; the hint is added to it until version 1.0.
-	Renamed map[string]string
 }
 
 // Descriptor describes an action type for the editor, the API (/catalog) and tools
@@ -209,13 +205,6 @@ func (r *Registry) Register(d Definition) {
 	s, err := schema.For(d.Config)
 	if err != nil {
 		panic(fmt.Sprintf("action type %s: %v", d.Type, err))
-	}
-	if len(d.Renamed) > 0 {
-		newFn := d.New
-		d.New = func(with map[string]any) (Action, error) {
-			a, err := newFn(with)
-			return a, RenamedHint(err, d.Renamed)
-		}
 	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{
@@ -258,21 +247,6 @@ func (r *Registry) Types() []string {
 	}
 	slices.Sort(types)
 	return types
-}
-
-// RenamedHint adds the new name to the error "unknown field" for a renamed field
-// (ADR 0025): unknown field "overwrite" (renamed to ifExists: …). Other errors stay.
-func RenamedHint(err error, renamed map[string]string) error {
-	if err == nil {
-		return nil
-	}
-	msg := err.Error()
-	for old, hint := range renamed {
-		if msg == fmt.Sprintf("unknown field %q", old) || strings.HasSuffix(msg, fmt.Sprintf(": unknown field %q", old)) {
-			return fmt.Errorf("%s (%s)", msg, hint)
-		}
-	}
-	return err
 }
 
 // DecodeConfig decodes a "with" configuration into the struct pointed to by v.

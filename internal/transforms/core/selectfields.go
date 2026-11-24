@@ -21,7 +21,6 @@ var selectFieldsDefinition = transform.Definition{
 	Example:     "fields:\n  - { name: kdnr, as: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
 	Config:      selectFields{},
 	New:         newSelectFields,
-	Renamed:     map[string]string{"rename": "renamed to as"},
 }
 
 type selectFields struct {

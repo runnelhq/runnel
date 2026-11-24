@@ -44,11 +44,7 @@ func TestCopyFilesIntoFolder(t *testing.T) {
 	if read(t, filepath.Join(out, "a.csv")) != "A2" {
 		t.Error("not replaced")
 	}
-	// The old field names the new one; wrong values are rejected.
-	if err := configError(copyDefinition, map[string]any{"source": "a", "target": "b", "overwrite": true}); err == nil ||
-		err.Error() != `unknown field "overwrite" (renamed to ifExists: overwrite: true is now ifExists: replace)` {
-		t.Errorf("overwrite: %v", err)
-	}
+	// Wrong values are rejected.
 	if err := configError(copyDefinition, map[string]any{"source": "a", "target": "b", "ifExists": "keep"}); err == nil || !strings.Contains(err.Error(), `invalid ifExists "keep" (expected replace, skip or fail)`) {
 		t.Errorf("keep: %v", err)
 	}
