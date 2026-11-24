@@ -27,6 +27,7 @@
 | [0023](0023-programme-powershell.md) | Programme und PowerShell starten – `shell.run` und `shell.powershell` | Angenommen |
 | [0024](0024-excel-lesen-schreiben.md) | Excel lesen mit eigenem Reader, schreiben mit `excelize` | Angenommen |
 | [0025](0025-einheitliche-parameter.md) | Einheitliche Parameter der Bausteine | Angenommen |
+| [0026](0026-run-historie.md) | Run-Historie in einer eingebetteten SQLite-Datenbank | Angenommen |
 
 ## Wann eine ADR?
 
