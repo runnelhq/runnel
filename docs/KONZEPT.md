@@ -891,7 +891,12 @@ Windows, gRPC für andere Sprachen).
   so beim Prüfen oder Öffnen keinen Code aus ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag).
 - Weitere Ausgänge wie bei `core.switch` (Ziel-IDs in der `config`), optional `transform.init` für das Schema und
   `transform.detectFields`; Arbeitsverzeichnis des Plugins ist der Projektordner.
-- SDKs: Go (Referenz, `pkg/sdk`), später Python, C#/.NET, Node – jeweils dünne Wrapper.
+- Connections eingebauter Typen stehen aufgelöst in der `config`; Plugins können eigene Connection-Typen anbieten
+  (S49b). Secrets, die ein Plugin bekommt, maskiert der Host in allem, was zurückkommt.
+- Protokoll ab `protocolVersion: 1`, Änderungen darin nur additiv; `executable` je Betriebssystem; ein Plugin
+  bearbeitet ohne Angabe von `concurrency` eine Anfrage nach der anderen.
+- SDKs in eigenen Repositorys: Go (Referenz, S51), später Python, C#/.NET, Rust, Node – jeweils dünne Wrapper;
+  verbindlich ist die Beschreibung des Protokolls in `docs/dev/PLUGINS.md`.
 
 ```yaml
 # plugins/sap-rfc/plugin.yaml
@@ -1418,7 +1423,7 @@ runnel/
 ├─ examples/                # Beispielprojekte
 ├─ docs/                    # Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (docs/dev/)
 ├─ design/                  # Corporate Design: Logos, Design Tokens, Mockups
-│                           # geplant: pkg/sdk/ (Go-SDK für Plugins), build/ (Signierung)
+│                           # geplant: build/ (Signierung); SDKs in eigenen Repositorys
 ```
 
 **Build**: `make build` → `web` wird mit Vite gebaut, nach `internal/webui/dist` geschrieben, per `go:embed` eingebettet,
