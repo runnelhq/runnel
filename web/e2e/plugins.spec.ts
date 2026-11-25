@@ -104,3 +104,24 @@ test("a changed plugin is trusted again; one that cannot start offers Try again"
   await page.getByRole("button", { name: "Try again" }).first().click();
   await expect(page.getByTestId("plugin-state")).toHaveText("! Changed since trusted");
 });
+
+test("a step of a plugin that is not trusted leads to the plugin from the panel and from Problems", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("treeitem", { name: "e2e-plugin.workflow.yaml" }).click();
+  const node = page.getByTestId("node-say");
+  await expect(node).toHaveAttribute("data-severity", "error");
+  await node.click();
+  const panel = page.getByRole("region", { name: "Properties" });
+  await expect(panel.getByRole("alert")).toContainText("Plugin demo is not trusted on this computer");
+  await panel.getByRole("button", { name: "Open plugin demo" }).click();
+  await expect(view(page)).toBeVisible();
+  await expect(page.getByTestId("plugin-state")).toHaveText("! Not trusted");
+
+  // Back in the workflow: the same in Problems.
+  await page.getByRole("tab", { name: /e2e-plugin\.workflow\.yaml/ }).click();
+  const problems = page.getByRole("region", { name: "Problems and log" });
+  await problems.getByRole("button", { name: /^Problems/ }).click();
+  const row = problems.getByRole("table").getByRole("row", { name: /plugin "demo" is not trusted/ });
+  await row.getByRole("button", { name: "Open plugin demo" }).click();
+  await expect(page.getByTestId("plugin-view")).toBeVisible();
+});
