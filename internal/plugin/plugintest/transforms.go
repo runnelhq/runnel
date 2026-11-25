@@ -14,6 +14,8 @@ import (
 //	            link, "route" to the target "to", "crash" ends the process
 //	demo.count  an input: "count" records with a value of every type
 //
+// demo.upper names a category that runnel does not know: it is grouped by the plugin.
+//
 // Modes: "bad-to" emits to a target that is not in the configuration, "close-error"
 // closes every stream with an error, "same-fields" leaves out the fields of an emit when
 // they are those of the last emit.
@@ -21,7 +23,7 @@ import (
 func transformDescriptors() []any {
 	return []any{
 		map[string]any{
-			"type": "demo.upper", "category": "transform", "label": "Upper", "description": "Writes a field in capitals",
+			"type": "demo.upper", "category": "strings", "label": "Upper", "description": "Writes a field in capitals",
 			"recordErrors": true, "parallel": true, "init": true,
 			"schema": map[string]any{"type": "object", "required": []string{"field"}, "additionalProperties": false, "properties": map[string]any{
 				"field": map[string]any{"type": "string"},

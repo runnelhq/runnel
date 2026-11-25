@@ -130,7 +130,7 @@ Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
 | Methode | Antwort | Regeln |
 |---|---|---|
 | `initialize` | `protocolVersion` (1), `encoding` (`json`), `name` (wie in `plugin.yaml`), `version`, optional `concurrency` | Zeitgrenze 10 s; andere Version oder anderer Name: Plugin wird nicht genutzt |
-| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`); optional `transforms` (siehe [Transforms](#transforms)) und `connectionTypes` (siehe [Connection-Typen](#connection-typen)) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
+| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, optional `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`); optional `transforms` (siehe [Transforms](#transforms)) und `connectionTypes` (siehe [Connection-Typen](#connection-typen)) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
 | `action.execute` | `{"output": …}` (Text, Zahl, Liste, Objekt; im Workflow `result.output`) | `config` ist geprüft und aufgelöst (Variablen, Ausdrücke); ein Fehler ist eine Fehlerantwort, ihre `message` die Meldung der Action |
 | `connection.test` | `{"ok": true, "message": "…", "version": "…"}` | nur für Typen mit `"test": true`; `ok: false` mit `message` ist ein gescheiterter Test |
 | `shutdown` | `null` | danach schließt der Host stdin; nach 5 s beendet er den Prozess mit allen Kindprozessen |
@@ -150,7 +150,8 @@ Transforms laufen als Strom mit eigenen Nachrichten, siehe [Transforms](#transfo
 ## In Workflows
 
 Die Actions eines freigegebenen Plugins stehen in Workflows des Projekts wie eingebaute bereit (auch in der Palette des
-Editors):
+Editors). Mit einer Kategorie der eingebauten (`general`, `execution`, `files`, `network`, `database`) steht eine Action
+in deren Gruppe der Palette; ohne `category` oder mit einer anderen in einer Gruppe des Plugins („Plugin: iban“):
 
 ```yaml
 actions:
@@ -181,8 +182,9 @@ Ein Transform eines Plugins bekommt die Records seines Eingangs als Strom und sc
    "invalid": {"type": "string", "format": "runnel-target"}}}}
 ```
 
-`recordErrors` erlaubt einen Fehler-Link, `parallel` erlaubt `copies`. Eine Kategorie, die Runnel nicht kennt, wird
-`transform`. `init` und `detectFields` kündigen die Methoden unter [Schema und Felder](#schema-und-felder) an.
+`recordErrors` erlaubt einen Fehler-Link, `parallel` erlaubt `copies`. `category` ist optional: Ohne eine Kategorie der
+eingebauten (`input`, `transform`, `flow`, `execution`, `combine`, `output`) steht der Transform in der Palette in einer
+Gruppe des Plugins und verhält sich wie einer der Kategorie `transform` (nur `input` hat keinen Eingang). `init` und `detectFields` kündigen die Methoden unter [Schema und Felder](#schema-und-felder) an.
 
 ### Ablauf
 
