@@ -31,7 +31,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e21-tabs.html`](e21-tabs.html) | E21 – Viele offene Dateien: Liste und Menü der Tabs | `many`, `list`, `search`, `menu` | freigegeben mit PR #184, umgesetzt mit E21 |
 | [`s26d-runs.html`](s26d-runs.html) | S26d – Liste der Läufe im Editor | `list`, `filter`, `run`, `changed`, `empty` | freigegeben mit PR #213; `list`, `filter` und `empty` umgesetzt mit S26e1, `run` und `changed` mit S26e2 |
 | [`s52-plugins.html`](s52-plugins.html) | S52 – Plugins im Editor | `plugin`, `untrusted`, `trust`, `changed`, `error`, `canvas` | freigegeben mit PR #227; Server mit S52a, `plugin`, `untrusted`, `trust`, `changed` und `error` umgesetzt mit S52b1, `canvas` mit S52b2 |
-| [`e22-split-link.html`](e22-split-link.html) | E22 – Link teilen: Schritt zwischen zwei Schritte einfügen | `drag`, `menu`, `inserted`, `pipeline`, `blocked` | zur Freigabe |
+| [`e22-split-link.html`](e22-split-link.html) | E22 – Link teilen: Schritt zwischen zwei Schritte einfügen | `drag`, `menu`, `inserted`, `pipeline`, `blocked` | freigegeben mit PR #239, umgesetzt mit E22 |
 
 ## Entscheidungen
 

@@ -65,7 +65,7 @@ test("the palette lists the actions of the catalog by category", async ({ page }
   await expect(palette.getByTestId("palette-core.log")).toHaveAttribute("draggable", "false");
 
   await open(page);
-  await expect(palette.getByText("Drag an action onto the canvas.")).toBeVisible();
+  await expect(palette.getByText("Drag an action onto the canvas, or onto a link to insert it between two steps.")).toBeVisible();
   await expect(palette.getByTestId("palette-core.log")).toHaveAttribute("draggable", "true");
   // The workflow has a start action already.
   await expect(palette.getByTestId("palette-core.start")).toHaveAttribute("aria-disabled", "true");

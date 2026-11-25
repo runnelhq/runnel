@@ -18,6 +18,7 @@ import {
 import "@xyflow/react/dist/base.css";
 import { categoryColor, paletteDrag, paletteMime, tileColor, useCatalog } from "../catalog";
 import {
+  cannotInsert,
   closesCycle,
   kindOfLink,
   newActionId,
@@ -26,6 +27,7 @@ import {
   nodeWidth,
   place,
   problemsByAction,
+  splitNote,
   type Link,
   type Problem,
   type Workflow,
@@ -69,6 +71,11 @@ export interface CanvasProps {
   onRename?: (from: string, to: string) => void;
   /** Called with a new link drawn from an output to an input. */
   onConnect?: (link: Link) => void;
+  /**
+   * Called when a step is put between the two ends of a link (mockup E22: dropped from the
+   * palette onto the link, or "Insert step…" in the link menu), with its position.
+   */
+  onInsert?: (action: { id: string; type: string }, link: number, positions: Positions) => void;
   /** Called when the kind of a link was chosen in the link menu. */
   onLinkKind?: (index: number, when: SettableKind) => void;
   /** Called with the selected actions and links. */
@@ -112,7 +119,7 @@ export function Canvas(props: CanvasProps) {
 function Graph(props: CanvasProps) {
   const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel, run, preview } =
     props;
-  const { onClipboard, onPaste, canPaste, pointer } = props;
+  const { onClipboard, onPaste, canPaste, pointer, onInsert } = props;
   const pipeline = workflow.kind === "pipeline";
   const catalog = useCatalog(workflow.kind);
   const editable = onMove !== undefined;
@@ -121,7 +128,7 @@ function Graph(props: CanvasProps) {
   // Context menu of the selection or the free canvas (E16): position in the container and on the canvas.
   const [context, setContext] = useState<{ x: number; y: number; at: { x: number; y: number }; ids: string[] } | null>(null);
   const container = useRef<HTMLDivElement>(null);
-  const [ghost, setGhost] = useState<{ type: string; x: number; y: number } | null>(null);
+  const [ghost, setGhost] = useState<GhostState | null>(null);
   // Starts with the selection of the file view, e.g. when switching back from the YAML view.
   const selectedRef = useRef(new Set<string>(props.selection?.actions ?? []));
   const selectedLinksRef = useRef(new Set<string>((props.selection?.links ?? []).map(String)));
@@ -285,21 +292,71 @@ function Graph(props: CanvasProps) {
     const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     return { x: snap(p.x - nodeWidth / 2), y: snap(p.y - nodeHeight / 2) };
   };
+  // Over a link the step goes between its two ends (mockup E22): the link is highlighted
+  // and the card sits in its middle; a type that cannot go there says why.
+  const linkAt = (e: DragEvent): string | null => {
+    if (!onInsert) return null;
+    for (const el of document.elementsFromPoint(e.clientX, e.clientY)) {
+      // the line of the link, or its symbol
+      const id = el.closest(".react-flow__edge")?.getAttribute("data-id") ?? /^link-(\d+)$/.exec(el.getAttribute("data-testid") ?? "")?.[1];
+      if (id) return id;
+    }
+    return null;
+  };
+  /** The middle of a link, as the position of a card on the grid. */
+  const middleOf = (link: string) => {
+    const edge = edges.find((x) => x.id === link);
+    const a = nodes.find((n) => n.id === edge?.source)?.position;
+    const b = nodes.find((n) => n.id === edge?.target)?.position;
+    if (!a || !b) return null;
+    return { x: snap((a.x + nodeWidth + b.x) / 2 - nodeWidth / 2), y: snap((a.y + b.y) / 2) };
+  };
   const onDragOver = (e: DragEvent) => {
     if (!onAdd || !e.dataTransfer.types.includes(paletteMime)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
     const type = paletteDrag.type;
-    if (type) setGhost({ type, ...dropPosition(e) });
+    if (!type) return;
+    const link = linkAt(e);
+    const l = link === null ? undefined : workflow.links?.[Number(link)];
+    const middle = link === null ? null : middleOf(link);
+    if (link === null || !l || !middle) return setGhost({ type, ...dropPosition(e) });
+    const blocked = cannotInsert(workflow.kind ?? "workflow", type, catalog.get(type)?.category);
+    if (blocked) return setGhost({ type, ...dropPosition(e), hint: { text: blocked, note: "Drop to place it on the canvas; the link stays as it is", blocked: true } });
+    const id = newActionId(workflow, type);
+    setGhost({ type, ...middle, link, hint: { text: `Drop to insert between ${l.from} and ${l.to}`, note: splitNote(workflow, l, id) ?? undefined } });
   };
   const onDrop = (e: DragEvent) => {
     const type = e.dataTransfer.getData(paletteMime);
+    const link = ghost?.link;
     setGhost(null);
     if (!onAdd || !type) return;
     e.preventDefault();
     const id = newActionId(workflow, type);
+    const middle = link === undefined ? null : middleOf(link);
+    if (link !== undefined && middle && onInsert) return onInsert({ id, type }, Number(link), withLayout({ [id]: middle }));
     onAdd({ id, type }, withLayout({ [id]: dropPosition(e) }));
   };
+  /** "Insert step…" in the link menu: the chosen type in the middle of the link. */
+  const insertInto = useCallback(
+    (link: string, type: string) => {
+      setMenu(null);
+      const middle = middleOf(link);
+      if (!onInsert || !middle) return;
+      const id = newActionId(workflow, type);
+      onInsert({ id, type }, Number(link), withLayout({ [id]: middle }));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- middleOf reads the current nodes and edges
+    [onInsert, workflow, withLayout, nodes, edges],
+  );
+  /** Types the link menu offers to insert (mockup E22): the palette without those that cannot go between two steps. */
+  const insertable = useMemo(
+    () =>
+      [...catalog.values()]
+        .filter((d) => !cannotInsert(workflow.kind ?? "workflow", d.type, d.category))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [catalog, workflow.kind],
+  );
 
   const openContext = (e: ReactMouseEvent | MouseEvent, ids: string[]) => {
     e.preventDefault();
@@ -368,6 +425,7 @@ function Graph(props: CanvasProps) {
     if (!menu) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") return setMenu(null);
+      if (e.target instanceof HTMLInputElement) return; // the search of "Insert step…"
       // In a pipeline, D, E and I choose the type of the link (mockups S25a and S23b, state "link").
       const kind = pipeline && !e.ctrlKey && !e.metaKey && !e.altKey && pipelineKinds.find(([, , key]) => key?.toLowerCase() === e.key.toLowerCase())?.[0];
       const edge = edges.find((x) => x.id === menu);
@@ -397,9 +455,12 @@ function Graph(props: CanvasProps) {
             setMenu(null);
             onDelete?.([], [Number(e.id)]);
           },
+          dropTarget: ghost?.link === e.id,
+          insertable: onInsert ? insertable : undefined,
+          onInsert: (type: string) => insertInto(e.id, type),
         },
       })),
-    [edges, editable, menu, openMenu, onLinkKind, onDelete],
+    [edges, editable, menu, openMenu, onLinkKind, onDelete, ghost?.link, onInsert, insertable, insertInto],
   );
 
   return (
@@ -594,9 +655,38 @@ function linkRun(run: RunView | null | undefined, l: Link): "flow" | "dead" | un
   return to === "running" ? "flow" : undefined;
 }
 
-/** Preview of an action dropped from the palette: a dashed card on the 8-px grid. */
-function Ghost(props: { type: string; id: string; x: number; y: number; color?: string }) {
+interface GhostState {
+  type: string;
+  x: number;
+  y: number;
+  /** The link the step goes into (mockup E22). */
+  link?: string;
+  hint?: { text: string; note?: string; blocked?: boolean };
+}
+
+/**
+ * Preview of an action dropped from the palette: a dashed card on the 8-px grid; over a
+ * link with a hint below it (mockup E22).
+ */
+function Ghost(props: GhostState & { id: string; color?: string }) {
+  const { hint } = props;
   return (
+    <>
+      {hint && (
+        <div
+          data-testid="drop-hint"
+          className="pointer-events-none absolute max-w-[320px] rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+          style={{ transform: `translate(${props.x}px, ${props.y + 64}px)`, borderColor: hint.blocked ? undefined : "var(--ring)" }}
+        >
+          <span className="flex items-center gap-1.5 font-medium">
+            <span aria-hidden className={hint.blocked ? "text-muted-foreground" : "text-primary"}>
+              {hint.blocked ? "ⓘ" : "⊕"}
+            </span>
+            {hint.text}
+          </span>
+          {hint.note && <span className="mt-0.5 block text-muted-foreground">{hint.note}</span>}
+        </div>
+      )}
     <div
       data-testid="drop-preview"
       className="pointer-events-none absolute flex h-[52px] w-[176px] items-center gap-2.5 rounded-lg border border-dashed border-node-selected bg-node pr-3 pl-2.5 opacity-70 shadow-md"
@@ -610,6 +700,7 @@ function Ghost(props: { type: string; id: string; x: number; y: number; color?: 
         <span className="block truncate font-mono text-2xs text-muted-foreground">{props.type}</span>
       </span>
     </div>
+    </>
   );
 }
 
