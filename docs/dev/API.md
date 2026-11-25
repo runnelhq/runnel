@@ -338,7 +338,8 @@ POST /api/v1/pipelines/edit
 - **IDs:** Freie IDs bleiben; belegte bekommen `-2`, `-3` … (`types-2` wird zu `types-3`). Verweise unter den
   eingefügten Schritten folgen: in Workflows `results.<id>` und `results["<id>"]` in Ausdrücken `{{ … }}` (auch in
   `when` der Links; eine ID mit `-` wird mit Klammern geschrieben, in den Anführungszeichen, die den YAML-Wert der Zeile
-  nicht beenden), in Pipelines die Ziele `to:` (z. B. von `core.switch`). `references` zählt die Änderungen.
+  nicht beenden), in Pipelines die Ziel-Felder der Typen (Format `runnel-target`: `to` und `default` von `core.switch`,
+  `else` von `core.filter`, Ziele von Plugins). `references` zählt die Änderungen.
 - **Position:** `at` ist die linke obere Ecke der eingefügten Schritte (der Editor schickt die Mausposition); ohne
   `at` bleiben die Positionen, bei umbenannten IDs um 40 px versetzt.
 - **Ablehnungen (`400`):** Actions in einer Pipeline bzw. Transforms in einem Workflow („Actions can't be pasted into a

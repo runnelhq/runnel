@@ -34,6 +34,9 @@ type Paste struct {
 	// At is the position of the top-left pasted step on the canvas; nil places the
 	// steps where they were, moved a little if an id had to be changed.
 	At *Point `json:"at,omitempty"`
+	// Targets: see PipelineEdit.Targets; the target fields of pasted transforms follow
+	// renamed ids. nil: only "to".
+	Targets func(typ string) [][]string `json:"-"`
 }
 
 // Pasted tells what was pasted.
@@ -248,7 +251,11 @@ func readClip(text, stepsKey string) (c *clipSteps, err error) {
 				raw[j] = strings.TrimLeft(l, " ")
 			}
 		}
-		c.steps = append(c.steps, rawStep{ID: idNode.GetToken().Value, Lines: raw})
+		step := rawStep{ID: idNode.GetToken().Value, Lines: raw}
+		if t, ok := valueOf(es, "type").(*ast.StringNode); ok {
+			step.Type = t.Value
+		}
+		c.steps = append(c.steps, step)
 	}
 	if n := valueOf(top, "links"); n != nil {
 		if err := yaml.NodeToValue(n, &c.links); err != nil {
@@ -335,11 +342,12 @@ func pasteEdit(d *graphDoc, p Paste) (*graphEdit, Pasted, error) {
 			}
 		}
 		n := 0
+		keys := targetKeys(p.Targets, s.Type)
 		for j := range lines {
 			if d.stepsKey == "actions" {
 				lines[j], n = renameResults(lines[j], res.Renamed, n)
 			} else {
-				lines[j], n = renameTargets(lines[j], res.Renamed, n)
+				lines[j], n = renameTargets(lines[j], res.Renamed, n, keys)
 			}
 		}
 		res.References += n
@@ -444,7 +452,6 @@ var (
 	resultsRef  = regexp.MustCompile(`\bresults(?:\.([A-Za-z_][A-Za-z0-9_]*)|\[\s*(["'])([^"'\]]+)["']\s*\])`)
 	identifier  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	quotedValue = regexp.MustCompile(`^\s*(?:-\s+)?(?:[A-Za-z0-9_.-]+\s*:\s+)?(["'])`)
-	targetRef   = regexp.MustCompile(`(\bto:\s*)(["']?)([A-Za-z][A-Za-z0-9_-]*)(["']?)(\s*(?:[,}#]|$))`)
 )
 
 // renameResults changes results.<id> and results["<id>"] in the expressions of a line to
@@ -484,13 +491,33 @@ func renameResults(line string, renamed map[string]string, n int) (string, int) 
 	return line, n
 }
 
-// renameTargets changes "to: <id>" (targets of core.switch) to the renamed ids.
-func renameTargets(line string, renamed map[string]string, n int) (string, int) {
-	if len(renamed) == 0 || !strings.Contains(line, "to:") {
+// targetKeys returns a pattern for "<key>: <id>" with the keys of the fields of a
+// transform type that name other transforms, e.g. to and default for core.switch;
+// without targets only "to"; nil if the type has none.
+func targetKeys(targets func(string) [][]string, typ string) *regexp.Regexp {
+	keys := []string{"to"}
+	if targets != nil {
+		keys = nil
+		for _, path := range targets(typ) {
+			if k := regexp.QuoteMeta(path[len(path)-1]); k != `\*` && !slices.Contains(keys, k) {
+				keys = append(keys, k)
+			}
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	return regexp.MustCompile(`(\b(?:` + strings.Join(keys, "|") + `):\s*)(["']?)([A-Za-z][A-Za-z0-9_-]*)(["']?)(\s*(?:[,}#]|$))`)
+}
+
+// renameTargets changes "<key>: <id>" in a line of a pasted transform (to, default and
+// else of core.switch and core.filter, see targetKeys) to the renamed ids.
+func renameTargets(line string, renamed map[string]string, n int, ref *regexp.Regexp) (string, int) {
+	if len(renamed) == 0 || ref == nil || !strings.Contains(line, ":") {
 		return line, n
 	}
-	line = targetRef.ReplaceAllStringFunc(line, func(s string) string {
-		m := targetRef.FindStringSubmatch(s)
+	line = ref.ReplaceAllStringFunc(line, func(s string) string {
+		m := ref.FindStringSubmatch(s)
 		to, ok := renamed[m[3]]
 		if !ok || m[2] != m[4] {
 			return s

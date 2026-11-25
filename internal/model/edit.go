@@ -202,6 +202,7 @@ type linkRef struct{ From, To string }
 // indentation of the list.
 type rawStep struct {
 	ID    string
+	Type  string
 	Lines []string
 }
 

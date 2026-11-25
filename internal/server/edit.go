@@ -91,19 +91,13 @@ func (s *Server) handleEditPipeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Paste != nil {
+		req.Paste.Targets = s.targetFields()
 		out, pasted, err := model.PastePipeline(name, []byte(req.Content), *req.Paste)
 		writeEdit(w, s, "pipeline", out, &pasted, err)
 		return
 	}
 	if len(req.Rename) > 0 {
-		// Renaming also changes the fields that name transforms (to, default, else …).
-		reg := runs.WithPluginTransforms(s.transforms, s.dir)
-		req.Targets = func(typ string) [][]string {
-			if d, ok := reg.Descriptor(typ); ok {
-				return d.Schema.Paths(schema.FormatTarget)
-			}
-			return nil
-		}
+		req.Targets = s.targetFields() // renaming also changes to, default, else …
 	}
 	out, err := model.EditPipeline(name, []byte(req.Content), req.PipelineEdit)
 	var diags model.Errors
@@ -117,6 +111,18 @@ func (s *Server) handleEditPipeline(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		writeJSON(w, http.StatusOK, editResponse{Content: string(out)})
+	}
+}
+
+// targetFields returns the fields of a transform type that name other transforms
+// (format runnel-target in its schema), for renaming and pasting.
+func (s *Server) targetFields() func(typ string) [][]string {
+	reg := runs.WithPluginTransforms(s.transforms, s.dir)
+	return func(typ string) [][]string {
+		if d, ok := reg.Descriptor(typ); ok {
+			return d.Schema.Paths(schema.FormatTarget)
+		}
+		return nil
 	}
 }
 
