@@ -44,7 +44,7 @@ import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
 import type { ReferenceAction, ReferenceTarget } from "./ReferencePanel";
 import { insertField, useSchema } from "../reference";
-import { useCatalog } from "../catalog";
+import { refreshCatalog, useCatalog, useCatalogVersion } from "../catalog";
 import type { AssistContext } from "../yamlAssist";
 import {
   ChevronIcon,
@@ -237,6 +237,7 @@ export function FileView(props: {
       try {
         setPluginOverride(await act());
         onReloadExplorer(); // the state in the explorer
+        refreshCatalog(); // its types in the palette and the panel, the checks of open files
       } catch (e) {
         setEditError(`${failure}: ${(e as Error).message}`);
         plugins.reload();
@@ -295,8 +296,10 @@ export function FileView(props: {
 
   useEffect(() => onDirty(path, dirty), [path, dirty, onDirty]);
 
-  // The server checks the text shown and returns the parsed workflow or pipeline for the canvas.
+  // The server checks the text shown and returns the parsed workflow or pipeline for the canvas;
+  // again when the catalog changes (a plugin trusted or untrusted).
   const text = doc?.text;
+  const catalogVersion = useCatalogVersion();
   useEffect(() => {
     if (!editsText || isDoc || text === undefined) return;
     let cancelled = false;
@@ -310,7 +313,7 @@ export function FileView(props: {
     return () => {
       cancelled = true;
     };
-  }, [editsText, isDoc, path, text]);
+  }, [editsText, isDoc, path, text, catalogVersion]);
   const graph = useMemo(() => graphOf(validation), [validation]);
   const steps = graphKind === "pipeline" ? "transforms" : "actions";
 

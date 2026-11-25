@@ -111,14 +111,47 @@ function load(): Promise<Catalogs> {
 
 const none = new Map<string, Descriptor>();
 
+// The catalog changes with the plugins of the project (trusted, untrusted, updated): then
+// it is loaded again and every user of it is told (S52, test of the first release).
+const listeners = new Set<() => void>();
+let version = 0;
+
+/** Loads the catalog again, e.g. after a plugin was trusted; open files are checked again. */
+export function refreshCatalog() {
+  cache = null;
+  version++;
+  for (const l of listeners) l();
+}
+
+/** A number that changes whenever the catalog is loaded again (refreshCatalog). */
+export function useCatalogVersion(): number {
+  const [v, setV] = useState(version);
+  useEffect(() => {
+    const update = () => setV(version);
+    listeners.add(update);
+    return () => {
+      listeners.delete(update);
+    };
+  }, []);
+  return v;
+}
+
 /**
  * useCatalog returns the descriptors by type (empty until loaded): of the actions for a
  * workflow, of the transforms for a pipeline.
  */
 export function useCatalog(kind: CatalogKind = "workflow"): Map<string, Descriptor> {
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
+  const v = useCatalogVersion();
   useEffect(() => {
-    load().then(setCatalogs, () => setCatalogs(null));
-  }, []);
+    let live = true;
+    load().then(
+      (c) => live && setCatalogs(c),
+      () => live && setCatalogs(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [v]);
   return catalogs?.[kind] ?? none;
 }

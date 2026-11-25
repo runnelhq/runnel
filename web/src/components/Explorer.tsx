@@ -23,6 +23,7 @@ import { useConnections } from "../reference";
 import { Dialog } from "./Dialog";
 import { ChevronIcon, ConnectionIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlugIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import { usePlugins, type PluginInfo } from "../plugins";
+import { refreshCatalog } from "../catalog";
 
 /** Changes of the project files made in the explorer, for the tabs (E11). */
 export interface ExplorerChanges {
@@ -82,8 +83,23 @@ export function Explorer(props: {
   // Connections and triggers show their type (mockups S39b, E20).
   const connectionTypes = new Map([...(connections ?? []).map((c) => [c.file, c.type] as const), ...(triggers?.triggers ?? []).map((t) => [t.file, t.type] as const)]);
   // Plugins show their version and state (mockup S52).
-  const pluginsInfo = usePlugins(props.tree).info;
+  const { info: pluginsInfo, reload: reloadPlugins } = usePlugins(props.tree);
+  // Approvals live outside the project (runnel plugins trust in a terminal): checked again
+  // when the editor gets the focus back.
+  useEffect(() => {
+    window.addEventListener("focus", reloadPlugins);
+    return () => window.removeEventListener("focus", reloadPlugins);
+  }, [reloadPlugins]);
   const plugins = new Map((pluginsInfo?.plugins ?? []).map((p) => [p.folder, p] as const));
+  // A plugin trusted, untrusted or changed (also outside the editor, e.g. with runnel
+  // plugins trust): the palette, the panel and the checks of open files follow.
+  const pluginsKey = pluginsInfo ? pluginsInfo.plugins.map((p) => `${p.name}:${p.state}:${p.hash ?? ""}`).join(",") : null;
+  const lastPluginsKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (pluginsKey === null) return;
+    if (lastPluginsKey.current !== null && lastPluginsKey.current !== pluginsKey) refreshCatalog();
+    lastPluginsKey.current = pluginsKey;
+  }, [pluginsKey]);
 
   const all = flatten(props.tree);
   const exists = (path: string) => all.some((e) => e.path.toLowerCase() === path.toLowerCase());
