@@ -1,0 +1,43 @@
+# Error workflow (ADR 0027): reports a failed run. Runnel starts it after a run of a
+# trigger, of the Windows service or of "runnel run" fails, once project.yaml names it:
+#   settings:
+#     onError: workflows/on-error.workflow.yaml
+# A workflow or pipeline can name another one, or turn it off with "onError: none".
+# In the editor: "On error" in the form of project.yaml and in the settings of a
+# workflow or pipeline. Runs in the editor start no error workflow.
+#
+# Runnel passes only the FAILED_… parameters declared here, as text: FAILED_RUN,
+# FAILED_PATH, FAILED_NAME, FAILED_ACTION, FAILED_ERROR, FAILED_TRIGGER,
+# FAILED_STARTED and FAILED_FINISHED. Try it by hand:
+#   runnel run examples/hello/workflows/on-error.workflow.yaml --param FAILED_ERROR=boom
+#
+# To send a mail instead of (or after) the log, add an action like this, with a
+# connection of type smtp in connections/ (see examples/mail):
+#  - id: mail
+#    type: mail.send
+#    with:
+#      connection: mail
+#      to: ops@example.com
+#      subject: "Runnel: ${FAILED_PATH} failed"
+#      body: "Run ${FAILED_RUN} (${FAILED_TRIGGER}) failed: ${FAILED_ERROR}"
+kind: Workflow
+apiVersion: runnel/v1
+name: on-error
+description: Reports a failed run of the project
+parameters:
+  - name: FAILED_PATH
+    description: The workflow or pipeline that failed, relative to the project
+  - name: FAILED_ERROR
+    description: The error of the failed run
+  - name: FAILED_RUN
+    description: ID of the failed run; empty if it failed before it started
+actions:
+  - id: start
+    type: core.start
+  - id: report
+    type: core.log
+    with:
+      level: error
+      message: "${FAILED_PATH} failed (run ${FAILED_RUN}): ${FAILED_ERROR}"
+links:
+  - { from: start, to: report }

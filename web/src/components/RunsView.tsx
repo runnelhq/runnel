@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDuration, type RunStatus } from "../run";
 import type { TriggerInfo } from "../forms";
-import { dayLabel, fetchRun, fetchRuns, runsPage, timeOf, triggerLabel, type RunDetail, type RunFilter, type RunInfo } from "../runs";
+import { dayLabel, errorTrigger, fetchRun, fetchRuns, runLabel, runsPage, timeOf, triggerLabel, type RunDetail, type RunFilter, type RunInfo } from "../runs";
 import {
+  AlertIcon,
   ChevronIcon,
   ClockIcon,
   CloseIcon,
@@ -106,6 +107,7 @@ export function RunsView(props: {
     () => [
       ["editor", "Editor"],
       ["cli", "runnel run"],
+      [errorTrigger, "Error workflow"],
       ...props.triggers.map((t) => [`${t.type}:${t.name}`, `${t.type}:${t.name}`]),
     ],
     [props.triggers],
@@ -204,7 +206,15 @@ export function RunsView(props: {
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
           {detail && selected === detail.id ? (
-            <Details run={detail} triggers={props.triggers} onOpenFile={props.onOpenFile} onOpenRun={() => props.onOpenRun(detail.path, detail.id)} />
+            <Details
+              key={detail.id}
+              run={detail}
+              triggers={props.triggers}
+              onOpenFile={props.onOpenFile}
+              onOpenRun={() => props.onOpenRun(detail.path, detail.id)}
+              onSelectRun={setSelected}
+              tick={tick}
+            />
           ) : (
             <p className="m-4 text-xs text-muted-foreground">Select a run to see its details.</p>
           )}
@@ -238,9 +248,9 @@ export function RunStatusLabel({ status }: { status: RunStatus }) {
 
 /** The trigger as a chip: schedule, http call, runnel run or the editor. */
 export function TriggerChip({ trigger }: { trigger?: string }) {
-  const Icon = !trigger ? PencilIcon : trigger === "cli" ? TerminalIcon : trigger.startsWith("http:") ? GlobeIcon : ClockIcon;
+  const Icon = !trigger ? PencilIcon : trigger === "cli" ? TerminalIcon : trigger === errorTrigger ? AlertIcon : trigger.startsWith("http:") ? GlobeIcon : ClockIcon;
   return (
-    <span className={"inline-flex h-5 max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2 text-[10px] font-medium text-secondary-foreground " + (trigger ? "font-mono" : "")}>
+    <span className={"inline-flex h-5 max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2 text-[10px] font-medium text-secondary-foreground " + (trigger && trigger !== errorTrigger ? "font-mono" : "")}>
       <Icon width={11} height={11} className="shrink-0" />
       <span className="truncate">{triggerLabel(trigger)}</span>
     </span>
@@ -365,9 +375,10 @@ function FilterSelect(props: { label: string; value: string; all?: string; optio
 }
 
 /** The selected run (GET /runs/{id}): error, where it came from, its parameters, the status of each action and its log. */
-function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (path: string) => void; onOpenRun: () => void }) {
+function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (path: string) => void; onOpenRun: () => void; onSelectRun: (id: string) => void; tick: number }) {
   const r = props.run;
   const [log, setLog] = useState(false);
+  const related = useRelatedRun(r, props.tick);
   const failed = r.actions.filter((a) => a.status === "failed").length;
   const trigger = r.trigger && props.triggers.find((t) => `${t.type}:${t.name}` === r.trigger);
   const params = Object.entries(r.params ?? {});
@@ -388,6 +399,25 @@ function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (
           {r.finished && ` – ${timeOf(r.finished)}`}
           {r.status !== "running" && ` · ${formatDuration(r.durationMs)}`}
         </div>
+        {related && (
+          <div className="mt-1 text-2xs text-muted-foreground" data-testid="run-relation">
+            {related.kind === "for" ? "for run" : "reported by"}{" "}
+            {related.run ? (
+              <button
+                type="button"
+                title={related.run.id}
+                onClick={() => props.onSelectRun(related.run!.id)}
+                className="cursor-pointer border-0 bg-transparent p-0 text-left font-mono text-2xs break-all text-primary underline"
+              >
+                {runLabel(related.run)}
+              </button>
+            ) : (
+              <span className="font-mono" title="The run is no longer in the run history">
+                {related.id}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex gap-2 px-4 pb-3">
         <button
@@ -488,6 +518,36 @@ function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (
       </section>
     </div>
   );
+}
+
+/**
+ * The run linked to a run (ADR 0027, S72b): for a run of the error workflow the failed run it
+ * reports ("for run …", its parent), for a failed run the run of the error workflow that
+ * reports it ("reported by …"), again when runs start (tick), since that run starts after the
+ * failed one has ended. run is missing when the failed run is no longer kept.
+ */
+function useRelatedRun(r: RunDetail, tick: number): { kind: "for" | "reported"; id: string; run?: RunInfo } | null {
+  const [related, setRelated] = useState<{ kind: "for" | "reported"; id: string; run?: RunInfo } | null>(null);
+  const { id, parent, status } = r;
+  const reports = r.trigger === errorTrigger && !!parent;
+  useEffect(() => {
+    let live = true;
+    if (reports) {
+      fetchRun(parent!).then(
+        (p) => live && setRelated({ kind: "for", id: parent!, run: p }),
+        () => live && setRelated({ kind: "for", id: parent! }),
+      );
+    } else if (status === "failed") {
+      fetchRuns({ parent: id }, undefined, 1).then(
+        (list) => live && setRelated(list[0] ? { kind: "reported", id: list[0].id, run: list[0] } : null),
+        () => live && setRelated(null),
+      );
+    } else setRelated(null);
+    return () => {
+      live = false;
+    };
+  }, [id, parent, status, reports, tick]);
+  return related;
 }
 
 /** Statuses of an action that ran; the server leaves out a duration of 0. */

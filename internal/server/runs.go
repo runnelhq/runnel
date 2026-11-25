@@ -100,7 +100,8 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := history.Filter{Status: q.Get("status"), Path: q.Get("path"), Trigger: q.Get("trigger"), Before: q.Get("before")}
+	f := history.Filter{Status: q.Get("status"), Path: q.Get("path"), Trigger: q.Get("trigger"), Parent: q.Get("parent"),
+		Before: q.Get("before")}
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 || n > runs.MaxList {

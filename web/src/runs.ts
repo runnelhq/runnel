@@ -16,8 +16,10 @@ export interface RunInfo {
   path: string;
   kind: "workflow" | "pipeline";
   workflow: string;
-  /** cron:<name>, http:<name>, cli …; missing for runs started in the editor. */
+  /** cron:<name>, http:<name>, cli, error …; missing for runs started in the editor. */
   trigger?: string;
+  /** The run this one belongs to: for the error workflow (trigger error), the failed run it reports (ADR 0027). */
+  parent?: string;
   client?: string;
   environment?: string;
   params?: Record<string, string>;
@@ -42,6 +44,8 @@ export interface RunFilter {
   status?: RunStatus;
   path?: string;
   trigger?: string;
+  /** The runs that belong to this run, e.g. the run of the error workflow of a failed run (S72b). */
+  parent?: string;
 }
 
 /** Runs per page, as the server lists them by default (runs.DefaultList). */
@@ -96,5 +100,12 @@ export const timeOf = (iso: string) => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
-/** How the trigger of a run is shown: "Editor", "runnel run" or "cron:nightly". */
-export const triggerLabel = (trigger?: string) => (!trigger ? "Editor" : trigger === "cli" ? "runnel run" : trigger);
+/** The trigger of the runs of the error workflow (ADR 0027). */
+export const errorTrigger = "error";
+
+/** How the trigger of a run is shown: "Editor", "runnel run", "Error workflow" or "cron:nightly". */
+export const triggerLabel = (trigger?: string) =>
+  !trigger ? "Editor" : trigger === "cli" ? "runnel run" : trigger === errorTrigger ? "Error workflow" : trigger;
+
+/** A run in a link between runs: "hello.workflow.yaml · 01KF3Q8Z…". */
+export const runLabel = (run: { id: string; path: string }) => `${run.path.slice(run.path.lastIndexOf("/") + 1)} · ${run.id.slice(0, 10)}…`;

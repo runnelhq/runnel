@@ -397,7 +397,8 @@ func (e *editor) check() error {
 	return e.checkEntries()
 }
 
-var workflowFields = map[string]bool{"name": true, "description": true, "settings.timeout": true, "settings.maxConcurrentRuns": true}
+var workflowFields = map[string]bool{"name": true, "description": true, "settings.timeout": true, "settings.maxConcurrentRuns": true,
+	"settings.onError": true}
 
 func checkID(noun, id string) error {
 	if !idPattern.MatchString(id) {
@@ -1222,7 +1223,7 @@ type PipelineLinkUpdate struct {
 var (
 	transformFields = map[string]bool{"copies": true, "distribution": true}
 	pipelineFields  = map[string]bool{"name": true, "description": true,
-		"settings.batchSize": true, "settings.bufferSize": true, "settings.strict": true}
+		"settings.batchSize": true, "settings.bufferSize": true, "settings.strict": true, "settings.onError": true}
 )
 
 // EditPipeline applies an edit to the text of a pipeline file and returns the new text,

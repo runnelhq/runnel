@@ -72,6 +72,10 @@ func TestEditPipelineSetAndRename(t *testing.T) {
 	if !strings.Contains(got, "name: customers\nsettings:\n  strict: true\ntransforms:\n") {
 		t.Errorf("settings:\n%s", got)
 	}
+	got = editPipeline(t, got, PipelineEdit{SetPipeline: []WorkflowField{{Field: "settings.onError", Value: "workflows/on-error.workflow.yaml"}}})
+	if !strings.Contains(got, "settings:\n  strict: true\n  onError: workflows/on-error.workflow.yaml\ntransforms:\n") {
+		t.Errorf("settings.onError:\n%s", got)
+	}
 	got = editPipeline(t, pipelineSource, PipelineEdit{Rename: map[string]string{"types": "convert"}})
 	want := strings.NewReplacer("  - id: types\n", "  - id: convert\n", "{ from: read, to: types }", "{ from: read, to: convert }",
 		"{ from: types, to: write }", "{ from: convert, to: write }").Replace(pipelineSource)

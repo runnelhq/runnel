@@ -41,7 +41,7 @@ import { runTriggerTarget } from "../forms";
 import { MarkdownView } from "./MarkdownView";
 import { YamlEditor } from "./YamlEditor";
 import { Dialog } from "./Dialog";
-import { PropertiesPanel, type FieldValue, type LinkChange } from "./PropertiesPanel";
+import { PropertiesPanel, type FieldValue, type LinkChange, type OnErrorChoices } from "./PropertiesPanel";
 import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
 import type { ReferenceAction, ReferenceTarget } from "./ReferencePanel";
@@ -193,6 +193,12 @@ export function FileView(props: {
     setTyping(pending);
   }, []);
   const [checking, setChecking] = useState(false);
+  // The choices of settings.onError (S72b): the workflows of the project and that of project.yaml.
+  const projectOnError = props.project?.onError;
+  const onErrorChoices = useMemo<OnErrorChoices>(
+    () => ({ workflows: [...(props.files ?? noFiles)].filter((p) => p.endsWith(".workflow.yaml")).sort(), project: projectOnError, self: path }),
+    [props.files, projectOnError, path],
+  );
   const [yamlFocus, setYamlFocus] = useState<{ line: number; seq: number; from?: number; to?: number } | null>(null);
   const flushTyping = useRef<(() => void) | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -1144,6 +1150,7 @@ export function FileView(props: {
             saved={!dirty}
             projectDir={props.projectDir}
             problems={validation?.problems ?? []}
+            workflows={onErrorChoices.workflows}
             onText={(next) => setText(next, "push")}
             onError={setEditError}
           />
@@ -1303,6 +1310,7 @@ export function FileView(props: {
             onRename(from, to);
           }}
           onHide={() => setPanel(false)}
+          onErrorChoices={onErrorChoices}
           onDetectFields={graphKind === "pipeline" ? setDetecting : undefined}
           onPreview={graphKind === "pipeline" ? (id) => void startPreview(id, preview?.limit) : undefined}
         />

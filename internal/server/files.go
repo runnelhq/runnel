@@ -43,6 +43,9 @@ type projectInfo struct {
 	DefaultEnvironment string `json:"defaultEnvironment,omitempty"`
 	// History is how long ended runs are kept (S26c), for the list of runs (S26e1).
 	History historyInfo `json:"history"`
+	// OnError is the error workflow of the project (ADR 0027), for "Project default" in
+	// the settings of workflows and pipelines (S72b); empty if none is set.
+	OnError string `json:"onError,omitempty"`
 }
 
 type historyInfo struct {
@@ -58,6 +61,7 @@ func (s *Server) handleProject(w http.ResponseWriter, _ *http.Request) {
 		info.Environments = p.EnvironmentNames()
 		info.DefaultEnvironment = p.DefaultEnvironment
 		history = p.Settings.History
+		info.OnError = p.Settings.OnError
 	}
 	info.History.KeepDays, info.History.MaxRuns = history.Retention()
 	writeJSON(w, http.StatusOK, info)

@@ -878,6 +878,11 @@ settings:
 - **Prüfung:** `validate` und der Editor melden an `settings.onError`: Datei fehlt oder ist kein Workflow, weitere
   Pflichtparameter, `FAILED_*` mit anderem Typ als `string`; ein Workflow, der sich selbst nennt, bekommt eine
   Warnung (dort gilt dann die Einstellung des Projekts).
+- **Editor (S72b):** Feld „On error“ im Formular von `project.yaml` und in den Einstellungen von Workflow und Pipeline
+  (Auswahl der Workflows des Projekts, dazu „Project default“ bzw. „None“). Die Liste der Läufe verbindet beide Läufe:
+  am Fehler-Lauf „for run …“, am fehlgeschlagenen „reported by …“; der Trigger-Filter kennt „Error workflow“.
+- **Beispiel:** `examples/hello/workflows/on-error.workflow.yaml` schreibt Datei, Lauf und Fehler ins Log und zeigt im
+  Kommentar, wie `mail.send` eine Mail schickt.
 
 ---
 

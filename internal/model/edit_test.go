@@ -306,6 +306,8 @@ func TestEditWorkflowSetWorkflow(t *testing.T) {
 			"name: edit\n", "name: edit\ndescription: Runs at night\n"},
 		{"settings before the actions", WorkflowField{Field: "settings.maxConcurrentRuns", Value: float64(1)},
 			"name: edit\nactions:\n", "name: edit\nsettings:\n  maxConcurrentRuns: 1\nactions:\n"},
+		{"error workflow (S72b)", WorkflowField{Field: "settings.onError", Value: "none"},
+			"name: edit\nactions:\n", "name: edit\nsettings:\n  onError: none\nactions:\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got := edit(t, editSource, WorkflowEdit{SetWorkflow: []WorkflowField{tt.field}})

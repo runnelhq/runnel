@@ -698,7 +698,7 @@ func (m *Manager) Find(ctx context.Context, f history.Filter) ([]Run, error) {
 func matches(r Run, f history.Filter) bool {
 	return (f.Status == "" || string(r.Status) == f.Status) && (f.Path == "" || r.Path == f.Path) &&
 		(f.Trigger == "" || r.Trigger == f.Trigger || f.Trigger == history.TriggerEditor && r.Trigger == "") &&
-		(f.Before == "" || r.ID < f.Before)
+		(f.Parent == "" || r.Parent == f.Parent) && (f.Before == "" || r.ID < f.Before)
 }
 
 // Get returns a run with its actions and log, from memory or else from the history.

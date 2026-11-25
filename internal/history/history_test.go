@@ -233,6 +233,7 @@ func TestFind(t *testing.T) {
 		{ID: "03", Path: "a", Trigger: "cron:n", Status: "failed"},
 		{ID: "04", Path: "a", Trigger: "cli", Status: "failed"},
 		{ID: "05", Path: "a", Status: "succeeded"}, // editor
+		{ID: "06", Path: "e", Trigger: "error", Status: "succeeded", Parent: "04"},
 	} {
 		r.Kind, r.Started, r.Data = "workflow", time.Now(), []byte(`{}`)
 		if err := s.PutRun(ctx, r); err != nil {
@@ -254,12 +255,14 @@ func TestFind(t *testing.T) {
 		f    Filter
 		want string
 	}{
-		{Filter{}, "05,04,03,02,01"},
+		{Filter{}, "06,05,04,03,02,01"},
 		{Filter{Status: "failed"}, "04,03,02"},
 		{Filter{Trigger: TriggerEditor}, "05"},
 		{Filter{Path: "a", Status: "failed"}, "04,03"},
 		{Filter{Trigger: "cron:n"}, "03,02"},
-		{Filter{Limit: 2}, "05,04"},
+		{Filter{Limit: 2}, "06,05"},
+		{Filter{Parent: "04"}, "06"},
+		{Filter{Parent: "03"}, ""},
 		{Filter{Limit: 2, Before: "03"}, "02,01"},
 		{Filter{Path: "x"}, ""},
 	} {
