@@ -120,3 +120,47 @@ func TestHistorySettings(t *testing.T) {
 		}
 	}
 }
+
+// settings.onError names a workflow of the project (ADR 0027); none only in workflows
+// and pipelines.
+func TestOnErrorSettings(t *testing.T) {
+	const head = "kind: Project\napiVersion: runnel/v1\nname: p\nsettings:\n  onError: "
+	p, err := ReadProject("project.yaml", []byte(head+"workflows/on-error.workflow.yaml\n"), nil)
+	if err != nil || OnErrorTarget(p, "") != "workflows/on-error.workflow.yaml" || OnErrorTarget(p, "none") != "" ||
+		OnErrorTarget(p, "./workflows/b.workflow.yaml") != "workflows/b.workflow.yaml" {
+		t.Fatalf("%+v %v", p.Settings, err)
+	}
+	// An invalid setting (a project with errors) names no workflow.
+	if got := OnErrorTarget(&Project{Settings: ProjectSettings{OnError: "../x.workflow.yaml"}}, ""); got != "" {
+		t.Errorf("invalid setting: %q", got)
+	}
+	for value, want := range map[string]string{
+		"none":                               "project.yaml:5:12: onError: none is only for workflows and pipelines",
+		"/abs/x.workflow.yaml":               "project.yaml:5:12: onError \"/abs/x.workflow.yaml\" must be a path inside the project",
+		"../x.workflow.yaml":                 "must be a path inside the project",
+		"pipelines/a.pipeline.yaml":          "must be a workflow file (*.workflow.yaml), not a pipeline",
+		"workflows/${NAME}.workflow.yaml":    "variables and expressions are not allowed here",
+		"workflows/{{ x }}.workflow.yaml":    "variables and expressions are not allowed here",
+		"workflows/../../x.workflow.yaml":    "must be a path inside the project",
+		`C:\flows\x.workflow.yaml`:           "must be a path inside the project",
+		"workflows\\..\\..\\x.workflow.yaml": "must be a path inside the project",
+	} {
+		_, err := ReadProject("project.yaml", []byte(head+"'"+value+"'\n"), nil)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: %v, want %q", value, err, want)
+		}
+	}
+
+	_, err = ParseWorkflow("a.workflow.yaml", []byte("kind: Workflow\napiVersion: runnel/v1\nname: a\nsettings:\n  onError: x.pipeline.yaml\n"+
+		"actions:\n  - { id: start, type: core.start }\n"))
+	if err == nil || !strings.Contains(err.Error(), "a.workflow.yaml:5:12: onError \"x.pipeline.yaml\" must be a workflow file") {
+		t.Errorf("workflow: %v", err)
+	}
+	pl, err := ParsePipeline("a.pipeline.yaml", []byte("kind: Pipeline\napiVersion: runnel/v1\nname: a\nsettings:\n  onError: none\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if errs := pl.Validate(); strings.Contains(errs.Error(), "onError") || pl.Settings.OnError != OnErrorNone {
+		t.Errorf("pipeline: %v", errs)
+	}
+}

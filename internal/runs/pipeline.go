@@ -38,6 +38,8 @@ type PipelineSpec struct {
 	Respond action.Responder
 	// History: see Spec.History.
 	History string
+	// NoOnError: see Spec.NoOnError.
+	NoOnError bool
 	// Preview runs only a part of the pipeline as data preview (S44); nil: all of it.
 	Preview *PreviewSpec
 }

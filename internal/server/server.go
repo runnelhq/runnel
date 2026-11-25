@@ -83,6 +83,8 @@ type Server struct {
 	// pruneStop ends the cleanup of the history (S26c); pruneDone is closed when it has.
 	pruneStop, pruneDone chan struct{}
 	pruneOnce            sync.Once
+	// onError runs the error workflows of failed runs one at a time (ADR 0027).
+	onError *runs.ErrorQueue
 }
 
 // New opens the project directory. Close releases it.
@@ -113,6 +115,8 @@ func New(opts Options) (*Server, error) {
 	if opts.Logger != nil {
 		s.runs.OnEnd(func(r runs.Run) { logRun(opts.Logger, r) })
 	}
+	s.onError = runs.NewErrorQueue(s.runOnError, s.warn)
+	s.runs.OnFailed(s.onError.Add)
 	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Wait: s.waitRun, Running: s.running, Log: opts.Log, Warn: opts.Warn,
 		Listen: opts.TriggerListen, TLS: opts.TriggerTLS})
 	return s, nil
@@ -128,6 +132,7 @@ func (s *Server) StartTriggers(ctx context.Context) {
 // waits for the event streams.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.stopOnce.Do(func() { close(s.stop) })
+	s.onError.Close()
 	return s.runs.Shutdown(ctx)
 }
 
@@ -135,6 +140,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // 503) and waits until the running runs have ended or ctx is done, without cancelling
 // them (S41). Call Shutdown afterwards for the rest.
 func (s *Server) Drain(ctx context.Context) error {
+	s.onError.Close() // waiting error workflows are dropped; a running one may end
 	return s.runs.Drain(ctx)
 }
 

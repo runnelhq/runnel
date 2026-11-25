@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/history"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
@@ -43,7 +44,8 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
-	opts := startOptions{env: req.Environment, params: req.Params}
+	// Runs of the editor and the API start no error workflow, also not "Run target now" (ADR 0027).
+	opts := startOptions{env: req.Environment, params: req.Params, noOnError: true}
 	if req.Trigger != "" {
 		if req.Path != "" || req.Environment != "" || len(req.Params) > 0 {
 			writeError(w, http.StatusBadRequest, "a run of a trigger takes path, environment and params from the trigger")
@@ -59,7 +61,7 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		req.Path = t.Target
-		opts = startOptions{env: t.Environment, params: triggers.TriggerParams(t), trigger: t.Type + ":" + t.Name}
+		opts = startOptions{env: t.Environment, params: triggers.TriggerParams(t), trigger: t.Type + ":" + t.Name, noOnError: true}
 	}
 	name, err := filePath(req.Path)
 	if err != nil {
@@ -249,18 +251,45 @@ func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (string
 	if err != nil {
 		return "", err
 	}
-	run, err := s.startFile(name, data, startOptions{env: t.Environment, params: params, trigger: t.Type + ":" + t.Name,
+	trigger := t.Type + ":" + t.Name
+	run, err := s.startFile(name, data, startOptions{env: t.Environment, params: params, trigger: trigger,
 		client: r.Client, request: r.Request, respond: r.Respond, history: r.History, rows: rows})
+	// A run that fails before it starts (e.g. a missing secret) is reported too (ADR 0027).
+	if f, ok := runs.StartFailure(s.dir, name, data, trigger, t.Environment, false, err); ok {
+		s.onError.Add(f)
+	}
 	return run.ID, err
+}
+
+// runOnError runs the error workflow of a failed run and waits until it has ended (ADR
+// 0027); problems go to the server log.
+func (s *Server) runOnError(f runs.Failure) {
+	data, err := s.readFile(f.Target)
+	if err == nil {
+		spec := runs.ErrorSpec(f, s.dir, filepath.Join(s.dir, filepath.FromSlash(f.Target)), data)
+		spec.Registry, spec.Transforms = s.registry, s.transforms
+		var run runs.Run
+		if run, _, err = s.runs.Start(f.Target, spec); err == nil {
+			s.info(fmt.Sprintf("on error: started %s for %s, run %s", f.Target, f.Describe(), run.ID))
+			d, _ := s.runs.Wait(context.Background(), run.ID)
+			if d.Status != workflow.Succeeded {
+				s.warn(fmt.Sprintf("on error: %s (run %s) %s: %s", f.Target, run.ID, d.Status, d.Error))
+			}
+			return
+		}
+	}
+	s.warn(fmt.Sprintf("on error: %s could not be started for %s: %v", f.Target, f.Describe(), err))
 }
 
 // startOptions describe a start of a saved file, from the API or a trigger.
 type startOptions struct {
 	env, trigger, client, history string
-	params                        map[string]string
-	request                       map[string]any  // workflows (http triggers)
-	rows                          []record.Record // pipelines (JSON list of an http request)
-	respond                       action.Responder
+	// noOnError: no error workflow when the run fails (runs of the editor, ADR 0027).
+	noOnError bool
+	params    map[string]string
+	request   map[string]any  // workflows (http triggers)
+	rows      []record.Record // pipelines (JSON list of an http request)
+	respond   action.Responder
 }
 
 // startFile starts a run of the saved workflow or pipeline name of the project.
@@ -268,12 +297,12 @@ func (s *Server) startFile(name string, data []byte, o startOptions) (runs.Run, 
 	if fileKind(name) == "pipeline" {
 		run, _, err := s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
 			Env: o.env, Params: o.params, Registry: s.transforms, Trigger: o.trigger, Client: o.client,
-			Rows: o.rows, Respond: o.respond, History: o.history})
+			Rows: o.rows, Respond: o.respond, History: o.history, NoOnError: o.noOnError})
 		return run, err
 	}
 	run, _, err := s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
 		ProjectDir: s.dir, Env: o.env, Params: o.params, Registry: s.registry, Transforms: s.transforms, Trigger: o.trigger,
-		Client: o.client, Request: o.request, Respond: o.respond, History: o.history})
+		Client: o.client, Request: o.request, Respond: o.respond, History: o.history, NoOnError: o.noOnError})
 	return run, err
 }
 

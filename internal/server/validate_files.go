@@ -23,7 +23,9 @@ func (s *Server) validateText(kind, name string, data []byte) (model.Errors, err
 		}
 		var p *model.Project
 		if p, err = model.ReadProject(name, data, exists); err == nil {
-			return p.InlineSecretWarnings(), nil
+			diags := append(p.InlineSecretWarnings(), runs.CheckOnError(p.ErrorAt, p.WarningAt, p.Settings.OnError, s.dir, "")...)
+			diags.Sort()
+			return diags, nil
 		}
 	case "environment":
 		var env *model.Environment

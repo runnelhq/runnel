@@ -62,7 +62,7 @@ func TestPutGetList(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := s.PutRun(ctx, Run{ID: "01B", Path: "workflows/import.workflow.yaml", Kind: "workflow", Status: "failed",
-		Started: start, Finished: &end, Error: "boom", Data: []byte(`{"id":"01B","status":"failed"}`)}); err != nil {
+		Started: start, Finished: &end, Error: "boom", Parent: "01A", Data: []byte(`{"id":"01B","status":"failed"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	_ = s.Close()
@@ -76,7 +76,7 @@ func TestPutGetList(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatal(ok, err)
 	}
-	if d.Run.Status != "failed" || d.Run.Error != "boom" || d.Run.Finished == nil || !d.Run.Finished.Equal(end) || !d.Run.Started.Equal(start) {
+	if d.Run.Status != "failed" || d.Run.Error != "boom" || d.Run.Parent != "01A" || d.Run.Finished == nil || !d.Run.Finished.Equal(end) || !d.Run.Started.Equal(start) {
 		t.Errorf("run %+v", d.Run)
 	}
 	if len(d.Nodes) != 1 || string(d.Nodes[0].Data) != `{"id":"read","status":"failed"}` {

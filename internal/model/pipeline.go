@@ -42,6 +42,8 @@ type PipelineSettings struct {
 	// Strict requires a closed schema on every link; warnings about unknown fields
 	// become errors (ADR 0007).
 	Strict bool `yaml:"strict,omitempty" json:"strict,omitempty"`
+	// OnError is the workflow started when a run fails (ADR 0027); see WorkflowSettings.
+	OnError string `yaml:"onError,omitempty" json:"onError,omitempty" doc:"Workflow started when a run of this pipeline fails, relative to the project; none: no error workflow; empty: the one of project.yaml"`
 }
 
 // Limits of the settings, so that a typo does not take all memory.
@@ -179,6 +181,9 @@ func (p *Pipeline) validate() error {
 	}
 	if st.BufferSize < 0 || st.BufferSize > MaxBufferSize {
 		add("$.settings.bufferSize", "settings.bufferSize must be between 1 and %d", MaxBufferSize)
+	}
+	if msg := CheckOnErrorPath(st.OnError); msg != "" {
+		add("$.settings.onError", "%s", msg)
 	}
 	if st.BatchSize > 0 && st.BufferSize > 0 && st.BufferSize < st.BatchSize {
 		add("$.settings.bufferSize", "settings.bufferSize (%d) must be at least settings.batchSize (%d)", st.BufferSize, st.BatchSize)

@@ -56,7 +56,10 @@ type Run struct {
 	Error    string
 	// FileHash identifies the content of the workflow or pipeline that ran.
 	FileHash string
-	Data     []byte
+	// Parent is the run this one belongs to, e.g. the failed run an error workflow
+	// reports (ADR 0027); empty: none.
+	Parent string
+	Data   []byte
 }
 
 // Node is the state of an action or transform of a run, as JSON.
@@ -279,12 +282,13 @@ func (t *Tx) PutRun(ctx context.Context, r Run) error {
 	if r.Finished != nil {
 		finished = ms(*r.Finished)
 	}
-	_, err := t.ex.ExecContext(ctx, `INSERT INTO runs (id, path, kind, trigger, status, started, finished, heartbeat, error, file_hash, data)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	_, err := t.ex.ExecContext(ctx, `INSERT INTO runs (id, path, kind, trigger, status, started, finished, heartbeat, error, file_hash, parent_id, data)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET path = excluded.path, kind = excluded.kind, trigger = excluded.trigger,
 			status = excluded.status, started = excluded.started, finished = excluded.finished,
-			heartbeat = excluded.heartbeat, error = excluded.error, file_hash = excluded.file_hash, data = excluded.data`,
-		r.ID, r.Path, r.Kind, r.Trigger, r.Status, ms(r.Started), finished, ms(time.Now()), r.Error, r.FileHash, string(r.Data))
+			heartbeat = excluded.heartbeat, error = excluded.error, file_hash = excluded.file_hash,
+			parent_id = excluded.parent_id, data = excluded.data`,
+		r.ID, r.Path, r.Kind, r.Trigger, r.Status, ms(r.Started), finished, ms(time.Now()), r.Error, r.FileHash, r.Parent, string(r.Data))
 	return err
 }
 
@@ -364,14 +368,14 @@ func (t *Tx) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-const runColumns = `id, path, kind, trigger, status, started, finished, error, file_hash, data`
+const runColumns = `id, path, kind, trigger, status, started, finished, error, file_hash, parent_id, data`
 
 func scanRun(row interface{ Scan(...any) error }) (Run, error) {
 	var r Run
 	var started int64
 	var finished sql.NullInt64
 	var data string
-	if err := row.Scan(&r.ID, &r.Path, &r.Kind, &r.Trigger, &r.Status, &started, &finished, &r.Error, &r.FileHash, &data); err != nil {
+	if err := row.Scan(&r.ID, &r.Path, &r.Kind, &r.Trigger, &r.Status, &started, &finished, &r.Error, &r.FileHash, &r.Parent, &data); err != nil {
 		return r, err
 	}
 	r.Started, r.Data = fromMs(started), []byte(data)

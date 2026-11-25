@@ -40,6 +40,8 @@ type runOptions struct {
 	// history (all, errors, none) overrides settings.history.cli; historyDir is the
 	// folder of the run histories (ADR 0026, S26b).
 	history, historyDir string
+	// noOnError starts no error workflow when the run fails (ADR 0027).
+	noOnError bool
 }
 
 func newRunCommand() *cobra.Command {
@@ -55,6 +57,8 @@ func newRunCommand() *cobra.Command {
 			"Ctrl+C cancels the run cleanly (running actions and transforms are stopped); press it twice to exit at once.\n\n" +
 			"The run is kept in the run history of the project (see \"runnel runs\"): all runs, only failed ones or none,\n" +
 			"as set by --history or settings.history.cli in project.yaml (default all).\n\n" +
+			"When the run fails, the error workflow of settings.onError (project.yaml, or the file itself) runs\n" +
+			"afterwards in the same environment; the exit code stays that of the failed run. --no-on-error turns it off.\n\n" +
 			"Exit codes: 0 succeeded, 1 failed, 2 not started (invalid file or arguments), 130 cancelled.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,6 +74,7 @@ func newRunCommand() *cobra.Command {
 	logFlags(cmd, &opts.log)
 	cmd.Flags().StringVar(&opts.history, "history", "", "which ended runs are kept in the run history: all, errors or none; empty: settings.history.cli of the project, else all")
 	historyDirFlag(cmd, &opts.historyDir, defaultHistoryHint)
+	cmd.Flags().BoolVar(&opts.noOnError, "no-on-error", false, "start no error workflow (settings.onError) when the run fails")
 	return cmd
 }
 
@@ -79,6 +84,7 @@ func runWorkflow(ctx context.Context, out, errOut io.Writer, file string, opts r
 		if _, ok := errors.AsType[errExitCode](err); !ok {
 			_, _ = fmt.Fprintln(errOut, "Error:", err)
 		}
+		r.onError(ctx, errOut) // r is set if the failure has an error workflow
 		return errExitCode(exitNotRun)
 	}
 	return r.execute(ctx, errOut)
@@ -102,7 +108,8 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*cliRun, e
 
 	var logger *runLogger
 	m := runs.NewManager()
-	pend, p, err := m.PrepareRun(runPath(file, projectDir), runs.Spec{
+	path := runPath(file, projectDir)
+	pend, p, err := m.PrepareRun(path, runs.Spec{
 		Name:       filepath.ToSlash(file),
 		Data:       data,
 		ProjectDir: projectDir,
@@ -112,24 +119,36 @@ func prepareRun(out, errOut io.Writer, file string, opts runOptions) (*cliRun, e
 		Transforms: transforms.Builtin(),
 		Trigger:    runTriggerCLI,
 		Observer:   func(e workflow.Event) { logger.event(e) },
+		NoOnError:  opts.noOnError,
 	})
 	printDiags(errOut, p.Warnings)
 	if err != nil {
-		if diags, ok := errors.AsType[model.Errors](err); ok {
-			printDiags(errOut, diags)
-			return nil, errExitCode(exitNotRun)
-		}
-		if errors.Is(err, runs.ErrMissingParameters) {
-			err = fmt.Errorf("%w (set with --param NAME=VALUE)", err)
-		}
-		return nil, err
+		return notStarted(out, errOut, file, projectDir, path, data, opts, err)
 	}
 	for _, name := range p.Undeclared {
 		_, _ = fmt.Fprintf(errOut, "warning: parameter %q is not declared in workflow %q; it is available as variable ${%s}\n",
 			name, p.Workflow.Name, name)
 	}
 	logger, _ = newRunLogger(out, opts, p.Workflow.Name, p.Env)
-	return newCLIRun(m, pend, errOut, opts, projectDir, p.Project), nil
+	return newCLIRun(m, pend, out, errOut, opts, projectDir, file, p.Project), nil
+}
+
+// notStarted reports a run that could not be started: problems in files are printed and
+// returned as errExitCode. The cliRun is set if the failure has an error workflow (ADR
+// 0027), to run with its onError.
+func notStarted(out, errOut io.Writer, file, projectDir, path string, data []byte, opts runOptions, err error) (*cliRun, error) {
+	var r *cliRun
+	if f, ok := runs.StartFailure(projectDir, path, data, runTriggerCLI, opts.env, opts.noOnError, err); ok {
+		r = &cliRun{out: out, opts: opts, projectDir: projectDir, file: file, failure: &f}
+	}
+	if diags, ok := errors.AsType[model.Errors](err); ok {
+		printDiags(errOut, diags)
+		return r, errExitCode(exitNotRun)
+	}
+	if errors.Is(err, runs.ErrMissingParameters) {
+		err = fmt.Errorf("%w (set with --param NAME=VALUE)", err)
+	}
+	return r, err
 }
 
 // readRunFile reads a workflow or pipeline file and finds its project ("" if none).
