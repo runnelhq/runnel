@@ -549,3 +549,25 @@ func CheckConfig(s *Schema, with map[string]any) error {
 	}
 	return nil
 }
+
+// Paths returns the paths of the fields with the given format in a configuration, e.g.
+// [default] and [cases * to] for FormatTarget in core.switch; "*" stands for every item
+// of a list.
+func (s *Schema) Paths(format string) [][]string {
+	var out [][]string
+	var walk func(s *Schema, at []string)
+	walk = func(s *Schema, at []string) {
+		if s == nil {
+			return
+		}
+		if s.Format == format && len(at) > 0 {
+			out = append(out, slices.Clone(at))
+		}
+		for _, p := range s.Properties {
+			walk(p.Schema, append(at, p.Name))
+		}
+		walk(s.Items, append(at, "*"))
+	}
+	walk(s, nil)
+	return out
+}

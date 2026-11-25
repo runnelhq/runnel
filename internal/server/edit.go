@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/schema"
 )
 
 // editRequest applies changes made on the canvas to the text the editor shows.
@@ -92,6 +94,16 @@ func (s *Server) handleEditPipeline(w http.ResponseWriter, r *http.Request) {
 		out, pasted, err := model.PastePipeline(name, []byte(req.Content), *req.Paste)
 		writeEdit(w, s, "pipeline", out, &pasted, err)
 		return
+	}
+	if len(req.Rename) > 0 {
+		// Renaming also changes the fields that name transforms (to, default, else …).
+		reg := runs.WithPluginTransforms(s.transforms, s.dir)
+		req.Targets = func(typ string) [][]string {
+			if d, ok := reg.Descriptor(typ); ok {
+				return d.Schema.Paths(schema.FormatTarget)
+			}
+			return nil
+		}
 	}
 	out, err := model.EditPipeline(name, []byte(req.Content), req.PipelineEdit)
 	var diags model.Errors

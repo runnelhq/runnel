@@ -297,7 +297,7 @@ POST /api/v1/pipelines/edit
 
 | Feld | Unterschied zu `/workflows/edit` |
 |---|---|
-| `move`, `delete`, `add`, `rename`, `deleteLinks` | wie dort, für Transforms (`transforms:`) |
+| `move`, `delete`, `add`, `rename`, `deleteLinks` | wie dort, für Transforms (`transforms:`); `rename` ändert zusätzlich die Felder anderer Transforms, die den Transform nennen (Format `runnel-target` im Schema des Typs, z. B. `to` und `default` von `core.switch`, `else` von `core.filter`, auch bei Plugins) |
 | `addLinks` | `from`, `to`, optional `type: error` (`data` ist der Standard und wird nicht geschrieben) |
 | `updateLinks` | ändert den Typ: `[{"index": 1, "type": "error"}]`; `data` entfernt `type:` |
 | `set` | `copies`, `distribution` und `with.<name>` eines Transforms; zusätzlich setzt `list` ein Feld der Konfiguration auf eine Liste von Zuordnungen, je eine Zeile im Flow-Stil (S46): `{"id": "read", "field": "with.fields", "value": null, "list": [[{"key": "name", "value": "kdnr"}, {"key": "type", "value": "int"}]]}` → `- { name: kdnr, type: int }`; Texte mit `,` `[` `]` `{` `}` in Anführungszeichen; Werte in `list` dürfen auch Zahlen und `true`/`false` sein (E14a, z. B. `- { name: total, descending: true }`). `texts` setzt eine Liste von Texten, geschrieben als `[a, b]` (E14a, z. B. `groupBy`). Eine vorhandene Liste wird ersetzt, ohne `list`, `texts` und `value` entfernt |

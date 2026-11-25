@@ -226,6 +226,8 @@ type graphEdit struct {
 	Set         []SetField
 	SetDoc      []WorkflowField
 	Entries     []EntryEdit
+	// Targets: see PipelineEdit.Targets.
+	Targets func(typ string) [][]string
 }
 
 // editText applies an edit to the text of a file: read parses the text into the steps
@@ -1001,6 +1003,21 @@ func (e *editor) rename() error {
 		if i < len(e.d.steps) {
 			add(valueOf(entries(item), "id"), e.d.steps[i])
 		}
+		// Fields that name other transforms (to, default, else …) follow the new ids.
+		if e.edit.Targets == nil {
+			continue
+		}
+		typ, ok := valueOf(entries(item), "type").(*ast.StringNode)
+		if !ok {
+			continue
+		}
+		for _, path := range e.edit.Targets(typ.Value) {
+			for _, n := range nodesAt(valueOf(entries(item), "with"), path) {
+				if s, ok := n.(*ast.StringNode); ok {
+					add(s, s.Value)
+				}
+			}
+		}
 	}
 	for i, item := range seqValues(valueOf(e.top, "links")) {
 		if i < len(e.d.links) {
@@ -1032,6 +1049,25 @@ func (e *editor) rename() error {
 		e.edits = append(e.edits, lineEdit{start: line, end: line, lines: []string{string(text)}})
 	}
 	return nil
+}
+
+// nodesAt returns the nodes at a path in a mapping, e.g. [cases * to]; "*" stands for
+// every item of a list.
+func nodesAt(n ast.Node, path []string) []ast.Node {
+	if n == nil {
+		return nil
+	}
+	if len(path) == 0 {
+		return []ast.Node{n}
+	}
+	if path[0] == "*" {
+		var out []ast.Node
+		for _, item := range seqValues(n) {
+			out = append(out, nodesAt(item, path[1:])...)
+		}
+		return out
+	}
+	return nodesAt(valueOf(entries(n), path[0]), path[1:])
 }
 
 func seqValues(n ast.Node) []ast.Node {
@@ -1170,6 +1206,10 @@ type PipelineEdit struct {
 	SetPipeline []WorkflowField `json:"setPipeline,omitempty"`
 	// Entries changes a parameter (E7c); at most one.
 	Entries []EntryEdit `json:"entries,omitempty"`
+	// Targets returns the fields of a transform type that name other transforms (format
+	// runnel-target, e.g. [default] and [cases * to] of core.switch): Rename changes them
+	// too. Set by the server from the registry; nil: none.
+	Targets func(typ string) [][]string `json:"-"`
 }
 
 // PipelineLinkUpdate changes the type of a link: data or error.
@@ -1193,7 +1233,7 @@ func EditPipeline(name string, data []byte, edit PipelineEdit) ([]byte, error) {
 			return nil, nil, err
 		}
 		g := &graphEdit{Move: edit.Move, Delete: edit.Delete, Add: edit.Add, Rename: edit.Rename,
-			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetPipeline, Entries: edit.Entries}
+			DeleteLinks: edit.DeleteLinks, Set: edit.Set, SetDoc: edit.SetPipeline, Entries: edit.Entries, Targets: edit.Targets}
 		for _, l := range edit.AddLinks {
 			if err := checkLinkType(l.Type); err != nil {
 				return nil, nil, fmt.Errorf("cannot add link from %q to %q: %w", l.From, l.To, err)
