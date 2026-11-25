@@ -139,6 +139,35 @@ func TestPluginTransformStream(t *testing.T) {
 	}
 }
 
+// A plugin may leave out the fields of an emit when they are those of the last emit
+// (ADR 0019); the host then reads the rows with those fields.
+func TestPluginTransformSameFields(t *testing.T) {
+	dir := pluginProject(t)
+	t.Setenv(plugintest.ModeEnv, "same-fields")
+	trustDemo(t, dir)
+	in := names("a", "bad", "route", "b")
+	for range 997 {
+		in = append(in, names("x")...)
+	}
+	res := runPluginPipeline(t, dir, upperPipeline, in...)
+	if res.Status != pipeline.Succeeded {
+		t.Fatalf("%s %v", res.Status, res.Err)
+	}
+	if c := res.Counts["up"]; c.Read != 1001 || c.Written != 1000 || c.Errors != 1 || len(res.Rows) != 999 {
+		t.Errorf("up %+v, rows %d", c, len(res.Rows))
+	}
+	if v, _ := res.Rows[998].Get("name"); v != "X" {
+		t.Errorf("last %v", res.Rows[998])
+	}
+	res = runPluginPipeline(t, dir, countPipeline)
+	if res.Status != pipeline.Succeeded || len(res.Rows) != 250 {
+		t.Fatalf("input: %s %v, %d rows", res.Status, res.Err, len(res.Rows))
+	}
+	if v, _ := res.Rows[249].Get("name"); v != "row 250" {
+		t.Errorf("last %v", res.Rows[249])
+	}
+}
+
 // Errors of the stream stop the pipeline with a message: a stream closed with an error,
 // emits to a target outside the configuration, more emits than the window, a crash, a
 // plugin that is not trusted.

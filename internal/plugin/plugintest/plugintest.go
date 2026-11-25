@@ -8,7 +8,7 @@
 //	other-name  answers initialize as plugin "other"
 //	outside     describes core.echo (outside its namespace)
 //	conn-outside describes connection type sql (outside its namespace)
-//	bad-to, close-error: see transforms.go
+//	bad-to, close-error, same-fields: see transforms.go
 //
 // The text "fail" fails, "sleep" takes 300 ms, "crash" ends the process, "hang" waits for
 // $/cancelRequest.

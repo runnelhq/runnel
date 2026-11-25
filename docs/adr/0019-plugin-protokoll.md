@@ -523,6 +523,41 @@ bei der Umsetzung von S50a:
   `warning`). Runnel prüft Namen und Typen und vergleicht mit `fields:` der Konfiguration. Zeitgrenze 1 Minute;
   Secrets der Connections sind in Fehlermeldungen maskiert.
 
+## Nachtrag 2026-11-24 (S51): Go-SDK
+
+Präzisierungen bei der Umsetzung in `runnelhq/sdk-go` (Actions und Connection-Typen wurden zuerst gebaut, die
+Transforms nach S50):
+
+- **API:** `runnel.New(name, version)`, `runnel.AddAction`, `runnel.AddTransform` und `runnel.AddConnectionType` mit
+  einem Struct je Konfiguration (Go-Generics), `p.Main()`. Fehler in den Definitionen (Typ außerhalb des Namensraums,
+  doppelt, unbekannte Kategorie, ungültige Tags) sind Programmierfehler (`panic` beim Start, also im ersten Test).
+- **Schema aus Struct-Tags** wie bei eingebauten Bausteinen (`json`, `doc`, `schema`, ADR 0014), damit Plugins und Kern
+  dieselben Schemas liefern. Zusätzlich: `connection=<typ>` an einem Struct-Feld ergibt im Schema einen Text mit
+  `format: runnel-connection`; das Feld bekommt die aufgelöste Connection. `schema:"-"` liest ein Feld, ohne es ins
+  Schema zu nehmen (`runnel.ConnectionInfo` mit `name` und `type`).
+- **Werte:** Texte in Feldern vom Typ Zahl oder `bool` wandelt das SDK um, weil aufgelöste Variablen als Text
+  ankommen; ein Wert, der nicht passt, scheitert mit `field "x": expected …` ohne Go-Typnamen. Für `transform.init`
+  bleiben solche Felder leer (Variablen sind dort eventuell noch `${…}`), Connections kommen dort als Name.
+- **`concurrency`** ist im SDK 4, wenn das Plugin nichts anderes setzt; das SDK hält die Grenze selbst ein. Ströme
+  zählen nicht mit.
+- **Transforms:** `Stream.Next` liefert Batches, `Stream.Emit` schreibt an `main`, `error` oder ein Ziel. Das SDK liest
+  eingehende Nachrichten in einer eigenen Goroutine und nimmt höchstens `window` (4) Batches an, die `Next` noch nicht
+  geliefert hat; `$/ack` für einen Batch schickt es, sobald `Next` ihn liefert. `Emit` wartet auf Kredite des Hosts.
+  `fields` gehen mit jedem `emit`: Runnel liest bis S50b ein `emit` ohne `fields` als eines ohne Felder, obwohl das
+  Protokoll das Weglassen erlaubt.
+- **Fehler:** Ein `error` der Action ist `-32000` mit seiner Meldung, ein `panic` ebenso (das Plugin läuft weiter, der
+  Stack steht im Log); bei Transforms beendet beides den Strom mit `transform.closed` und Meldung. Abgebrochene
+  Anfragen `-32800`, Anfragen vor `initialize` `-32002`, unbekannte Methoden `-32601`. Ein Fehler in `connection.test`
+  ist ein gescheiterter Test (`ok: false`), keine Fehlerantwort.
+- **Tests:** `runneltest` spricht das Protokoll im Testprozess (auch `RunTransform` mit Krediten wie der Host);
+  `runneltest.NewProject` baut das Plugin in ein temporäres Projekt, gibt es frei (Freigaben im temporären Ordner) und
+  startet `runnel`, wenn `RUNNEL_BIN` gesetzt ist. Die CI der Repositorys des SDK und der Plugins baut dafür `runnel`
+  aus `main`.
+- **Leistung:** Beispiel-Transform mit Runnel (500.000 Records mit fünf Feldern, ein Feld dazu, vier Kerne): etwa
+  360.000 Records/s; `make bench` im SDK misst den Strom ohne Runnel (≈ 300.000 Records/s mit Test-Client).
+- **Erste Plugins:** `runnelhq/plugin-iban` und `runnelhq/plugin-ldap` (Version 0.1.0) mit Release-Archiven nach
+  `docs/dev/PLUGINS.md` und `THIRD_PARTY_NOTICES`.
+
 ## Nachtrag 2026-11-25 (S52a): Freigeben im Editor
 
 Nach dem freigegebenen Mockup S52 kann der Editor Plugins freigeben (`POST /api/v1/plugins/{name}/trust`).
