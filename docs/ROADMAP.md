@@ -182,6 +182,9 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 | E22 ✅ | Link teilen | Umsetzung nach freigegebenem Mockup E22 in Workflows und Pipelines, ein Schritt für Rückgängig | Playwright (`e2e/insert.spec.ts`) |
 | S72a ✅ | Fehler-Workflow: Ausführung | Nach [ADR 0027](adr/0027-fehler-workflow.md): `settings.onError` in `project.yaml`, Workflows und Pipelines (`none` schaltet ab), Prüfung in `validate`; Start nach einem fehlgeschlagenen Lauf aus Trigger, Dienst und `runnel run` (`--no-on-error`) mit den Parametern `FAILED_*`, höchstens ein Fehler-Lauf gleichzeitig, Warteschlange 20; Auslöser `error` und Eltern-Lauf in der Historie | Go-Tests (Server, CLI, Warteschlange, Prüfung) |
 | S72b ✅ | Fehler-Workflow: Editor und Beispiel | Feld „On error“ in den Einstellungen von Projekt, Workflow und Pipeline; Verweise zwischen Fehler-Lauf und fehlgeschlagenem Lauf in der Liste der Läufe; Beispiel `examples/hello/workflows/on-error.workflow.yaml` | Playwright |
+| S73a | JavaScript: Action | Nach [ADR 0028](adr/0028-javascript-core-script.md): goja, Action `core.script` mit `script` oder `file`, `params`, `return` als `result.output`, `console.*` ins Log; Sandbox ohne Dateisystem und Netzwerk, `require` nur aus `scripts/`, Zeitlimit über `timeout`, Grenzen für Log und Rückgabe; Beispiel | Go-Tests (Werte, Fehler, Ablehnungen), Benchmark |
+| S73b | JavaScript: Transform | Transform `core.script` je Datensatz (`record`, Rückgabe Objekt/`null`/Array, Exception auf den Fehler-Link), Typen nach ADR 0028 (`decimal` als Text), `fields`, `init`/`end`, `maxRecordTime` (Standard 1 s), `copies` | Go-Tests, Benchmark (Ziel > 100.000 Datensätze/s) |
+| S73c | JavaScript: Editor | Code-Feld mit Hervorhebung (`@codemirror/lang-javascript`) und Vervollständigung für `record`, `params`, `console` und Felder | Playwright |
 | S53 | MCP-Server (vormals S11a) | `runnel mcp` (stdio): Workflows eines Projekts als MCP-Tools; Eingabe-Schema aus `parameters`, Ergebnis aus `outputs`, Log als Fortschrittsmeldungen ([ADR 0012](adr/0012-ki-faehigkeit.md)) | MCP Inspector; Claude Desktop/Claude Code ruft `examples/hello` auf |
 
 ---
@@ -280,7 +283,7 @@ Bekannte Fehler und Einschränkungen ([Testplan, Kap. 3](TESTPLAN.md#3-bekannte-
 |---|---|
 | Kommunikation | Mail abrufen (IMAP) – Connections nach ADR 0022 (Mail senden: S62a, S62b) |
 | Secret-Quellen | `windows-credentials`, `azure-keyvault`, `vault` (REST ohne SDK), Cloud-Tresore, Plugin-Quellen (`secrets.get`) – ADR 0022 |
-| Skripte & Programme | Transform `shell.powershell` (Action: S61, Programm starten: S60), JavaScript (`core.script` als Action und Transform, mit goja) |
+| Skripte & Programme | Transform `shell.powershell` (Action: S61, Programm starten: S60); JavaScript jetzt S73a–S73c; `http`/`fs` im Skript (ADR 0028) |
 | Dateiformate | Fixed-Width; XML (nach S68a/S68b): XPath mit Bedingungen in `records` und `from`, Prüfung gegen ein XSD-Schema, Namensräume beim Schreiben (`xmlns`-Präfixe, z. B. für XRechnung/ZUGFeRD), XSLT; Excel: an ein Blatt anhängen, in eine Vorlage ab einer Zelle schreiben, mehrere Blätter in einem Lauf, Action zum Lesen eines Bereichs als Wert (nach S67a/S67b) |
 | Dateitransfer | siehe S57 (Packen und Entpacken: S54) |
 | Netzwerk-Transforms | REST-Eingabe mit Paging (`http.input`, Paginierung aus S63c), HTTP-Lookup, REST-Ausgabe |
