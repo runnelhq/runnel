@@ -142,3 +142,37 @@ links:
 	rec := do(t, s, "POST", "/api/v1/runs", `{"path": "pipelines/broken.pipeline.yaml"}`)
 	expect(t, rec, http.StatusUnprocessableEntity, "the pipeline cannot be started")
 }
+
+// Renaming a transform on the canvas also changes the fields of other transforms that
+// name it, taken from their schemas (format runnel-target).
+func TestEditPipelineRenameTargets(t *testing.T) {
+	s := pipelineServer(t)
+	content := `kind: Pipeline
+apiVersion: runnel/v1
+name: route
+transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 1 } }
+  - id: check
+    type: core.filter
+    with:
+      condition: "{{ true }}"
+      else: rejected
+  - { id: ok, type: core.dummy }
+  - { id: rejected, type: core.dummy }
+links:
+  - { from: gen, to: check }
+  - { from: check, to: ok }
+  - { from: check, to: rejected }
+`
+	rec := do(t, s, "POST", "/api/v1/pipelines/edit", mustJSON(t, map[string]any{"path": "pipelines/route.pipeline.yaml", "content": content,
+		"rename": map[string]string{"rejected": "invalid"}}))
+	var res editResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("%d %s %v", rec.Code, rec.Body, err)
+	}
+	for _, want := range []string{"      else: invalid\n", "  - { id: invalid, type: core.dummy }\n", "  - { from: check, to: invalid }\n"} {
+		if !strings.Contains(res.Content, want) {
+			t.Errorf("missing %q in:\n%s", want, res.Content)
+		}
+	}
+}

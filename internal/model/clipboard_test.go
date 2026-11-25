@@ -170,6 +170,45 @@ links:
 	}
 }
 
+// With the target fields of the types (from their schemas), default of core.switch and
+// else of core.filter follow renamed ids too; a field that is not a target stays.
+func TestPastePipelineTargets(t *testing.T) {
+	target := "kind: Pipeline\napiVersion: runnel/v1\nname: p\ntransforms:\n  - id: rest\n    type: core.dummy\n"
+	clip := `transforms:
+  - id: route
+    type: core.switch
+    with:
+      cases:
+        - { when: "{{ record.n > 1 }}", to: rest }
+      default: rest
+  - { id: check, type: core.filter, with: { condition: "{{ true }}", else: rest } }
+  - { id: names, type: core.map-values, with: { field: x, default: rest } }
+  - id: rest
+    type: core.dummy
+`
+	targets := func(typ string) [][]string {
+		switch typ {
+		case "core.switch":
+			return [][]string{{"cases", "*", "to"}, {"default"}}
+		case "core.filter":
+			return [][]string{{"else"}}
+		}
+		return nil
+	}
+	out, res, err := PastePipeline("p.pipeline.yaml", []byte(target), Paste{Text: clip, Targets: targets})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"to: rest-2 }", "      default: rest-2\n", "else: rest-2 }", "with: { field: x, default: rest }", "  - id: rest-2\n"} {
+		if !strings.Contains(string(out), s) {
+			t.Errorf("missing %q in:\n%s", s, out)
+		}
+	}
+	if res.References != 3 {
+		t.Errorf("references %d", res.References)
+	}
+}
+
 // TestPasteRejected: the wrong kind of steps, text without steps, too much text, an
 // item without id.
 func TestPasteRejected(t *testing.T) {

@@ -297,7 +297,7 @@ POST /api/v1/pipelines/edit
 
 | Feld | Unterschied zu `/workflows/edit` |
 |---|---|
-| `move`, `delete`, `add`, `rename`, `deleteLinks` | wie dort, für Transforms (`transforms:`) |
+| `move`, `delete`, `add`, `rename`, `deleteLinks` | wie dort, für Transforms (`transforms:`); `rename` ändert zusätzlich die Felder anderer Transforms, die den Transform nennen (Format `runnel-target` im Schema des Typs, z. B. `to` und `default` von `core.switch`, `else` von `core.filter`, auch bei Plugins) |
 | `addLinks` | `from`, `to`, optional `type: error` (`data` ist der Standard und wird nicht geschrieben) |
 | `updateLinks` | ändert den Typ: `[{"index": 1, "type": "error"}]`; `data` entfernt `type:` |
 | `set` | `copies`, `distribution` und `with.<name>` eines Transforms; zusätzlich setzt `list` ein Feld der Konfiguration auf eine Liste von Zuordnungen, je eine Zeile im Flow-Stil (S46): `{"id": "read", "field": "with.fields", "value": null, "list": [[{"key": "name", "value": "kdnr"}, {"key": "type", "value": "int"}]]}` → `- { name: kdnr, type: int }`; Texte mit `,` `[` `]` `{` `}` in Anführungszeichen; Werte in `list` dürfen auch Zahlen und `true`/`false` sein (E14a, z. B. `- { name: total, descending: true }`). `texts` setzt eine Liste von Texten, geschrieben als `[a, b]` (E14a, z. B. `groupBy`). Eine vorhandene Liste wird ersetzt, ohne `list`, `texts` und `value` entfernt |
@@ -338,7 +338,8 @@ POST /api/v1/pipelines/edit
 - **IDs:** Freie IDs bleiben; belegte bekommen `-2`, `-3` … (`types-2` wird zu `types-3`). Verweise unter den
   eingefügten Schritten folgen: in Workflows `results.<id>` und `results["<id>"]` in Ausdrücken `{{ … }}` (auch in
   `when` der Links; eine ID mit `-` wird mit Klammern geschrieben, in den Anführungszeichen, die den YAML-Wert der Zeile
-  nicht beenden), in Pipelines die Ziele `to:` (z. B. von `core.switch`). `references` zählt die Änderungen.
+  nicht beenden), in Pipelines die Ziel-Felder der Typen (Format `runnel-target`: `to` und `default` von `core.switch`,
+  `else` von `core.filter`, Ziele von Plugins). `references` zählt die Änderungen.
 - **Position:** `at` ist die linke obere Ecke der eingefügten Schritte (der Editor schickt die Mausposition); ohne
   `at` bleiben die Positionen, bei umbenannten IDs um 40 px versetzt.
 - **Ablehnungen (`400`):** Actions in einer Pipeline bzw. Transforms in einem Workflow („Actions can't be pasted into a

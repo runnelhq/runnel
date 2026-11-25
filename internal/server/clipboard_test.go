@@ -58,6 +58,16 @@ func TestPastePipelineAPI(t *testing.T) {
 	if !strings.Contains(res.Content, "  - id: active-2\n    type: core.filter\n") {
 		t.Errorf("paste:\n%s", res.Content)
 	}
+	// The target fields of pasted transforms follow renamed ids (from the schema: else).
+	text := "transforms:\n  - { id: check, type: core.filter, with: { condition: \"{{ true }}\", else: active } }\n  - { id: active, type: core.dummy }\n"
+	rec = do(t, s, "POST", "/api/v1/pipelines/edit", mustJSON(t, map[string]any{
+		"path": "pipelines/customers.pipeline.yaml", "content": pipelineYAML, "paste": map[string]any{"text": text}}))
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("paste: status %d: %s", rec.Code, rec.Body)
+	}
+	if !strings.Contains(res.Content, "else: active-2 }") {
+		t.Errorf("paste with else:\n%s", res.Content)
+	}
 }
 
 // TestCopyPasteRejected: unknown ids, other files, the wrong kind and oversized text.
