@@ -184,6 +184,12 @@ export function FileView(props: {
   // Editing in the YAML view (E9): typed text waiting for the typing pause, a check on its way,
   // the line to show in the editor, and the function that hands over typed text at once.
   const [typing, setTyping] = useState(false);
+  // Typed text the YAML editor has not handed over yet (typing pause): a reload must keep it.
+  const typingRef = useRef(false);
+  const onPending = useCallback((pending: boolean) => {
+    typingRef.current = pending;
+    setTyping(pending);
+  }, []);
   const [checking, setChecking] = useState(false);
   const [yamlFocus, setYamlFocus] = useState<{ line: number; seq: number; from?: number; to?: number } | null>(null);
   const flushTyping = useRef<(() => void) | null>(null);
@@ -253,9 +259,18 @@ export function FileView(props: {
     let cancelled = false;
     fetchFile(path).then(
       (f) => {
-        // A reload must never replace changes made while it was on its way.
-        if (cancelled || (dirtyRef.current && !force)) return;
-        setState({ status: "loaded", doc: { text: f.text, saved: f.text, etag: f.etag ?? "*", encoding: f.encoding } });
+        // A reload must never replace changes made while it was on its way: neither text
+        // typed but not handed over yet, nor text handed over but not rendered yet (the
+        // reload after connecting could otherwise undo the last typing before a save).
+        if (cancelled) return;
+        const pendingChanges = () => typingRef.current || (docRef.current !== null && docRef.current.text !== docRef.current.saved);
+        if (!force && (dirtyRef.current || pendingChanges())) return;
+        // Also checked against the state itself: an update queued before this one wins.
+        setState((s) =>
+          !force && s.status === "loaded" && s.doc.text !== s.doc.saved
+            ? s
+            : { status: "loaded", doc: { text: f.text, saved: f.text, etag: f.etag ?? "*", encoding: f.encoding } },
+        );
         setUndo([]);
         setRedo([]);
       },
@@ -1126,7 +1141,7 @@ export function FileView(props: {
             focus={yamlFocus}
             assist={isDoc ? undefined : assist}
             onChange={(next) => setText(next, "push")}
-            onPending={setTyping}
+            onPending={onPending}
             onUndo={doUndo}
             onRedo={doRedo}
             registerFlush={(f) => (flushTyping.current = f)}
