@@ -1,0 +1,106 @@
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+
+// Plugins in the editor (mockup design/mockups/s52-plugins.html, S52b1): their state in the
+// explorer, the overview, trusting after the dialog, untrusting, a changed plugin and one
+// that cannot start. The plugin is a small Node script that speaks the protocol (ADR 0019).
+// Against the server on a temporary copy of examples/hello (e2e/serve-copy.mjs), whose
+// approvals are in a folder of the test.
+test.use({ baseURL: "http://127.0.0.1:7398" });
+test.describe.configure({ mode: "serial" });
+
+// The plugin: answers initialize and describe with one action; "broken" ends at once.
+const script = `import { createInterface } from "node:readline";
+if (process.argv[2] === "broken") { console.error("cannot open the directory"); process.exit(3); }
+const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...m }) + "\\n");
+createInterface({ input: process.stdin }).on("line", (line) => {
+  const { id, method } = JSON.parse(line);
+  if (method === "initialize") send({ id, result: { protocolVersion: 1, encoding: "json", name: "demo", version: "1.0.0" } });
+  else if (method === "describe") send({ id, result: { actions: [{ type: "demo.echo", category: "general", label: "Echo", description: "Returns its text", schema: { type: "object", properties: { text: { type: "string" } } } }] } });
+  else if (method === "shutdown") { send({ id, result: null }); process.exit(0); }
+  else if (id !== undefined) send({ id, error: { code: -32601, message: "method not found" } });
+});
+`;
+const pluginYAML = (args: string) =>
+  `kind: Plugin\napiVersion: runnel/v1\nname: demo\nversion: 1.0.0\ndescription: A demo plugin\nnamespace: demo\nexecutable: node\nargs: [${args}]\n`;
+const files: Record<string, string> = {
+  "plugins/demo/plugin.mjs": script,
+  "plugins/demo/plugin.yaml": pluginYAML("plugin.mjs"),
+  "workflows/e2e-plugin.workflow.yaml":
+    "kind: Workflow\napiVersion: runnel/v1\nname: e2e-plugin\nactions:\n  - id: start\n    type: core.start\n  - id: say\n    type: demo.echo\n    with:\n      text: hi\nlinks:\n  - { from: start, to: say }\n",
+};
+
+const put = async (request: APIRequestContext, path: string, data: string) =>
+  expect((await request.put(`/api/v1/files/${path}`, { headers: { "If-Match": "*" }, data })).ok()).toBe(true);
+
+test.beforeEach(async ({ request }) => {
+  for (const [path, data] of Object.entries(files)) await put(request, path, data);
+  await request.post("/api/v1/plugins/demo/untrust", { data: {} });
+});
+
+test.afterAll(async ({ request }) => {
+  await request.post("/api/v1/plugins/demo/untrust", { data: {} });
+  for (const path of Object.keys(files)) await request.delete(`/api/v1/files/${path}`, { headers: { "If-Match": "*" } });
+  await request.delete("/api/v1/folders/plugins/demo");
+  await request.delete("/api/v1/folders/plugins");
+});
+
+const row = (page: Page) => page.getByRole("treeitem", { name: "demo" });
+const view = (page: Page) => page.getByTestId("plugin-view");
+
+async function openPlugin(page: Page) {
+  await page.goto("/");
+  await row(page).locator("> div").click();
+  await expect(view(page)).toBeVisible();
+}
+
+test("a plugin that is not trusted is shown, trusted after the dialog and untrusted again", async ({ page, request }) => {
+  await openPlugin(page);
+  await expect(page.getByTestId("plugin-state-demo")).toHaveAttribute("title", "Not trusted");
+  await expect(page.getByTestId("plugin-state")).toHaveText("! Not trusted");
+  await expect(view(page)).toContainText("Not trusted on this computer");
+  // Without starting the plugin: what the project uses of it.
+  await expect(view(page).getByRole("region", { name: "Types" })).toContainText("demo.echo – 1 step(s)");
+  await expect(view(page).getByRole("region", { name: "Used by" })).toContainText("say (demo.echo)");
+
+  await page.getByRole("button", { name: "Trust…", exact: true }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Trust plugin demo?" });
+  const { plugins } = (await (await request.get("/api/v1/plugins")).json()) as { plugins: { hash: string }[] };
+  await expect(dialog.getByTestId("trust-hash")).toHaveText(plugins[0].hash);
+  await expect(dialog).toContainText("node");
+  await dialog.getByRole("button", { name: "Trust plugin" }).click();
+  await expect(dialog).toBeHidden();
+
+  await expect(page.getByTestId("plugin-state")).toHaveText("✓ Trusted");
+  await expect(view(page)).toContainText("Trusted on this computer");
+  await expect(view(page).getByRole("region", { name: "Types" }).getByRole("row", { name: /demo\.echo/ })).toContainText("Returns its text");
+  await expect(page.getByTestId("plugin-state-demo")).toHaveAttribute("title", "Trusted");
+
+  await page.getByRole("button", { name: "Untrust" }).click();
+  await expect(page.getByTestId("plugin-state")).toHaveText("! Not trusted");
+  await expect(page.getByTestId("plugin-state-demo")).toHaveAttribute("title", "Not trusted");
+});
+
+test("a changed plugin is trusted again; one that cannot start offers Try again", async ({ page, request }) => {
+  const { plugins } = (await (await request.get("/api/v1/plugins")).json()) as { plugins: { hash: string }[] };
+  expect((await request.post("/api/v1/plugins/demo/trust", { data: { hash: plugins[0].hash } })).ok()).toBe(true);
+  await put(request, "plugins/demo/plugin.mjs", script + "// changed\n");
+
+  await openPlugin(page);
+  await expect(page.getByTestId("plugin-state")).toHaveText("! Changed since trusted");
+  await expect(view(page)).toContainText("Changed since it was trusted");
+  await page.getByRole("button", { name: "Trust again…", exact: true }).click();
+  await page.getByRole("alertdialog", { name: "Trust plugin demo?" }).getByRole("button", { name: "Trust plugin" }).click();
+  await expect(page.getByTestId("plugin-state")).toHaveText("✓ Trusted");
+
+  // The plugin ends at once: after trusting it again (plugin.yaml changed), it cannot start.
+  await put(request, "plugins/demo/plugin.yaml", pluginYAML("plugin.mjs, broken"));
+  await page.reload();
+  await row(page).locator("> div").click();
+  await page.getByRole("button", { name: "Trust again…", exact: true }).click();
+  await page.getByRole("alertdialog", { name: "Trust plugin demo?" }).getByRole("button", { name: "Trust plugin" }).click();
+  await expect(page.getByTestId("plugin-state")).toHaveText("✕ Cannot start");
+  await expect(view(page)).toContainText("cannot open the directory");
+  await put(request, "plugins/demo/plugin.yaml", pluginYAML("plugin.mjs"));
+  await page.getByRole("button", { name: "Try again" }).first().click();
+  await expect(page.getByTestId("plugin-state")).toHaveText("! Changed since trusted");
+});

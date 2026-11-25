@@ -21,7 +21,8 @@ import { NewTriggerDialog } from "./NewTrigger";
 import { useTriggers } from "../forms";
 import { useConnections } from "../reference";
 import { Dialog } from "./Dialog";
-import { ChevronIcon, ConnectionIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ChevronIcon, ConnectionIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlugIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { usePlugins, type PluginInfo } from "../plugins";
 
 /** Changes of the project files made in the explorer, for the tabs (E11). */
 export interface ExplorerChanges {
@@ -80,6 +81,9 @@ export function Explorer(props: {
   const triggers = useTriggers(props.tree);
   // Connections and triggers show their type (mockups S39b, E20).
   const connectionTypes = new Map([...(connections ?? []).map((c) => [c.file, c.type] as const), ...(triggers?.triggers ?? []).map((t) => [t.file, t.type] as const)]);
+  // Plugins show their version and state (mockup S52).
+  const pluginsInfo = usePlugins(props.tree).info;
+  const plugins = new Map((pluginsInfo?.plugins ?? []).map((p) => [p.folder, p] as const));
 
   const all = flatten(props.tree);
   const exists = (path: string) => all.some((e) => e.path.toLowerCase() === path.toLowerCase());
@@ -330,6 +334,7 @@ export function Explorer(props: {
             onSubmit={submit}
             onCancel={() => setEditing(null)}
             connectionTypes={connectionTypes}
+            plugins={plugins}
             reveal={props.reveal ?? null}
           />
         ))}
@@ -485,6 +490,8 @@ function Node(props: {
   onCancel: () => void;
   /** Types of the connection and trigger files by path, for their sign and tag (mockups S39b, E20). */
   connectionTypes: Map<string, string>;
+  /** The plugins by folder (plugins/<name>), with version and state (mockup S52). */
+  plugins: Map<string, PluginInfo>;
   reveal: { path: string; seq: number } | null;
 }) {
   const { entry, depth, editing } = props;
@@ -503,8 +510,11 @@ function Node(props: {
       row.current?.focus({ preventScroll: true });
     }
   }, [reveal, isDir, entry.path]);
-  const selected = !isDir && entry.path === props.selected;
-  const activate = () => (isDir ? setOpen(!open) : props.onOpen(entry.path));
+  // A plugin folder opens the overview of its plugin; its chevron opens the folder.
+  const plugin = isDir ? props.plugins.get(entry.path) : undefined;
+  const pluginFile = plugin ? entry.path + "/plugin.yaml" : null;
+  const selected = (!isDir && entry.path === props.selected) || (pluginFile !== null && pluginFile === props.selected);
+  const activate = () => (pluginFile ? props.onOpen(pluginFile) : isDir ? setOpen(!open) : props.onOpen(entry.path));
   const renaming = editing && "rename" in editing && editing.rename.path === entry.path;
   const creatingHere = editing && "create" in editing && editing.dir === entry.path;
   // A row dropped on a file goes into the folder of that file.
@@ -557,14 +567,31 @@ function Node(props: {
           (props.dragging === entry.path ? " opacity-55" : "")
         }
       >
-        {isDir ? <ChevronIcon open={open} width={12} height={12} className="text-muted-foreground" /> : <span className="w-3" />}
+        {isDir ? (
+          <ChevronIcon
+            open={open}
+            width={12}
+            height={12}
+            className="text-muted-foreground"
+            onClick={
+              plugin
+                ? (e) => {
+                    e.stopPropagation();
+                    setOpen(!open);
+                  }
+                : undefined
+            }
+          />
+        ) : (
+          <span className="w-3" />
+        )}
         <span className={selected ? "text-accent-foreground" : "text-muted-foreground"}>
-          {isDir ? <FolderIcon /> : connectionType ? <ConnectionIcon type={connectionType} /> : <KindIcon kind={entry.kind} />}
+          {plugin ? <PlugIcon /> : isDir ? <FolderIcon /> : connectionType ? <ConnectionIcon type={connectionType} /> : <KindIcon kind={entry.kind} />}
         </span>
         <span className="truncate">{entry.name}</span>
         <span className="ml-auto inline-flex items-center gap-1">
           {typeTag && <span className="font-mono text-[10px] text-muted-foreground">{typeTag}</span>}
-          {isDir && <span className="text-2xs text-muted-foreground">{entry.children?.length ?? 0}</span>}
+          {plugin ? <PluginState plugin={plugin} /> : isDir && <span className="text-2xs text-muted-foreground">{entry.children?.length ?? 0}</span>}
           <button
             type="button"
             aria-label={`Actions for ${entry.name}`}
@@ -961,5 +988,23 @@ function ReferencesDialog(props: {
       </ul>
       <p className="mb-0!">Only these lines change; the files are saved. Unchecked files keep the old path and report it as missing.</p>
     </Dialog>
+  );
+}
+
+/** Version and state of a plugin in its row (mockup S52): the sign never without its meaning. */
+function PluginState({ plugin }: { plugin: PluginInfo }) {
+  const [sign, tone, title] =
+    plugin.state === "trusted"
+      ? ["✓", "bg-success", "Trusted"]
+      : plugin.state === "error"
+        ? ["✕", "bg-destructive", "Cannot start"]
+        : ["!", "bg-warning", plugin.state === "changed" ? "Changed since trusted" : "Not trusted"];
+  return (
+    <>
+      <span className="font-mono text-[10px] text-muted-foreground">{plugin.version}</span>
+      <span title={title} aria-label={title} data-testid={`plugin-state-${plugin.name}`} className={`inline-grid size-4 place-items-center rounded-full text-[9px] font-bold text-white ${tone}`}>
+        {sign}
+      </span>
+    </>
   );
 }

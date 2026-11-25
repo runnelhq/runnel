@@ -31,6 +31,8 @@ import type { ProjectInfo } from "../api";
 import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRun, type RunSettings, type RunView } from "../run";
 import { CodeView } from "./CodeView";
 import { ConnectionForm, TestButton, type TestResult } from "./ConnectionForm";
+import { PluginActions, PluginView, TrustDialog } from "./PluginView";
+import { pluginOf, reloadPlugin, trustPlugin, untrustPlugin, usePlugins, type PluginInfo } from "../plugins";
 import { TriggerForm } from "./TriggerForm";
 import { SettingsForm } from "./SettingsForm";
 import { runTriggerTarget } from "../forms";
@@ -149,13 +151,14 @@ export function FileView(props: {
   // Files edited as text in the YAML view (E9, E10): graphs and the other files of a project.
   // Documents (E17) show "canvas" as the formatted view ("Preview") and "yaml" as the text.
   const isDoc = fileKind === "document";
-  const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger" || fileKind === "connection";
+  const isPlugin = fileKind === "plugin";
+  const editsText = isGraph || isDoc || fileKind === "project" || fileKind === "environment" || fileKind === "trigger" || fileKind === "connection" || isPlugin;
   const isConnection = fileKind === "connection";
   const isTrigger = fileKind === "trigger";
   const settingsKind = fileKind === "environment" || fileKind === "project" ? fileKind : null;
   // Connections, triggers, environments and project.yaml open as a form (mockups S39b,
-  // E20); "canvas" is the form there.
-  const isForm = isConnection || isTrigger || settingsKind !== null;
+  // E20), plugin.yaml as the overview of its plugin (S52b1); "canvas" is the form there.
+  const isForm = isConnection || isTrigger || settingsKind !== null || isPlugin;
   const [view, setView] = useState<View>(isGraph || isDoc || isForm ? "canvas" : "yaml");
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [focusLine, setFocusLine] = useState<number | null>(null);
@@ -207,6 +210,40 @@ export function FileView(props: {
   }, [view]);
 
   const doc = state.status === "loaded" ? state.doc : null;
+  // The plugin of a plugin.yaml (S52b1): again after each save and reconnect.
+  const plugins = usePlugins(isPlugin ? `${epoch}:${doc?.etag ?? ""}` : null);
+  const [pluginOverride, setPluginOverride] = useState<PluginInfo | null>(null);
+  const [trusting, setTrusting] = useState<"dialog" | "busy" | null>(null);
+  const pluginName = isPlugin ? pluginOf(path) : null;
+  const pluginInfo: PluginInfo | null | undefined = !isPlugin
+    ? undefined
+    : pluginOverride?.name === pluginName
+      ? pluginOverride
+      : plugins.info
+        ? (plugins.info.plugins.find((x) => x.name === pluginName) ?? null)
+        : plugins.error
+          ? null
+          : undefined;
+  useEffect(() => setPluginOverride(null), [plugins.info]);
+  const { onReloadExplorer } = props;
+  const pluginAction = useCallback(
+    async (act: () => Promise<PluginInfo>, failure: string) => {
+      try {
+        setPluginOverride(await act());
+        onReloadExplorer(); // the state in the explorer
+      } catch (e) {
+        setEditError(`${failure}: ${(e as Error).message}`);
+        plugins.reload();
+      }
+    },
+    [onReloadExplorer, plugins],
+  );
+  const trust = useCallback(async () => {
+    if (!pluginInfo?.hash) return;
+    setTrusting("busy");
+    await pluginAction(() => trustPlugin(pluginInfo.name, pluginInfo.hash!), "The plugin was not trusted");
+    setTrusting(null);
+  }, [pluginInfo, pluginAction]);
   const dirty = doc !== null && doc.text !== doc.saved;
 
   const dirtyRef = useRef(false);
@@ -942,6 +979,15 @@ export function FileView(props: {
             </span>
           ))}
         {isConnection && <TestButton name={path.split("/").pop()!.replace(/\.yaml$/, "")} onResult={setTestResult} />}
+        {isPlugin && pluginInfo && (
+          <PluginActions
+            info={pluginInfo}
+            canTrust={plugins.info?.canTrust ?? true}
+            onTrust={() => setTrusting("dialog")}
+            onUntrust={() => void pluginAction(() => untrustPlugin(pluginInfo.name), "The approval was not removed")}
+            onRetry={() => void pluginAction(() => reloadPlugin(pluginInfo.name), "The plugin was not checked again")}
+          />
+        )}
         {isTrigger && (
           <button
             type="button"
@@ -983,7 +1029,7 @@ export function FileView(props: {
           </>
         )}
         {isDoc && <ViewSwitch view={view} onView={switchView} document />}
-        {isForm && <ViewSwitch view={view} onView={switchView} form />}
+        {isForm && <ViewSwitch view={view} onView={switchView} form overview={isPlugin} />}
         {isGraph && (
           <>
             <ViewSwitch view={view} onView={switchView} pipeline={graphKind === "pipeline"} notAGraph={!!validation && !graph} />
@@ -1037,6 +1083,16 @@ export function FileView(props: {
             result={testResult}
             onText={(next) => setText(next, "push")}
             onError={setEditError}
+          />
+        ) : view === "canvas" && isPlugin ? (
+          <PluginView
+            info={pluginInfo}
+            error={plugins.error}
+            serviceApprovals={plugins.info?.serviceApprovals ?? false}
+            canTrust={plugins.info?.canTrust ?? true}
+            onTrust={() => setTrusting("dialog")}
+            onRetry={() => pluginInfo && void pluginAction(() => reloadPlugin(pluginInfo.name), "The plugin was not checked again")}
+            onOpenFile={(p) => props.onOpenFile?.(p)}
           />
         ) : view === "canvas" && isTrigger ? (
           <TriggerForm
@@ -1276,6 +1332,9 @@ export function FileView(props: {
           </p>
         </Dialog>
       )}
+      {trusting && pluginInfo && (
+        <TrustDialog p={pluginInfo} projectDir={props.projectDir ?? undefined} busy={trusting === "busy"} onTrust={() => void trust()} onCancel={() => setTrusting(null)} />
+      )}
       {conflict && (
         <Dialog
           title="File changed outside the editor"
@@ -1323,7 +1382,7 @@ const problemList = (v: Validation, severity: "error" | "warning") =>
 
 const noFiles = new Set<string>();
 
-function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean; notAGraph?: boolean; document?: boolean; form?: boolean }) {
+function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: boolean; notAGraph?: boolean; document?: boolean; form?: boolean; overview?: boolean }) {
   const views: [View, string, typeof CodeIcon][] = props.document
     ? [
         ["canvas", "Preview", EyeIcon],
@@ -1331,7 +1390,7 @@ function ViewSwitch(props: { view: View; onView: (v: View) => void; pipeline?: b
       ]
     : props.form
       ? [
-          ["canvas", "Form", FormIcon],
+          ["canvas", props.overview ? "Overview" : "Form", FormIcon],
           ["yaml", "YAML", CodeIcon],
         ]
       : [

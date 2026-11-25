@@ -133,6 +133,8 @@ func fileKind(p string) string {
 		return "trigger"
 	case path.Dir(p) == model.ConnectionsDir && strings.HasSuffix(p, ".yaml"):
 		return "connection"
+	case path.Base(p) == model.PluginFileName && path.Dir(path.Dir(p)) == model.PluginsDir:
+		return "plugin" // plugins/<name>/plugin.yaml (S52b1)
 	case strings.EqualFold(path.Ext(p), ".md"):
 		return "document"
 	case imageTypes[strings.ToLower(path.Ext(p))] != "":

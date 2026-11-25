@@ -316,7 +316,7 @@ func TestValidateWithInvalidProject(t *testing.T) {
 
 func TestValidateBadRequests(t *testing.T) {
 	_, s := newProject(t)
-	expect(t, do(t, s, "POST", "/api/v1/validate", `{"path": "data/in.csv"}`), http.StatusBadRequest, "only workflows, pipelines, project.yaml, environments, triggers and connections")
+	expect(t, do(t, s, "POST", "/api/v1/validate", `{"path": "data/in.csv"}`), http.StatusBadRequest, "only workflows, pipelines, project.yaml, environments, triggers, connections and plugins")
 	expect(t, do(t, s, "POST", "/api/v1/validate", `{"file": "x"}`), http.StatusBadRequest, "invalid request")
 	expect(t, do(t, s, "POST", "/api/v1/validate", `{"path": "../x.workflow.yaml"}`), http.StatusBadRequest, "invalid path")
 	expect(t, do(t, s, "POST", "/api/v1/validate", `{"path": "workflows/none.workflow.yaml"}`), http.StatusNotFound, "file not found")

@@ -230,3 +230,16 @@ func BenchmarkPlugins(b *testing.B) {
 		}
 	}
 }
+
+// plugin.yaml has the kind plugin in the tree and is checked by /validate (S52b1).
+func TestPluginFile(t *testing.T) {
+	dir, s := newProject(t)
+	writeDemoPlugin(t, dir, "db.example.com")
+	expect(t, do(t, s, "GET", "/api/v1/projects/current/tree", ""), http.StatusOK, `"kind": "plugin"`)
+	expect(t, do(t, s, "POST", "/api/v1/validate", `{"path":"plugins/demo/plugin.yaml"}`), http.StatusOK, `"errors": 0`)
+	bad := `{"path":"plugins/demo/plugin.yaml","content":"kind: Plugin\napiVersion: runnel/v1\nname: other\nversion: 1\nnamespace: demo\nexecutable: x\n"}`
+	rec := do(t, s, "POST", "/api/v1/validate", bad)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"severity": "error"`) || !strings.Contains(rec.Body.String(), "SemVer") {
+		t.Errorf("%d %s", rec.Code, rec.Body)
+	}
+}
