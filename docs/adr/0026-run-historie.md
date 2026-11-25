@@ -203,6 +203,6 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
 Die Historie sortiert Läufe nach ID (ULID). Bisher war der Zufallsteil einer ULID unabhängig: Zwei Läufe, die in
 derselben Millisekunde starteten, konnten in `runnel runs` und im Editor vertauscht erscheinen (gefunden durch einen
 Test, der unter Windows gelegentlich scheiterte). `runid.New` erzeugt jetzt monotone ULIDs nach der Spezifikation:
-In derselben Millisekunde wie die letzte ID (oder wenn die Uhr zurückspringt) ist die neue ID die letzte plus eins.
-Die Reihenfolge gilt je Prozess; Läufe verschiedener Prozesse (z. B. `runnel run` neben dem Server) sind innerhalb
+In derselben Millisekunde wie die letzte ID ist die neue ID die letzte plus eins; die ersten zehn Zeichen bleiben die
+Zeit des Starts. Die Reihenfolge gilt je Prozess; Läufe verschiedener Prozesse (z. B. `runnel run` neben dem Server) sind innerhalb
 einer Millisekunde weiterhin nicht geordnet.

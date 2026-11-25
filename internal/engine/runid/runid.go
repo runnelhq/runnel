@@ -27,9 +27,9 @@ func New(now time.Time) string {
 	binary.BigEndian.PutUint64(b[:8], uint64(now.UnixMilli())<<16)
 	_, _ = rand.Read(b[6:]) // never fails
 	mu.Lock()
-	if bytes.Compare(b[:6], last[:6]) <= 0 {
+	if bytes.Equal(b[:6], last[:6]) {
 		b = last
-		for i := 15; i >= 0; i-- { // plus one
+		for i := 15; i >= 6; i-- { // plus one (80 random bits: no overflow in practice)
 			b[i]++
 			if b[i] != 0 {
 				break

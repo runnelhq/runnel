@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Ids sort in the order they were made, also within one millisecond and when the clock
-// goes back; the time stays readable in the first ten characters.
+// Ids sort in the order they were made, also within one millisecond; the first ten
+// characters are the time given.
 func TestMonotonic(t *testing.T) {
 	now := time.Date(2026, 11, 25, 13, 58, 27, 703_000_000, time.UTC)
 	prev := New(now)
@@ -15,19 +15,17 @@ func TestMonotonic(t *testing.T) {
 		t.Fatalf("id %q", prev)
 	}
 	for i := range 1000 {
-		at := now
-		if i%10 == 9 {
-			at = now.Add(-time.Second) // clock went back
-		}
-		id := New(at)
-		if id <= prev {
+		id := New(now)
+		if id <= prev || id[:10] != prev[:10] {
 			t.Fatalf("%d: %s after %s", i, id, prev)
 		}
 		prev = id
 	}
-	later := New(now.Add(time.Hour))
-	if later <= prev || later[:10] != New(now.Add(time.Hour))[:10] || later[:10] == prev[:10] {
+	if later := New(now.Add(time.Millisecond)); later <= prev || later[:10] == prev[:10] {
 		t.Errorf("later %s, prev %s", later, prev)
+	}
+	if earlier := New(now.Add(-time.Second)); earlier[:10] >= prev[:10] { // the clock went back: its own time
+		t.Errorf("earlier %s, prev %s", earlier, prev)
 	}
 }
 
