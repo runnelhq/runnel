@@ -16,7 +16,7 @@ inspiriert vom Modell von Apache Hop: Workflows und Pipelines aus Actions bzw. T
 - **Runner** – Ausführung per CLI, als Server mit Scheduler oder als Windows-Dienst
 - **Eine `runnel.exe`**, keine Runtime, keine externe Datenbank, Definitionen als YAML (Git-freundlich)
 
-Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Testplan: [docs/TESTPLAN.md](docs/TESTPLAN.md) · Mitarbeiten: [CONTRIBUTING.md](CONTRIBUTING.md) · Entscheidungen: [docs/adr](docs/adr/README.md) · Corporate Design: [design/](design/README.md) · Sicherheit: [SECURITY.md](SECURITY.md)
+Konzept und technische Architektur: [docs/KONZEPT.md](docs/KONZEPT.md) · Umstieg von Apache Hop: [docs/VON-HOP.md](docs/VON-HOP.md) · Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md) · Testplan: [docs/TESTPLAN.md](docs/TESTPLAN.md) · Mitarbeiten: [CONTRIBUTING.md](CONTRIBUTING.md) · Entscheidungen: [docs/adr](docs/adr/README.md) · Corporate Design: [design/](design/README.md) · Sicherheit: [SECURITY.md](SECURITY.md)
 
 ## Verwendung
 
