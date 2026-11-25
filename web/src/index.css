@@ -142,6 +142,13 @@
   pre {
     font-family: var(--rn-font-mono);
   }
+  /* The open list of a select: selects with a transparent background (filters) would show
+     it light on light in the dark scheme on Windows; it takes the colours of a popover. */
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
 }
 
 /* Small uppercase panel titles ("Explorer", "Project"). */

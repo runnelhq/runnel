@@ -152,3 +152,28 @@ test("opens a run of the history on the canvas, with older and newer runs", asyn
   await expect(info).toHaveCount(0);
   await expect(page.getByTestId("node-start")).not.toHaveAttribute("data-run", /./);
 });
+
+// The open list of a filter takes the colours of a popover, also in the dark scheme
+// (the select itself is transparent).
+test("the lists of the filters are readable in the dark scheme", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await page.getByRole("button", { name: /^Runs/ }).click();
+  const option = page.getByTestId("runs-view").getByRole("combobox", { name: "File" }).locator("option").first();
+  const colours = await option.evaluate((o) => {
+    const s = getComputedStyle(o);
+    return [s.backgroundColor, s.color];
+  });
+  const expected = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = "var(--popover)";
+    probe.style.color = "var(--popover-foreground)";
+    document.body.append(probe);
+    const s = getComputedStyle(probe);
+    const out = [s.backgroundColor, s.color];
+    probe.remove();
+    return out;
+  });
+  expect(colours).toEqual(expected);
+  expect(colours[0]).not.toEqual(colours[1]);
+});
