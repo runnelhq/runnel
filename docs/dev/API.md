@@ -54,6 +54,10 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | GET | `/runs/{id}` | Lauf mit `actions` (Status je Knoten) und `log`, auch aus der Run-Historie; `500`, wenn sie nicht lesbar ist (Details im Server-Log) |
 | POST | `/runs/{id}/cancel` | Lauf abbrechen: `202`; bereits beendet `409` |
 | GET | `/events` | Live-Ereignisse (Server-Sent Events), siehe unten |
+| GET | `/plugins` | Plugins des Projekts (S52a), siehe [Plugins](#plugins) |
+| POST | `/plugins/{name}/trust` | Plugin für das Konto des Servers freigeben, siehe unten |
+| POST | `/plugins/{name}/untrust` | Freigabe zurücknehmen, siehe unten |
+| POST | `/plugins/{name}/reload` | Plugin erneut prüfen und starten (`describe`), siehe unten |
 | GET | `/triggers` | Trigger des Projekts (S37, S38): `{"triggers": [{name, file, type, target, schedule, timezone, enabled, next, last} …], "problems": [Problem …]}`. `schedule` ist der Cron-Ausdruck, `every 15m` (`interval`), `new *.csv in inbox` (`file`) oder `POST /hooks/import` (`http`, seit S38a); `http` ist die Adresse des Listeners der HTTP-Trigger, sobald er offen ist; `timezone` nur bei `cron`. `next` ist der nächste Zeitpunkt, bei `file` die nächste Abfrage des Ordners (fehlt bei deaktivierten Triggern), `last` das Ergebnis des letzten fälligen Zeitpunkts seit dem Start des Servers (`{time, runId}`, `{time, skipped: true}` bei `overlap: skip` oder `{time, error}`, bei `file` zusätzlich `files` mit den absoluten Pfaden; ein nicht lesbarer Ordner steht als `error`); `problems` sind Fehler in Trigger-Dateien (Format wie `/validate`), solche Trigger sind nicht aktiv |
 
 ## Konfliktschutz (ETag)
@@ -378,6 +382,43 @@ Ein Typ wird nur vorgeschlagen, wenn **jeder** gelesene Wert passt (`int`, `deci
 Null bleiben Text. Antworten: `404` für einen unbekannten Transform, `400` für Typen ohne Erkennung, `422`, wenn die
 Pipeline oder das Projekt nicht lesbar ist, oder – mit `{"error", "baseDir"}` – wenn die Eingabe nicht lesbar ist
 (relative Pfade beziehen sich auf `baseDir`, den Projektordner, ADR 0020).
+
+## Plugins
+
+Für die Plugin-Verwaltung im Editor (S52a, Mockup [`s52-plugins.html`](../../design/mockups/s52-plugins.html)).
+Dieselben Freigaben wie `runnel plugins trust` ([PLUGINS.md](PLUGINS.md#freigabe)).
+
+```json
+GET /api/v1/plugins
+→ 200 { "plugins": [ {
+          "name": "iban", "version": "1.2.0", "namespace": "iban", "description": "Checks IBAN and BIC",
+          "folder": "plugins/iban", "program": "bin/iban.exe", "executable": { "windows": "bin/iban.exe", "linux": "bin/iban" },
+          "files": 4, "bytes": 6502400, "hash": "8b0d5e…41d2",
+          "state": "trusted",
+          "user": { "version": "1.2.0", "hash": "8b0d5e…41d2", "trusted": "2026-11-20T09:12:00Z", "current": true },
+          "types": { "actions": [ { "type": "iban.check", "label": "Check IBAN", "description": "…" } ],
+                     "transforms": [ … ], "connectionTypes": [ … ] },
+          "uses": [ { "file": "workflows/sync.workflow.yaml", "kind": "action", "id": "verify", "type": "iban.check" },
+                    { "file": "connections/bank.yaml", "kind": "connection", "id": "bank", "type": "iban-registry" } ] } ],
+        "serviceApprovals": true, "canTrust": true }
+```
+
+| Feld | Bedeutung |
+|---|---|
+| `state` | `trusted`, `not-trusted`, `changed` (seit der Freigabe geändert) oder `error` (nicht prüfbar oder startet nicht; Grund in `message`) |
+| `hash` | SHA-256 des Plugin-Ordners jetzt – das, was eine Freigabe bestätigt |
+| `user`, `service` | gespeicherte Freigabe des Kontos bzw. des Windows-Dienstes; `current: false`, wenn sich das Plugin seitdem geändert hat; fehlt ohne Freigabe |
+| `types` | Typen aus `describe`, nur bei `trusted`. Runnel startet dafür freigegebene Plugins, deren Typen noch nicht zwischengespeichert sind; andere startet es nie |
+| `uses` | Schritte und Connections mit Typen des Plugins, aus den Dateien des Projekts gelesen, ohne das Plugin zu starten |
+| `serviceApprovals` | es gibt Freigaben für den Windows-Dienst (Windows) |
+| `canTrust` | der Editor darf freigeben; `false`, wenn Runnel als Windows-Dienst läuft |
+
+`POST /plugins/{name}/trust` mit `{"hash": "<hash aus der Liste>"}` gibt das Plugin für das Konto frei, unter dem
+`runnel serve` läuft (nie für den Dienst), und antwortet mit dem Plugin wie in der Liste. Der Hash muss dem Stand jetzt
+entsprechen: So gilt die Freigabe genau dem, was im Editor zu sehen war. Antworten: `400` ohne `hash`, `409`, wenn
+sich das Plugin seitdem geändert hat, `404` unbekanntes oder fehlerhaftes Plugin, `403`, wenn Runnel als Windows-Dienst
+läuft. `…/untrust` nimmt die Freigabe des Kontos zurück, `…/reload` verwirft den Zwischenspeicher und prüft und
+startet das Plugin erneut (z. B. nach einem Fehler beim Start). Freigeben und Zurücknehmen stehen im Server-Log.
 
 ## Datenvorschau (`/preview`)
 

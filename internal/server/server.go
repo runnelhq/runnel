@@ -79,6 +79,7 @@ type Server struct {
 	// history keeps the runs of the project (ADR 0026); nil: in memory only.
 	history *history.Store
 	warn    func(string)
+	info    func(string) // messages for the server log, e.g. a plugin trusted in the editor
 	// pruneStop ends the cleanup of the history (S26c); pruneDone is closed when it has.
 	pruneStop, pruneDone chan struct{}
 	pruneOnce            sync.Once
@@ -102,7 +103,10 @@ func New(opts Options) (*Server, error) {
 		warn = func(string) {}
 	}
 	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
-		stop: make(chan struct{}), warn: warn}
+		stop: make(chan struct{}), warn: warn, info: opts.Log}
+	if s.info == nil {
+		s.info = func(string) {}
+	}
 	if opts.HistoryDir != "" {
 		s.openHistory(opts.HistoryDir, opts.Log)
 	}
@@ -246,6 +250,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST "+APIPrefix+"/runs/{id}/cancel", s.handleCancelRun)
 	mux.HandleFunc("GET "+APIPrefix+"/events", s.handleEvents)
 	mux.HandleFunc("GET "+APIPrefix+"/triggers", s.handleTriggers)
+	mux.HandleFunc("GET "+APIPrefix+"/plugins", s.handlePlugins)
+	mux.HandleFunc("POST "+APIPrefix+"/plugins/{name}/trust", s.handleTrustPlugin)
+	mux.HandleFunc("POST "+APIPrefix+"/plugins/{name}/untrust", s.handleUntrustPlugin)
+	mux.HandleFunc("POST "+APIPrefix+"/plugins/{name}/reload", s.handleReloadPlugin)
 	mux.HandleFunc("GET "+APIPrefix+"/version", handleVersion)
 	mux.HandleFunc("/", s.handleUI)
 	mux.HandleFunc(APIPrefix+"/", func(w http.ResponseWriter, r *http.Request) {

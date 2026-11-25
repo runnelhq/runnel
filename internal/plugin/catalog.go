@@ -36,6 +36,7 @@ type entry struct {
 	tdefs       []transform.Definition
 	conns       []connection.Definition
 	tests       map[string]bool // connection types the plugin can test
+	desc        Description     // its types as described, for the editor (S52a)
 	hint        string
 }
 
@@ -141,6 +142,61 @@ func TestConnection(ctx context.Context, projectDir string, store plugintrust.St
 	return "", fmt.Errorf("connections of type %s cannot be tested yet", c.Type)
 }
 
+// Types returns the types of a plugin as the catalog knows them, and why it cannot be
+// used (not trusted, changed, failing to start); a trusted plugin is started for describe
+// unless its types are cached (S52a).
+func Types(ctx context.Context, projectDir string, p *model.Plugin, store plugintrust.Store) (Description, string) {
+	e := lookup(ctx, projectDir, p, store)
+	return e.desc, e.hint
+}
+
+// states caches the approval of plugins by fingerprint (names, sizes and modification
+// times of their files and of the files of approvals), so that showing the plugins does
+// not hash their folders on every request (S52a).
+var states = struct {
+	sync.Mutex
+	m map[string]stateEntry
+}{m: map[string]stateEntry{}}
+
+type stateEntry struct {
+	fingerprint string
+	status      plugintrust.Status
+}
+
+// Check returns the approval of a plugin like store.Check, hashing its folder only when
+// a file of it or of the approvals changed.
+func Check(projectDir string, p *model.Plugin, store plugintrust.Store) (plugintrust.Status, error) {
+	dir, _ := filepath.Abs(p.Dir)
+	key := projectDir + "\x00" + dir
+	fp := fingerprint(p.Dir, store)
+	states.Lock()
+	e, ok := states.m[key]
+	states.Unlock()
+	if ok && e.fingerprint == fp {
+		return e.status, nil
+	}
+	st, err := store.Check(projectDir, p.Name, p.Dir)
+	if err != nil {
+		return st, err
+	}
+	states.Lock()
+	if len(states.m) >= 1024 {
+		clear(states.m)
+	}
+	states.m[key] = stateEntry{fingerprint: fp, status: st}
+	states.Unlock()
+	return st, nil
+}
+
+// Forget drops what the catalog knows about a plugin, so that the next use checks and
+// describes it again, e.g. after a plugin failed to start ("Try again" in the editor).
+func Forget(p *model.Plugin) {
+	key, _ := filepath.Abs(p.Dir)
+	catalog.Lock()
+	delete(catalog.entries, key)
+	catalog.Unlock()
+}
+
 func mapKeys[V any](m map[string]V) func(func(string) bool) {
 	return func(yield func(string) bool) {
 		for k := range m {
@@ -222,6 +278,7 @@ func describe(ctx context.Context, projectDir string, p *model.Plugin, store plu
 	if err != nil {
 		return err
 	}
+	e.desc = d
 	for _, a := range d.Actions {
 		e.defs = append(e.defs, definition(p.Name, a))
 	}

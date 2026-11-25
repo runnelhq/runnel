@@ -31,7 +31,7 @@ links:
 `
 
 // newProject creates a small project and a server for it.
-func newProject(t *testing.T) (string, *Server) {
+func newProject(t testing.TB) (string, *Server) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "demo")
 	files := map[string]string{

@@ -277,3 +277,48 @@ func (s Store) file(service bool) (string, error) {
 	}
 	return s.Service, nil
 }
+
+// Approvals returns the approvals of a plugin of a project as they are stored, for the
+// user and for the Windows service; nil where there is none (S52a). Whether they match the
+// files of the plugin now tells Check.
+func (s Store) Approvals(projectDir, name string) (user, service *Entry, err error) {
+	key, err := projectKey(projectDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	find := func(path string) (*Entry, error) {
+		entries, err := read(path)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			if e.Plugin == name && sameProject(e.Project, key) {
+				return &e, nil
+			}
+		}
+		return nil, nil
+	}
+	if user, err = find(s.User); err != nil {
+		return nil, nil, err
+	}
+	service, err = find(s.Service)
+	return user, service, err
+}
+
+// Size returns the number of files and bytes in the folder of a plugin (as the hash
+// counts them), e.g. to show before trusting it.
+func Size(dir string) (files int, bytes int64, err error) {
+	err = filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		files++
+		bytes += info.Size()
+		return nil
+	})
+	return files, bytes, err
+}

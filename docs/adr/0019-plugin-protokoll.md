@@ -522,6 +522,7 @@ bei der Umsetzung von S50a:
   (`[{"name", "value"}]`), `rows`, `complete`, `fields` (`name`, `type`, optional `format`, `values`, `note`,
   `warning`). Runnel prüft Namen und Typen und vergleicht mit `fields:` der Konfiguration. Zeitgrenze 1 Minute;
   Secrets der Connections sind in Fehlermeldungen maskiert.
+
 ## Nachtrag 2026-11-24 (S51): Go-SDK
 
 Präzisierungen bei der Umsetzung in `runnelhq/sdk-go` (Actions und Connection-Typen wurden zuerst gebaut, die
@@ -556,3 +557,23 @@ Transforms nach S50):
   360.000 Records/s; `make bench` im SDK misst den Strom ohne Runnel (≈ 300.000 Records/s mit Test-Client).
 - **Erste Plugins:** `runnelhq/plugin-iban` und `runnelhq/plugin-ldap` (Version 0.1.0) mit Release-Archiven nach
   `docs/dev/PLUGINS.md` und `THIRD_PARTY_NOTICES`.
+
+## Nachtrag 2026-11-25 (S52a): Freigeben im Editor
+
+Nach dem freigegebenen Mockup S52 kann der Editor Plugins freigeben (`POST /api/v1/plugins/{name}/trust`).
+
+- **Gleiche Freigabe wie die CLI:** für das Konto, unter dem `runnel serve` läuft, in dessen Datei der Freigaben. Die
+  Freigabe für den Windows-Dienst schreibt der Editor nie; läuft Runnel selbst als Dienst, lehnt der Server Freigeben
+  und Zurücknehmen ab (`403`) und nennt den Befehl für Administratoren.
+- **Nur, was angezeigt wurde:** Die Anfrage nennt den Hash, den der Editor gezeigt hat; hat sich der Ordner seitdem
+  geändert, lehnt der Server ab (`409`). So kann keine Datei zwischen Anzeigen und Freigeben ausgetauscht werden.
+- **Nichts startet vor der Freigabe:** Die Liste liest Stand, Programm und Verwendung aus den Dateien; nur freigegebene
+  Plugins werden für ihre Typen gestartet.
+
+### Sicherheit
+
+- Die Endpunkte gelten nur für Anfragen an `localhost`/`127.0.0.1` ohne fremden `Origin` (wie alle des Servers): Eine
+  Webseite kann kein Plugin freigeben.
+- Wer den Editor erreicht, darf ohnehin Workflows ändern und starten; Freigeben erweitert das nicht über das Konto des
+  Servers hinaus.
+- Freigeben und Zurücknehmen stehen mit Name, Version und Hash im Server-Log.
