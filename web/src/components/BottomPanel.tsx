@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { formatDuration, type RunView } from "../run";
 import { problemTarget, type Problem, type Workflow } from "../workflow";
 import { ChevronIcon } from "./Icons";
+import { pluginInMessage } from "../plugins";
 
 /** Names of fields for "Where", as labelled in the properties panel. */
 const fieldLabels: Record<string, string> = {
@@ -89,6 +90,8 @@ export function BottomPanel(props: {
   tab: BottomTab | null;
   onTab: (tab: BottomTab | null) => void;
   onOpen: (p: Problem) => void;
+  /** Opens the overview of a plugin named by a problem (S52b2). */
+  onOpenPlugin?: (name: string) => void;
   run: RunView | null;
   /** A request to show the first line of an action (from the properties panel); seq changes with every request. */
   logFocus?: { actionId: string; seq: number } | null;
@@ -157,7 +160,7 @@ export function BottomPanel(props: {
   );
 }
 
-function ProblemsTable(props: { workflow: Workflow | null; problems: Problem[]; onOpen: (p: Problem) => void }) {
+function ProblemsTable(props: { workflow: Workflow | null; problems: Problem[]; onOpen: (p: Problem) => void; onOpenPlugin?: (name: string) => void }) {
   const { problems } = props;
   return (
     <div role="table" aria-label="Problems" className="h-[168px] overflow-auto border-t border-border text-xs">
@@ -180,7 +183,10 @@ function ProblemsTable(props: { workflow: Workflow | null; problems: Problem[]; 
           <span role="cell" className={"font-bold " + (p.severity === "error" ? "text-destructive" : "text-warning")}>
             {p.severity === "error" ? "✖" : "⚠"}
           </span>
-          <span role="cell">{p.message}</span>
+          <span role="cell">
+            {p.message}
+            <PluginLink message={p.message} onOpenPlugin={props.onOpenPlugin} />
+          </span>
           <span role="cell" className="truncate font-mono text-2xs text-muted-foreground">
             {props.workflow ? where(props.workflow, p) : ""}
           </span>
@@ -314,5 +320,23 @@ function LogView(props: {
         ))}
       </div>
     </>
+  );
+}
+
+/** "Open plugin …" after a message about a plugin that cannot be used (mockup S52, state canvas). */
+function PluginLink(props: { message: string; onOpenPlugin?: (name: string) => void }) {
+  const plugin = props.onOpenPlugin ? pluginInMessage(props.message) : null;
+  if (!plugin) return null;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        props.onOpenPlugin!(plugin.name);
+      }}
+      className="ml-2 cursor-pointer border-0 bg-transparent p-0 text-xs whitespace-nowrap text-primary underline underline-offset-2"
+    >
+      Open plugin {plugin.name}
+    </button>
   );
 }

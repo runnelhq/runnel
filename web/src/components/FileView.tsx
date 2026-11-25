@@ -32,7 +32,7 @@ import { loadRunSettings, saveRunSettings, StartError, structureSignature, useRu
 import { CodeView } from "./CodeView";
 import { ConnectionForm, TestButton, type TestResult } from "./ConnectionForm";
 import { PluginActions, PluginView, TrustDialog } from "./PluginView";
-import { pluginOf, reloadPlugin, trustPlugin, untrustPlugin, usePlugins, type PluginInfo } from "../plugins";
+import { pluginFile, pluginOf, reloadPlugin, trustPlugin, untrustPlugin, usePlugins, type PluginInfo } from "../plugins";
 import { TriggerForm } from "./TriggerForm";
 import { SettingsForm } from "./SettingsForm";
 import { runTriggerTarget } from "../forms";
@@ -1196,6 +1196,7 @@ export function FileView(props: {
             tab={bottomTab}
             onTab={setBottomTab}
             onOpen={openProblem}
+            onOpenPlugin={(name) => props.onOpenFile?.(pluginFile(name))}
             run={run}
             logFocus={logFocus}
             onSelectAction={(id) => {
@@ -1242,6 +1243,7 @@ export function FileView(props: {
       {showPanel && graph && (
         <PropertiesPanel
           workflow={graph}
+          onOpenPlugin={(name) => props.onOpenFile?.(pluginFile(name))}
           schemas={validation?.schemas}
           selected={selection}
           problems={validation?.problems ?? []}

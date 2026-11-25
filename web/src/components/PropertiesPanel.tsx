@@ -20,7 +20,8 @@ import {
   type Workflow,
 } from "../workflow";
 import type { Selection } from "./Canvas";
-import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, DetectIcon, EyeIcon, PipelineIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, DetectIcon, EyeIcon, PipelineIcon, PlugIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { pluginInMessage } from "../plugins";
 import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
@@ -35,6 +36,8 @@ export type FieldValue = string | number | boolean | null;
 
 export interface PropertiesProps {
   workflow: Workflow;
+  /** Opens the overview of a plugin (S52b2), e.g. from the message of a step whose plugin cannot be used. */
+  onOpenPlugin?: (name: string) => void;
   /** The selected actions and links. */
   selected: Selection;
   problems: Problem[];
@@ -260,7 +263,11 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
         .filter(Boolean)
         .join(" · ");
   const outgoing = (workflow.links ?? []).filter((l) => l.from === action.id && l.type === "data").length;
-  const rest = own.filter((p) => !used.has(p));
+  // A step of a plugin that cannot be used (not trusted, changed, cannot start; S52b2):
+  // its message shows as the hint with "Open plugin" instead of in the list.
+  const blockedBy = d ? undefined : own.find((p) => !used.has(p) && pluginInMessage(p.message));
+  const blocked = blockedBy ? pluginInMessage(blockedBy.message) : null;
+  const rest = own.filter((p) => !used.has(p) && p !== blockedBy);
 
   return (
     <div data-testid="properties">
@@ -272,13 +279,35 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           <ActionIcon type={action.type} known={!!d} />
         </span>
         <div className="min-w-0">
-          <h3 className="m-0 text-base leading-tight font-semibold">{d?.label ?? `Unknown ${pipeline ? "transform" : "action"} type`}</h3>
+          <h3 className="m-0 text-base leading-tight font-semibold">
+            {d?.label ?? (blocked ? `${pipeline ? "Transform" : "Action"} of plugin ${blocked.name}` : `Unknown ${pipeline ? "transform" : "action"} type`)}
+          </h3>
           <div className="font-mono text-2xs text-muted-foreground">{action.type}</div>
         </div>
       </div>
-      <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
-        {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in the YAML view."}
-      </p>
+      {!d && blocked ? (
+        <div role="alert" className="mx-4 mt-1 mb-3 flex gap-2 rounded-md bg-danger-soft px-3 py-2.5 text-xs">
+          <span className="font-bold text-destructive">✕</span>
+          <div className="min-w-0">
+            <b className="block">{blocked.title}</b>
+            <span className="text-2xs text-muted-foreground">The step cannot run, and its fields are shown once the plugin can be used. Until then, edit them in YAML.</span>
+            {props.onOpenPlugin && (
+              <button
+                type="button"
+                onClick={() => props.onOpenPlugin!(blocked.name)}
+                className="mt-2 flex h-6 cursor-pointer items-center gap-1.5 rounded-md border border-primary bg-primary px-2 text-2xs font-medium text-primary-foreground"
+              >
+                <PlugIcon width={12} height={12} />
+                Open plugin {blocked.name}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="mx-4 mt-0 mb-2 text-xs text-muted-foreground">
+          {d ? d.description : "This type is not known to this version of Runnel. Change its configuration in the YAML view."}
+        </p>
+      )}
       {pipeline && d && props.onPreview && (
         <div className="mx-4 mb-3">
           <button

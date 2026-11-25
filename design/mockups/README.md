@@ -30,7 +30,7 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`e20-forms.html`](e20-forms.html) | E20 – Formulare für Trigger, Environments und `project.yaml` | `cron`, `http`, `type`, `environment`, `project`, `new` | freigegeben mit PR #178; `cron`, `http`, `type` und `new` umgesetzt mit E20a, `environment` und `project` mit E20b |
 | [`e21-tabs.html`](e21-tabs.html) | E21 – Viele offene Dateien: Liste und Menü der Tabs | `many`, `list`, `search`, `menu` | freigegeben mit PR #184, umgesetzt mit E21 |
 | [`s26d-runs.html`](s26d-runs.html) | S26d – Liste der Läufe im Editor | `list`, `filter`, `run`, `changed`, `empty` | freigegeben mit PR #213; `list`, `filter` und `empty` umgesetzt mit S26e1, `run` und `changed` mit S26e2 |
-| [`s52-plugins.html`](s52-plugins.html) | S52 – Plugins im Editor | `plugin`, `untrusted`, `trust`, `changed`, `error`, `canvas` | freigegeben mit PR #227; Server mit S52a, `plugin`, `untrusted`, `trust`, `changed` und `error` umgesetzt mit S52b1, `canvas` folgt mit S52b2 |
+| [`s52-plugins.html`](s52-plugins.html) | S52 – Plugins im Editor | `plugin`, `untrusted`, `trust`, `changed`, `error`, `canvas` | freigegeben mit PR #227; Server mit S52a, `plugin`, `untrusted`, `trust`, `changed` und `error` umgesetzt mit S52b1, `canvas` mit S52b2 |
 
 ## Entscheidungen
 

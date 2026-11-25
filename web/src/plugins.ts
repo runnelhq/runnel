@@ -124,3 +124,23 @@ export const shortHash = (hash?: string) => {
   const h = (hash ?? "").replace(/^sha256:/, "");
   return h.length > 12 ? `${h.slice(0, 6)}…${h.slice(-4)}` : h;
 };
+
+/**
+ * The plugin a message of the checks is about (mockup S52, state canvas), e.g.
+ * `action "say": plugin "ldap" is not trusted on this computer; …` or `plugin ldap:
+ * initialize: …` for a plugin that cannot start; null for other messages.
+ */
+export function pluginInMessage(message: string): { name: string; title: string } | null {
+  const m = /\bplugin "?([a-z][a-z0-9-]*)"?(:| is | changed)/.exec(message);
+  if (!m) return null;
+  const name = m[1];
+  const title = message.includes("is not trusted")
+    ? `Plugin ${name} is not trusted on this computer`
+    : message.includes("changed since it was trusted")
+      ? `Plugin ${name} changed since it was trusted`
+      : `Plugin ${name} cannot start`;
+  return { name, title };
+}
+
+/** The file that opens the overview of a plugin. */
+export const pluginFile = (name: string) => `plugins/${name}/plugin.yaml`;
