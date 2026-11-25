@@ -516,7 +516,9 @@ function Node(props: {
   const plugin = isPluginDir ? props.plugins.get(entry.path) : undefined;
   const pluginFile = isPluginDir ? entry.path + "/plugin.yaml" : null;
   const selected = (!isDir && entry.path === props.selected) || (pluginFile !== null && pluginFile === props.selected);
-  const activate = () => (pluginFile ? props.onOpen(pluginFile) : isDir ? setOpen(!open) : props.onOpen(entry.path));
+  // Binary files (programs, archives, databases) stay in the tree but do not open.
+  const binary = !isDir && entry.kind === "binary";
+  const activate = () => (pluginFile ? props.onOpen(pluginFile) : isDir ? setOpen(!open) : binary ? undefined : props.onOpen(entry.path));
   const renaming = editing && "rename" in editing && editing.rename.path === entry.path;
   const creatingHere = editing && "create" in editing && editing.dir === entry.path;
   // A row dropped on a file goes into the folder of that file.
@@ -542,7 +544,7 @@ function Node(props: {
       <div
         ref={row}
         tabIndex={0}
-        title={entry.path}
+        title={binary ? `${entry.path} – a binary file, not shown in the editor` : entry.path}
         draggable={!!props.drag && entry.path !== projectFile}
         onDragStart={(e) => props.drag?.onStart(entry, e)}
         onDragEnd={() => props.drag?.onEnd()}
@@ -566,7 +568,8 @@ function Node(props: {
           "group flex h-[26px] cursor-default items-center gap-1.5 rounded-sm pr-1 whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring " +
           (selected ? "bg-accent font-medium text-accent-foreground" : props.menuOpen === entry.path ? "bg-sidebar-accent" : "hover:bg-sidebar-accent") +
           (isDir && props.dropOver === entry.path ? " bg-accent outline-1 outline-ring outline-dashed -outline-offset-1" : "") +
-          (props.dragging === entry.path ? " opacity-55" : "")
+          (props.dragging === entry.path ? " opacity-55" : "") +
+          (binary ? " text-muted-foreground" : "")
         }
       >
         {isDir ? (

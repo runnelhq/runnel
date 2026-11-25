@@ -11,7 +11,7 @@ export interface Entry {
 }
 
 /** Kinds of files; documents (.md) and images since E17. */
-export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "connection" | "plugin" | "document" | "image" | "runs" | "other";
+export type FileKind = "workflow" | "pipeline" | "project" | "environment" | "trigger" | "connection" | "plugin" | "document" | "image" | "binary" | "runs" | "other";
 
 /** Error of the file API with its HTTP status (404: file not found). */
 export class APIError extends Error {
@@ -154,6 +154,7 @@ export function kindOf(path: string): FileKind {
   if (/^plugins\/[^/]+\/plugin\.yaml$/.test(path)) return "plugin";
   if (/\.md$/i.test(path)) return "document";
   if (isImage(path)) return "image";
+  if (isBinary(path)) return "binary";
   return "other";
 }
 
@@ -167,6 +168,7 @@ export const kindLabel: Record<FileKind, string> = {
   plugin: "Plugin",
   document: "Document",
   image: "Image",
+  binary: "Binary file",
   runs: "Runs",
   other: "File",
 };
@@ -176,6 +178,13 @@ export const tabName = (path: string) => (path === ":runs" ? "Runs" : path.slice
 
 /** Images a document can show (as the server serves them, E17). */
 export const isImage = (path: string) => /\.(png|jpe?g|gif|webp)$/i.test(path);
+
+/**
+ * Files the editor does not open (as the server's fileKind "binary"): programs, libraries,
+ * archives, databases and office documents, e.g. the program of a plugin (S52).
+ */
+export const isBinary = (path: string) =>
+  /\.(exe|dll|so|dylib|bin|msi|com|sys|zip|7z|gz|tgz|tar|rar|jar|class|pyc|db|sqlite3?|mdb|accdb|xlsx|xls|xlsm|docx|doc|pptx|pdf)$/i.test(path);
 
 export const isYAML = (path: string) => /\.ya?ml$/i.test(path);
 

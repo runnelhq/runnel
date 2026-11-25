@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -139,8 +140,28 @@ func fileKind(p string) string {
 		return "document"
 	case imageTypes[strings.ToLower(path.Ext(p))] != "":
 		return "image"
+	case binaryTypes[strings.ToLower(path.Ext(p))]:
+		return "binary"
 	}
 	return "other"
+}
+
+// binaryTypes are files the editor does not open: programs, libraries, archives,
+// databases and office documents, e.g. the program of a plugin (S52).
+var binaryTypes = map[string]bool{
+	".exe": true, ".dll": true, ".so": true, ".dylib": true, ".bin": true, ".msi": true, ".com": true, ".sys": true,
+	".zip": true, ".7z": true, ".gz": true, ".tgz": true, ".tar": true, ".rar": true, ".jar": true, ".class": true, ".pyc": true,
+	".db": true, ".sqlite": true, ".sqlite3": true, ".mdb": true, ".accdb": true,
+	".xlsx": true, ".xls": true, ".xlsm": true, ".docx": true, ".doc": true, ".pptx": true, ".pdf": true,
+}
+
+// isBinary reports content the editor cannot show as text: a NUL byte in its first 8 KB,
+// except in text encoded as UTF-16 with a byte order mark (Fix K13).
+func isBinary(data []byte) bool {
+	if bytes.HasPrefix(data, []byte{0xff, 0xfe}) || bytes.HasPrefix(data, []byte{0xfe, 0xff}) {
+		return false
+	}
+	return bytes.IndexByte(data[:min(len(data), 8000)], 0) >= 0
 }
 
 func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +173,10 @@ func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
 	data, err := s.readFile(name)
 	if err != nil {
 		writeErr(w, err)
+		return
+	}
+	if fileKind(name) == "binary" || (fileKind(name) != "image" && isBinary(data)) {
+		writeError(w, http.StatusUnsupportedMediaType, "a binary file (e.g. a program, an archive or a database) cannot be shown in the editor")
 		return
 	}
 	h := w.Header()
@@ -264,6 +289,10 @@ func (s *Server) readFile(name string) ([]byte, error) {
 	}
 	if info.IsDir() {
 		return nil, errorf(http.StatusBadRequest, "%s is a directory", name)
+	}
+	// The same limit as for writing: a large file is never read into memory as a whole.
+	if info.Size() > MaxFileSize {
+		return nil, errorf(http.StatusUnprocessableEntity, "the file is too large for the editor (%.1f MB, at most %d MB)", float64(info.Size())/(1<<20), MaxFileSize>>20)
 	}
 	return s.root.ReadFile(filepath.FromSlash(name))
 }

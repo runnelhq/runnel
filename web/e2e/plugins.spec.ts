@@ -24,6 +24,7 @@ const pluginYAML = (args: string) =>
   `kind: Plugin\napiVersion: runnel/v1\nname: demo\nversion: 1.0.0\ndescription: A demo plugin\nnamespace: demo\nexecutable: node\nargs: [${args}]\n`;
 const files: Record<string, string> = {
   "plugins/demo/plugin.mjs": script,
+  "plugins/demo/bin/demo.exe": "MZ\u0000\u0000program",
   "plugins/demo/plugin.yaml": pluginYAML("plugin.mjs"),
   "workflows/e2e-plugin.workflow.yaml":
     "kind: Workflow\napiVersion: runnel/v1\nname: e2e-plugin\nactions:\n  - id: start\n    type: core.start\n  - id: say\n    type: demo.echo\n    with:\n      text: hi\nlinks:\n  - { from: start, to: say }\n",
@@ -40,11 +41,12 @@ test.beforeEach(async ({ request }) => {
 test.afterAll(async ({ request }) => {
   await request.post("/api/v1/plugins/demo/untrust", { data: {} });
   for (const path of Object.keys(files)) await request.delete(`/api/v1/files/${path}`, { headers: { "If-Match": "*" } });
+  await request.delete("/api/v1/folders/plugins/demo/bin");
   await request.delete("/api/v1/folders/plugins/demo");
   await request.delete("/api/v1/folders/plugins");
 });
 
-const row = (page: Page) => page.getByRole("treeitem", { name: "demo" });
+const row = (page: Page) => page.getByRole("treeitem", { name: "demo", exact: true });
 const view = (page: Page) => page.getByTestId("plugin-view");
 
 async function openPlugin(page: Page) {
@@ -124,4 +126,12 @@ test("a step of a plugin that is not trusted leads to the plugin from the panel 
   const row = problems.getByRole("table").getByRole("row", { name: /plugin "demo" is not trusted/ });
   await row.getByRole("button", { name: "Open plugin demo" }).click();
   await expect(page.getByTestId("plugin-view")).toBeVisible();
+});
+
+test("the program of a plugin stays in the explorer but does not open", async ({ page }) => {
+  await page.goto("/");
+  const exe = page.getByRole("treeitem", { name: "demo.exe" });
+  await expect(exe.locator("> div")).toHaveAttribute("title", /a binary file, not shown in the editor/);
+  await exe.locator("> div").click();
+  await expect(page.getByRole("tab", { name: /demo\.exe/ })).toHaveCount(0);
 });
