@@ -95,6 +95,36 @@ func TestCalculateSchema(t *testing.T) {
 	}
 }
 
+// The type of a calculated field is known before the run where it can be: a copy of a
+// field (like "Set field value" in Apache Hop, also of a field calculated before), a fixed
+// value, text around {{ … }}; other expressions are known only when the pipeline runs.
+func TestCalculateSchemaTypes(t *testing.T) {
+	tr := transformtest.New(t, calculateDefinition, map[string]any{"fields": []any{
+		map[string]any{"name": "copy", "value": "{{ record.price }}"},
+		map[string]any{"name": "again", "value": " {{record.copy}} "},
+		map[string]any{"name": "count", "value": "3"},
+		map[string]any{"name": "rate", "value": "1.5"},
+		map[string]any{"name": "flag", "value": "true"},
+		map[string]any{"name": "status", "value": "open"},
+		map[string]any{"name": "label", "value": "No. {{ record.qty }}"},
+		map[string]any{"name": "total", "value": "{{ record.price * record.qty }}"},
+		map[string]any{"name": "city", "value": "{{ record.city ?? 'unknown' }}"},
+		map[string]any{"name": "missing", "value": "{{ record.nope }}"},
+	}})
+	in := record.Schema{}.With("price", record.Decimal).With("qty", record.Int).With("city", record.String)
+	s, err := tr.(transform.Initializer).Init(transform.NewInitContext(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]record.Type{"copy": record.Decimal, "again": record.Decimal, "count": record.Int, "rate": record.Decimal, "flag": record.Bool,
+		"status": record.String, "label": record.String, "total": record.Unknown, "city": record.Unknown, "missing": record.Unknown}
+	for name, typ := range want {
+		if f, _ := s.Field(name); f.Type != typ {
+			t.Errorf("%s: %q, want %q", name, f.Type, typ)
+		}
+	}
+}
+
 func TestCalculateConfig(t *testing.T) {
 	for _, tt := range []struct {
 		with map[string]any

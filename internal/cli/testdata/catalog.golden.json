@@ -1358,7 +1358,7 @@
       "kind": "transform",
       "category": "transform",
       "label": "Calculate",
-      "description": "Sets fields to the result of an expression for every record",
+      "description": "Sets fields for every record: a copy of another field, a fixed value, a default or a calculated value",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

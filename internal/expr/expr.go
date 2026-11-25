@@ -203,6 +203,28 @@ func (t *Template) Static() bool {
 	return true
 }
 
+// IsText reports whether the template joins text and expressions, so that its result is
+// always a text (see Eval).
+func (t *Template) IsText() bool {
+	return !t.whole && !t.Static()
+}
+
+// fieldRef is an expression that only names a member, e.g. record.amount.
+var fieldRef = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)$`)
+
+// Member returns the name of the member when the template is exactly one expression that
+// names a member of root and nothing else, e.g. "amount" for {{ record.amount }}.
+func (t *Template) Member(root string) (string, bool) {
+	if !t.whole || len(t.parts) != 1 {
+		return "", false
+	}
+	m := fieldRef.FindStringSubmatch(t.parts[0].code)
+	if m == nil || m[1] != root {
+		return "", false
+	}
+	return m[2], true
+}
+
 // Eval evaluates the template. A value that consists of one expression returns the
 // result with its type; otherwise the parts are joined as text (see Format).
 func (t *Template) Eval(env map[string]any) (any, error) {

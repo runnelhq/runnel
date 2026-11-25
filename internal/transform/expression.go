@@ -63,6 +63,24 @@ func (e *Expression) Fields() []string {
 	return e.tpl.Members("record")
 }
 
+// Type returns the type of the result as far as it is known before the run: a text for a
+// template with text around {{ … }}, the type of the field for an expression that only
+// names a field of the record (e.g. {{ record.amount }}); Unknown otherwise.
+func (e *Expression) Type(in record.Schema) record.Type {
+	switch {
+	case e.tpl == nil:
+		return record.Unknown
+	case e.tpl.IsText():
+		return record.String
+	}
+	if name, ok := e.tpl.Member("record"); ok {
+		if f, ok := in.Field(name); ok {
+			return f.Type
+		}
+	}
+	return record.Unknown
+}
+
 // Bool evaluates a condition for a record; the result must be true or false.
 func (e *Expression) Bool(out *Output, r record.Record) (bool, error) {
 	if e.tpl == nil {
