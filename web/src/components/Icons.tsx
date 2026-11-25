@@ -528,6 +528,14 @@ export const TerminalIcon = (p: P) => (
   </Icon>
 );
 
+/** Runs of the error workflow (trigger error, ADR 0027). */
+export const AlertIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 3L2 20h20z" />
+    <path d="M12 10v4M12 17v.01" />
+  </Icon>
+);
+
 export const PencilIcon = (p: P) => (
   <Icon {...p}>
     <path d="M4 20h4L19 9l-4-4L4 16z" />

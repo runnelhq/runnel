@@ -133,6 +133,11 @@ func TestProject(t *testing.T) {
 		strings.Join(info.Environments, ",") != "dev" || info.History != (historyInfo{KeepDays: 30, MaxRuns: 10000}) {
 		t.Errorf("project %+v, err %v", info, err)
 	}
+	// The error workflow of the project (S72b).
+	writeFile(t, filepath.Join(dir, "project.yaml"), "kind: Project\napiVersion: runnel/v1\nname: demo\nsettings:\n  onError: workflows/report.workflow.yaml\n")
+	if err := json.Unmarshal(do(t, s, "GET", "/api/v1/projects/current", "").Body.Bytes(), &info); err != nil || info.OnError != "workflows/report.workflow.yaml" {
+		t.Errorf("project %+v, err %v", info, err)
+	}
 }
 
 func TestTree(t *testing.T) {

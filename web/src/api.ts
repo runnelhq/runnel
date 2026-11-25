@@ -11,6 +11,8 @@ export interface ProjectInfo {
   defaultEnvironment?: string;
   /** How long ended runs are kept (S26c), with the defaults. */
   history?: { keepDays: number; maxRuns: number };
+  /** The error workflow of the project (settings.onError, ADR 0027), if set. */
+  onError?: string;
 }
 
 export interface VersionInfo {

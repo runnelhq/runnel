@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -98,6 +99,25 @@ func TestOnError(t *testing.T) {
 	}
 	if want := "run=" + id + " action=boom trigger=cron:nightly error=broken for you in dev"; !strings.Contains(logText(d), want) {
 		t.Errorf("log %q, want %q", logText(d), want)
+	}
+	// The list finds the error run of a failed run by its parent (S72b).
+	children := func(parent string) []string {
+		t.Helper()
+		var out struct{ Runs []runs.Run }
+		if err := json.Unmarshal(do(t, s, "GET", "/api/v1/runs?parent="+parent, "").Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		var ids []string
+		for _, r := range out.Runs {
+			ids = append(ids, r.ID)
+		}
+		return ids
+	}
+	if got := children(id); len(got) != 1 || got[0] != e.ID {
+		t.Errorf("runs with parent %s: %v, want %s", id, got, e.ID)
+	}
+	if got := children(e.ID); len(got) != 0 {
+		t.Errorf("runs with parent %s: %v, want none", e.ID, got)
 	}
 
 	// The project is full; the trigger fails before its run starts (missing parameter):

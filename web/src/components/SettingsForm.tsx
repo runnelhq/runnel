@@ -4,7 +4,7 @@ import { useForm, useFormChange, type FieldChange, type SettingsData } from "../
 import { missingIn, useVariables, type VariableInfo } from "../reference";
 import type { Problem } from "../workflow";
 import { ChevronIcon, LinesIcon, PlusIcon, ProjectIcon, TrashIcon } from "./Icons";
-import { Field, TextInput, inputClass } from "./PropertiesPanel";
+import { Field, OnErrorField, TextInput, inputClass } from "./PropertiesPanel";
 
 /**
  * An environment or project.yaml as a form (mockup E20, states "environment" and
@@ -31,6 +31,8 @@ export function SettingsForm(props: {
   saved: boolean;
   projectDir?: string | null;
   problems: Problem[];
+  /** Workflows of the project, for settings.onError of project.yaml (S72b). */
+  workflows?: string[];
   onText: (text: string) => void;
   onError: (message: string) => void;
 }) {
@@ -119,6 +121,13 @@ export function SettingsForm(props: {
                   </select>
                 )}
               </Field>
+              <OnErrorField
+                kind="project"
+                value={typeof data.settings?.onError === "string" ? data.settings.onError : undefined}
+                choices={{ workflows: props.workflows ?? [] }}
+                problems={at("$.settings.onError")}
+                onSet={(value) => void change({ field: "settings.onError", value })}
+              />
             </>
           )}
         </Section>

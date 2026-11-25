@@ -61,7 +61,7 @@ export interface Workflow {
   description?: string;
   parameters?: Parameter[];
   outputs?: Output[];
-  settings?: { timeout?: string; maxConcurrentRuns?: number; batchSize?: number; bufferSize?: number; strict?: boolean };
+  settings?: { timeout?: string; maxConcurrentRuns?: number; batchSize?: number; bufferSize?: number; strict?: boolean; onError?: string };
   actions?: Action[];
   links?: Link[];
   layout?: Record<string, { x: number; y: number }>;
@@ -74,7 +74,7 @@ export interface Pipeline {
   parameters?: Parameter[];
   transforms?: Action[];
   links?: { from: string; to: string; type?: string }[];
-  settings?: { batchSize?: number; bufferSize?: number; strict?: boolean };
+  settings?: { batchSize?: number; bufferSize?: number; strict?: boolean; onError?: string };
   layout?: Record<string, { x: number; y: number }>;
 }
 

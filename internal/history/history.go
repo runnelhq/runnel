@@ -395,6 +395,9 @@ type Filter struct {
 	Status  string // e.g. failed
 	Path    string // the file of the workflow or pipeline, as in the project ("workflows/a.workflow.yaml")
 	Trigger string // e.g. cron:nightly, http:orders, cli; TriggerEditor: runs without trigger
+	// Parent lists the runs that belong to this one, e.g. the run of the error workflow
+	// that reports a failed run (ADR 0027).
+	Parent string
 	// Before lists the runs started before the one with this id (pages: the id of the
 	// last run of the page before).
 	Before string
@@ -414,7 +417,8 @@ func (s *Store) Find(ctx context.Context, f Filter) ([]Run, error) {
 	var where []string
 	var args []any
 	for _, c := range []struct{ col, op, val string }{
-		{"status", "=", f.Status}, {"path", "=", f.Path}, {"trigger", "=", f.Trigger}, {"id", "<", f.Before},
+		{"status", "=", f.Status}, {"path", "=", f.Path}, {"trigger", "=", f.Trigger}, {"parent_id", "=", f.Parent},
+		{"id", "<", f.Before},
 	} {
 		if c.val != "" {
 			where = append(where, c.col+" "+c.op+" ?")

@@ -70,6 +70,15 @@ export interface PropertiesProps {
   onPreview?: (id: string) => void;
   /** Shows a transform in the YAML view (help, E14b). */
   onShowInYAML?: (id: string) => void;
+  /** Choices of settings.onError (S72b): the workflows of the project, that of project.yaml and the open file. */
+  onErrorChoices?: OnErrorChoices;
+}
+
+/** The choices of settings.onError (ADR 0027): workflows of the project (paths), the error workflow of project.yaml and the open file. */
+export interface OnErrorChoices {
+  workflows: string[];
+  project?: string;
+  self?: string;
 }
 
 /** A change of a link in the panel. */
@@ -1372,6 +1381,7 @@ function WorkflowProperties(props: PropertiesProps & { ctx: ExprContext }) {
             />
           )}
         </Field>
+        <OnErrorField kind="workflow" value={workflow.settings?.onError} choices={props.onErrorChoices} problems={problemsAt(problems, "$", "settings.onError")} onSet={(v) => onSetWorkflow("settings.onError", v)} />
       </Section>
       <EntrySection {...props} list="parameters" />
       <EntrySection {...props} list="outputs" defaultOpen={false} />
@@ -1709,9 +1719,58 @@ function PipelineProperties(props: PropertiesProps & { ctx: ExprContext }) {
           problems={problemsAt(problems, "$", "settings.strict")}
           onChange={(on) => onSetWorkflow("settings.strict", on ? true : null)}
         />
+        <OnErrorField kind="pipeline" value={settings.onError} choices={props.onErrorChoices} problems={problemsAt(problems, "$", "settings.onError")} onSet={(v) => onSetWorkflow("settings.onError", v)} />
       </Section>
       <EntrySection {...props} list="parameters" />
     </div>
+  );
+}
+
+/**
+ * settings.onError (ADR 0027, S72b): the workflow started when a run fails, as a choice of the
+ * workflows of the project. In project.yaml empty means none; in a workflow or pipeline empty
+ * means the project default and "none" turns it off. A value that is not a workflow of the
+ * project stays selectable, so that its problem shows here.
+ */
+export function OnErrorField(props: {
+  kind: "project" | "workflow" | "pipeline";
+  value?: string;
+  choices?: OnErrorChoices;
+  problems: Problem[];
+  onSet: (value: string | null) => void;
+}) {
+  const { kind, value = "", choices } = props;
+  const own = kind !== "project";
+  const workflows = (choices?.workflows ?? []).filter((w) => w !== choices?.self);
+  const options = value && !(own && value === "none") && !workflows.includes(value) ? [value, ...workflows] : workflows;
+  const help = own
+    ? `Workflow started when a run of this ${kind} fails (not for runs in the editor). Project default: the one of project.yaml`
+    : "Workflow started when a run fails (not for runs in the editor); it gets the FAILED_… parameters it declares";
+  return (
+    <Field label="On error" fieldKey="settings.onError" help={help} problems={props.problems}>
+      {(p) => (
+        <select
+          id={p.id}
+          value={value}
+          onChange={(e) => props.onSet(e.target.value || null)}
+          className={inputClass(p.invalid, true) + " cursor-pointer"}
+        >
+          {own ? (
+            <>
+              <option value="">{choices?.project ? `Project default (${choices.project})` : "Project default (none)"}</option>
+              <option value="none">None</option>
+            </>
+          ) : (
+            <option value="">None</option>
+          )}
+          {options.map((w) => (
+            <option key={w} value={w}>
+              {w}
+            </option>
+          ))}
+        </select>
+      )}
+    </Field>
   );
 }
 

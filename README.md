@@ -50,7 +50,8 @@ zeigt nur Warnungen und Fehler, `--log-format json` gibt jede Zeile als JSON-Obj
 Strg+C bricht einen Lauf sauber ab (laufende Actions werden gestoppt); ein zweites Strg+C beendet sofort.
 Scheitert der Lauf und nennt `project.yaml` (oder die Datei selbst) unter `settings.onError` einen Fehler-Workflow,
 läuft dieser danach im selben Environment ([ADR 0027](docs/adr/0027-fehler-workflow.md)); der Exit-Code bleibt der des
-Laufs, `--no-on-error` schaltet ihn ab.
+Laufs, `--no-on-error` schaltet ihn ab. Ein Beispiel ist `examples/hello/workflows/on-error.workflow.yaml`; im Editor
+heißt die Einstellung „On error“.
 
 ```bash
 runnel validate examples/hello
