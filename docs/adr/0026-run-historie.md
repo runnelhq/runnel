@@ -197,3 +197,12 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
   Datei. Weichen die Actions ab (IDs), nennt der Editor sie und lässt die Zähler an Links weg, weil deren Reihenfolge
   nicht mehr stimmen muss. Geänderte Links bei gleichen Actions erkennt er nicht.
 - Ein noch laufender Lauf aus der Liste wird wie ein im Editor gestarteter über `/events?run=<id>&since=0` verfolgt.
+
+## Nachtrag 2026-11-25 (Fix): Monotone Lauf-IDs
+
+Die Historie sortiert Läufe nach ID (ULID). Bisher war der Zufallsteil einer ULID unabhängig: Zwei Läufe, die in
+derselben Millisekunde starteten, konnten in `runnel runs` und im Editor vertauscht erscheinen (gefunden durch einen
+Test, der unter Windows gelegentlich scheiterte). `runid.New` erzeugt jetzt monotone ULIDs nach der Spezifikation:
+In derselben Millisekunde wie die letzte ID (oder wenn die Uhr zurückspringt) ist die neue ID die letzte plus eins.
+Die Reihenfolge gilt je Prozess; Läufe verschiedener Prozesse (z. B. `runnel run` neben dem Server) sind innerhalb
+einer Millisekunde weiterhin nicht geordnet.
