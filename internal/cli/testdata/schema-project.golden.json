@@ -111,6 +111,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "onError": {
+          "type": "string",
+          "description": "Workflow started when a run of the project fails (not for runs in the editor), relative to the project; it gets the FAILED_… parameters it declares. A workflow or pipeline can set its own or none",
+          "examples": [
+            "workflows/on-error.workflow.yaml"
+          ]
         }
       },
       "additionalProperties": false

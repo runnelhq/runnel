@@ -47,7 +47,10 @@ type Run struct {
 	// Trigger names what started the run, e.g. "cron:nightly" (S37); empty: by hand.
 	Trigger string `json:"trigger,omitempty"`
 	// Client is the address of the caller of an http trigger (S38a).
-	Client      string            `json:"client,omitempty"`
+	Client string `json:"client,omitempty"`
+	// Parent is the run this one belongs to: for an error workflow (trigger error) the
+	// failed run it reports (ADR 0027).
+	Parent      string            `json:"parent,omitempty"`
 	Environment string            `json:"environment,omitempty"`
 	Params      map[string]string `json:"params,omitempty"`
 	Status      workflow.Status   `json:"status"`
@@ -132,6 +135,8 @@ type Manager struct {
 	rec   *historyWriter
 	// onEnd receives each run that ended and is kept (history), e.g. for the server log.
 	onEnd func(Run)
+	// onFailed receives each failed run with an error workflow (ADR 0027).
+	onFailed func(Failure)
 }
 
 type entry struct {
@@ -150,6 +155,8 @@ type entry struct {
 	// in the history.
 	hash   string
 	logSeq int64
+	// onError is the error workflow of the run (ADR 0027); empty: none.
+	onError string
 }
 
 // NewManager creates a manager. Runs are cancelled by Shutdown.
@@ -175,6 +182,14 @@ func (m *Manager) OnEnd(fn func(Run)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.onEnd = fn
+}
+
+// OnFailed calls fn for each run that ended with status failed and has an error workflow
+// (ADR 0027), whatever its history; fn must not block. Call it before the first run.
+func (m *Manager) OnFailed(fn func(Failure)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onFailed = fn
 }
 
 // CloseHistory writes what is queued for the history and stops writing to it. It does
@@ -238,11 +253,15 @@ type Pending struct {
 	steps   [][2]string
 	lim     limits
 	hash    string
+	onError string
 	start   func(context.Context)
 }
 
 // ID returns the id of the run.
 func (p *Pending) ID() string { return p.id }
+
+// OnError returns the error workflow of the run (ADR 0027), relative to the project; empty: none.
+func (p *Pending) OnError() string { return p.onError }
 
 // Start prepares and starts a run in the background and returns its state. The spec's
 // RunID is set by the manager; its Observer, if any, gets the events after the manager.
@@ -278,10 +297,16 @@ func (m *Manager) PrepareRun(path string, spec Spec) (*Pending, *Prepared, error
 	for i, a := range p.Workflow.Actions {
 		steps[i] = [2]string{a.ID, a.Type}
 	}
+	lim := limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns)
+	if spec.Trigger == TriggerError {
+		lim = limits{} // an error workflow can always report (ADR 0027)
+	}
 	return &Pending{History: spec.History, id: id, env: p.Env, steps: steps, hash: fileHash(spec.Data),
-		run:   Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client},
-		lim:   limitsOf(p.Project, p.Workflow.Settings.MaxConcurrentRuns),
-		start: func(ctx context.Context) { p.Runner.Run(ctx) }}, p, nil
+		run: Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger,
+			Client: spec.Client, Parent: spec.Parent},
+		lim:     lim,
+		onError: onErrorOf(spec.Trigger, spec.NoOnError, p.Project, p.Workflow.Settings.OnError, path),
+		start:   func(ctx context.Context) { p.Runner.Run(ctx) }}, p, nil
 }
 
 // StartPipeline prepares and starts a pipeline run in the background, like Start (S25a3).
@@ -320,26 +345,28 @@ func (m *Manager) PreparePipelineRun(path string, spec PipelineSpec) (*Pending, 
 	return &Pending{History: spec.History, id: id, env: p.Env, steps: steps, hash: fileHash(spec.Data),
 		run: Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
 			LinkRows: make([]int64, len(p.Pipeline.Links))},
-		lim:   limitsOf(p.Project, 0),
-		start: func(ctx context.Context) { p.Runner.Run(ctx) }}, p, nil
+		lim:     limitsOf(p.Project, 0),
+		onError: onErrorOf(spec.Trigger, spec.NoOnError, p.Project, p.Pipeline.Settings.OnError, path),
+		start:   func(ctx context.Context) { p.Runner.Run(ctx) }}, p, nil
 }
 
 // Launch starts a prepared run in the background, unless a limit of runs at the same
 // time is reached or the manager is shutting down.
 func (m *Manager) Launch(p *Pending) (Run, error) {
-	return m.add(p.id, p.run, p.env, p.steps, p.lim, p.History, p.hash, p.start)
+	return m.add(p)
 }
 
-// add registers a run with its steps (id and type of the actions or transforms) and
-// runs it in the background, unless a limit of runs at the same time is reached.
-func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]string, lim limits, history, hash string, start func(context.Context)) (Run, error) {
+// add registers a prepared run with its steps (id and type of the actions or transforms)
+// and runs it in the background, unless a limit of runs at the same time is reached.
+func (m *Manager) add(p *Pending) (Run, error) {
 	ctx, cancel := context.WithCancel(m.ctx)
+	id, run := p.id, p.run
 	run.Status, run.Started = StatusRunning, time.Now()
-	if env != nil {
-		run.Environment = env.Name
+	if p.env != nil {
+		run.Environment = p.env.Name
 	}
-	e := &entry{run: run, byID: map[string]*ActionState{}, cancel: cancel, history: history, hash: hash, done: make(chan struct{})}
-	for _, st := range steps {
+	e := &entry{run: run, byID: map[string]*ActionState{}, cancel: cancel, history: p.History, hash: p.hash, onError: p.onError, done: make(chan struct{})}
+	for _, st := range p.steps {
 		s := &ActionState{ID: st[0], Type: st[1], Status: StatusPending}
 		e.actions = append(e.actions, s)
 		e.byID[st[0]] = s
@@ -350,7 +377,7 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 		cancel()
 		return Run{}, ErrShutdown
 	}
-	if err := m.checkLimits(run.Path, lim); err != nil {
+	if err := m.checkLimits(run.Path, p.lim); err != nil {
 		m.mu.Unlock()
 		cancel()
 		return Run{}, err
@@ -367,13 +394,21 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 
 	m.wg.Go(func() {
 		defer cancel()
-		start(ctx)
+		p.start(ctx)
 		m.mu.Lock()
 		kept := m.ended(e)
 		onEnd, run := m.onEnd, snapshot(e)
+		onFailed, failed := m.onFailed, e.run.Status == workflow.Failed && e.onError != ""
+		var f Failure
+		if onFailed != nil && failed {
+			f = FailureOf(detailOf(e), e.onError)
+		}
 		m.mu.Unlock()
 		if onEnd != nil && kept {
 			onEnd(run)
+		}
+		if onFailed != nil && failed {
+			onFailed(f)
 		}
 	})
 	return out, nil
@@ -384,7 +419,7 @@ func (m *Manager) add(id string, run Run, env *model.Environment, steps [][2]str
 func (m *Manager) checkLimits(path string, lim limits) error {
 	all, same := 0, 0
 	for _, e := range m.runs {
-		if e.run.Status != StatusRunning {
+		if e.run.Status != StatusRunning || e.run.Trigger == TriggerError { // error workflows do not count (ADR 0027)
 			continue
 		}
 		all++

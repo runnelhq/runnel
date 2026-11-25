@@ -178,8 +178,11 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft. Seit 
 }
 ```
 
-`trigger` nennt, was den Lauf gestartet hat (`cron:<name>`, `interval:<name>`, `file:<name>`, `http:<name>`; fehlt bei
-Starts von Hand), `client` bei `http` die Adresse des Aufrufers.
+`trigger` nennt, was den Lauf gestartet hat (`cron:<name>`, `interval:<name>`, `file:<name>`, `http:<name>`, `cli` für
+`runnel run`, `error` für einen Fehler-Workflow; fehlt bei Starts von Hand), `client` bei `http` die Adresse des
+Aufrufers. `parent` (seit S72a) nennt beim Fehler-Workflow ([ADR 0027](../adr/0027-fehler-workflow.md)) den
+fehlgeschlagenen Lauf, den er meldet; leer, wenn dieser vor dem Start scheiterte. Läufe mit `POST /runs` (auch mit
+`trigger`) starten keinen Fehler-Workflow.
 
 `status` eines Laufs: `running`, `succeeded`, `failed`, `cancelled`. `GET /runs/{id}` ergänzt `actions` – je Action
 `id`, `type`, `status` (`pending`, `waiting`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), Zeiten, `durationMs`,

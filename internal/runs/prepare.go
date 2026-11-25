@@ -52,6 +52,12 @@ type Spec struct {
 	// History decides whether the run is kept when it has ended: all (default),
 	// errors or none (runs of http triggers, S38b2).
 	History string
+	// Parent is the run this one belongs to (Run.Parent): the failed run of an error
+	// workflow (ADR 0027).
+	Parent string
+	// NoOnError starts no error workflow when the run fails (ADR 0027), e.g. for runs of
+	// the editor or with runnel run --no-on-error.
+	NoOnError bool
 
 	// chain lists the workflows that called this one (core.run-workflow).
 	chain []caller

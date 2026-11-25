@@ -61,13 +61,20 @@ type cliRun struct {
 	pend     *runs.Pending
 	store    *history.Store
 	settings model.HistorySettings
+	// out, opts, projectDir and file are for the error workflow (ADR 0027); failure is
+	// set when the run failed and has one.
+	out        io.Writer
+	opts       runOptions
+	projectDir string
+	file       string
+	failure    *runs.Failure
 }
 
 // newCLIRun chooses which runs are kept (--history, else settings.history.cli, else
 // all) and opens the project's run history. A run without project, or with history
 // none, opens nothing; a history that cannot be opened is a warning, the run goes on.
-func newCLIRun(m *runs.Manager, pend *runs.Pending, errOut io.Writer, opts runOptions, projectDir string, project *model.Project) *cliRun {
-	r := &cliRun{m: m, pend: pend}
+func newCLIRun(m *runs.Manager, pend *runs.Pending, out, errOut io.Writer, opts runOptions, projectDir, file string, project *model.Project) *cliRun {
+	r := &cliRun{m: m, pend: pend, out: out, opts: opts, projectDir: projectDir, file: file}
 	if project != nil {
 		r.settings = project.Settings.History
 	}
@@ -103,8 +110,16 @@ func newCLIRun(m *runs.Manager, pend *runs.Pending, errOut io.Writer, opts runOp
 	return r
 }
 
-// execute runs it until it ends; Ctrl+C (ctx) cancels it. The error is the exit code.
+// execute runs it until it ends, and then its error workflow if it failed (ADR 0027);
+// Ctrl+C (ctx) cancels it. The error is the exit code, that of the run.
 func (r *cliRun) execute(ctx context.Context, errOut io.Writer) error {
+	code := r.launch(ctx, errOut)
+	r.onError(ctx, errOut)
+	return code
+}
+
+// launch runs it until it ends and writes it to the history.
+func (r *cliRun) launch(ctx context.Context, errOut io.Writer) error {
 	defer r.close()
 	run, err := r.m.Launch(r.pend)
 	if err != nil {
@@ -119,6 +134,10 @@ func (r *cliRun) execute(ctx context.Context, errOut io.Writer) error {
 		return nil
 	case workflow.Cancelled:
 		return errExitCode(ExitCancelled)
+	}
+	if target := r.pend.OnError(); target != "" {
+		f := runs.FailureOf(d, target)
+		r.failure = &f
 	}
 	return errExitCode(exitRunFailed)
 }

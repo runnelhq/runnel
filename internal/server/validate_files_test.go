@@ -21,6 +21,9 @@ func TestValidateText(t *testing.T) {
 		{"project.yaml", "kind: Project\napiVersion: runnel/v1\nname: demo\ndefaultEnvironment: dev\n", nil},
 		{"project.yaml", "kind: Project\napiVersion: runnel/v1\nname: demo\ndefaultEnvironment: prod\n", []string{`default environment "prod" not found`}},
 		{"project.yaml", "kind: Project\napiVersion: runnel/v1\nname: demo\nvariables: { 1x: a }\n", []string{`invalid variable name "1x"`}},
+		// settings.onError (ADR 0027): the error workflow must exist.
+		{"project.yaml", "kind: Project\napiVersion: runnel/v1\nname: demo\nsettings: { onError: workflows/import.workflow.yaml }\n", nil},
+		{"project.yaml", "kind: Project\napiVersion: runnel/v1\nname: demo\nsettings: { onError: workflows/gone.workflow.yaml }\n", []string{"error workflow workflows/gone.workflow.yaml not found"}},
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\n", nil},
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: prod\n", []string{`must match the file name`}},
 		{"environments/dev.yaml", "kind: Environment\napiVersion: runnel/v1\nname: dev\nvariables: [\n", []string{""}},

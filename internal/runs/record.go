@@ -255,7 +255,7 @@ func putRun(ctx context.Context, tx *history.Tx, op recOp) error {
 		return err
 	}
 	h := history.Run{ID: op.run.ID, Path: op.run.Path, Kind: op.run.Kind, Trigger: op.run.Trigger, Status: string(op.run.Status),
-		Started: op.run.Started, Finished: op.run.Finished, Error: op.run.Error, FileHash: op.hash, Data: data}
+		Started: op.run.Started, Finished: op.run.Finished, Error: op.run.Error, FileHash: op.hash, Parent: op.run.Parent, Data: data}
 	if len(data) > history.MaxDataBytes {
 		// Outputs or parameters too large: keep the run without them, with a note.
 		small := op.run

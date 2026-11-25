@@ -57,6 +57,7 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 		diags = append(diags, workflow.Check(w, workflow.Options{Registry: c.Registry})...)
 		diags = append(diags, CheckCalls(w, c.ProjectDir, c.File)...)
 	}
+	diags = append(diags, CheckOnError(w.ErrorAt, w.WarningAt, w.Settings.OnError, c.ProjectDir, c.File)...)
 	diags.Sort()
 	return diags, nil
 }
@@ -72,6 +73,7 @@ func CheckPipeline(p *model.Pipeline, diags model.Errors, registry *transform.Re
 	diags = append(diags, p.CheckSQL(TransformSQLField(registry))...)
 	if project != nil {
 		diags = append(diags, checkConnectionRefs(pipelineSteps(p, registry), project)...)
+		diags = append(diags, CheckOnError(p.ErrorAt, p.WarningAt, p.Settings.OnError, project.Dir, "")...)
 	}
 	if !diags.HasErrors() && registry != nil {
 		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: registry})...)

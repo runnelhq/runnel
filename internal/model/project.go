@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -59,6 +60,8 @@ type ProjectSettings struct {
 	MaxConcurrentRuns int `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty" doc:"Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit" schema:"default=0"`
 	// History controls the run history of the project (ADR 0026).
 	History HistorySettings `yaml:"history,omitempty" json:"history,omitzero" doc:"Run history of the project: which runs are kept"`
+	// OnError is the workflow started after a failed run (ADR 0027), relative to the project.
+	OnError string `yaml:"onError,omitempty" json:"onError,omitempty" doc:"Workflow started when a run of the project fails (not for runs in the editor), relative to the project; it gets the FAILED_… parameters it declares. A workflow or pipeline can set its own or none" schema:"example=workflows/on-error.workflow.yaml"`
 }
 
 // Limits of the run history (ADR 0026, S26c).
@@ -288,6 +291,11 @@ func (p *Project) validate() Errors {
 	default:
 		errs = append(errs, p.src.errorf("$.settings.history.cli", "invalid history %q (expected all, errors or none)", p.Settings.History.CLI))
 	}
+	if p.Settings.OnError == OnErrorNone {
+		errs = append(errs, p.src.errorf("$.settings.onError", "onError: none is only for workflows and pipelines (to turn off the setting of the project); leave settings.onError out instead"))
+	} else if msg := CheckOnErrorPath(p.Settings.OnError); msg != "" {
+		errs = append(errs, p.src.errorf("$.settings.onError", "%s", msg))
+	}
 	errs = append(errs, checkVariables(p.src, p.Variables)...)
 	errs = append(errs, checkReferenceSyntax(p.src)...)
 	errs = append(errs, checkSecretStore(p.src, p.SecretStore)...)
@@ -405,4 +413,60 @@ func VarContexts(w *Workflow, p *Project, only string, params map[string]string)
 		contexts[i] = VarContext{Environment: name, Scope: Scope(w, p, p.Environments[name], params)}
 	}
 	return contexts, nil
+}
+
+// OnErrorNone in settings.onError of a workflow or pipeline turns off the error workflow
+// of the project for it (ADR 0027).
+const OnErrorNone = "none"
+
+// CheckOnErrorPath checks the syntax of settings.onError (ADR 0027): a path relative to
+// the project (ADR 0020) of a workflow file. It returns a message, or "" if it is fine.
+// Whether the file exists is checked against the project (runs.CheckOnError).
+func CheckOnErrorPath(value string) string {
+	if value == "" || value == OnErrorNone {
+		return ""
+	}
+	switch {
+	case strings.Contains(value, "${") || strings.Contains(value, "{{"):
+		return fmt.Sprintf("onError %q: variables and expressions are not allowed here; give the path of a workflow of the project", value)
+	case filepath.IsAbs(value) || strings.HasPrefix(slash(value), "/") || len(value) > 1 && value[1] == ':' ||
+		slices.Contains(strings.Split(slash(value), "/"), ".."):
+		return fmt.Sprintf("onError %q must be a path inside the project, relative to its directory (e.g. workflows/on-error.workflow.yaml)", value)
+	case !strings.HasSuffix(value, ".workflow.yaml"):
+		return fmt.Sprintf("onError %q must be a workflow file (*.workflow.yaml), not a pipeline or another file", value)
+	}
+	return ""
+}
+
+// OnErrorTarget returns the workflow to start after a failed run (ADR 0027): the
+// setting of the file (none: no workflow), else that of the project; "" if none or if
+// the setting is invalid (CheckOnErrorPath), e.g. of a project with errors. The path is
+// relative to the project with "/".
+func OnErrorTarget(project *Project, file string) string {
+	if file == "" && project != nil {
+		file = project.Settings.OnError
+	}
+	if file == "" || file == OnErrorNone || CheckOnErrorPath(file) != "" {
+		return ""
+	}
+	return path.Clean(slash(file))
+}
+
+// slash returns a path with "/" as separator, also for "\" on Linux (files written on Windows).
+func slash(p string) string { return strings.ReplaceAll(p, "\\", "/") }
+
+// ErrorAt creates an error located at a YAML path of project.yaml.
+func (p *Project) ErrorAt(path, format string, args ...any) *Error {
+	if p.src == nil {
+		return &Error{Msg: fmt.Sprintf(format, args...)}
+	}
+	return p.src.errorf(path, format, args...)
+}
+
+// WarningAt creates a warning located at a YAML path of project.yaml.
+func (p *Project) WarningAt(path, format string, args ...any) *Error {
+	if p.src == nil {
+		return &Error{Severity: SeverityWarning, Msg: fmt.Sprintf(format, args...)}
+	}
+	return p.src.warnf(path, format, args...)
 }

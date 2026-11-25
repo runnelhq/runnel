@@ -48,6 +48,9 @@ Parameter, `-v` (oder `--log-level debug`) zeigt zusätzlich Debug-Meldungen und
 zeigt nur Warnungen und Fehler, `--log-format json` gibt jede Zeile als JSON-Objekt aus (z. B. für Splunk oder ELK). Exit-Code: `0` erfolgreich, `1` fehlgeschlagen,
 `2` nicht gestartet (ungültiger Workflow oder Aufruf), `130` abgebrochen – passend für die Windows-Aufgabenplanung.
 Strg+C bricht einen Lauf sauber ab (laufende Actions werden gestoppt); ein zweites Strg+C beendet sofort.
+Scheitert der Lauf und nennt `project.yaml` (oder die Datei selbst) unter `settings.onError` einen Fehler-Workflow,
+läuft dieser danach im selben Environment ([ADR 0027](docs/adr/0027-fehler-workflow.md)); der Exit-Code bleibt der des
+Laufs, `--no-on-error` schaltet ihn ab.
 
 ```bash
 runnel validate examples/hello

@@ -841,10 +841,43 @@ type Transform interface {
 - Globales Limit gleichzeitiger Runs (`settings.maxConcurrentRuns` in `project.yaml`), zusätzlich pro Workflow
   (`settings.maxConcurrentRuns`). Seit S37 wird ein Start über dem Limit abgelehnt (Editor/API: `429`, Trigger: Meldung
   im Server-Log); eine Warteschlange, die ihn später startet, steht im Backlog.
+  Fehler-Workflows (6.5) zählen nicht mit und werden nicht abgelehnt.
 - Prioritäten (manuell > HTTP-Trigger > zeitgesteuerte Trigger) – mit der Run-Queue (Backlog).
 - Graceful Shutdown: Dienst-Stopp wartet konfigurierbar auf laufende Runs (`--stop-timeout`, beim Dienst Standard 30 s,
   bei `runnel serve` 0), startet in der Zeit keine neuen und bricht danach ab – Status `cancelled` (seit S41; Fortsetzen
   abgebrochener Runs folgt mit der Run-Historie).
+
+### 6.5 Fehler-Workflow
+
+Festgelegt in [ADR 0027](adr/0027-fehler-workflow.md) (seit S72a): `settings.onError` in `project.yaml` nennt einen
+Workflow des Projekts (Pfad relativ zum Projekt), der nach jedem fehlgeschlagenen Lauf startet; ein Workflow oder eine
+Pipeline kann unter `settings.onError` einen anderen nennen oder mit `none` abschalten.
+
+```yaml
+# project.yaml
+settings:
+  onError: workflows/fehler-melden.workflow.yaml
+```
+
+- **Wann:** Ein Lauf aus einem Trigger, dem Dienst oder `runnel run` endet mit `failed` – auch, wenn er schon vor dem
+  Start scheitert (z. B. fehlendes Secret oder Parameter), sobald die Datei bekannt ist. Nicht bei `cancelled`, nicht
+  für Läufe aus dem Editor (auch nicht „Run target now“), nicht für Unterläufe (`core.run-workflow`,
+  `core.run-pipeline`; deren Fehler meldet der Aufrufer) und nie für einen Fehler-Lauf selbst. Ein Start über
+  `settings.maxConcurrentRuns` und das Beenden des Servers lösen ihn nicht aus.
+- **Parameter:** Nur die, die der Fehler-Workflow deklariert: `FAILED_RUN` (leer, wenn der Lauf nicht startete),
+  `FAILED_PATH`, `FAILED_NAME`, `FAILED_ACTION` (erste fehlgeschlagene Action bzw. Transform), `FAILED_ERROR` (maskiert),
+  `FAILED_TRIGGER`, `FAILED_STARTED`, `FAILED_FINISHED` (RFC 3339). Er läuft im Environment des fehlgeschlagenen Laufs;
+  dessen Parameter gehen nicht über.
+- **Server und Dienst:** höchstens ein Fehler-Lauf gleichzeitig, bis zu 20 Fehler warten; weitere werden mit der
+  Warnung `on-error queue full: …` im Server-Log verworfen. Beim Beenden läuft ein laufender Fehler-Lauf wie andere
+  Läufe zu Ende (`--stop-timeout`), wartende werden verworfen und im Log genannt. `settings.maxConcurrentRuns` zählt
+  Fehler-Läufe nicht.
+- **`runnel run`:** Der Fehler-Workflow läuft danach synchron im selben Prozess (stderr: `on error: started …` und das
+  Ergebnis); der Exit-Code bleibt der des Laufs. `--no-on-error` schaltet ihn ab.
+- **Historie:** Auslöser `error`, Eltern-Lauf (`parent`, Spalte `parent_id`) ist der fehlgeschlagene Lauf.
+- **Prüfung:** `validate` und der Editor melden an `settings.onError`: Datei fehlt oder ist kein Workflow, weitere
+  Pflichtparameter, `FAILED_*` mit anderem Typ als `string`; ein Workflow, der sich selbst nennt, bekommt eine
+  Warnung (dort gilt dann die Einstellung des Projekts).
 
 ---
 

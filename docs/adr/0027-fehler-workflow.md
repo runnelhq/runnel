@@ -116,3 +116,19 @@ Workflow nutzen, der einen Teil davon braucht:
 
 Umsetzung: **S72a** Modell, Prüfung, Ausführung in Server, Dienst und CLI, Historie; **S72b** Felder im Editor,
 Verweise in der Liste der Läufe, Beispiel `examples/hello/workflows/on-error.workflow.yaml`.
+
+## Nachtrag 2026-11-25 (S72a): Grenzfälle
+
+- **Editor:** Auch „Run target now“ (`POST /runs` mit `trigger`) startet keinen Fehler-Workflow, obwohl der Lauf den
+  Auslöser des Triggers trägt: Er wird im Editor gestartet, der Fehler ist dort sichtbar.
+- **Vor dem Start:** Gemeldet wird jeder Fehler der Vorbereitung, sobald die Datei gelesen ist (Feldfehler,
+  Parameter, Environment, Secrets); nicht gemeldet werden das Limit `settings.maxConcurrentRuns`, das Beenden des
+  Servers und eine Zieldatei, die sich nicht lesen lässt. `FAILED_RUN` und `parent` sind dann leer. Bei `runnel run`
+  bleibt der Exit-Code `2`.
+- **`none` in `project.yaml`** ist ein Fehler (es gibt dort nichts abzuschalten). Pfade mit `..`, absolute Pfade,
+  Variablen und andere Dateien als `*.workflow.yaml` sind Fehler der Datei; eine ungültige Einstellung (z. B. eines
+  Projekts mit Fehlern) startet keinen Fehler-Workflow.
+- **Selbstbezug:** Nennt ein Workflow sich selbst als `onError`, gilt für ihn die Einstellung des Projekts.
+- **Ausgabe in `runnel run`:** Das Log des Fehler-Laufs erscheint wie das des Laufs auf stdout, die Zeilen
+  `on error: started …` und das Ergebnis auf stderr. Er wird wie der Lauf in der Historie gehalten (`--history`,
+  `settings.history.cli`).

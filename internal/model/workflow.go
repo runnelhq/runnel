@@ -85,6 +85,9 @@ type Output struct {
 type WorkflowSettings struct {
 	Timeout           Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	MaxConcurrentRuns int      `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty"`
+	// OnError is the workflow started when a run fails (ADR 0027), relative to the
+	// project; none turns off that of the project; empty: that of the project.
+	OnError string `yaml:"onError,omitempty" json:"onError,omitempty" doc:"Workflow started when a run of this workflow fails, relative to the project; none: no error workflow; empty: the one of project.yaml"`
 }
 
 // Action is a step of a workflow.
@@ -324,6 +327,9 @@ func (w *Workflow) validate() error {
 	duration("$.settings.timeout", "settings.timeout", w.Settings.Timeout)
 	if w.Settings.MaxConcurrentRuns < 0 {
 		add("$.settings.maxConcurrentRuns", "maxConcurrentRuns must not be negative")
+	}
+	if msg := CheckOnErrorPath(w.Settings.OnError); msg != "" {
+		add("$.settings.onError", "%s", msg)
 	}
 
 	for i, a := range w.Actions {
