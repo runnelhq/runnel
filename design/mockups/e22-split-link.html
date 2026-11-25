@@ -1,0 +1,623 @@
+<!doctype html>
+<!--
+  Mockup E22 – Split a link: a new step is inserted between two steps (A → B becomes
+  A → New → B), in two ways:
+  1. Drag and drop: a step dragged from the palette onto an existing link. While dragging, the
+     link under the pointer is highlighted and a ghost of the new step sits on it.
+  2. Link menu: a click on a link opens its menu (E6b, S23b) with the new entry "Insert step…";
+     it shows a search field and the matching types of the palette in the same popover
+     (↑↓ and Enter choose, Esc closes). Types that can't go between two steps are not listed.
+  Either way the step is placed in the middle of the link, snapped to the grid, and one Undo
+  removes it again. What belongs to A stays on the first link (workflow condition `when`,
+  pipeline error link), what belongs to B stays on the second (pipeline info link). Types
+  without an input or an output (core.start, inputs, outputs) can't be inserted: dropped on a
+  link, the link stays as it is and the step is placed freely. Nodes are not shifted.
+  Builds on the approved mockups E6a/E6b (editing, palette), E7 (panel), E16 (canvas, hints),
+  S25a (pipelines) and S23b (info links). Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                 (default light)
+    state = drag | menu | inserted | pipeline | blocked  (default drag)
+    controls = 0                                    hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>split a link – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5;
+    color: var(--foreground); background: var(--background); -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  code, .mono { font-family: var(--rn-font-mono); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
+          stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (as approved in mockup E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 248px 1fr 320px; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4);
+           border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border);
+               border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent;
+                      padding: 3px 8px; border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs);
+                      color: var(--muted-foreground); cursor: pointer; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { background: var(--sidebar); color: var(--sidebar-foreground); border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; height: 36px; padding: 0 16px; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .k { color: var(--muted-foreground); }
+  .row.selected .k { color: var(--accent-foreground); }
+  .row .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .tab .dirty { width: 18px; text-align: center; color: var(--foreground); font-size: 10px; }
+  .filebar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); white-space: nowrap; }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; }
+  .btn svg.i { width: 14px; height: 14px; }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn .play { color: var(--status-success); }
+  .icon-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--input);
+              border-radius: var(--rn-radius-md); background: var(--background); color: var(--foreground); }
+  .icon-btn[disabled] { color: var(--muted-foreground); opacity: .5; }
+  .group { display: inline-flex; gap: 4px; }
+  .splitbtn { display: inline-flex; }
+  .splitbtn .btn:first-child { border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md); }
+  .splitbtn .btn:last-child { border-radius: 0 var(--rn-radius-md) var(--rn-radius-md) 0; border-left: 0; padding: 0 6px; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+  footer .dirty { color: var(--foreground); }
+
+  /* Canvas (design/README.md, 6.1 "Canvas-Konventionen") */
+  .work { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .canvas {
+    position: relative; flex: 1; overflow: hidden; background-color: var(--canvas);
+    background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1.2px);
+    background-size: 16px 16px;
+  }
+  .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  svg.edges { position: absolute; left: 0; top: 0; overflow: visible; }
+  .edge { fill: none; stroke-width: 2; }
+  .edge.success { stroke: var(--link-success); }
+  .edge.failure { stroke: var(--link-failure); }
+  .edge.always { stroke: var(--link-always); }
+  .edge-label {
+    position: absolute; transform: translate(-50%, -50%);
+    display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+    border-radius: var(--rn-radius-full); background: var(--card); border: 1.5px solid currentColor;
+    font-size: 11px; font-weight: 700; line-height: 1;
+  }
+  .edge-label.success { color: var(--link-success); }
+  .edge-label.failure { color: var(--link-failure); }
+  .edge-label.always { color: var(--link-always); }
+
+  .node {
+    position: absolute; width: 176px; height: 52px; display: flex; align-items: center; gap: 10px;
+    padding: 0 12px 0 10px; background: var(--node); border: 1px solid var(--node-border);
+    border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-sm); cursor: grab;
+  }
+  .node.selected { outline: 2px solid var(--node-selected); outline-offset: 1px; }
+  .tile { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-allgemein); color: var(--rn-tiefe-0); flex: none; }
+  .node .text { min-width: 0; line-height: 1.25; }
+  .node .id { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .type { font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); color: var(--muted-foreground); white-space: nowrap; }
+  .port { position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+          background: var(--node); border: 1.5px solid var(--node-border); }
+  .port.in { left: -5px; }
+  .port.out { right: -5px; }
+  .port.error-src { border-color: var(--link-failure); }
+
+  .controls-panel { position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column;
+                    background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-md);
+                    box-shadow: var(--rn-shadow-sm); overflow: hidden; }
+  .controls-panel button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; background: transparent;
+                           color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+  .controls-panel button:last-child { border-bottom: 0; }
+  .zoom { position: absolute; left: 56px; bottom: 16px; height: 22px; padding: 0 8px; display: inline-flex; align-items: center;
+          background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-sm);
+          font: 11px var(--rn-font-mono); color: var(--muted-foreground); }
+
+  /* Palette and ghost (E6b) */
+  aside.split { display: flex; flex-direction: column; min-height: 0; }
+  aside.split .tree { flex: none; }
+  .palette { margin-top: 8px; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; min-height: 0; }
+  .search { display: flex; align-items: center; gap: 6px; margin: 0 12px 8px; height: 28px; padding: 0 8px;
+            border: 1px solid var(--input); border-radius: var(--rn-radius-md); background: var(--background); color: var(--muted-foreground); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; color: var(--foreground); }
+  .search kbd { font: 10px var(--rn-font-mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
+  .palette .group { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 16px; font-weight: 600; font-size: var(--rn-text-xs); }
+  .palette .group .count { margin-left: auto; }
+  .palette .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .items { list-style: none; margin: 0; padding: 0 8px; }
+  .item { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: var(--rn-radius-md); cursor: grab; }
+  .item:hover, .item.dragging { background: var(--sidebar-accent); }
+  .item.dragging { outline: 1px dashed var(--node-selected); }
+  .item.disabled { opacity: .45; cursor: not-allowed; }
+  .item .tile { width: 22px; height: 22px; border-radius: var(--rn-radius-sm); }
+  .item .tile svg.i { width: 13px; height: 13px; }
+  .item .t { line-height: 1.2; }
+  .item .t small { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .palette-hint { margin: 8px 16px; font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .ghost { position: absolute; opacity: .7; border-style: dashed !important; border-color: var(--node-selected) !important; box-shadow: var(--rn-shadow-md); pointer-events: none; }
+  .cursor { position: absolute; width: 18px; height: 18px; pointer-events: none; color: var(--foreground); }
+  .port.source { border-color: var(--node-selected); background: var(--node-selected); }
+
+  /* Pipelines (S25a) */
+  .tile.cat-input { background: var(--rn-kategorie-eingabe); }
+  .tile.cat-transform { background: var(--rn-kategorie-transformation); }
+  .tile.cat-flow { background: var(--rn-kategorie-fluss); }
+  .tile.cat-combine { background: var(--rn-kategorie-transformation); }
+  .tile.cat-output { background: var(--rn-kategorie-ausgabe); }
+  .tile.cat-general { background: var(--rn-kategorie-allgemein); }
+  .tile.cat-network { background: var(--rn-kategorie-netzwerk); }
+  .tile.cat-execution { background: var(--rn-kategorie-ausfuehrung); }
+  .edge.data { stroke: var(--link-always); }
+  .edge.error { stroke: var(--link-failure); stroke-dasharray: 7 4; }
+  .edge-label.error { color: var(--link-failure); }
+
+  /* Toast (E6a, E16) */
+  .toast { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: inline-flex; align-items: center;
+           gap: 12px; height: 36px; padding: 0 6px 0 14px; background: var(--card); color: var(--card-foreground);
+           border: 1px solid var(--border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-sm);
+           white-space: nowrap; }
+  .toast .btn { height: 26px; }
+  .toast .sym { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+                font-size: 10px; font-weight: 700; color: var(--rn-tiefe-0); flex: none; }
+  .toast .sym.ok { background: var(--success); }
+  .toast .sub { color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+
+  /* Properties (E7) */
+  .props { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--background); }
+  .props .panel-title { justify-content: space-between; padding-right: 8px; border-bottom: 1px solid var(--border); flex: none; }
+  .props-scroll { overflow: auto; flex: 1; padding: 0 0 16px; }
+  .ph { display: flex; gap: 10px; align-items: center; padding: 14px 16px 6px; }
+  .ph .tile { width: 32px; height: 32px; }
+  .ph h3 { margin: 0; font-size: var(--rn-text-base); font-weight: 600; line-height: 1.2; }
+  .ph .t { font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .ph-desc { margin: 0 16px 8px; color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .section { border-top: 1px solid var(--border); margin-top: 8px; }
+  .section > h4 { display: flex; align-items: center; gap: 6px; margin: 0; height: 34px; padding: 0 16px;
+                  font-size: var(--rn-text-xs); font-weight: 600; }
+  .section > h4 .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .field { padding: 0 16px; margin-bottom: 12px; }
+  .field > label { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; font-size: var(--rn-text-xs); font-weight: 500; }
+  .field > label .req { color: var(--destructive); }
+  .field > label .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); font-weight: 400; }
+  .input { display: flex; align-items: center; width: 100%; min-height: 30px; padding: 0 8px; border: 1px solid var(--input);
+           border-radius: var(--rn-radius-md); background: var(--background); color: var(--foreground); font: inherit;
+           white-space: nowrap; overflow: hidden; }
+  .input.mono { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); }
+  .input.placeholder { color: var(--muted-foreground); }
+  .input.area { align-items: flex-start; min-height: 64px; padding: 6px 8px; white-space: pre-wrap; }
+  .select { justify-content: space-between; }
+  .select svg.i { width: 14px; height: 14px; color: var(--muted-foreground); }
+  .note { margin: 0 16px 12px; padding: 8px 10px; border-radius: var(--rn-radius-md); background: var(--muted);
+          font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+
+  /* Problems panel below the canvas (collapsed) */
+  .bottom { flex: none; border-top: 1px solid var(--border); background: var(--background); }
+  .bottom .tabs2 { display: flex; align-items: center; height: 32px; padding: 0 8px; gap: 2px; }
+  .bottom .tabs2 .t2 { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--rn-radius-sm);
+                       font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .bottom .chev { width: 12px; height: 12px; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+                   font: 12px/1 var(--rn-font-mono); background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+
+  /* Link menu (E6b, S23b) */
+  .edge.selected { stroke-width: 3.5; }
+  .edge-label.selected { outline: 2px solid var(--node-selected); outline-offset: 2px; }
+  .menu { position: absolute; width: 252px; padding: 4px; background: var(--popover); color: var(--popover-foreground);
+          border: 1px solid var(--border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-sm); }
+  .menu .mi { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: var(--rn-radius-sm); }
+  .menu .mi.active { background: var(--accent); color: var(--accent-foreground); }
+  .menu .mi .sym { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font-size: 10px; font-weight: 700; background: var(--card); }
+  .menu .mi .k { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .menu .mi svg.i { width: 15px; height: 15px; }
+  .menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+  .menu .danger { color: var(--destructive); }
+  /* "Insert step…" opened in the same popover: search field and the matching types */
+  .menu .mi.open { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .menu .search { margin: 6px 4px 4px; }
+  .menu .search .caret { width: 1px; height: 14px; background: var(--foreground); margin-left: -5px; }
+  .menu .pick { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px; border-radius: var(--rn-radius-sm); }
+  .menu .pick.active { background: var(--accent); color: var(--accent-foreground); }
+  .menu .pick .tile { width: 22px; height: 22px; border-radius: var(--rn-radius-sm); }
+  .menu .pick .tile svg.i { width: 13px; height: 13px; }
+  .menu .pick .t { line-height: 1.2; }
+  .menu .pick .t small { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .menu .pick mark { background: none; color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+  .menu .foot { display: flex; gap: 10px; padding: 6px 8px 4px; margin-top: 2px; border-top: 1px solid var(--border);
+                font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .menu .foot kbd { font: 10px var(--rn-font-mono); padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
+
+  /* Split a link (E22) */
+  /* The link under the dragged step: a halo in the ring colour under the link, the link itself thicker.
+     Its own colour, dash and symbol stay, so the kind of link stays visible. */
+  .edge.drop-halo { stroke: var(--ring); stroke-width: 12; stroke-opacity: .3; stroke-linecap: round; stroke-dasharray: none; }
+  .edge.drop { stroke-width: 3.5; }
+  .edge-label.drop { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 30%, transparent); }
+  .port.drop { border-color: var(--ring); background: var(--ring); }
+  .ghost .port { border-color: var(--node-selected); border-style: dashed; }
+  /* Hint next to the pointer while dragging */
+  .drop-hint { position: absolute; display: inline-flex; flex-direction: column; gap: 4px; padding: 6px 10px;
+               background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border);
+               border-radius: var(--rn-radius-md); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs);
+               white-space: nowrap; pointer-events: none; }
+  .drop-hint.insert { border-color: var(--ring); }
+  .drop-hint .line1 { display: inline-flex; align-items: center; gap: 6px; }
+  .drop-hint .line1 svg.i { width: 14px; height: 14px; color: var(--ring); }
+  .drop-hint.free .line1 svg.i { color: var(--muted-foreground); }
+  .drop-hint .mono { font-size: var(--rn-text-2xs); font-weight: 600; }
+  .drop-hint small { color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  /* The links the drop creates, as a small legend: line sample with the symbol of the link */
+  .result { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .result svg { width: 26px; height: 10px; overflow: visible; }
+  .result .s { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor;
+               font-size: 8px; font-weight: 700; background: var(--card); }
+  .result .s.error { color: var(--link-failure); }
+  .result .s.data { color: var(--link-always); }
+  .result b { color: var(--foreground); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E22</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="drag" href="#">drag</a> <a data-state="menu" href="#">menu</a> <a data-state="inserted" href="#">inserted</a>
+  <a data-state="pipeline" href="#">pipeline</a> <a data-state="blocked" href="#">blocked</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>orders</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\orders</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside class="split">
+      <div class="panel-title label">Explorer</div>
+      <ul class="tree" id="tree"></ul>
+      <section class="palette" aria-label="Palette">
+        <div class="panel-title label">Palette</div>
+        <label class="search">
+          <svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+          <input id="search" aria-label="Search">
+          <kbd>/</kbd>
+        </label>
+        <div id="palette"></div>
+      </section>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div class="work">
+        <div class="canvas" id="canvas"></div>
+        <div class="bottom" id="bottom"></div>
+      </div>
+    </main>
+    <section class="props" aria-label="Properties">
+      <div class="panel-title"><span class="label">Properties</span>
+        <button class="icon-btn" style="border:0" title="Hide properties" aria-label="Hide properties">×</button></div>
+      <div class="props-scroll" id="props"></div>
+    </section>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = ["drag", "menu", "inserted", "pipeline", "blocked"].includes(params.get("state")) ? params.get("state") : "drag";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const down = icon('<path d="M6 9l6 6 6-6"/>', 14);
+  const play = '<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
+  const undoIcon = '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>';
+  const info = '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>';
+  const split = '<path d="M3 12h5M16 12h5"/><rect x="8" y="8" width="8" height="8" rx="1.5"/>';
+  // Icons as in web/src/components/Icons.tsx.
+  const icons = {
+    "core.start": '<path d="M8 5l11 7-11 7z" fill="currentColor"/>',
+    "core.check": '<path d="M12 3l9 9-9 9-9-9zM8.5 12l2.5 2.5 4.5-5"/>',
+    "core.log": '<path d="M5 6h14M5 12h14M5 18h9"/>',
+    "core.wait": '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    "core.dummy": '<path d="M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="5" stroke-dasharray="2.6 2.2"/>',
+    "http.request": '<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',
+    "mail.send": '<rect x="3" y="5" width="14" height="11" rx="1.5"/><path d="M3 6.5l7 5 7-5M14 19.5h7.5M18.5 16.5l3 3-3 3"/>',
+    "core.run-workflow": '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    "csv.input": '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h6"/>',
+    "csv.output": '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v7M9 15l3 3 3-3"/>',
+    "core.generate-rows": '<path d="M4 6h16M4 12h16M4 18h16"/><path d="M19 3v6M16 6h6"/>',
+    "core.calculate": '<path d="M9 4c-2 0-3 1-3 3v2.5C6 11 5 12 3.5 12 5 12 6 13 6 14.5V17c0 2 1 3 3 3M15 4c2 0 3 1 3 3v2.5c0 1.5 1 2.5 2.5 2.5-1.5 0-2.5 1-2.5 2.5V17c0 2-1 3-3 3"/><path d="M10 12h4M12 10v4"/>',
+    "core.convert": '<path d="M5 8h11l-3-3M19 16H8l3 3"/>',
+    "core.filter": '<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',
+    "core.select-fields": '<path d="M5 6h14M5 12h9M5 18h5"/><path d="M17 15l2 2 3-4"/>',
+  };
+  const category = {
+    "core.start": "general", "core.check": "general", "core.log": "general", "core.wait": "general", "core.dummy": "general",
+    "http.request": "network", "mail.send": "network", "core.run-workflow": "execution",
+    "csv.input": "input", "core.generate-rows": "input", "csv.output": "output",
+    "core.calculate": "transform", "core.convert": "transform", "core.filter": "transform", "core.select-fields": "transform",
+  };
+  const symbols = { success: "✔", failure: "✖", always: "∞", error: "✖" };
+  const whenText = { success: "On success", failure: "On failure", always: "Always" };
+
+  const pipeline = state === "pipeline" || state === "blocked";
+  const dirty = state === "inserted";
+  const file = pipeline ? "customers.pipeline.yaml" : "nightly.workflow.yaml";
+
+  // Explorer
+  const kind = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    pl: '<path d="M3 7h5l3 5-3 5H3"/><path d="M11 12h10M17 8l4 4-4 4"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  };
+  const files = [["folder", "data", 0, "2", false], ["folder", "pipelines", 0, "2", true],
+                 ["pl", "customers.pipeline.yaml", 1], ["pl", "orders.pipeline.yaml", 1],
+                 ["folder", "workflows", 0, "2", true], ["wf", "import.workflow.yaml", 1], ["wf", "nightly.workflow.yaml", 1],
+                 ["proj", "project.yaml", 0]];
+  document.getElementById("tree").innerHTML = files.map(([k, n, d, c, open]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === file ? "selected" : ""}">` +
+    (k === "folder" ? (open ? chev : chevRight) : `<span style="width:12px"></span>`) +
+    `<span class="k">${icon(kind[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}</div></li>`).join("");
+
+  // Palette: actions in a workflow (E6b), transforms by category in a pipeline (S25a).
+  const dragged = { drag: "core.log", pipeline: "core.calculate", blocked: "csv.input" }[state];
+  document.getElementById("search").placeholder = pipeline ? "Search transforms" : "Search actions";
+  const groups = pipeline ? [
+    ["Input", [["csv.input", "CSV Input"], ["core.generate-rows", "Generate Rows"]], true, 4],
+    ["Transform", [["core.calculate", "Calculate"], ["core.convert", "Convert Types"], ["core.filter", "Filter"], ["core.select-fields", "Select Fields"]], true, 8],
+    ["Flow", [], false, 2], ["Combine", [], false, 6], ["Output", [], false, 6],
+  ] : [
+    ["General", [["core.check", "Check Condition"], ["core.dummy", "Dummy"], ["core.log", "Log"], ["core.start", "Start"], ["core.wait", "Wait"]], true, 8],
+    ["Files", [], false, 9], ["Network", [], false, 4], ["Execution", [], false, 2],
+  ];
+  document.getElementById("palette").innerHTML = groups.map(([g, items, open, n]) =>
+    `<div class="group">${open ? chev : chevRight}${g}<span class="count">${n}</span></div>` +
+    (open ? `<ul class="items">${items.map(([t, label]) => {
+      const disabled = t === "core.start";
+      return `<li class="item ${disabled ? "disabled" : ""} ${t === dragged ? "dragging" : ""}" title="${disabled ? "The workflow already has a start action" : `${label} – drag onto the canvas or onto a link`}">` +
+        `<span class="tile cat-${category[t]}">${icon(icons[t])}</span><span class="t">${label}<small>${t}</small></span></li>`;
+    }).join("")}</ul>` : "")).join("") +
+    `<p class="palette-hint">Drag onto the canvas, or onto a link to insert it between two steps.</p>`;
+
+  // Tabs and file bar
+  document.getElementById("tabs").innerHTML =
+    (pipeline ? "" : `<div class="tab">${icon(kind.wf)} import.workflow.yaml ×</div>`) +
+    `<div class="tab active">${icon(pipeline ? kind.pl : kind.wf)} ${file} ${dirty ? '<span class="dirty" title="Unsaved changes">●</span>' : "×"}</div>`;
+  document.getElementById("filebar").innerHTML = `
+    <span class="crumbs" title="${pipeline ? "pipelines" : "workflows"}/${file}"><b>${file}</b></span>
+    <button class="icon-btn" style="border:0;width:22px;height:22px" title="Copy path" aria-label="Copy path">${icon('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>', 13)}</button>
+    <div class="spacer"></div>
+    <span class="splitbtn"><button class="btn" title="Run with dev (F5)"><span class="play">${icon(play, 14)}</span>Run</button>
+      <button class="btn" title="Run with other values…" aria-label="Run with other values">${down}</button></span>
+    <div class="group">
+      <button class="icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo" ${dirty ? "" : "disabled"}>${icon(undoIcon, 14)}</button>
+      <button class="icon-btn" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>${icon('<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>', 14)}</button>
+    </div>
+    <button class="btn primary" title="Save (Ctrl+S)" ${dirty ? "" : 'style="opacity:.5"'}>${icon('<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/>', 14)}Save</button>
+    <div class="segmented" role="group" aria-label="View">
+      <button aria-pressed="true">${icon(pipeline ? kind.pl : kind.wf, 14)}Canvas</button>
+      <button aria-pressed="false">${icon('<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>', 14)}YAML</button>
+    </div>`;
+
+  // The graphs. Workflow nightly: check fails → notify by mail; pipeline customers: read → types → write,
+  // the records that read can't parse go over the error link to rejected.
+  const workflow = {
+    nodes: [
+      { id: "start", type: "core.start", x: 0, y: 208 }, { id: "fetch", type: "http.request", x: 224, y: 208 },
+      { id: "check", type: "core.check", x: 448, y: 208 }, { id: "report", type: "core.log", x: 912, y: 64 },
+      { id: "notify", type: "mail.send", x: 912, y: 416 }],
+    edges: [["start", "fetch", "success"], ["fetch", "check", "success"], ["check", "report", "success"], ["check", "notify", "failure"]],
+  };
+  const customers = {
+    nodes: [
+      { id: "read", type: "csv.input", x: 0, y: 144 }, { id: "types", type: "core.convert", x: 288, y: 144 },
+      { id: "write", type: "csv.output", x: 720, y: 144 }, { id: "rejected", type: "csv.output", x: 720, y: 432 }],
+    edges: [["read", "types", "data"], ["types", "write", "data"], ["read", "rejected", "error"]],
+  };
+  const g = structuredClone(pipeline ? customers : workflow);
+  // The link under the pointer [from, to] and where the ghost sits (centre of the link, snapped to 16 px).
+  const target = { drag: ["check", "notify"], pipeline: ["read", "rejected"], blocked: ["types", "write"] }[state];
+  const insertable = state === "drag" || state === "pipeline";
+  if (state === "inserted") {
+    // check →(On failure) log-1 → notify; the old link is gone, one undo step brings it back.
+    g.nodes.push({ id: "log-1", type: "core.log", x: 672, y: 304, selected: true });
+    g.edges = g.edges.filter(([a, b]) => !(a === "check" && b === "notify"));
+    g.edges.push(["check", "log-1", "failure"], ["log-1", "notify", "success"]);
+  }
+  const byId = Object.fromEntries(g.nodes.map(n => [n.id, n]));
+
+  const canvas = document.getElementById("canvas");
+  const W = 176, H = 52, zoom = pipeline ? 0.9 : 0.78, ox = 16, oy = pipeline ? 64 : 72;
+  const stage = document.createElement("div");
+  stage.className = "stage";
+  stage.style.transform = `translate(${ox}px, ${oy}px) scale(${zoom})`;
+  const curve = (x1, y1, x2, y2) => {
+    const dx = Math.max(40, (x2 - x1) / 2);
+    const at = t => { const u = 1 - t; return [u*u*u*x1 + 3*u*u*t*(x1 + dx) + 3*u*t*t*(x2 - dx) + t*t*t*x2, u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2]; };
+    return { d: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`, at };
+  };
+  let svg = `<svg class="edges" width="1200" height="700">`, labels = "", mid = null, menuAt = null;
+  for (const [from, to, type] of g.edges) {
+    const a = byId[from], b = byId[to];
+    const c = curve(a.x + W + 4, a.y + H / 2, b.x - 4, b.y + H / 2);
+    const hot = insertable && target && from === target[0] && to === target[1];
+    if (target && from === target[0] && to === target[1]) mid = c.at(0.5);
+    const sel = state === "menu" && from === "check" && to === "notify" ? "selected" : "";
+    if (hot) svg += `<path class="edge drop-halo" d="${c.d}"/>`;
+    svg += `<path class="edge ${type} ${hot ? "drop" : ""} ${sel}" d="${c.d}"/>`;
+    if (type === "data") continue;
+    // Symbol at 35 % of the curve (from the source), as in E6b.
+    const [mx, my] = c.at(0.35);
+    const title = type === "error" ? "Error link" : `when: ${type}`;
+    if (sel) menuAt = [mx, my];
+    labels += `<span class="edge-label ${type} ${hot ? "drop" : ""} ${sel}" style="left:${mx}px;top:${my}px" title="${title}">${symbols[type]}</span>`;
+  }
+  svg += `</svg>`;
+  const noInput = t => t === "csv.input" || t === "core.start";
+  stage.innerHTML = svg + labels + g.nodes.map(n => {
+    const src = insertable && target && n.id === target[0], dst = insertable && target && n.id === target[1];
+    return `
+    <div class="node ${n.selected ? "selected" : ""}" style="left:${n.x}px;top:${n.y}px">
+      ${noInput(n.type) ? "" : `<span class="port in ${dst ? "drop" : ""}"></span>`}
+      <span class="tile cat-${category[n.type]}">${icon(icons[n.type])}</span>
+      <span class="text"><div class="id">${n.id}</div><div class="type">${n.type}</div></span>
+      <span class="port out ${src ? "drop" : ""}"></span>
+    </div>`;
+  }).join("");
+  canvas.append(stage);
+  canvas.insertAdjacentHTML("beforeend", `<div class="controls-panel">
+      <button title="Zoom in">${icon('<path d="M12 5v14M5 12h14"/>', 14)}</button>
+      <button title="Zoom out">${icon('<path d="M5 12h14"/>', 14)}</button>
+      <button title="Fit to view">${icon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>', 14)}</button>
+    </div><span class="zoom">${Math.round(zoom * 100)} %</span>`);
+
+  // Dragging: the ghost of the new step centred on the pointer (snapped as in the editor), the pointer,
+  // and the hint below the ghost.
+  const px = (x, y) => [ox + x * zoom, oy + y * zoom];
+  const pointer = (x, y) => `<svg class="cursor" viewBox="0 0 24 24" style="left:${x}px;top:${y}px"><path d="M5 3l14 8-6 2-3 6z" fill="currentColor" stroke="var(--background)" stroke-width="1"/></svg>`;
+  const snap = v => Math.round(v / 16) * 16;
+  if (dragged && mid) {
+    const gx = snap(mid[0] - W / 2), gy = snap(mid[1] - H / 2);
+    const id = { "core.log": "log-1", "core.calculate": "calculate-1", "csv.input": "input-1" }[dragged];
+    const [sx, sy] = px(gx, gy);
+    canvas.insertAdjacentHTML("beforeend", `<div class="node ghost" style="left:${sx}px;top:${sy}px;transform:scale(${zoom});transform-origin:0 0">
+        ${noInput(dragged) ? "" : '<span class="port in"></span>'}
+        <span class="tile cat-${category[dragged]}">${icon(icons[dragged])}</span>
+        <span class="text"><div class="id">${id}</div><div class="type">${dragged}</div></span>
+        <span class="port out"></span></div>` + pointer(sx + 70 * zoom, sy + 22 * zoom));
+    const [a, b] = target;
+    const sample = (cls) => `<svg viewBox="0 0 26 10"><path class="edge ${cls}" d="M1,5 H25"/></svg>`;
+    const hint = {
+      drag: `<span class="line1">${icon(split)}Drop to insert between <span class="mono">${a}</span> and <span class="mono">${b}</span></span>
+             <small>The condition stays on the first link: ${symbols.failure} ${whenText.failure}</small>`,
+      pipeline: `<span class="line1">${icon(split)}Drop to insert between <span class="mono">${a}</span> and <span class="mono">${b}</span></span>
+             <span class="result">${sample("error")}<span class="s error">✖</span>error link<span>→</span><b>Calculate</b><span>→</span>${sample("data")}<span class="s data">→</span>data link</span>`,
+      blocked: `<span class="line1">${icon(info)}<span class="mono">csv.input</span> has no input – it can’t go between two steps</span>
+             <small>Drop to place it on the canvas; the link stays as it is</small>`,
+    }[state];
+    // Below the ghost; when blocked above it, so the symbol of the error link below stays visible.
+    const top = state === "blocked" ? sy - 72 : sy + (H + 18) * zoom;
+    canvas.insertAdjacentHTML("beforeend", `<div class="drop-hint ${insertable ? "insert" : "free"}" role="status" style="left:${sx + W * zoom + 24}px;top:${top}px;transform:translateX(-100%)">${hint}</div>`);
+  }
+
+  // The link menu of E6b with the new entry "Insert step…", opened: "lo" typed, two matches, the first one chosen.
+  if (state === "menu") {
+    const [lx, ly] = px(...menuAt);
+    const pick = (t, label, ty, active) => `<div class="pick ${active ? "active" : ""}" role="option" aria-selected="${active}">
+        <span class="tile cat-${category[t]}">${icon(icons[t])}</span><span class="t">${label}<small>${ty}</small></span>
+        ${active ? '<span class="k" style="margin-left:auto;font:10px var(--rn-font-mono);color:var(--muted-foreground)">Enter</span>' : ""}</div>`;
+    canvas.insertAdjacentHTML("beforeend", `<div class="menu" role="menu" aria-label="Link check → notify" style="left:${lx - 270}px;top:${ly - 210}px">
+      <div class="mi"><span class="sym" style="color:var(--link-success)">✔</span>On success</div>
+      <div class="mi"><span class="sym" style="color:var(--link-failure)">✖</span>On failure<span class="k">✓</span></div>
+      <div class="mi"><span class="sym" style="color:var(--link-always)">∞</span>Always</div>
+      <hr>
+      <div class="mi open">${icon(split)}Insert step…</div>
+      <label class="search"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+        <input value="lo" aria-label="Search actions" placeholder="Search actions"><span class="caret"></span></label>
+      <div role="listbox" aria-label="Actions">
+        ${pick("core.log", "<mark>Lo</mark>g", "core.<mark>lo</mark>g", true)}
+        ${pick("core.run-workflow", "Run Workf<mark>lo</mark>w", "core.run-workf<mark>lo</mark>w", false)}
+      </div>
+      <div class="foot"><span><kbd>↑</kbd><kbd>↓</kbd> choose</span><span><kbd>Enter</kbd> insert</span><span><kbd>Esc</kbd> close</span></div>
+      <hr>
+      <div class="mi danger">${icon('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', 14)}Delete link<span class="k">Del</span></div>
+    </div>`);
+  }
+
+  // After the drop: as for deleting (E6a) and pasting (E16), with Undo.
+  if (state === "inserted") {
+    canvas.insertAdjacentHTML("beforeend", `<div class="toast" role="status"><span class="sym ok">✔</span>
+      <span>Inserted <b>log-1</b> between <b>check</b> and <b>notify</b> <span class="sub">· ${symbols.failure} ${whenText.failure} stays on check → log-1</span></span>
+      <button class="btn">${icon(undoIcon, 14)}Undo</button></div>`);
+  }
+
+  // Status bar and the collapsed panel below the canvas
+  const things = pipeline ? "transforms" : "actions";
+  document.getElementById("status").innerHTML =
+    `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>` +
+    `<span>${pipeline ? "Pipeline" : "Workflow"} · ${g.nodes.length} ${things} · ${g.edges.length} links</span>` +
+    (dirty ? `<span class="dirty">● Unsaved changes</span>` : "") +
+    `<span class="spacer"></span><span>Runnel v0.1.0</span>`;
+  document.getElementById("bottom").innerHTML =
+    `<div class="tabs2"><span class="t2">${chevRight}Problems</span><span class="t2">${chevRight}Log</span></div>`;
+
+  // Properties: the new action after the drop, the link in the menu state, otherwise the file (unchanged while dragging).
+  const props = document.getElementById("props");
+  if (state === "inserted") {
+    props.innerHTML = `<div class="ph"><span class="tile cat-general">${icon(icons["core.log"])}</span>
+        <div><h3>Log</h3><div class="t">core.log</div></div></div><p class="ph-desc">Writes a message to the run log</p>
+      <div class="field"><label>ID<span class="req">*</span><span class="key">id</span></label><div class="input">log-1</div></div>
+      <div class="section"><h4>${chev}Configuration</h4>
+        <div class="field"><label>Message<span class="req">*</span><span class="key">message</span></label>
+          <div class="input area mono placeholder">Text for the run log</div></div>
+        <div class="field"><label>Level<span class="key">level</span></label><div class="input select">info${down}</div></div>
+      </div>
+      <div class="section"><h4>${chevRight}Execution</h4></div>`;
+  } else if (state === "menu") {
+    props.innerHTML = `<div class="ph"><span class="tile" style="background:var(--link-failure)">${icon('<path d="M6 6l12 12M18 6L6 18"/>')}</span>
+        <div><h3>Link</h3><div class="t">check → notify</div></div></div>
+      <p class="ph-desc">notify runs when check fails.</p>
+      <div class="field"><label>Condition<span class="key">when</span></label><div class="input select">✖ On failure${down}</div></div>
+      <p class="note">Insert step… puts the chosen step in the middle of this link: check → <b>new step</b> → notify. The condition stays on the first link.</p>`;
+  } else {
+    props.innerHTML = `<div class="ph"><span class="tile cat-${pipeline ? "transform" : "general"}">${icon(pipeline ? kind.pl : kind.wf)}</span>
+        <div><h3>${pipeline ? "customers" : "nightly"}</h3><div class="t">${pipeline ? "Pipeline" : "Workflow"}</div></div></div>
+      <p class="ph-desc">Properties of the ${pipeline ? "pipeline" : "workflow"}, unchanged.</p>`;
+  }
+</script>
+</body>
+</html>
