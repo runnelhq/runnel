@@ -7,6 +7,8 @@ import {
   fieldsList,
   graphOf,
   problemTarget,
+  splitLink,
+  splitNote,
   pasteSteps,
   validate,
   type EntryEdit,
@@ -412,6 +414,17 @@ export function FileView(props: {
     [applyEdit],
   );
   const onRename = useCallback((from: string, to: string) => void applyEdit({ rename: { [from]: to } }), [applyEdit]);
+  // A step between the two ends of a link (mockup E22): one edit, so one step to undo.
+  const onInsert = useCallback(
+    async (action: { id: string; type: string }, link: number, positions: Positions) => {
+      const l = graph?.links?.[link];
+      if (!graph || !l) return;
+      if ((await applyEdit({ add: [action], move: positions, ...splitLink(graph, link, action.id) })) === null) return;
+      setSelection({ actions: [action.id], links: [] });
+      setToast({ text: `Inserted ${action.id} between ${l.from} and ${l.to}`, detail: splitNote(graph, l, action.id) ?? undefined, status: "ok", undo: true });
+    },
+    [applyEdit, graph],
+  );
 
   // Copy, cut and paste (mockup E16): the clipboard holds the YAML text of the steps.
   const copy = useCallback(
@@ -1165,6 +1178,7 @@ export function FileView(props: {
             onAdd={editable ? onAdd : undefined}
             onRename={editable ? onRename : undefined}
             onConnect={editable ? onConnect : undefined}
+            onInsert={editable ? (a, l, p) => void onInsert(a, l, p) : undefined}
             onLinkKind={editable ? onLinkKind : undefined}
             onClipboard={editable ? (op, ids) => void copy(ids, op === "cut") : undefined}
             onPaste={editable ? pasteFromMenu : undefined}

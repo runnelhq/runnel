@@ -79,7 +79,7 @@ test("shows a pipeline as a graph with data and error links", async ({ page }) =
   await expect(palette.getByRole("group", { name: "Input" }).getByTestId("palette-csv.input")).toContainText("CSV Input");
   await expect(palette.getByRole("group", { name: "Combine" }).getByTestId("palette-core.sort")).toBeVisible();
   await expect(palette.getByTestId("palette-core.start")).toHaveCount(0);
-  await expect(palette.getByText("Drag a transform onto the canvas.")).toBeVisible();
+  await expect(palette.getByText("Drag a transform onto the canvas, or onto a link to insert it between two steps.")).toBeVisible();
 });
 
 test("changes the type of a link in the menu and in the panel", async ({ page }) => {

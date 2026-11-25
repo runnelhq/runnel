@@ -520,3 +520,42 @@ export function fieldsList(fields: { name: string; from?: string; type: string; 
     ...(f.format ? [{ key: "format", value: f.format }] : []),
   ]);
 }
+
+/**
+ * Why a type cannot go between two steps (mockup E22), or null if it can: core.start and
+ * pipeline inputs take no input, pipeline outputs pass nothing on.
+ */
+export function cannotInsert(kind: GraphKind, type: string, category: string | undefined): string | null {
+  if (kind === "workflow") return type === "core.start" ? `${type} has no input – it can't go between two steps` : null;
+  if (category === "input") return `${type} has no input – it can't go between two steps`;
+  if (category === "output") return `${type} has no output – it can't go between two steps`;
+  return null;
+}
+
+/**
+ * The edit that splits link index with the new step id (mockup E22): what belongs to the
+ * source (the condition of a workflow link, an error link) stays on the first link, what
+ * belongs to the target (an info link, a loop back to it) on the second.
+ */
+export function splitLink(wf: Workflow, index: number, id: string): Pick<WorkflowEdit, "deleteLinks" | "addLinks"> {
+  const l = wf.links![index];
+  if (wf.kind === "pipeline") {
+    const first: Link = { from: l.from, to: id, type: l.type === "error" ? "error" : "data" };
+    const second: Link = { from: id, to: l.to, type: l.type === "info" ? "info" : "data" };
+    return { deleteLinks: [index], addLinks: [first, second] };
+  }
+  const first: Link = { from: l.from, to: id, ...(l.when ? { when: l.when } : {}), ...(l.disabled ? { disabled: true } : {}) };
+  const second: Link = { from: id, to: l.to, ...(l.loop ? { loop: true } : {}) };
+  return { deleteLinks: [index], addLinks: [first, second] };
+}
+
+/** What stays where after splitting a link, for the hints of mockup E22; null for a plain link. */
+export function splitNote(wf: Workflow, l: Link, id: string): string | null {
+  const kind = kindOfLink(l);
+  if (kind === "error") return `the error link stays on ${l.from} → ${id}`;
+  if (kind === "info") return `the info link stays on ${id} → ${l.to}`;
+  if (kind === "failure") return `On failure stays on ${l.from} → ${id}`;
+  if (kind === "always") return `Always stays on ${l.from} → ${id}`;
+  if (kind === "expression") return `the condition stays on ${l.from} → ${id}`;
+  return wf.kind === "pipeline" || !l.loop ? null : `the loop stays on ${id} → ${l.to}`;
+}

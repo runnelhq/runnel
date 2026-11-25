@@ -118,7 +118,7 @@ export function Palette(props: { target: PaletteTarget | null }) {
           </p>
         )}
         <p className="mx-4 my-2 text-xs text-muted-foreground">
-          {editable ? `Drag ${pipeline ? "a transform" : "an action"} onto the canvas.` : "Open a workflow or pipeline on the canvas to add steps."}
+          {editable ? `Drag ${pipeline ? "a transform" : "an action"} onto the canvas, or onto a link to insert it between two steps.` : "Open a workflow or pipeline on the canvas to add steps."}
         </p>
       </div>
     </section>
