@@ -159,3 +159,20 @@ Betrachtete Varianten:
 
 Umsetzung: **S73a** goja, Action `core.script`, Sandbox, `require`, Beispiel; **S73b** Transform `core.script` mit
 Typen, `fields`, `init`/`end`, Fehler-Link, Benchmark; **S73c** Editor (Hervorhebung, Vervollständigung).
+
+## Nachtrag 2026-11-25 (S73a): Action
+
+- **Code ist Text:** In `script` von `core.script` werden `${…}` und `{{ … }}` weder ersetzt noch geprüft, auch nicht
+  bei der Suche nach Variablen und beim Umbenennen (Felder mit Code: `model.CodeFields`). `file` behält die Prüfung
+  von `shell.powershell`: Der Pfad enthält kein `${…}` und kein `{{ … }}`, damit Werte nicht wählen, welches Skript läuft.
+- **Secrets in `params`:** `params` hat das Format `runnel-params`. Ein Wert, der `${secret:…}` enthält, wird wie ein
+  Feld für ein Secret aufgelöst (nur `${…}`, keine Ausdrücke) und vor dem Lauf gelesen. Tiefer verschachtelte Werte
+  dürfen kein Secret enthalten (Fehler beim Prüfen).
+- **`require`:** Pfade gelten immer relativ zum Projekt, auch in Modulen (`require('./scripts/x.js')`); Module setzen
+  `module.exports` oder `exports`. Skriptdatei und Modul höchstens 4 MiB.
+- **`console`:** `log` und `info` (info), `warn`, `error`; Objekte und Listen als JSON. Eine Zeile ist ein Aufruf.
+- **Meldungen:** `script, line 3: no orders` bzw. mit dem Pfad der Datei; bei anderen Fehlertypen als `Error` mit
+  ihrem Namen (`TypeError: …`). Rekursion über 10.000 Aufrufe ist ein Fehler statt eines Absturzes.
+- **Rückgabe:** ganze Zahlen (bis ±2^53, `BigInt` bis int64) als `int`, andere als `float`; `NaN` und `Infinity`
+  werden leer (wie bei `JSON.stringify`); `Date` als Zeitpunkt; Methoden in Objekten entfallen, eine Funktion oder ein
+  Symbol als Wert ist ein Fehler. `decimal` kommt mit seinen Nachkommastellen als Text (`"12.50"`).

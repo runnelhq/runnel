@@ -24,8 +24,8 @@ Noch vor Version 1.0 (Stand: Phase 0.5 abgeschlossen, siehe [Roadmap](docs/ROADM
 
 - **Workflows** mit den Basis-Actions (`core.start`, `core.log`, `core.wait`, `core.success`, `core.abort`,
   `core.dummy`), Sub-Workflows und Pipelines als Schritt (`core.run-workflow`, `core.run-pipeline`), Datei-Actions
-  (`file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list`, `file.read`, `file.write`) und der Antwort an
-  HTTP-Aufrufer (`http.response`); Ausdrücke `{{ … }}`, `forEach`, Retry und Timeouts.
+  (`file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list`, `file.read`, `file.write`) der Antwort an
+  HTTP-Aufrufer (`http.response`) und JavaScript (`core.script`); Ausdrücke `{{ … }}`, `forEach`, Retry und Timeouts.
 - **Pipelines** mit CSV (`csv.input`, `csv.output`), Filtern, Umwandeln, Verteilen, Sortieren und Gruppieren,
   Datensätzen von und zu Workflows sowie der Antwort an HTTP-Aufrufer (`http.response`).
 - **Editor** im Browser für Workflows und Pipelines, **Trigger** (Zeitplan, Intervall, Ordner, HTTP) und der Betrieb

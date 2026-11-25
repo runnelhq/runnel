@@ -31,15 +31,21 @@ func checkSQL(s *source, isSQL func(path string) bool) Errors {
 	return checkLiteral(s, isSQL, "the statement must not contain ${…} or {{ … }}: write @name and give the value under params, so that values cannot change the statement")
 }
 
-// CheckScript reports ${…} and {{ … }} in the scripts of shell.powershell and their
-// files (format runnel-script, isScript): values come in as params only (ADR 0023).
+// CheckScript reports ${…} and {{ … }} in the scripts of shell.powershell and in the
+// files of scripts (format runnel-script, isScript): values come in as params only (ADR
+// 0023, 0028). The JavaScript of core.script is not checked: there they are plain text.
 func (w *Workflow) CheckScript(isScript func(typ, field string) bool) Errors {
 	types := make([]string, len(w.Actions))
 	for i, a := range w.Actions {
 		types[i] = a.Type
 	}
-	return checkLiteral(w.src, stepSecretPaths("actions", types, isScript),
-		"the script must not contain ${…} or {{ … }}: declare a parameter with param(...) and give the value under params, so that values cannot change the script; for PowerShell variables write $Name or $env:NAME instead of ${…}")
+	const powershell = "shell.powershell"
+	errs := checkLiteral(w.src, stepSecretPaths("actions", types, func(typ, field string) bool {
+		return typ == powershell && isScript(typ, field)
+	}), "the script must not contain ${…} or {{ … }}: declare a parameter with param(...) and give the value under params, so that values cannot change the script; for PowerShell variables write $Name or $env:NAME instead of ${…}")
+	return append(errs, checkLiteral(w.src, stepSecretPaths("actions", types, func(typ, field string) bool {
+		return typ != powershell && isScript(typ, field)
+	}), "the script file must not contain ${…} or {{ … }}: write its path as it is and give values under params, so that values cannot choose the script")...)
 }
 
 // checkLiteral reports ${…} and {{ … }} in fields that are passed as written.

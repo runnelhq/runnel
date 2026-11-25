@@ -438,6 +438,8 @@ const actionIcons: Record<string, ReactNode> = {
     </>
   ),
   "shell.powershell": <path d="M7 5h14l-4 14H3zM8.5 9.5l3 2.5-3 2.5M12.5 15h3" />,
+  // JavaScript (S73a): braces around a dot.
+  "core.script": <path d="M8 4c-2 0-2.5 1-2.5 3v2c0 1.5-.8 3-2.5 3 1.7 0 2.5 1.5 2.5 3v2c0 2 .5 3 2.5 3M16 4c2 0 2.5 1 2.5 3v2c0 1.5.8 3 2.5 3-1.7 0-2.5 1.5-2.5 3v2c0 2-.5 3-2.5 3M12 12h.01" />,
   "mail.send": (
     <>
       <rect x="3" y="5" width="14" height="11" rx="1.5" />

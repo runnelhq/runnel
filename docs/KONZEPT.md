@@ -349,7 +349,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | YAML | `goccy/go-yaml` (Fehlermeldungen mit Zeilennummer, zeilengenaues Bearbeiten über den AST) |
 | JSON Schema | eigenes Paket `internal/schema` (Schemas aus Konfigurations-Structs, ADR 0014); Validierung über Schemas bei Bedarf später |
 | Ausdrücke | `expr-lang/expr` (kompiliert, schnell, ohne Seiteneffekte) |
-| Skript-Bausteine | `dop251/goja` (JavaScript, eingebettet, sandboxbar) |
+| Skript-Bausteine | `dop251/goja` (JavaScript, eingebettet, sandboxbar; seit S73a, [ADR 0028](adr/0028-javascript-core-script.md)) |
 | Exakte Dezimalzahlen | `shopspring/decimal` |
 | Cron | `robfig/cron/v3` |
 | Dateiüberwachung | keine Bibliothek: Polling des Ordners (S38), damit Netzlaufwerke und UNC-Pfade gleich funktionieren |
@@ -892,9 +892,26 @@ Drei Stufen – von einfach bis mächtig:
 
 ### 7.1 Stufe 1: Skript-Actions/-Transforms (JavaScript, eingebettet)
 
-- Action `core.script` (Workflow) und Transform `core.script` (Pipeline) führen JS in **goja** aus. JavaScript gibt es nur hier; `{{ … }}`-Ausdrücke nutzen `expr-lang` ([ADR 0006](adr/0006-ausdruckssprache.md)).
-- Sandbox: kein Dateisystem-/Netzwerkzugriff außer über bereitgestellte APIs (`http`, `fs` – per Projekteinstellung freischaltbar), CPU-Zeitlimit.
-- Wiederverwendbare Skripte in `scripts/` werden über `require('./scripts/utils.js')` geladen.
+Regeln: [ADR 0028](adr/0028-javascript-core-script.md).
+
+- Action `core.script` (Workflow, seit S73a) und Transform `core.script` (Pipeline, S73b) führen JS in **goja** aus
+  (`internal/script`). JavaScript gibt es nur hier; `{{ … }}`-Ausdrücke nutzen `expr-lang`
+  ([ADR 0006](adr/0006-ausdruckssprache.md)). Faustregel: Ausdrücke für Werte und Bedingungen, `core.script` für
+  Logik über mehrere Schritte (Schleifen, Zwischenwerte, verschachteltes JSON umbauen).
+- Action: Code aus `script` oder aus einer `.js`-Datei (`file`, relativ zum Projekt). Der Code ist der Rumpf einer
+  Funktion: Werte kommen nur über `params` hinein (mit `${…}` und `{{ … }}`; ein eigener Wert darf `${secret:…}` sein
+  und wird in Log, Fehlern und Ergebnis maskiert), `return` liefert `result.output`, `console.log`/`warn`/`error`
+  schreiben ins Log des Laufs, eine Exception lässt die Action fehlschlagen (Meldung mit Zeile im Skript).
+  Im Code sind `${…}` und `{{ … }}` nur Text (z. B. Template-Literale) und werden weder ersetzt noch geprüft.
+- Werte: Text, Zahlen, Boolean, Listen und Objekte wie in JSON; `decimal` und `date` kommen als Text (`"12.50"`),
+  ganze Zahlen über ±2^53 als `BigInt`, Zeitpunkte als `Date`. Ganze Zahlen kommen als `int` zurück, andere als `float`.
+- Sandbox: kein Zugriff auf Dateisystem, Netzwerk, Prozesse und Umgebungsvariablen; `http`/`fs` im Skript gibt es in
+  dieser Fassung nicht (ADR 0028). Zeitlimit über `timeout` der Action, Abbruch des Laufs unterbricht das Skript
+  sofort; höchstens 1.000 Zeilen `console.*` je Ausführung (je Zeile 8 KB), Rückgabewert höchstens 16 MiB als JSON.
+  Speicher lässt sich nicht hart begrenzen.
+- Wiederverwendbare Skripte in `scripts/` werden über `require('./scripts/utils.js')` geladen: nur `.js`-Dateien in
+  `scripts/` des Projekts (Pfad relativ zum Projekt, kein `..`, keine Links aus `scripts/` heraus, keine npm-Module),
+  jedes Modul einmal je Ausführung.
 
 ### 7.2 Stufe 2: PowerShell / Shell
 
@@ -1115,7 +1132,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Kategorie | Actions |
 |---|---|
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen (`core.check`, seit S10), Log schreiben, Schleife (ForEach über Liste/Dateien) |
-| Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript, PowerShell (`shell.powershell`, seit S61), Programm starten (`shell.run`, seit S60, [ADR 0023](adr/0023-programme-powershell.md)) |
+| Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript (`core.script`, seit S73a, [ADR 0028](adr/0028-javascript-core-script.md)), PowerShell (`shell.powershell`, seit S61), Programm starten (`shell.run`, seit S60, [ADR 0023](adr/0023-programme-powershell.md)) |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
 | Netzwerk | HTTP-Request (`http.request`, seit S10; mit `http`-Connection für Basis-Adresse und Anmeldung seit S63a, `Retry-After` seit S63b, Paginierung mit `paginate` seit S63c, Download als Datei mit `saveTo` seit S63d), HTTP-Antwort (`http.response`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`: upload, download, list, delete, move, mkdir, exists, wait; Protokoll in der Connection, S57), Mail senden (`mail.send`, seit S62a: über eine `smtp`-Connection, Text und HTML, Anhänge), Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Abfrage in den Workflow (`db.query`, seit S59: Zeilen, Anzahl, erster Wert – deckt auch „Tabelle existiert“ und „Zeilen zählen“ ab) |

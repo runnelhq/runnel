@@ -3,6 +3,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -186,13 +187,14 @@ func (r *Runner) evalWith(a *model.Action, scope *vars.Scope, values map[string]
 	if a.With == nil {
 		return nil, nil
 	}
-	text, secret, literal, program := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
+	text, secret, literal, program, params := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	if d, ok := r.opts.Registry.Descriptor(a.Type); ok && d.Schema != nil {
 		for _, p := range d.Schema.Properties {
 			text[p.Name] = p.Schema.Type == "string"
 			secret[p.Name] = p.Schema.Format == schema.FormatSecret
 			literal[p.Name] = p.Schema.Format == schema.FormatSQL || p.Schema.Format == schema.FormatScript
 			program[p.Name] = p.Schema.Format == schema.FormatProgram
+			params[p.Name] = p.Schema.Format == schema.FormatParams
 		}
 	}
 	out := make(map[string]any, len(a.With))
@@ -225,6 +227,24 @@ func (r *Runner) evalWith(a *model.Action, scope *vars.Scope, values map[string]
 					return nil, fmt.Errorf("%s.%s: %w", k, name, err)
 				}
 				e[name] = val
+			}
+			out[k] = e
+			continue
+		}
+		if m, ok := v.(map[string]any); ok && params[k] {
+			// Values for a script (ADR 0028): one with ${secret:…} like a field for a
+			// secret (no expressions), the others like any value.
+			e := make(map[string]any, len(m))
+			for name, x := range m {
+				var err error
+				if s, isText := x.(string); isText && strings.Contains(s, "${secret:") {
+					e[name], err = expandSecret(s, scope)
+				} else {
+					e[name], err = r.evalValue(x, scope, values)
+				}
+				if err != nil {
+					return nil, fmt.Errorf("%s.%s: %w", k, name, err)
+				}
 			}
 			out[k] = e
 			continue

@@ -75,9 +75,15 @@ const FormatSQL = "runnel-sql"
 // that a caller (e.g. of an http trigger) cannot choose what runs.
 const FormatProgram = "runnel-program"
 
-// FormatScript marks the script of shell.powershell or its file (ADR 0023): passed as
-// written; ${…} or {{ … }} in it are an error, values come as parameters.
+// FormatScript marks the script of shell.powershell or core.script or its file (ADR
+// 0023, 0028): passed as written, values come as parameters. ${…} or {{ … }} in it are
+// an error, except in the JavaScript of core.script, where they are plain text.
 const FormatScript = "runnel-script"
+
+// FormatParams marks the values for a script, e.g. params of core.script (ADR 0028): a
+// mapping whose values may use ${…} and {{ … }}; a value that is ${secret:…} alone is
+// resolved like a field for a secret.
+const FormatParams = "runnel-params"
 
 // FormatSecret marks a field that holds a secret, e.g. a password or token (ADR 0022):
 // only such fields may use ${secret:…}; their values are resolved without expressions
@@ -328,6 +334,9 @@ func applyOptions(s *Schema, o options, path string) error {
 			// (ADR 0023); it stands on the mapping too, so that checks find it by field.
 			s.Format = o.format
 			s.AdditionalProperties.(*Schema).Format = o.format
+		case s.Type == "object" && o.format == FormatParams:
+			// Values of any type for a script (ADR 0028).
+			s.Format = o.format
 		default:
 			return fmt.Errorf("%s: format is only allowed for strings, lists of strings and mappings of strings", describe(path))
 		}
