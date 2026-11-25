@@ -39,6 +39,8 @@ export interface Descriptor {
   detectFields?: boolean;
   /** Transforms: take lookup data over an info link (S23b), e.g. core.stream-lookup. */
   infoInput?: boolean;
+  /** The plugin the type comes from; missing for built-in types. */
+  plugin?: string;
 }
 
 /** Category colours of the tiles (design/README.md, chapter 3.3); transforms: KONZEPT 12.2. */
@@ -73,6 +75,16 @@ export const transformCategoryLabel: Record<string, string> = {
   combine: "Combine",
   output: "Output",
 };
+
+/**
+ * The group of a type in the palette: its category; a type of a plugin without one of the
+ * categories (empty category) gets a group of its plugin, "plugin:<name>".
+ */
+export const paletteGroup = (d: Descriptor) => d.category || (d.plugin ? `plugin:${d.plugin}` : "general");
+
+/** Name of a group of the palette: that of the category, "Plugin: <name>" for a plugin. */
+export const groupLabel = (group: string, labels: Record<string, string>) =>
+  labels[group] ?? (group.startsWith("plugin:") ? `Plugin: ${group.slice("plugin:".length)}` : group);
 
 /** Colour of the tile of a type; general for an unknown category. */
 export const tileColor = (d: Descriptor) => categoryColor[d.category] ?? categoryColor.general;

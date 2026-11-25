@@ -8,6 +8,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/engine/pipeline"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/plugin/plugintest"
@@ -310,5 +311,26 @@ func TestPluginTransformInit(t *testing.T) {
 	}
 	if got := CheckPipeline(bad, nil, transforms.Builtin(), project).Error(); !strings.Contains(got, `13:14: transform "up": field "nope" is not in the input`) {
 		t.Errorf("validate %s", got)
+	}
+}
+
+// A type of a plugin keeps a known category; without one (or with an unknown one) its
+// category is empty and the editor groups it by the plugin.
+func TestPluginCategories(t *testing.T) {
+	dir := pluginProject(t)
+	trustDemo(t, dir)
+	trs := WithPluginTransforms(transforms.Builtin(), dir)
+	if d, _ := trs.Descriptor("demo.upper"); d.Category != "" || d.Plugin != "demo" {
+		t.Errorf("demo.upper: category %q, plugin %q", d.Category, d.Plugin)
+	}
+	if d, _ := trs.Descriptor("demo.count"); d.Category != "input" || d.Plugin != "demo" {
+		t.Errorf("demo.count: category %q, plugin %q", d.Category, d.Plugin)
+	}
+	if d, _ := trs.Descriptor("core.dummy"); d.Plugin != "" {
+		t.Errorf("core.dummy: plugin %q", d.Plugin)
+	}
+	acts := WithPlugins(actions.Builtin(), dir)
+	if d, _ := acts.Descriptor("demo.echo"); d.Category != "general" || d.Plugin != "demo" {
+		t.Errorf("demo.echo: category %q, plugin %q", d.Category, d.Plugin)
 	}
 }

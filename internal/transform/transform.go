@@ -260,8 +260,11 @@ var Categories = []string{CategoryInput, CategoryTransform, CategoryFlow, Catego
 type Definition struct {
 	// Type is the name used in pipeline files, e.g. "core.generate-rows".
 	Type string
-	// Category is one of Categories.
-	Category    string
+	// Category is one of Categories; empty for a type of a plugin that names none of
+	// them (it then behaves like a transform of the category transform).
+	Category string
+	// Plugin is the name of the plugin the type comes from; empty for built-in types.
+	Plugin      string
 	Label       string
 	Description string
 	// Example is a short configuration ("with:", in YAML) shown in the help of the editor
@@ -312,6 +315,8 @@ type Descriptor struct {
 	DetectFields bool `json:"detectFields,omitempty"`
 	// InfoInput: the transform takes lookup data over an info link (Definition.InfoInput).
 	InfoInput bool `json:"infoInput,omitempty"`
+	// Plugin: see Definition.Plugin.
+	Plugin string `json:"plugin,omitempty"`
 }
 
 // Registry holds the available transform types.
@@ -336,7 +341,7 @@ func (r *Registry) Register(d Definition) {
 	if _, dup := r.defs[d.Type]; dup {
 		panic("transform type registered twice: " + d.Type)
 	}
-	if !slices.Contains(Categories, d.Category) {
+	if !slices.Contains(Categories, d.Category) && (d.Category != "" || d.Plugin == "") {
 		panic(fmt.Sprintf("transform type %s: unknown category %q", d.Type, d.Category))
 	}
 	s := d.Schema
@@ -348,7 +353,7 @@ func (r *Registry) Register(d Definition) {
 	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, Example: d.Example, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
-		DetectFields: d.DetectFields != nil, InfoInput: d.InfoInput}
+		DetectFields: d.DetectFields != nil, InfoInput: d.InfoInput, Plugin: d.Plugin}
 }
 
 // With returns a copy of the registry with more transform types (those of the plugins

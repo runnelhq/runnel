@@ -158,8 +158,11 @@ var Categories = []string{CategoryGeneral, CategoryExecution, CategoryFiles, Cat
 type Definition struct {
 	// Type is the name used in workflow files, e.g. "core.log".
 	Type string
-	// Category is one of Categories.
+	// Category is one of Categories; empty for a type of a plugin that names none of
+	// them (the editor groups it by its plugin).
 	Category string
+	// Plugin is the name of the plugin the type comes from; empty for built-in types.
+	Plugin string
 	// Label is the short display name in the editor, e.g. "Log" (English, title case).
 	Label string
 	// Description is one short English sentence without a final period.
@@ -193,6 +196,8 @@ type Descriptor struct {
 	Schema      *schema.Schema `json:"schema"` // schema of the "with" configuration
 	// Example: see Definition.Example.
 	Example string `json:"example,omitempty"`
+	// Plugin: see Definition.Plugin.
+	Plugin string `json:"plugin,omitempty"`
 }
 
 // Registry holds the available action types. Transforms have a registry of their own,
@@ -234,6 +239,7 @@ func (r *Registry) Register(d Definition) {
 		Description: d.Description,
 		Schema:      s,
 		Example:     d.Example,
+		Plugin:      d.Plugin,
 	}
 }
 

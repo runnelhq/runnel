@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { categoryLabel, paletteDrag, paletteMime, tileColor, transformCategoryLabel, useCatalog, type Descriptor } from "../catalog";
+import { categoryLabel, groupLabel, paletteDrag, paletteGroup, paletteMime, tileColor, transformCategoryLabel, useCatalog, type Descriptor } from "../catalog";
 import { ActionIcon, ChevronIcon, SearchIcon } from "./Icons";
 
 /** What the palette needs to know about the open file. */
@@ -13,7 +13,8 @@ export interface PaletteTarget {
 }
 
 /**
- * Palette below the explorer (mockup E6b): the action types of the catalog by category,
+ * Palette below the explorer (mockup E6b): the action types of the catalog by category
+ * (types of plugins without a category by plugin),
  * with a search field ("/" jumps into it); for a pipeline the transform types (mockup
  * S25a). Entries are dragged onto the canvas.
  */
@@ -45,10 +46,13 @@ export function Palette(props: { target: PaletteTarget | null }) {
       !q || [d.type, d.label, d.description].some((s) => s.toLowerCase().includes(q));
     const byCategory = new Map<string, Descriptor[]>();
     for (const d of [...catalog.values()].filter(match).sort((a, b) => a.label.localeCompare(b.label))) {
-      byCategory.set(d.category, [...(byCategory.get(d.category) ?? []), d]);
+      const g = paletteGroup(d);
+      byCategory.set(g, [...(byCategory.get(g) ?? []), d]);
     }
+    // The categories in their order, then the groups of plugins by name.
     const order = Object.keys(labels);
-    return [...byCategory.entries()].sort(([a], [b]) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+    const rank = (g: string) => order.indexOf(g) + 1 || 99;
+    return [...byCategory.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
   }, [catalog, query, labels]);
 
   const editable = props.target?.editable ?? false;
@@ -80,7 +84,7 @@ export function Palette(props: { target: PaletteTarget | null }) {
         {groups.map(([category, items]) => {
           const open = query.trim() !== "" || !closed.has(category);
           return (
-            <div key={category} role="group" aria-label={labels[category] ?? category}>
+            <div key={category} role="group" aria-label={groupLabel(category, labels)}>
               <button
                 type="button"
                 aria-expanded={open}
@@ -95,7 +99,7 @@ export function Palette(props: { target: PaletteTarget | null }) {
                 className="flex h-[26px] w-full cursor-pointer items-center gap-1.5 border-0 bg-transparent px-4 text-xs font-semibold text-sidebar-foreground"
               >
                 <ChevronIcon open={open} width={12} height={12} className="text-muted-foreground" />
-                {labels[category] ?? category}
+                {groupLabel(category, labels)}
                 <span className="ml-auto text-2xs font-normal text-muted-foreground">{items.length}</span>
               </button>
               {open && (

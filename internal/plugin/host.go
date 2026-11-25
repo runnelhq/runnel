@@ -274,6 +274,10 @@ func (pr *Process) Describe(ctx context.Context) (Description, error) {
 		if d.Label == "" {
 			d.Label = d.Type
 		}
+		if !slices.Contains(action.Categories, d.Category) {
+			d.Category = "" // grouped by the plugin in the editor
+		}
+		d.Plugin = pr.plugin.Name
 	}
 	for i := range res.Transforms {
 		d := &res.Transforms[i].Descriptor
@@ -296,8 +300,9 @@ func (pr *Process) Describe(ctx context.Context) (Description, error) {
 			d.Label = d.Type
 		}
 		if !slices.Contains(transform.Categories, d.Category) {
-			d.Category = transform.CategoryTransform
+			d.Category = "" // grouped by the plugin in the editor
 		}
+		d.Plugin = pr.plugin.Name
 	}
 	ns := pr.plugin.Namespace
 	for i := range res.Connections {

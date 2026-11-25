@@ -296,12 +296,8 @@ func describe(ctx context.Context, projectDir string, p *model.Plugin, store plu
 // definition is the action type of a plugin: the configuration is checked against the
 // schema of describe, the action runs in the process of the plugin for the run.
 func definition(plugin string, d action.Descriptor) action.Definition {
-	category := d.Category
-	if !slices.Contains(action.Categories, category) {
-		category = action.CategoryGeneral
-	}
 	return action.Definition{
-		Type: d.Type, Category: category, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
+		Type: d.Type, Category: d.Category, Plugin: plugin, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
 		New: func(with map[string]any) (action.Action, error) {
 			if err := schema.CheckConfig(d.Schema, with); err != nil {
 				return nil, err
@@ -365,7 +361,7 @@ func withConnections(ctx context.Context, sc *schema.Schema, with map[string]any
 func transformDefinition(projectDir string, p *model.Plugin, store plugintrust.Store, tt TransformType) transform.Definition {
 	d := tt.Descriptor
 	def := transform.Definition{
-		Type: d.Type, Category: d.Category, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
+		Type: d.Type, Category: d.Category, Plugin: p.Name, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
 		RecordErrors: d.RecordErrors, Parallel: d.Parallel,
 		New: func(with map[string]any) (transform.Transform, error) {
 			if err := schema.CheckConfig(d.Schema, with); err != nil {

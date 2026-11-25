@@ -15,7 +15,7 @@ const send = (m) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...m }
 createInterface({ input: process.stdin }).on("line", (line) => {
   const { id, method } = JSON.parse(line);
   if (method === "initialize") send({ id, result: { protocolVersion: 1, encoding: "json", name: "demo", version: "1.0.0" } });
-  else if (method === "describe") send({ id, result: { actions: [{ type: "demo.echo", category: "general", label: "Echo", description: "Returns its text", schema: { type: "object", properties: { text: { type: "string" } } } }] } });
+  else if (method === "describe") send({ id, result: { actions: [{ type: "demo.echo", label: "Echo", description: "Returns its text", schema: { type: "object", properties: { text: { type: "string" } } } }] } });
   else if (method === "shutdown") { send({ id, result: null }); process.exit(0); }
   else if (id !== undefined) send({ id, error: { code: -32601, message: "method not found" } });
 });
@@ -150,5 +150,6 @@ test("trusting a plugin brings its types into the palette and the panel without 
   await expect(panel.getByRole("heading", { name: "Echo" })).toBeVisible();
   await expect(page.getByTestId("node-say")).not.toHaveAttribute("data-severity", "error");
   await page.getByLabel("Search actions").fill("echo");
-  await expect(page.getByRole("region", { name: "Palette" })).toContainText("demo.echo");
+  // Without a category the action is grouped by its plugin.
+  await expect(page.getByRole("region", { name: "Palette" }).getByRole("group", { name: "Plugin: demo" })).toContainText("demo.echo");
 });

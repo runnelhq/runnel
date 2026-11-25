@@ -577,3 +577,17 @@ Nach dem freigegebenen Mockup S52 kann der Editor Plugins freigeben (`POST /api/
 - Wer den Editor erreicht, darf ohnehin Workflows ändern und starten; Freigeben erweitert das nicht über das Konto des
   Servers hinaus.
 - Freigeben und Zurücknehmen stehen mit Name, Version und Hash im Server-Log.
+
+## Nachtrag 2026-11-25 (Fix): Kategorie optional
+
+Befund aus dem Test mit `plugin-iban`: Bausteine mit unbekannter oder fehlender Kategorie standen unter „General“
+(Actions) bzw. „Transform“ (Transforms) zwischen den eingebauten, ihre Herkunft war nicht zu erkennen.
+
+- **`category` ist optional.** Eine Kategorie der eingebauten ordnet den Baustein wie bisher ein. Ohne sie oder mit
+  einer unbekannten ist sie im Katalog leer, und der Editor zeigt den Baustein in einer Gruppe des Plugins
+  („Plugin: \<name\>“, nach den Gruppen der Kategorien, Farbe der Kachel wie `general`). Die Gruppe trägt den Namen des
+  Plugins, nicht den Namensraum, wie Explorer, Freigabe und Meldungen.
+- **Katalog:** Descriptoren von Plugin-Typen tragen `plugin` (Name des Plugins), auch mit Kategorie.
+- **Verhalten:** Ein Transform ohne Kategorie verhält sich wie einer der Kategorie `transform`.
+- **SDK:** `runnelhq/sdk-go` behandelt eine unbekannte Kategorie bisher als Programmierfehler; eine leere Kategorie
+  sollte es zulassen (Änderung im SDK).
