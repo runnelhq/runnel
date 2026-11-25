@@ -2,7 +2,7 @@
 
 - **Status:** Angenommen
 - **Datum:** 2026-11-25
-- **Bezug:** [ADR 0003 – Ausführungsmodell](0003-ausfuehrungsmodell.md), [ADR 0022 – Connections und Secrets](0022-connections-secrets.md)
+- **Bezug:** [ADR 0003 – Join-Semantik](0003-join-semantik.md), [ADR 0020 – Relative Pfade](0020-relative-pfade.md), [ADR 0022 – Connections und Secrets](0022-connections-secrets.md)
   (Maskierung), [ADR 0026 – Run-Historie](0026-run-historie.md); KONZEPT Kap. 6 (Betrieb); Roadmap S72a, S72b
 
 ## Kontext
@@ -34,7 +34,7 @@ Betrachtete Varianten:
   des Projekts.
 - **Workflow oder Pipeline:** `settings.onError` überschreibt die Einstellung des Projekts mit einer anderen Datei;
   `none` schaltet sie für diese Datei ab.
-- Der Wert ist ein Pfad relativ zum Projektordner (ADR 0020) und muss ein **Workflow** des Projekts sein, keine Pipeline.
+- Der Wert ist ein Pfad relativ zum Projektordner ([ADR 0020](0020-relative-pfade.md)) und muss ein **Workflow** des Projekts sein, keine Pipeline.
 
 ### 2. Wann der Fehler-Workflow startet
 
