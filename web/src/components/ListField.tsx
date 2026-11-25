@@ -351,7 +351,17 @@ function Entries(props: {
               {handle(key)}
               <span className="grid size-[18px] place-items-center rounded-full bg-muted text-[10px] text-muted-foreground">{key === "new" ? "+" : key + 1}</span>
               {isOpen ? (
-                <b className="truncate font-semibold">{title}</b>
+                // A click on the title folds the card again (without leaving the panel).
+                <button
+                  type="button"
+                  aria-expanded
+                  title="Collapse"
+                  onClick={() => setOpen(null)}
+                  className="flex min-w-0 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-foreground"
+                >
+                  <b className="truncate font-semibold">{title}</b>
+                  <ChevronIcon open width={12} height={12} className="ml-auto shrink-0 text-muted-foreground" />
+                </button>
               ) : (
                 <button
                   type="button"

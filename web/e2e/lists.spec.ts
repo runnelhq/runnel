@@ -122,6 +122,13 @@ test("chips for texts, cards with fields that apply only sometimes", async ({ pa
   await card.getByRole("combobox", { name: "Function" }).selectOption("count");
   await type(page, card.getByRole("textbox").first(), "orders");
   await expect(cards.getByRole("listitem", { name: "aggregate 1" })).toBeVisible();
+  // An open card folds again with a click on its title, and opens with one on its summary.
+  const first = cards.getByRole("listitem", { name: "aggregate 1" });
+  await expect(first.getByRole("combobox", { name: "Function" })).toBeVisible();
+  await first.getByRole("button", { expanded: true }).click();
+  await expect(first.getByRole("combobox", { name: "Function" })).toHaveCount(0);
+  await first.getByRole("button", { expanded: false }).click();
+  await expect(first.getByRole("combobox", { name: "Function" })).toBeVisible();
   const text = await saved(page);
   expect(text).toContain("      groupBy: [source]\n");
   expect(text).toContain("        - { name: orders, function: count }\n");
