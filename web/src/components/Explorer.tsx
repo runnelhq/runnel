@@ -510,9 +510,11 @@ function Node(props: {
       row.current?.focus({ preventScroll: true });
     }
   }, [reveal, isDir, entry.path]);
-  // A plugin folder opens the overview of its plugin; its chevron opens the folder.
-  const plugin = isDir ? props.plugins.get(entry.path) : undefined;
-  const pluginFile = plugin ? entry.path + "/plugin.yaml" : null;
+  // A plugin folder (plugins/<name> with a plugin.yaml) opens the overview of its plugin;
+  // its chevron opens the folder. Version and state follow once GET /plugins answered.
+  const isPluginDir = isDir && /^plugins\/[^/]+$/.test(entry.path) && !!entry.children?.some((c) => c.name === "plugin.yaml");
+  const plugin = isPluginDir ? props.plugins.get(entry.path) : undefined;
+  const pluginFile = isPluginDir ? entry.path + "/plugin.yaml" : null;
   const selected = (!isDir && entry.path === props.selected) || (pluginFile !== null && pluginFile === props.selected);
   const activate = () => (pluginFile ? props.onOpen(pluginFile) : isDir ? setOpen(!open) : props.onOpen(entry.path));
   const renaming = editing && "rename" in editing && editing.rename.path === entry.path;
@@ -574,7 +576,7 @@ function Node(props: {
             height={12}
             className="text-muted-foreground"
             onClick={
-              plugin
+              isPluginDir
                 ? (e) => {
                     e.stopPropagation();
                     setOpen(!open);
@@ -586,12 +588,12 @@ function Node(props: {
           <span className="w-3" />
         )}
         <span className={selected ? "text-accent-foreground" : "text-muted-foreground"}>
-          {plugin ? <PlugIcon /> : isDir ? <FolderIcon /> : connectionType ? <ConnectionIcon type={connectionType} /> : <KindIcon kind={entry.kind} />}
+          {isPluginDir ? <PlugIcon /> : isDir ? <FolderIcon /> : connectionType ? <ConnectionIcon type={connectionType} /> : <KindIcon kind={entry.kind} />}
         </span>
         <span className="truncate">{entry.name}</span>
         <span className="ml-auto inline-flex items-center gap-1">
           {typeTag && <span className="font-mono text-[10px] text-muted-foreground">{typeTag}</span>}
-          {plugin ? <PluginState plugin={plugin} /> : isDir && <span className="text-2xs text-muted-foreground">{entry.children?.length ?? 0}</span>}
+          {plugin ? <PluginState plugin={plugin} /> : isDir && !isPluginDir && <span className="text-2xs text-muted-foreground">{entry.children?.length ?? 0}</span>}
           <button
             type="button"
             aria-label={`Actions for ${entry.name}`}
