@@ -135,3 +135,20 @@ test("the program of a plugin stays in the explorer but does not open", async ({
   await exe.locator("> div").click();
   await expect(page.getByRole("tab", { name: /demo\.exe/ })).toHaveCount(0);
 });
+
+test("trusting a plugin brings its types into the palette and the panel without reloading", async ({ page, request }) => {
+  await page.goto("/");
+  await page.getByRole("treeitem", { name: "e2e-plugin.workflow.yaml" }).click();
+  await page.getByTestId("node-say").click();
+  const panel = page.getByRole("region", { name: "Properties" });
+  await expect(panel).toContainText("Action of plugin demo");
+
+  // Trusted in a terminal (here: the API) while the editor is open: on focus it follows.
+  const { plugins } = (await (await request.get("/api/v1/plugins")).json()) as { plugins: { hash: string }[] };
+  expect((await request.post("/api/v1/plugins/demo/trust", { data: { hash: plugins[0].hash } })).ok()).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(panel.getByRole("heading", { name: "Echo" })).toBeVisible();
+  await expect(page.getByTestId("node-say")).not.toHaveAttribute("data-severity", "error");
+  await page.getByLabel("Search actions").fill("echo");
+  await expect(page.getByRole("region", { name: "Palette" })).toContainText("demo.echo");
+});
