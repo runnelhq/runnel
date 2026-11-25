@@ -41,9 +41,13 @@ export function Palette(props: { target: PaletteTarget | null }) {
   }, []);
 
   const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const match = (d: Descriptor) =>
-      !q || [d.type, d.label, d.description].some((s) => s.toLowerCase().includes(q));
+    // Every word of the search in type, name or description, e.g. "set field value" finds
+    // core.calculate (the name of the transform in Apache Hop).
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const match = (d: Descriptor) => {
+      const text = `${d.type} ${d.label} ${d.description}`.toLowerCase();
+      return words.every((w) => text.includes(w));
+    };
     const byCategory = new Map<string, Descriptor[]>();
     for (const d of [...catalog.values()].filter(match).sort((a, b) => a.label.localeCompare(b.label))) {
       const g = paletteGroup(d);

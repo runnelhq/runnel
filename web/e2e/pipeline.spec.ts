@@ -80,6 +80,10 @@ test("shows a pipeline as a graph with data and error links", async ({ page }) =
   await expect(palette.getByRole("group", { name: "Combine" }).getByTestId("palette-core.sort")).toBeVisible();
   await expect(palette.getByTestId("palette-core.start")).toHaveCount(0);
   await expect(palette.getByText("Drag a transform onto the canvas, or onto a link to insert it between two steps.")).toBeVisible();
+  // Every word counts on its own: the name of the transform in Apache Hop finds core.calculate.
+  await palette.getByRole("textbox", { name: "Search transforms" }).fill("set field value");
+  await expect(palette.getByTestId("palette-core.calculate")).toBeVisible();
+  await expect(palette.getByTestId("palette-core.sort")).toHaveCount(0);
 });
 
 test("changes the type of a link in the menu and in the panel", async ({ page }) => {

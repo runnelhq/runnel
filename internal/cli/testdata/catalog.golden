@@ -39,7 +39,7 @@ transforms / input
   json.input          JSON Input     Reads the objects of a JSON or NDJSON file as records
   xml.input           XML Input      Reads the elements of an XML file as records
 transforms / transform
-  core.calculate      Calculate      Sets fields to the result of an expression for every record
+  core.calculate      Calculate      Sets fields for every record: a copy of another field, a fixed value, a default or a calculated value
   core.constant       Add Constants  Adds fields with the same value to every record
   core.convert        Convert Types  Converts fields to another type, with a number or date format
   core.filter         Filter         Passes on the records for which a condition is true

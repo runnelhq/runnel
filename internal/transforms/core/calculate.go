@@ -24,7 +24,7 @@ var calculateDefinition = transform.Definition{
 	RecordErrors: true,
 	Category:     transform.CategoryTransform,
 	Label:        "Calculate",
-	Description:  "Sets fields to the result of an expression for every record",
+	Description:  "Sets fields for every record: a copy of another field, a fixed value, a default or a calculated value",
 	Example:      "fields:\n  - { name: total, value: \"{{ record.price * record.quantity }}\" }\n  - { name: label, value: \"{{ upper(record.name) }}: {{ record.total }}\" }\n",
 	Config:       calculate{},
 	New:          newCalculate,
@@ -71,7 +71,9 @@ func newCalculate(with map[string]any) (transform.Transform, error) {
 }
 
 // Init checks the fields the expressions read (except those calculated before) and adds
-// the calculated fields; their type is known only when the pipeline runs.
+// the calculated fields with the type known before the run: that of a fixed value, a text
+// for text around {{ … }}, the type of the field for a copy ({{ record.other }});
+// otherwise the type is known only when the pipeline runs.
 func (t *calculate) Init(ic *transform.InitContext) (record.Schema, error) {
 	s := ic.In
 	calculated := map[string]bool{}
@@ -81,7 +83,7 @@ func (t *calculate) Init(ic *transform.InitContext) (record.Schema, error) {
 				ic.Warn(fmt.Sprintf("fields[%d].value", i), fmt.Sprintf("%q is a fixed text; write {{ %s }} to calculate it for every record", f.Value, strings.TrimSpace(f.Value)))
 			}
 			calculated[f.Name] = true
-			s = s.With(f.Name, record.Unknown)
+			s = s.With(f.Name, record.TypeOf(t.fixed[i]))
 			continue
 		}
 		for _, name := range t.exprs[i].Fields() {
@@ -90,7 +92,7 @@ func (t *calculate) Init(ic *transform.InitContext) (record.Schema, error) {
 			}
 		}
 		calculated[f.Name] = true
-		s = s.With(f.Name, record.Unknown)
+		s = s.With(f.Name, t.exprs[i].Type(s))
 	}
 	return s, nil
 }

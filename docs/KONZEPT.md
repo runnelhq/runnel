@@ -1261,8 +1261,9 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   mit `record`, `params`, `vars`, `env`, `run`, in Reihenfolge – ein späteres Feld kann ein früheres nutzen. Ein Ausdruck
   allein behält den Typ seines Ergebnisses (Rechnen mit `decimal` bleibt exakt), Text um `{{ … }}` ergibt Text. Ohne
   `{{ … }}` ist der Wert fest (seit S65): Zahl, `true`/`false` oder Text, z. B. `{ name: route, value: unpaid }`. Ein
-  vorhandenes Feld behält seine Position. Der Typ der Felder steht erst beim Lauf fest (im Schema unbekannt; bei Bedarf
-  danach `core.convert`). Lässt sich ein Ausdruck nicht auswerten, geht der Datensatz unverändert auf den Fehler-Link.
+  vorhandenes Feld behält seine Position. Den Typ kennt das Schema schon vor dem Lauf bei einer Kopie eines Felds
+  (`{{ record.preis }}`, wie „Set field value“ in Apache Hop), einem festen Wert und Text um `{{ … }}`; sonst steht er
+  erst beim Lauf fest (bei Bedarf danach `core.convert`). Lässt sich ein Ausdruck nicht auswerten, geht der Datensatz unverändert auf den Fehler-Link.
 - **`core.sequence`** nummeriert die Datensätze in der Reihenfolge, in der sie ankommen: Feld `name` (`int`), ab `start`
   (Standard 1) im Abstand `step` (Standard 1, auch negativ; beide dürfen `${…}` sein). Mit `groupBy` zählt jede
   Kombination von Werten für sich ab `start`, ohne dass die Datensätze sortiert sein müssen (Positionen je Bestellung);
