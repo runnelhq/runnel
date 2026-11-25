@@ -13,11 +13,15 @@ cpSync(join(repo, "examples", "hello"), dir, { recursive: true });
 
 const binary = join(repo, "bin", process.platform === "win32" ? "runnel.exe" : "runnel");
 // The run history (ADR 0026) goes to a folder of the copy that the explorer hides.
-const server = spawn(binary, ["serve", dir, "--port", port, "--history-dir", join(dir, ".history")], { stdio: "inherit" });
+// Approvals of plugins (S52b1) go to a configuration folder of the test, not to that of the user.
+const config = mkdtempSync(join(tmpdir(), "runnel-e2e-config-"));
+const env = { ...process.env, XDG_CONFIG_HOME: config, APPDATA: config };
+const server = spawn(binary, ["serve", dir, "--port", port, "--history-dir", join(dir, ".history")], { stdio: "inherit", env });
 const stop = () => server.kill("SIGINT");
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
 server.on("exit", (code) => {
   rmSync(dir, { recursive: true, force: true });
+  rmSync(config, { recursive: true, force: true });
   process.exit(code ?? 0);
 });

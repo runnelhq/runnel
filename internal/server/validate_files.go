@@ -38,6 +38,8 @@ func (s *Server) validateText(kind, name string, data []byte) (model.Errors, err
 			diags.Sort()
 			return diags, nil
 		}
+	case "plugin":
+		_, err = model.ReadPlugin(name, data)
 	case "trigger":
 		var t *model.Trigger
 		if t, err = model.ParseTrigger(name, data); err == nil {
