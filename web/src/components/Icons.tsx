@@ -93,6 +93,12 @@ export const ReloadIcon = (p: P) => (
   </Icon>
 );
 
+export const CollapseAllIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M7 4l5 5 5-5M7 20l5-5 5 5" />
+  </Icon>
+);
+
 export const CloseIcon = (p: P) => (
   <Icon {...p}>
     <path d="M6 6l12 12M18 6L6 18" />

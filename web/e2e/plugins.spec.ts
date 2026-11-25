@@ -130,7 +130,12 @@ test("a step of a plugin that is not trusted leads to the plugin from the panel 
 
 test("the program of a plugin stays in the explorer but does not open", async ({ page }) => {
   await page.goto("/");
+  // The folder of a plugin starts closed; its chevron opens it.
   const exe = page.getByRole("treeitem", { name: "demo.exe" });
+  await expect(exe).toHaveCount(0);
+  const demo = page.getByRole("treeitem", { name: "demo", exact: true });
+  await demo.locator("> div svg").first().click();
+  await page.getByRole("treeitem", { name: "bin", exact: true }).locator("> div").click();
   await expect(exe.locator("> div")).toHaveAttribute("title", /a binary file, not shown in the editor/);
   await exe.locator("> div").click();
   await expect(page.getByRole("tab", { name: /demo\.exe/ })).toHaveCount(0);
