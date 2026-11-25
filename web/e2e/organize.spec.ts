@@ -70,7 +70,9 @@ test("moves a file to a new folder and updates the references", async ({ page })
 
 test("reads triggers in subfolders and renames their target", async ({ page }) => {
   await page.goto("/");
-  // The trigger in triggers/zz-organize/ is a trigger file without problems.
+  // The trigger in triggers/zz-organize/ is a trigger file without problems (the folder
+  // below the top level starts closed).
+  await tree(page).getByRole("treeitem", { name: "triggers" }).getByRole("treeitem", { name: dir }).locator(":scope > div").click();
   await tree(page).getByRole("treeitem", { name: "triggers" }).getByRole("treeitem", { name: "main.yaml" }).click();
   await expect(page.getByRole("tab", { name: /main\.yaml/ })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("kind")).toHaveText("Trigger");

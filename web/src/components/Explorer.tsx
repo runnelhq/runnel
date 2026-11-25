@@ -21,7 +21,7 @@ import { NewTriggerDialog } from "./NewTrigger";
 import { useTriggers } from "../forms";
 import { useConnections } from "../reference";
 import { Dialog } from "./Dialog";
-import { ChevronIcon, ConnectionIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlugIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ChevronIcon, CollapseAllIcon, ConnectionIcon, CopyIcon, FolderIcon, KindIcon, MoveIcon, PipelineIcon, PlugIcon, PlusIcon, ProjectIcon, ReloadIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import { usePlugins, type PluginInfo } from "../plugins";
 import { refreshCatalog } from "../catalog";
 
@@ -49,11 +49,59 @@ type Moving = { from: string; to: string; refs: Reference[]; chosen: Set<number>
 /** A file or folder being dragged, and the folder it would be dropped into ("" = project). */
 type Drag = { entry: Entry; over: string | null; x: number; y: number };
 
+/**
+ * Folders shown open: those the user opened or closed are kept per project in the
+ * browser; the others are open on the top level of the project only, so that plugins
+ * (program, licence …) and deeper folders do not fill the tree.
+ */
+interface Folders {
+  isOpen: (path: string) => boolean;
+  setOpen: (path: string, open: boolean) => void;
+  /** Closes every folder (top: the folders of the top level): only they are visible. */
+  collapseAll: (top: string[]) => void;
+}
+
+export function useFolders(project: string | undefined): Folders {
+  const key = `runnel.explorer.${project ?? ""}`;
+  const [state, setState] = useState<{ key: string; open: Record<string, boolean> }>(() => ({ key, open: storedFolders(key) }));
+  const open = state.key === key ? state.open : storedFolders(key); // another project
+  // Several rows may change at once (e.g. "Reveal in explorer"): each change applies to
+  // the latest state.
+  const update = (change: (open: Record<string, boolean>) => Record<string, boolean>) =>
+    setState((prev) => {
+      const next = change(prev.key === key ? prev.open : storedFolders(key));
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        // storage blocked: the folders stay as they are for this page
+      }
+      return { key, open: next };
+    });
+  return {
+    isOpen: (path) => open[path] ?? !path.includes("/"),
+    setOpen: (path, v) => {
+      if ((open[path] ?? !path.includes("/")) !== v) update((o) => ({ ...o, [path]: v }));
+    },
+    collapseAll: (top) => update(() => Object.fromEntries(top.map((p) => [p, false]))),
+  };
+}
+
+function storedFolders(key: string): Record<string, boolean> {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(key) ?? "{}");
+    if (v && typeof v === "object" && !Array.isArray(v)) return Object.fromEntries(Object.entries(v).filter(([, b]) => typeof b === "boolean"));
+  } catch {
+    // nothing stored, storage blocked or not JSON
+  }
+  return {};
+}
+
 const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
 const baseName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /**
- * Project explorer: the project tree, folders open by default (mockup E4). Files and
+ * Project explorer: the project tree (mockup E4), folders of the top level open until
+ * the user opens or closes them (kept per project, useFolders). Files and
  * folders are created, renamed and deleted here (mockup design/mockups/e11-files.html)
  * and moved by dragging or with "Move to…", with an offer to update the references of
  * other files (mockup design/mockups/e12-organize.html).
@@ -78,6 +126,7 @@ export function Explorer(props: {
   const [newConnection, setNewConnection] = useState(false);
   const [newTrigger, setNewTrigger] = useState<string | null>(null);
   const { changes } = props;
+  const folders = useFolders(props.tree?.name);
   const connections = useConnections(props.tree);
   const triggers = useTriggers(props.tree);
   // Connections and triggers show their type (mockups S39b, E20).
@@ -121,6 +170,8 @@ export function Explorer(props: {
           await createFile(path, template(editing.create, name, firstWorkflow));
         }
         setEditing(null);
+        // the new entry is visible: its folder and the folders above it open
+        for (let d = editing.dir; d; d = parentOf(d)) folders.setOpen(d, true);
         props.onReload();
         if (editing.create !== "folder") changes.onCreated(path);
         return null;
@@ -187,6 +238,8 @@ export function Explorer(props: {
     setMoving(null);
     try {
       const res = await renamePath(from, to, refs.map((r) => ({ file: r.file, line: r.line })));
+      // the moved entry stays visible: the folders it moved into open
+      for (let d = parentOf(to); d; d = parentOf(d)) folders.setOpen(d, true);
       props.onReload();
       changes.onRenamed(from, to);
       if (res.updated.length > 0) changes.onChanged(res.updated);
@@ -306,6 +359,15 @@ export function Explorer(props: {
           )}
           <button
             type="button"
+            title="Collapse all folders"
+            aria-label="Collapse all"
+            onClick={() => folders.collapseAll((props.tree?.children ?? []).filter((e) => e.type === "dir").map((e) => e.path))}
+            className="grid size-6 cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <CollapseAllIcon width={15} height={15} />
+          </button>
+          <button
+            type="button"
             title="Reload"
             aria-label="Reload explorer"
             onClick={props.onReload}
@@ -352,6 +414,7 @@ export function Explorer(props: {
             connectionTypes={connectionTypes}
             plugins={plugins}
             reveal={props.reveal ?? null}
+            folders={folders}
           />
         ))}
       </ul>
@@ -509,23 +572,25 @@ function Node(props: {
   /** The plugins by folder (plugins/<name>), with version and state (mockup S52). */
   plugins: Map<string, PluginInfo>;
   reveal: { path: string; seq: number } | null;
+  folders: Folders;
 }) {
-  const { entry, depth, editing } = props;
+  const { entry, depth, editing, folders } = props;
   const connectionType = entry.kind === "connection" ? props.connectionTypes.get(entry.path) : undefined;
   const typeTag = entry.kind === "connection" || entry.kind === "trigger" ? props.connectionTypes.get(entry.path) : undefined;
-  const [open, setOpen] = useState(true);
   const isDir = entry.type === "dir";
+  const open = isDir && folders.isOpen(entry.path);
+  const setOpen = (v: boolean) => folders.setOpen(entry.path, v);
   const row = useRef<HTMLDivElement>(null);
   // "Reveal in explorer": the folders of the file open, its row scrolls into view.
   const { reveal } = props;
   useEffect(() => {
     if (!reveal) return;
-    if (isDir && reveal.path.startsWith(entry.path + "/")) setOpen(true);
+    if (isDir && reveal.path.startsWith(entry.path + "/")) folders.setOpen(entry.path, true);
     if (reveal.path === entry.path) {
       row.current?.scrollIntoView?.({ block: "nearest" });
       row.current?.focus({ preventScroll: true });
     }
-  }, [reveal, isDir, entry.path]);
+  }, [reveal, isDir, entry.path]); // eslint-disable-line react-hooks/exhaustive-deps -- folders: only when a file is revealed
   // A plugin folder (plugins/<name> with a plugin.yaml) opens the overview of its plugin;
   // its chevron opens the folder. Version and state follow once GET /plugins answered.
   const isPluginDir = isDir && /^plugins\/[^/]+$/.test(entry.path) && !!entry.children?.some((c) => c.name === "plugin.yaml");
