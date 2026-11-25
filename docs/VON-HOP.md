@@ -52,7 +52,7 @@ Für Hops `Number` gibt es `float`, für `BigNumber` gibt es `decimal`, für `Ti
 | Concat fields | `core.calculate` | `{{ concat(' ', record.vorname, record.nachname) }}` |
 | Replace in string | `core.calculate` | `replace()` bzw. `replaceRegex()` |
 | Select values | `core.select-fields`, `core.convert` | Auswählen, Ordnen, Umbenennen, Entfernen; Typen und Formate mit `core.convert` |
-| Filter rows | `core.filter` | Bedingung als Ausdruck; die übrigen Datensätze fallen weg. Für zwei Wege (wahr/falsch) `core.switch` |
+| Filter rows | `core.filter` | Bedingung als Ausdruck; „Send false data to“ heißt `else: <id>`, ohne `else` fallen die übrigen Datensätze weg |
 | Switch / case | `core.switch` | |
 | Value mapper | `core.map-values` | |
 | Split fields | `core.split-field` | mit `into` |

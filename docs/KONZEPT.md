@@ -1249,8 +1249,9 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   auswerten, geht der Datensatz auf den Fehler-Link.
 
 - **`core.filter`** reicht die Datensätze weiter, für die `condition` wahr ist (`{{ record.betrag > 0 }}`, die
-  Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Für einen Ausgang „falsch“
-  `core.switch` mit `default` verwenden. Lässt sich die Bedingung nicht auswerten, geht der Datensatz auf den Fehler-Link.
+  Klammern dürfen fehlen); die anderen werden verworfen, das Log nennt die Anzahl. Mit `else: <id>` gehen sie statt dessen
+  an diesen Transform (wie „Send false data to“ in Apache Hop; ein Daten-Link muss dorthin führen), die übrigen an alle
+  anderen Daten-Links. Lässt sich die Bedingung nicht auswerten, geht der Datensatz auf den Fehler-Link.
 - **`core.select-fields`** behält mit `fields:` nur die genannten Felder, in dieser Reihenfolge, wahlweise umbenannt
   (`{ name: kdnr, as: externalId }`, geschlossenes Schema); fehlt ein Feld im Datensatz, ist es leer. Mit `remove:`
   werden die genannten Felder entfernt und alle anderen behalten. Beides zusammen ist ein Fehler.

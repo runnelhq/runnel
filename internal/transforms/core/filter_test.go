@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -128,5 +129,81 @@ func TestFilterErrorLink(t *testing.T) {
 	}
 	if len(logs) != 1 || logs[0].Msg != "kept 1 of 3 records, dropped 1, 1 with errors" {
 		t.Errorf("log %v", logs)
+	}
+}
+
+// With else the records for which the condition is false go to that transform, the
+// others to the other data links; validate checks the target.
+func TestFilterElse(t *testing.T) {
+	tr := transformtest.New(t, filterDefinition, map[string]any{"condition": "{{ record.amount > 1 }}", "else": "rejected"})
+	in := make(chan transform.Batch, 1)
+	in <- transform.Batch(orders())
+	close(in)
+	got := map[string][]int64{}
+	var logs []string
+	out := transform.NewOutput("t", func(record.Record) error {
+		t.Error("Emit with else")
+		return nil
+	}, func(_ slog.Level, m string) { logs = append(logs, m) }).WithTargetIDs([]string{"ok", "rejected"}).WithTargets(func(target string, r record.Record) error {
+		v, _ := r.Get("id")
+		got[target] = append(got[target], v.(int64))
+		return nil
+	})
+	if err := tr.Process(context.Background(), in, out); err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(got["ok"], got["rejected"]) != "[1 4] [2 3]" || len(logs) != 1 || logs[0] != "kept 2 of 4 records, sent to rejected 2" {
+		t.Errorf("%v %v", got, logs)
+	}
+
+	for _, tt := range []struct {
+		targets []string
+		want    string
+	}{
+		{[]string{"ok", "rejected"}, ""},
+		{[]string{"ok", "rejectd"}, `error else: no data link leads to "rejected" (did you mean "rejectd"?) (links to: ok, rejectd)`},
+		{[]string{"rejected"}, "warning else: the records that pass are dropped: only the link to the else transform leaves the filter"},
+	} {
+		ic := transform.NewInitContext(record.Schema{}.With("amount", record.Decimal))
+		ic.Targets = tt.targets
+		if _, err := tr.(transform.Initializer).Init(ic); err != nil {
+			t.Fatal(err)
+		}
+		var problems []string
+		for _, p := range ic.Problems() {
+			kind := "error"
+			if p.Warning {
+				kind = "warning"
+			}
+			problems = append(problems, fmt.Sprintf("%s %s: %s", kind, p.Path, p.Message))
+		}
+		if strings.Join(problems, "\n") != tt.want {
+			t.Errorf("%v: %v", tt.targets, problems)
+		}
+	}
+}
+
+// BenchmarkFilter: 1000 records through the condition, without and with else.
+func BenchmarkFilter(b *testing.B) {
+	for _, with := range []map[string]any{
+		{"condition": "{{ record.qty % 2 == 0 }}"},
+		{"condition": "{{ record.qty % 2 == 0 }}", "else": "rejected"},
+	} {
+		b.Run(fmt.Sprintf("else=%v", with["else"] != nil), func(b *testing.B) {
+			tr, err := newFilter(with)
+			if err != nil {
+				b.Fatal(err)
+			}
+			in := make([]record.Record, 1000)
+			b.ReportAllocs()
+			for b.Loop() {
+				for i := range in {
+					in[i] = item("pen", "1.10", int64(i))
+				}
+				if _, _, err := transformtest.RunRouted(context.Background(), tr, in...); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
