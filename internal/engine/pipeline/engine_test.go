@@ -571,6 +571,44 @@ links:
 	}
 }
 
+// core.filter with else (like "Send false data to" in Apache Hop): the records for which
+// the condition is false go to the else transform, the others to every other data link.
+func TestRunFilterElse(t *testing.T) {
+	body := `transforms:
+  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - id: check
+    type: core.filter
+    with:
+      condition: "{{ record.n <= 3 }}"
+      else: rejected
+  - { id: small, type: test.collect }
+  - { id: copy, type: test.collect }
+  - { id: rejected, type: test.collect }
+links:
+  - { from: gen, to: check }
+  - { from: check, to: small }
+  - { from: check, to: copy }
+  - { from: check, to: rejected }
+`
+	res, c, _ := run(context.Background(), t, body, nil)
+	if res.Status != Succeeded {
+		t.Fatalf("%s: %v", res.Status, res.Err)
+	}
+	if got := fmt.Sprint(len(c.recs["small"]), len(c.recs["copy"]), len(c.recs["rejected"])); got != "3 3 7" {
+		t.Errorf("small, copy, rejected = %s, want 3 3 7", got)
+	}
+	// The copies are records of their own.
+	c.recs["small"][0].Set("n", int64(99))
+	if v, _ := c.recs["copy"][0].Get("n"); v != int64(1) {
+		t.Errorf("copy %v", v)
+	}
+
+	p := parse(t, strings.Replace(body, "else: rejected", "else: rejectd", 1))
+	if got := Check(p, Options{Registry: testRegistry(c)}).Error(); !strings.Contains(got, `transform "check": no data link leads to "rejectd" (did you mean "rejected"?)`) {
+		t.Errorf("diags:\n%s", got)
+	}
+}
+
 func TestRunSwitchRoutesToSingleLinks(t *testing.T) {
 	body := `transforms:
   - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }

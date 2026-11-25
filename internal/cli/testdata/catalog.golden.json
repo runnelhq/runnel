@@ -1564,6 +1564,14 @@
             "examples": [
               "{{ record.amount \u003e 0 }}"
             ]
+          },
+          "else": {
+            "type": "string",
+            "description": "Transform for the records for which the condition is false; a data link must lead there, and the records that pass go to the other data links. Empty: they are dropped",
+            "format": "runnel-target",
+            "examples": [
+              "rejected"
+            ]
           }
         },
         "required": [
@@ -1571,7 +1579,7 @@
         ],
         "additionalProperties": false
       },
-      "example": "condition: \"{{ record.umsatz \u003e 0 \u0026\u0026 record.ort != '' }}\"\n",
+      "example": "condition: \"{{ record.umsatz \u003e 0 \u0026\u0026 record.ort != '' }}\"\nelse: rejected\n",
       "recordErrors": true,
       "parallel": true
     },
