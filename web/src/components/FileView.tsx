@@ -41,6 +41,8 @@ import { runTriggerTarget } from "../forms";
 import { MarkdownView } from "./MarkdownView";
 import { YamlEditor } from "./YamlEditor";
 import { Dialog } from "./Dialog";
+import { HelpPanel, type HelpTarget } from "./HelpPanel";
+import { useHelpRequests, type HelpRequest } from "../help";
 import { PropertiesPanel, type FieldValue, type LinkChange, type OnErrorChoices } from "./PropertiesPanel";
 import type { SettableKind } from "./LinkEdge";
 import type { PaletteTarget } from "./Palette";
@@ -181,6 +183,8 @@ export function FileView(props: {
   // A field of the properties panel to show and focus, e.g. after clicking a problem.
   const [focusField, setFocusField] = useState<{ key: string; seq: number } | null>(null);
   const [panel, setPanel] = useState(true);
+  // The help of a building block (mockup E15c), shown in place of the properties panel.
+  const [help, setHelp] = useState<HelpTarget | null>(null);
   // The transform whose fields are being detected (S46).
   const [detecting, setDetecting] = useState<string | null>(null);
   // Editing in the YAML view (E9): typed text waiting for the typing pause, a check on its way,
@@ -792,6 +796,22 @@ export function FileView(props: {
     return () => document.removeEventListener("paste", onPaste);
   }, [active, canvasEdit, paste]);
 
+  // Help (mockup E15c): requests of the palette, and F1 for the selected step.
+  // Opened from the palette, there is only × (decision for mockup E15c).
+  const onHelpRequest = useCallback((r: HelpRequest) => setHelp({ type: r.type, kind: r.kind, back: false }), []);
+  useHelpRequests(active && isGraph, onHelpRequest);
+  useEffect(() => {
+    if (!active || !graphKind) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "F1" || e.defaultPrevented) return;
+      e.preventDefault(); // instead of the help of the browser
+      const one = selection.actions.length === 1 ? graph?.actions?.find((a) => a.id === selection.actions[0]) : undefined;
+      if (one) setHelp({ type: one.type, kind: graphKind, back: panel && view === "canvas", step: one.id });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, graphKind, selection, graph, panel, view]);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 6000);
@@ -810,6 +830,10 @@ export function FileView(props: {
     setFocusLine(line);
     setYamlFocus((f) => ({ line, seq: (f?.seq ?? 0) + 1, from, to }));
   }, []);
+  const stepInYAML = (id: string) => {
+    const item = listItems(doc?.text ?? "", graphKind === "pipeline" ? "transforms" : "actions").find((i) => i.id === id);
+    if (item) showInYAML(item.from);
+  };
 
   // The reference (E18b): which file it helps with, and its requests to this file.
   const { onReference } = props;
@@ -923,6 +947,11 @@ export function FileView(props: {
   const slash = path.lastIndexOf("/");
   const editable = isGraph && !!graph;
   const showPanel = editable && view === "canvas" && panel;
+  // "Show <id> in YAML" only while the help is that of the selected step (decision for mockup E15c).
+  const helpStep =
+    help?.step && help.kind === graphKind && selection.actions.length === 1 && selection.actions[0] === help.step && graph?.actions?.find((a) => a.id === help.step)?.type === help.type
+      ? help.step
+      : undefined;
   // Workflows have the compact file bar of mockups E7/E8 in every view, with or without the
   // properties panel, so that nothing moves when switching between canvas and YAML: the
   // name with the path in its tooltip, "Copy path" as a symbol next to it, no kind badge.
@@ -1279,7 +1308,14 @@ export function FileView(props: {
           </div>
         )}
       </div>
-      {showPanel && graph && (
+      {help && graph ? (
+        <HelpPanel
+          target={{ ...help, step: helpStep }}
+          onOpen={(type, kind) => setHelp((h) => ({ type, kind, back: h?.back ?? false, step: h?.step }))}
+          onClose={() => setHelp(null)}
+          onShowInYAML={stepInYAML}
+        />
+      ) : showPanel && graph && (
         <PropertiesPanel
           workflow={graph}
           onOpenPlugin={(name) => props.onOpenFile?.(pluginFile(name))}
@@ -1296,9 +1332,9 @@ export function FileView(props: {
           onSetWorkflow={onSetWorkflow}
           onSetMap={onSetMap}
           onSetList={onSetList}
-          onShowInYAML={(id) => {
-            const item = listItems(doc?.text ?? "", graphKind === "pipeline" ? "transforms" : "actions").find((i) => i.id === id);
-            if (item) showInYAML(item.from);
+          onHelp={(id) => {
+            const type = graph.actions?.find((a) => a.id === id)?.type;
+            if (type && graphKind) setHelp({ type, kind: graphKind, back: true, step: id });
           }}
           onSetTexts={onSetTexts}
           onEntry={(e) => void onEntry(e)}

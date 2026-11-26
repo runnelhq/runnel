@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { requestHelp } from "../help";
 import { categoryLabel, groupLabel, paletteDrag, paletteGroup, paletteMime, tileColor, transformCategoryLabel, useCatalog, type Descriptor } from "../catalog";
 import { ActionIcon, ChevronIcon, SearchIcon } from "./Icons";
 
@@ -109,7 +110,13 @@ export function Palette(props: { target: PaletteTarget | null }) {
               {open && (
                 <ul className="m-0 list-none px-2 py-0">
                   {items.map((d) => (
-                    <Item key={d.type} d={d} editable={editable} blocked={!pipeline && d.type === "core.start" && !!props.target?.hasStart} />
+                    <Item
+                      key={d.type}
+                      d={d}
+                      editable={editable}
+                      blocked={!pipeline && d.type === "core.start" && !!props.target?.hasStart}
+                      onHelp={() => requestHelp(d.type, pipeline ? "pipeline" : "workflow")}
+                    />
                   ))}
                 </ul>
               )}
@@ -129,7 +136,7 @@ export function Palette(props: { target: PaletteTarget | null }) {
   );
 }
 
-function Item(props: { d: Descriptor; editable: boolean; blocked: boolean }) {
+function Item(props: { d: Descriptor; editable: boolean; blocked: boolean; onHelp: () => void }) {
   const { d, editable, blocked } = props;
   const enabled = editable && !blocked;
   return (
@@ -137,7 +144,14 @@ function Item(props: { d: Descriptor; editable: boolean; blocked: boolean }) {
       draggable={enabled}
       aria-disabled={!enabled}
       data-testid={`palette-${d.type}`}
-      title={blocked ? "The workflow already has a start action" : `${d.label} – ${d.description}`}
+      title={blocked ? "The workflow already has a start action" : `${d.label} – ${d.description}\nDrag to the canvas · ? or F1 for help`}
+      // F1 on the tile in focus (its "?") opens the help (mockup E15c); the file view leaves it alone.
+      onKeyDown={(e) => {
+        if (e.key === "F1") {
+          e.preventDefault();
+          props.onHelp();
+        }
+      }}
       onDragStart={(e) => {
         e.dataTransfer.setData(paletteMime, d.type);
         e.dataTransfer.effectAllowed = "copy";
@@ -147,7 +161,7 @@ function Item(props: { d: Descriptor; editable: boolean; blocked: boolean }) {
         paletteDrag.type = null;
       }}
       className={
-        "flex h-[34px] items-center gap-2 rounded-md px-2 " +
+        "group flex h-[34px] items-center gap-2 rounded-md pr-1.5 pl-2 " +
         (enabled ? "cursor-grab hover:bg-sidebar-accent" : editable ? "cursor-not-allowed opacity-45" : "cursor-default opacity-70")
       }
     >
@@ -161,6 +175,17 @@ function Item(props: { d: Descriptor; editable: boolean; blocked: boolean }) {
         <span className="block truncate">{d.label}</span>
         <small className="block truncate font-mono text-[10px] text-muted-foreground">{d.type}</small>
       </span>
+      {/* "?" on the tile under the mouse or in focus (mockup E15c), like the buttons of the explorer. */}
+      <button
+        type="button"
+        draggable={false}
+        aria-label={`Help for ${d.type}`}
+        title="Help (F1)"
+        onClick={props.onHelp}
+        className="ml-auto grid size-[22px] shrink-0 cursor-pointer place-items-center rounded-md border border-transparent bg-transparent text-xs leading-none font-semibold text-muted-foreground opacity-0 group-hover:opacity-100 hover:border-border hover:bg-accent hover:text-accent-foreground focus-visible:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+      >
+        ?
+      </button>
     </li>
   );
 }

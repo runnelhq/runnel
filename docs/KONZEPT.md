@@ -1004,7 +1004,7 @@ Alle Bausteine (eingebaut, JS, extern) beschreiben sich über denselben **Descri
 `type` bis `schema` gibt es seit E1 (`runnel catalog --json`); `example` (Hilfe im Panel, E14b), bei Transforms
 `recordErrors` (Fehler-Link erlaubt), `parallel` (`copies` erlaubt) und `detectFields` (S46) sind optional. Seit E15b
 beschreiben `outputs` (Teile von `result.output` bzw. gesetzte Felder), `records` (nur Transforms: weitergegebene
-Datensätze und Links), `errors` und `limits` Ergebnis, Fehlerverhalten und Grenzen ([ADR 0014](adr/0014-action-descriptor-schema.md)). Es gibt
+Datensätze und Links), `errors` und `limits` Ergebnis, Fehlerverhalten und Grenzen ([ADR 0014](adr/0014-action-descriptor-schema.md)); der Editor zeigt sie seit E15d1 in der Hilfe je Baustein. Es gibt
 **keine Ports**: Pipeline-Links sind Daten- oder Fehler-Links, weitere Ausgänge nennen Felder mit
 `format: runnel-target` (wie `to:` bei `core.switch`, [ADR 0021](adr/0021-unter-pipelines.md)). Eigene Icons von
 Plugins kommen erst als SVG-Pfaddaten (höchstens 4 KB, ADR 0019 Nachtrag); bis dahin zeigt der Editor das allgemeine Symbol. Eingebaute Bausteine erzeugen `schema` aus ihrem Konfigurations-Struct (Tags `json`, `doc`,

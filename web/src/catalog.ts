@@ -41,6 +41,21 @@ export interface Descriptor {
   infoInput?: boolean;
   /** The plugin the type comes from; missing for built-in types. */
   plugin?: string;
+  /** Actions: the parts of result.output; transforms: the fields set, "<…>" for names from the configuration (E15b). */
+  outputs?: OutputField[];
+  /** Transforms: which records it passes on and over which links (E15b). */
+  records?: string;
+  /** When the type fails and, for transforms, which records go to the error link (E15b). */
+  errors?: string;
+  /** Limits of size, number and time, with their defaults (E15b). */
+  limits?: string[];
+}
+
+/** A part of the output of an action or a field set by a transform (E15b). */
+export interface OutputField {
+  name: string;
+  type: string;
+  description: string;
 }
 
 /** Category colours of the tiles (design/README.md, chapter 3.3); transforms: KONZEPT 12.2. */
