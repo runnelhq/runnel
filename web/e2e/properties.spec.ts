@@ -276,11 +276,13 @@ test("lists the problems below the canvas and jumps to the field", async ({ page
 test("help with an example for every action, also without configuration", async ({ page }) => {
   await open(page);
   await select(page, "fetch-b");
-  await page.getByRole("button", { name: "Help" }).click();
+  // The Help section of E14 is one line now; the example is in the help (mockup E15c).
+  await page.getByRole("button", { name: /^Open help/ }).click();
   await expect(page.getByTestId("help-example")).toContainText("- id: fetch-b\n  type: core.wait\n  with:\n    duration: 30s");
   await expect(page.getByText("runnel catalog core.wait")).toBeVisible();
+  await page.getByRole("button", { name: "Properties", exact: true }).click();
   // The start action has no configuration: the example is the entry alone.
   await select(page, "start");
-  await page.getByRole("button", { name: "Help" }).click();
+  await page.getByRole("button", { name: /^Open help/ }).click();
   await expect(page.getByTestId("help-example")).toHaveText("- id: start\n  type: core.start\n");
 });

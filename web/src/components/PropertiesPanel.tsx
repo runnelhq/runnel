@@ -20,7 +20,7 @@ import {
   type Workflow,
 } from "../workflow";
 import type { Selection } from "./Canvas";
-import { ActionIcon, ArrowDownIcon, ArrowUpIcon, ChevronIcon, CloseIcon, DetectIcon, EyeIcon, PipelineIcon, PlugIcon, TrashIcon, WorkflowIcon } from "./Icons";
+import { ActionIcon, ArrowDownIcon, ArrowUpIcon, BookIcon, ChevronIcon, CloseIcon, DetectIcon, EyeIcon, PipelineIcon, PlugIcon, TrashIcon, WorkflowIcon } from "./Icons";
 import { pluginInMessage } from "../plugins";
 import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
@@ -69,8 +69,8 @@ export interface PropertiesProps {
   onDetectFields?: (id: string) => void;
   /** Pipelines: runs the data preview up to a transform (S44). */
   onPreview?: (id: string) => void;
-  /** Shows a transform in the YAML view (help, E14b). */
-  onShowInYAML?: (id: string) => void;
+  /** Opens the help of the selected step (mockup E15c). */
+  onHelp?: (id: string) => void;
   /** Choices of settings.onError (S72b): the workflows of the project, that of project.yaml and the open file. */
   onErrorChoices?: OnErrorChoices;
 }
@@ -306,7 +306,20 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           <h3 className="m-0 text-base leading-tight font-semibold">
             {d?.label ?? (blocked ? `${pipeline ? "Transform" : "Action"} of plugin ${blocked.name}` : `Unknown ${pipeline ? "transform" : "action"} type`)}
           </h3>
-          <div className="font-mono text-2xs text-muted-foreground">{action.type}</div>
+          <div className="flex items-center gap-1 font-mono text-2xs text-muted-foreground">
+            {action.type}
+            {d && props.onHelp && (
+              <button
+                type="button"
+                aria-label={`Help for ${action.type}`}
+                title="Open help (F1)"
+                onClick={() => props.onHelp!(action.id)}
+                className="grid size-5 cursor-pointer place-items-center rounded-full border border-border bg-transparent font-sans text-xs leading-none font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                ?
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {!d && blocked ? (
@@ -375,7 +388,6 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           )}
         </Section>
       )}
-      {d && <HelpSection id={action.id} type={action.type} example={d.example} onShowInYAML={props.onShowInYAML} />}
       {detect && (
         <FieldsSection value={action.with?.fields} problems={at("with.fields", "fields")} onDetect={props.onDetectFields && (() => props.onDetectFields!(action.id))} />
       )}
@@ -387,46 +399,31 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
           execution
         )}
       </Section>
+      {d && props.onHelp && <OpenHelp onOpen={() => props.onHelp!(action.id)} />}
       {pipeline && <IncomingFields workflow={workflow} action={action} schemas={props.schemas} />}
     </div>
   );
 }
 
-/**
- * Help of an action or transform (mockup E14, state "help"): a short example of its
- * configuration from the descriptor, to look at, copy or compare with the YAML view.
- */
-function HelpSection(props: { id: string; type: string; example?: string; onShowInYAML?: (id: string) => void }) {
-  const [copied, setCopied] = useState(false);
-  const snippet =
-    `- id: ${props.id}\n  type: ${props.type}\n` +
-    (props.example ? "  with:\n" + props.example.replace(/\n$/, "").replace(/^/gm, "    ") + "\n" : "");
-  const button = "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted";
+/** The help of the step is in its own panel (mockup E15c): one line to open it. */
+function OpenHelp(props: { onOpen: () => void }) {
   return (
-    <Section title="Help" summary="example" defaultOpen={false}>
-      <pre data-testid="help-example" className="mx-4 mt-0 mb-2 overflow-auto rounded-md bg-muted px-2.5 py-2 font-mono text-2xs leading-relaxed text-foreground">
-        {snippet}
-      </pre>
-      <div className="mx-4 mb-2 flex gap-1.5">
-        {props.onShowInYAML && (
-          <button type="button" className={button} onClick={() => props.onShowInYAML!(props.id)}>
-            Show in YAML
-          </button>
-        )}
+    <div className="mt-2 border-t border-border">
+      <h4 className="m-0 flex h-[34px] items-center gap-1.5 px-4 text-xs font-semibold">
+        <BookIcon width={13} height={13} />
+        Help
+      </h4>
+      <div className="mx-4 mb-3 flex items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-2 text-2xs text-muted-foreground">
+        Fields, output, errors, limits and an example
         <button
           type="button"
-          className={button}
-          onClick={() => {
-            void navigator.clipboard?.writeText(snippet).then(() => setCopied(true));
-          }}
+          onClick={props.onOpen}
+          className="ml-auto inline-flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2 text-2xs font-medium whitespace-nowrap text-foreground hover:bg-muted"
         >
-          {copied ? "Copied" : "Copy example"}
+          Open help <kbd className="font-mono text-[10px] opacity-75">F1</kbd>
         </button>
       </div>
-      <p className="mx-4 mt-0 mb-3 rounded-md bg-muted px-2.5 py-2 text-2xs text-muted-foreground">
-        All fields with types and defaults: <span className="font-mono">runnel catalog {props.type}</span>
-      </p>
-    </Section>
+    </div>
   );
 }
 

@@ -176,10 +176,10 @@ test("offers the targets of the data links", async ({ page }) => {
 
 test("help with an example of the configuration", async ({ page }) => {
   await open(page, "tag");
-  await page.getByRole("button", { name: "Help" }).click();
+  await page.getByRole("button", { name: /^Open help/ }).click();
   await expect(page.getByTestId("help-example")).toContainText("- id: tag\n  type: core.constant\n  with:\n    fields:");
   await expect(page.getByText("runnel catalog core.constant")).toBeVisible();
-  await page.getByRole("button", { name: "Show in YAML" }).click();
+  await page.getByRole("button", { name: "Show tag in YAML" }).click();
   const line = original.split("\n").findIndex((l) => l.includes("id: tag")) + 1;
   await expect(page.getByTestId("file-summary")).toContainText(`Ln ${line},`);
 });

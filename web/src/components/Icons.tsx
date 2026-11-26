@@ -87,6 +87,20 @@ export const ChevronIcon = ({ open, ...p }: P & { open: boolean }) => (
   </Icon>
 );
 
+/** Back to the previous panel (help, mockup E15c): a chevron to the left. */
+export const BackIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M15 6l-6 6 6 6" />
+  </Icon>
+);
+
+/** Help of a building block (mockup E15c): a book. */
+export const BookIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7" />
+  </Icon>
+);
+
 export const ReloadIcon = (p: P) => (
   <Icon {...p}>
     <path d="M20 11a8 8 0 0 0-14.6-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5L20 16M20 20v-4h-4" />
