@@ -48,7 +48,7 @@ func TestContract(t *testing.T) {
 			if _, err := json.Marshal(desc); err != nil {
 				t.Errorf("descriptor cannot be written as JSON: %v", err)
 			}
-			if _, err := def.New(sample(desc.Schema)); err != nil {
+			if _, err := def.New(sampleOf(typ, desc.Schema)); err != nil {
 				t.Errorf("configuration built from the schema was rejected (Config and New must use the same struct): %v", err)
 			}
 			checkExample(t, def, desc.Schema)
@@ -68,6 +68,19 @@ func checkSchema(t *testing.T, s *schema.Schema, path string) {
 	if s.Items != nil {
 		checkSchema(t, s.Items, path+"[]")
 	}
+}
+
+// leaveOut are fields the sample of a type must not set, because they exclude another
+// one: core.script takes either script or file.
+var leaveOut = map[string][]string{"core.script": {"file"}}
+
+// sampleOf is sample for a transform type.
+func sampleOf(typ string, s *schema.Schema) map[string]any {
+	with := sample(s)
+	for _, name := range leaveOut[typ] {
+		delete(with, name)
+	}
+	return with
 }
 
 func sample(s *schema.Schema) map[string]any {
@@ -117,7 +130,7 @@ func TestContractCancellation(t *testing.T) {
 	for _, typ := range r.Types() {
 		def, _ := r.Lookup(typ)
 		desc, _ := r.Descriptor(typ)
-		tr, err := def.New(sample(desc.Schema))
+		tr, err := def.New(sampleOf(typ, desc.Schema))
 		if err != nil {
 			t.Errorf("%s: %v", typ, err)
 			continue

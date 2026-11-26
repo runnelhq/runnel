@@ -371,9 +371,11 @@ func (w *Workflow) validate() error {
 			add(path+".parallel", "%s: parallel must be between 1 and %d", label, MaxParallel)
 		}
 		with := a.With
-		if field, ok := CodeFields[a.Type]; ok && with != nil {
+		if fields, ok := CodeFields[a.Type]; ok && with != nil {
 			with = maps.Clone(with)
-			delete(with, field) // code, not expressions (ADR 0028)
+			for _, field := range fields {
+				delete(with, field) // code, not expressions (ADR 0028)
+			}
 		}
 		checkWith(path+".with", label, with, roots)
 		switch a.Join {

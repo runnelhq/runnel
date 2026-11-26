@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -226,7 +227,8 @@ func build(p *model.Pipeline, opts Options) (*Runner, model.Errors) {
 				t.ID, t.Type, opts.Registry.Types()))
 			continue
 		}
-		with, err := expandWith(t.With, opts.Scope, fieldsWith(opts.Registry, t.Type, schema.FormatSecret), fieldsWith(opts.Registry, t.Type, schema.FormatSQL))
+		with, err := expandWith(t.With, opts.Scope, fieldsWith(opts.Registry, t.Type, schema.FormatSecret),
+			fieldsWith(opts.Registry, t.Type, schema.FormatSQL, schema.FormatScript), fieldsWith(opts.Registry, t.Type, schema.FormatParams))
 		if err == nil {
 			r.transforms[i], err = def.New(asText(with, opts.Registry, t.Type))
 		}
@@ -510,16 +512,16 @@ func asText(with map[string]any, reg *transform.Registry, typ string) map[string
 	return out
 }
 
-// fieldsWith returns the fields of a transform type with a format, e.g. the fields for
-// secrets or SQL statements (ADR 0022).
-func fieldsWith(reg *transform.Registry, typ, format string) map[string]bool {
+// fieldsWith returns the fields of a transform type with one of the formats, e.g. the
+// fields for secrets or SQL statements (ADR 0022).
+func fieldsWith(reg *transform.Registry, typ string, formats ...string) map[string]bool {
 	d, ok := reg.Descriptor(typ)
 	if !ok || d.Schema == nil {
 		return nil
 	}
 	var out map[string]bool
 	for _, p := range d.Schema.Properties {
-		if p.Schema.Format == format {
+		if slices.Contains(formats, p.Schema.Format) {
 			if out == nil {
 				out = map[string]bool{}
 			}
@@ -529,10 +531,12 @@ func fieldsWith(reg *transform.Registry, typ, format string) map[string]bool {
 	return out
 }
 
-// expandWith is expand with the fields for secrets resolved by ExpandSecret and the SQL
-// statements (literal) passed as written: their values come as parameters @name.
-func expandWith(v map[string]any, scope *vars.Scope, secret, literal map[string]bool) (map[string]any, error) {
-	if scope == nil || (len(secret) == 0 && len(literal) == 0) {
+// expandWith is expand with the fields for secrets resolved by ExpandSecret, the SQL
+// statements and scripts (literal) passed as written – their values come as parameters
+// – and the values for a script (params, ADR 0028): one with ${secret:…} like a field
+// for a secret, the others like any value.
+func expandWith(v map[string]any, scope *vars.Scope, secret, literal, params map[string]bool) (map[string]any, error) {
+	if scope == nil || (len(secret) == 0 && len(literal) == 0 && len(params) == 0) {
 		return expand(v, scope)
 	}
 	rest := maps.Clone(v)
@@ -552,6 +556,26 @@ func expandWith(v map[string]any, scope *vars.Scope, secret, literal map[string]
 			resolved[k] = x
 			delete(rest, k)
 		}
+	}
+	for k := range params {
+		m, ok := v[k].(map[string]any)
+		if !ok {
+			continue
+		}
+		e := make(map[string]any, len(m))
+		for name, x := range m {
+			var err error
+			if s, isText := x.(string); isText && strings.Contains(s, "${secret:") {
+				e[name], err = scope.ExpandSecret(s)
+			} else {
+				e[name], err = expandValue(x, scope)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("%s.%s: %w", k, name, err)
+			}
+		}
+		resolved[k] = e
+		delete(rest, k)
 	}
 	out, err := expand(rest, scope)
 	if err != nil {

@@ -81,8 +81,8 @@ const FormatProgram = "runnel-program"
 const FormatScript = "runnel-script"
 
 // FormatParams marks the values for a script, e.g. params of core.script (ADR 0028): a
-// mapping whose values may use ${…} and {{ … }}; a value that is ${secret:…} alone is
-// resolved like a field for a secret.
+// mapping whose values may use ${…} and, in workflows, {{ … }}; a value that is
+// ${secret:…} alone is resolved like a field for a secret.
 const FormatParams = "runnel-params"
 
 // FormatSecret marks a field that holds a secret, e.g. a password or token (ADR 0022):

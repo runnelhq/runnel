@@ -176,3 +176,39 @@ Typen, `fields`, `init`/`end`, Fehler-Link, Benchmark; **S73c** Editor (Hervorhe
 - **Rückgabe:** ganze Zahlen (bis ±2^53, `BigInt` bis int64) als `int`, andere als `float`; `NaN` und `Infinity`
   werden leer (wie bei `JSON.stringify`); `Date` als Zeitpunkt; Methoden in Objekten entfallen, eine Funktion oder ein
   Symbol als Wert ist ein Fehler. `decimal` kommt mit seinen Nachkommastellen als Text (`"12.50"`).
+
+## Nachtrag 2026-11-26 (S73b): Transform
+
+- **Gültigkeitsbereich:** `init` läuft als Skript auf **oberster Ebene** der Laufzeit. Seine Deklarationen (`let`,
+  `const`, `var`, `function`) sind global und für `script` und `end` sichtbar; ein Datensatz kann sie ändern (Zähler,
+  Summen). `script` (bzw. `file`) ist der Rumpf einer Funktion mit dem Parameter `record`, `end` der Rumpf einer
+  Funktion ohne Parameter. `params` ist eine globale Variable, einmal je Lauf umgewandelt. Je Kopie gibt es eine
+  eigene Laufzeit, also eigene globale Variablen, und `init` und `end` laufen je Kopie.
+- **`params`:** Im Transform werden nur `${…}` aufgelöst (ein eigener Wert darf `${secret:…}` sein, maskiert);
+  `{{ … }}` bleibt Text. Werte des Laufs stehen in Pipelines ohnehin über `${…}` bereit. So wird nie ein aufgelöster
+  Wert (z. B. ein Secret) als Ausdruck ausgewertet.
+- **Rückgabe:** Ein Objekt (nur ein einfaches Objekt, kein `Date`, kein `Uint8Array`) ist ein Datensatz mit den
+  Eigenschaften in ihrer Reihenfolge; Methoden entfallen. Ein Array von Objekten sind mehrere Datensätze, `null` und
+  `undefined` keiner. Ein anderer Wert ist ein Fehler des Datensatzes. Ohne `fields` gelten die Regeln der Action
+  (ganze Zahl → `int`, sonst `float`, `Date` → `datetime`, `BigInt` → `int`, Objekt oder Array → `json`), dazu
+  `Uint8Array` und `ArrayBuffer` → `binary` (auch für die Action).
+- **`fields`:** `[{ name, type }]` ohne `format`; jeder Wert wird wie mit `core.convert` umgewandelt, `binary` nur aus
+  `Uint8Array`/`ArrayBuffer`. Der Datensatz hat genau die deklarierten Felder in ihrer Reihenfolge; eine fehlende
+  Eigenschaft ist leer. Eigenschaften, die nicht in `fields` stehen, **entfallen** (passend zum geschlossenen Schema),
+  mit einer Warnung im Log je Name einmal je Lauf. Ein Wert, der nicht passt, schickt den eingehenden Datensatz auf den
+  Fehler-Link (`_errorField` ist das Feld).
+- **Meldungen:** `record 3: script, line 2: bad value` (bzw. mit dem Pfad der Datei), bei Umwandlung
+  `record 3: field "amount": …`, bei Zeitüberschreitung `record 3: script: the script took longer than maxRecordTime
+  (1s)`. Am Ende ein Info-Log „2 of 100 records with errors“.
+- **Zeit:** `maxRecordTime` gilt je Aufruf des Skripts für einen Datensatz, nicht für `init` und `end`; sie begrenzt
+  nur ein Abbruch des Laufs. Ein Timer je Kopie wird je Datensatz neu gestellt (keine Goroutine und kein Kontext je
+  Datensatz). Nach einer Unterbrechung ist die Laufzeit für den nächsten Datensatz wieder nutzbar. Eine Exception in
+  `init` oder `end` beendet die Pipeline mit dem Fehler.
+- **`console`:** höchstens 1.000 Zeilen je Lauf einer Kopie (über alle Datensätze, `init` und `end`).
+- **Prüfung:** `script`, `init` und `end` sind Felder mit Code (`model.CodeFields` gilt jetzt auch in Pipelines);
+  `file` darf kein `${…}` und kein `{{ … }}` enthalten. Syntaxfehler im Code meldet schon `runnel validate`.
+- **Leistung:** `BenchmarkScriptTransform` (100.000 Datensätze mit 5 Feldern, `{ ...record, total: … }`) ergibt
+  95.000–118.000 Datensätze/s auf einem Kern des Testrechners (3,5 KB und 102 Allokationen je Datensatz), also etwa
+  das Ziel, nicht deutlich darüber. Die Kosten liegen überwiegend in goja
+  (Objekte anlegen, Spread, Eigenschaften lesen); Laufzeit und übersetzter Code werden je Kopie wiederverwendet. Mehr
+  Durchsatz bringt `copies`.

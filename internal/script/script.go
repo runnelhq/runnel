@@ -4,7 +4,7 @@
 // from the folder scripts/ of the project; context cancellation interrupts a script.
 //
 // A Runtime is not safe for concurrent use: one per execution of the action, or one per
-// copy of a transform (S73b).
+// copy of the transform, which calls its code with a Session (S73b).
 package script
 
 import (
@@ -70,10 +70,9 @@ type Function struct {
 // given parameter names; name stands for the code in messages, e.g. "script" or a file.
 // The lines of the body keep their numbers in messages.
 func (r *Runtime) Compile(name, body string, params ...string) (*Function, error) {
-	src := "(function(" + strings.Join(params, ", ") + ") {" + body + "\n})"
-	prg, err := goja.Compile(name, src, false)
+	prg, err := parse(name, body, params)
 	if err != nil {
-		return nil, syntaxError(name, err)
+		return nil, err
 	}
 	v, err := r.vm.RunProgram(prg)
 	if err != nil {
@@ -84,6 +83,29 @@ func (r *Runtime) Compile(name, body string, params ...string) (*Function, error
 		return nil, fmt.Errorf("%s: not a function", name)
 	}
 	return &Function{name: name, fn: fn}, nil
+}
+
+// Check reports syntax errors of code as Compile (fn: the body of a function with the
+// given parameters) or Session.Run (not fn) would, without a runtime.
+func Check(name, code string, fn bool, params ...string) error {
+	if fn {
+		_, err := parse(name, code, params)
+		return err
+	}
+	if _, err := goja.Compile(name, code, false); err != nil {
+		return syntaxError(name, err)
+	}
+	return nil
+}
+
+// parse compiles the body of a function.
+func parse(name, body string, params []string) (*goja.Program, error) {
+	src := "(function(" + strings.Join(params, ", ") + ") {" + body + "\n})"
+	prg, err := goja.Compile(name, src, false)
+	if err != nil {
+		return nil, syntaxError(name, err)
+	}
+	return prg, nil
 }
 
 // Call runs a function with Go values as arguments (see Value) and returns its result

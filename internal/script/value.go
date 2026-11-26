@@ -26,7 +26,8 @@ const maxDepth = 100
 // Value converts a Go value of a run to JavaScript (ADR 0028): texts, numbers and
 // true/false as they are, integers beyond ±2^53 as BigInt, decimal numbers and dates
 // as text ("12.50", "2026-11-25"), times as Date, bytes as Uint8Array, maps as objects
-// (keys sorted) and slices as arrays; nil is null. Other values become text.
+// (keys sorted), records as objects (fields in their order) and slices as arrays; nil is
+// null. Other values become text.
 func (r *Runtime) Value(v any) goja.Value {
 	switch v := v.(type) {
 	case nil:
@@ -71,6 +72,12 @@ func (r *Runtime) Value(v any) goja.Value {
 			items[i] = r.Value(x)
 		}
 		return r.vm.NewArray(items...)
+	case record.Record:
+		obj := r.vm.NewObject()
+		for _, f := range v.Fields() {
+			_ = obj.Set(f.Name, r.Value(f.Value))
+		}
+		return obj
 	case []map[string]any:
 		items := make([]any, len(v))
 		for i, x := range v {
@@ -99,13 +106,19 @@ func (r *Runtime) Value(v any) goja.Value {
 
 // Export converts a JavaScript value to Go (ADR 0028): text, whole numbers as int64,
 // other numbers as float64 (NaN and Infinity as nil, like JSON.stringify), BigInt as
-// int64, true/false, Date as time.Time, arrays as []any and objects as map[string]any;
+// int64, true/false, Date as time.Time, Uint8Array and ArrayBuffer as []byte, arrays as
+// []any and objects as map[string]any;
 // null and undefined are nil. Functions, symbols and results larger than
 // MaxResultBytes (as JSON) are errors.
 func (r *Runtime) Export(v goja.Value) (any, error) {
 	size := 0
 	return r.export(v, 0, &size)
 }
+
+var (
+	typeBytes       = reflect.TypeFor[[]byte]()
+	typeArrayBuffer = reflect.TypeFor[goja.ArrayBuffer]()
+)
 
 var errTooLarge = fmt.Errorf("the result is larger than %d MiB", MaxResultBytes>>20)
 
@@ -162,6 +175,20 @@ func (r *Runtime) export(v goja.Value, depth int, size *int) (any, error) {
 	case "Boolean":
 		*size += 5
 		return obj.ToBoolean(), nil
+	}
+	switch obj.ExportType() {
+	case typeBytes, typeArrayBuffer:
+		var b []byte
+		switch x := obj.Export().(type) {
+		case []byte:
+			b = slices.Clone(x)
+		case goja.ArrayBuffer:
+			b = slices.Clone(x.Bytes())
+		}
+		if *size += len(b)*4/3 + 2; *size > MaxResultBytes {
+			return nil, errTooLarge
+		}
+		return b, nil
 	}
 	keys := obj.Keys()
 	out := make(map[string]any, len(keys))

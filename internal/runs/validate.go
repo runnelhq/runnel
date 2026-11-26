@@ -71,6 +71,7 @@ func CheckPipeline(p *model.Pipeline, diags model.Errors, registry *transform.Re
 	}
 	diags = append(diags, p.CheckSecrets(TransformSecretField(registry), nil)...)
 	diags = append(diags, p.CheckSQL(TransformSQLField(registry))...)
+	diags = append(diags, p.CheckScript(TransformScriptField(registry))...)
 	if project != nil {
 		diags = append(diags, checkConnectionRefs(pipelineSteps(p, registry), project)...)
 		diags = append(diags, CheckOnError(p.ErrorAt, p.WarningAt, p.Settings.OnError, project.Dir, "")...)

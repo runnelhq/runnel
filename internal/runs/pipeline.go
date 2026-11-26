@@ -91,7 +91,7 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 		limit := min(max(spec.Preview.Limit, 1), MaxPreviewLimit)
 		opts.InputLimit, opts.SampleRows = limit, limit
 	}
-	if errs := pl.CheckSQL(TransformSQLField(spec.Registry)); len(errs) > 0 {
+	if errs := append(pl.CheckSQL(TransformSQLField(spec.Registry)), pl.CheckScript(TransformScriptField(spec.Registry))...); len(errs) > 0 {
 		return p, errs
 	}
 	scope, mask := secretScope(model.PipelineScope(pl, p.Project, p.Env, spec.Params))

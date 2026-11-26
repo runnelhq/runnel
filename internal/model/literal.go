@@ -48,6 +48,17 @@ func (w *Workflow) CheckScript(isScript func(typ, field string) bool) Errors {
 	}), "the script file must not contain ${…} or {{ … }}: write its path as it is and give values under params, so that values cannot choose the script")...)
 }
 
+// CheckScript is Workflow.CheckScript for the transforms of a pipeline: the file of a
+// script must not contain ${…} or {{ … }}.
+func (pl *Pipeline) CheckScript(isScript func(typ, field string) bool) Errors {
+	types := make([]string, len(pl.Transforms))
+	for i, t := range pl.Transforms {
+		types[i] = t.Type
+	}
+	return checkLiteral(pl.src, stepSecretPaths("transforms", types, isScript),
+		"the script file must not contain ${…} or {{ … }}: write its path as it is and give values under params, so that values cannot choose the script")
+}
+
 // checkLiteral reports ${…} and {{ … }} in fields that are passed as written.
 func checkLiteral(s *source, is func(path string) bool, msg string) Errors {
 	var errs Errors
