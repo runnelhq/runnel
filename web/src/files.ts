@@ -296,7 +296,7 @@ export function template(kind: NewKind, name: string, firstWorkflow?: string): s
     case "workflow":
       return head("Workflow") + "actions:\n  - id: start\n    type: core.start\nlayout:\n  start: { x: 40, y: 120 }\n";
     case "pipeline":
-      return head("Pipeline") + "transforms:\n  - id: rows\n    type: core.generate-rows\n    with:\n      rows: 3\nlayout:\n  rows: { x: 40, y: 120 }\n";
+      return head("Pipeline") + "transforms:\n  - id: rows\n    type: core.generate-rows\n    with:\n      count: 3\nlayout:\n  rows: { x: 40, y: 120 }\n";
     case "trigger":
       return (
         head("Trigger") +

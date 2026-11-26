@@ -182,7 +182,7 @@ func finished(events []Event, id string) Event {
 func TestRunChainCountsRecords(t *testing.T) {
 	res, c, events := run(context.Background(), t, `
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 100, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 100, numberField: n } }
   - { id: pass, type: core.dummy }
   - { id: sink, type: test.collect }
 links:
@@ -213,7 +213,7 @@ links:
 func TestRunCopiesToAllOutputsAndMergesInputs(t *testing.T) {
 	res, c, _ := run(context.Background(), t, `
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 50 } }
+  - { id: gen, type: core.generate-rows, with: { count: 50 } }
   - { id: a, type: test.change }
   - { id: b, type: test.collect }
   - { id: both, type: test.collect }
@@ -243,7 +243,7 @@ links:
 func TestRunFailureStopsAllTransforms(t *testing.T) {
 	res, _, events := run(context.Background(), t, `
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 100000000 } }
+  - { id: gen, type: core.generate-rows, with: { count: 100000000 } }
   - { id: bad, type: test.fail, with: { after: 30 } }
 links:
   - { from: gen, to: bad }
@@ -263,7 +263,7 @@ links:
 func TestRunPanicBecomesError(t *testing.T) {
 	res, _, _ := run(context.Background(), t, `
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 10 } }
+  - { id: gen, type: core.generate-rows, with: { count: 10 } }
   - { id: p, type: test.panic }
 links:
   - { from: gen, to: p }
@@ -278,7 +278,7 @@ func TestRunTransformThatStopsReadingDoesNotBlock(t *testing.T) {
 	go func() {
 		res, _, _ := run(context.Background(), t, `
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 10000 } }
+  - { id: gen, type: core.generate-rows, with: { count: 10000 } }
   - { id: first, type: test.first }
   - { id: sink, type: test.collect }
 links:
@@ -302,7 +302,7 @@ func TestRunCancelled(t *testing.T) {
 	time.AfterFunc(50*time.Millisecond, cancel)
 	res, _, _ := run(ctx, t, `
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1000000000 } }
+  - { id: gen, type: core.generate-rows, with: { count: 1000000000 } }
   - { id: pass, type: core.dummy }
 links:
   - { from: gen, to: pass }
@@ -318,7 +318,7 @@ func TestPrepareErrors(t *testing.T) {
 parameters:
   - { name: N, default: "x" }
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: "${MISSING}" } }
+  - { id: gen, type: core.generate-rows, with: { count: "${MISSING}" } }
   - { id: what, type: core.nothing }
   - { id: log, type: core.log, with: { level: loud } }
 `)
@@ -326,7 +326,7 @@ transforms:
 	diags := Check(p, Options{Registry: testRegistry(c), Scope: scope})
 	got := diags.Error()
 	for _, want := range []string{
-		`transform "gen" (core.generate-rows): rows: variable "MISSING" is undefined`,
+		`transform "gen" (core.generate-rows): count: variable "MISSING" is undefined`,
 		`transform "what": unknown transform type "core.nothing"`,
 		`transform "log" (core.log): invalid level "loud"`,
 	} {
@@ -346,7 +346,7 @@ func TestRunManyRowsWithConstantMemory(t *testing.T) {
 	c := &collected{recs: map[string][]record.Record{}}
 	p := parse(t, fmt.Sprintf(`
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: %d, rowNumberField: n, fields: [ { name: text, value: "some text of a record" } ] } }
+  - { id: gen, type: core.generate-rows, with: { count: %d, numberField: n, fields: [ { name: text, value: "some text of a record" } ] } }
   - { id: pass, type: core.dummy }
   - { id: log, type: core.log, with: { every: 1000000, level: debug } }
 links:
@@ -394,7 +394,7 @@ func TestPrepareDerivesSchemas(t *testing.T) {
 	// Closed schema from generate-rows, passed on by dummy: a typo is an error.
 	_, err := prepare(`
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n, fields: [ { name: status, value: new } ] } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n, fields: [ { name: status, value: new } ] } }
   - { id: pass, type: core.dummy }
   - { id: show, type: core.log, with: { fields: [n, stauts] } }
 links:
@@ -409,7 +409,7 @@ links:
 	// test.open reports an open schema with the known fields: an unknown field is only a warning.
 	r, err := prepare(`
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
   - { id: open, type: test.open }
   - { id: show, type: core.log, with: { fields: [n, nn] } }
 links:
@@ -425,7 +425,7 @@ links:
 	// After a transform without Init nothing is known: no warning at all.
 	r, err = prepare(`
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1 } }
+  - { id: gen, type: core.generate-rows, with: { count: 1 } }
   - { id: other, type: test.collect }
   - { id: show, type: core.log, with: { fields: [anything] } }
 links:
@@ -442,8 +442,8 @@ links:
 	// Two inputs: the schemas are merged.
 	r, err = prepare(`
 transforms:
-  - { id: a, type: core.generate-rows, with: { rows: 1, rowNumberField: n, fields: [ { name: x, value: 1 } ] } }
-  - { id: b, type: core.generate-rows, with: { rows: 1, rowNumberField: n, fields: [ { name: x, value: text } ] } }
+  - { id: a, type: core.generate-rows, with: { count: 1, numberField: n, fields: [ { name: x, value: 1 } ] } }
+  - { id: b, type: core.generate-rows, with: { count: 1, numberField: n, fields: [ { name: x, value: text } ] } }
   - { id: both, type: core.dummy }
 links:
   - { from: a, to: both }
@@ -465,7 +465,7 @@ func TestRunPassesValuesToExpressions(t *testing.T) {
 	body := `parameters:
   - { name: MIN, type: integer, default: "4" }
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 10, numberField: n } }
   - id: keep
     type: core.filter
     with: { condition: "{{ record.n > params.MIN && run.pipeline == 'test' && run.id == 'R1' && vars.MIN == '6' }}" }
@@ -488,7 +488,7 @@ links:
 
 func TestRunErrorLinks(t *testing.T) {
 	body := `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 20, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 20, numberField: n } }
   - { id: check, type: test.odd }
   - { id: good, type: test.collect }
   - { id: bad, type: test.collect }
@@ -532,7 +532,7 @@ links:
 	}
 
 	// Without an error link, a record error stops the pipeline.
-	res, _, _ = run(context.Background(), t, "transforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 3, rowNumberField: n } }\n  - { id: check, type: test.odd }\nlinks:\n  - { from: gen, to: check }\n", nil)
+	res, _, _ = run(context.Background(), t, "transforms:\n  - { id: gen, type: core.generate-rows, with: { count: 3, numberField: n } }\n  - { id: check, type: test.odd }\nlinks:\n  - { from: gen, to: check }\n", nil)
 	if res.Status != Failed || res.Err.Error() != `transform "check": odd number 1` {
 		t.Errorf("without error link: %s %v", res.Status, res.Err)
 	}
@@ -541,7 +541,7 @@ links:
 func TestPrepareErrorLinks(t *testing.T) {
 	c := &collected{recs: map[string][]record.Record{}}
 	p := parse(t, `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
   - { id: pass, type: core.dummy }
   - { id: check, type: test.odd }
   - { id: log, type: core.log, with: { fields: [n, _error, nn] } }
@@ -575,7 +575,7 @@ links:
 // the condition is false go to the else transform, the others to every other data link.
 func TestRunFilterElse(t *testing.T) {
 	body := `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 10, numberField: n } }
   - id: check
     type: core.filter
     with:
@@ -611,14 +611,14 @@ links:
 
 func TestRunSwitchRoutesToSingleLinks(t *testing.T) {
 	body := `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 10, numberField: n } }
   - id: route
     type: core.switch
     with:
       cases:
         - { when: "{{ record.n <= 3 }}", to: small }
         - { when: "{{ record.n % 2 == 0 }}", to: even }
-      default: rest
+      else: rest
   - { id: small, type: test.collect }
   - { id: even, type: test.collect }
   - { id: rest, type: test.collect }
@@ -644,11 +644,11 @@ links:
 	}
 
 	// A target without a link is found before the run, with its position.
-	p := parse(t, strings.Replace(body, "default: rest", "default: rst", 1))
+	p := parse(t, strings.Replace(body, "else: rest", "else: rst", 1))
 	diags := Check(p, Options{Registry: testRegistry(c)})
 	got = diags.Error()
 	if len(diags) != 2 || !diags.HasErrors() ||
-		!strings.Contains(got, `test.pipeline.yaml:12:16: transform "route": no data link leads to "rst" (did you mean "rest"?) (links to: small, even, rest)`) ||
+		!strings.Contains(got, `test.pipeline.yaml:12:13: transform "route": no data link leads to "rst" (did you mean "rest"?) (links to: small, even, rest)`) ||
 		!strings.Contains(got, `test.pipeline.yaml:9:7: warning: transform "route": the link to "rest" gets no records`) {
 		t.Errorf("diags:\n%s", got)
 	}
@@ -656,7 +656,7 @@ links:
 
 func TestRunCopies(t *testing.T) {
 	body := `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1000, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1000, numberField: n } }
   - id: even
     type: core.filter
     copies: 4
@@ -699,7 +699,7 @@ links:
 
 func TestRunCopyFailureStopsAll(t *testing.T) {
 	body := `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 100, rowNumberField: n, fields: [{ name: s, value: a }] } }
+  - { id: gen, type: core.generate-rows, with: { count: 100, numberField: n, fields: [{ name: s, value: a }] } }
   - id: check
     type: core.filter
     copies: 3
@@ -715,8 +715,8 @@ links:
 
 func TestRunDistribute(t *testing.T) {
 	body := `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 9, rowNumberField: n } }
-  - { id: split, type: core.dummy, distribution: distribute }
+  - { id: gen, type: core.generate-rows, with: { count: 9, numberField: n } }
+  - { id: split, type: core.dummy, distribution: roundRobin }
   - { id: a, type: test.collect }
   - { id: b, type: test.collect }
   - { id: c, type: test.collect }
@@ -751,13 +751,13 @@ func TestPrepareSettingsAndCopies(t *testing.T) {
 	c := &collected{recs: map[string][]record.Record{}}
 	p := parse(t, `settings: { batchSize: 50, bufferSize: 200 }
 transforms:
-  - { id: gen, type: core.generate-rows, copies: 2, with: { rows: 1 } }
+  - { id: gen, type: core.generate-rows, copies: 2, with: { count: 1 } }
 `)
 	diags := Check(p, Options{Registry: testRegistry(c)})
 	if len(diags) != 1 || !strings.Contains(diags[0].Error(), `test.pipeline.yaml:6:50: transform "gen": core.generate-rows cannot run in several copies`) {
 		t.Errorf("copies of an input: %v", diags)
 	}
-	p = parse(t, "settings: { batchSize: 50, bufferSize: 200 }\ntransforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 1 } }\n")
+	p = parse(t, "settings: { batchSize: 50, bufferSize: 200 }\ntransforms:\n  - { id: gen, type: core.generate-rows, with: { count: 1 } }\n")
 	r, err := Prepare(p, Options{Registry: testRegistry(c)})
 	if err != nil {
 		t.Fatal(err)
@@ -771,7 +771,7 @@ func TestPrepareStrict(t *testing.T) {
 	c := &collected{recs: map[string][]record.Record{}}
 	body := `settings: { strict: true }
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
   - { id: open, type: test.open }
   - { id: log, type: core.log, with: { fields: [n, m] } }
 links:
@@ -799,7 +799,7 @@ func TestSchemasDespiteErrors(t *testing.T) {
 	c := &collected{recs: map[string][]record.Record{}}
 	p := parse(t, `
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
   - { id: conv, type: core.convert, with: { fields: [ { name: n, type: string } ] } }
   - { id: bad, type: core.dummy, with: { nope: 1 } }
   - { id: show, type: core.log }
@@ -841,7 +841,7 @@ links:
 // each link are kept, also those on error links.
 func TestRunInputLimitAndSamples(t *testing.T) {
 	body := `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1000, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1000, numberField: n } }
   - { id: check, type: test.odd }
   - { id: good, type: test.collect }
   - { id: bad, type: test.collect }

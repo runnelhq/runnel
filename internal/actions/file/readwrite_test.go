@@ -135,5 +135,5 @@ func TestWriteFile(t *testing.T) {
 	}
 	actiontest.ConfigError(t, writeDefinition, map[string]any{"path": "a", "ifExists": "keep"}, `invalid ifExists "keep"`)
 	actiontest.ConfigError(t, writeDefinition, map[string]any{"path": "a", "encoding": "ascii"}, `invalid encoding "ascii"`)
-	actiontest.ConfigError(t, writeDefinition, map[string]any{"path": "a", "encoding": "utf-16le"}, `invalid encoding "utf-16le": it is called utf-16 now`)
+	actiontest.ConfigError(t, writeDefinition, map[string]any{"path": "a", "encoding": "utf-16le"}, `invalid encoding "utf-16le" (expected utf-8, utf-8-bom, windows-1252, utf-16)`)
 }

@@ -9,7 +9,7 @@ transforms:
   - id: orders
     type: core.generate-rows
     with:
-      rows: 3
+      count: 3
       fields:
         - { name: customer, value: Grace }
   - id: number

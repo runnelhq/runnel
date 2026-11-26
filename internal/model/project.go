@@ -30,10 +30,9 @@ type Project struct {
 	Variables          map[string]string `yaml:"variables,omitempty" json:"variables,omitempty" doc:"Variables for all environments, used as ${NAME}; an environment can override them. Values may use other variables, e.g. ${BASE}\\inbox"`
 	SecretStore        string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables) or inline (secrets: in the file, plain text); empty: the local secret store, which is not available yet" schema:"enum=env|inline"`
 	Secrets            map[string]string `yaml:"secrets,omitempty" json:"-" doc:"Secrets in plain text for secretStore: inline, used as ${secret:NAME} where no environment has its own; only for development and simple APIs"`
-	// Workflow holds project-wide defaults for workflows.
-	Workflow ProjectWorkflowSettings `yaml:"workflow,omitempty" json:"workflow,omitzero" doc:"Defaults for all workflows of the project"`
-	// Settings control the runs of the project as a whole (roadmap S37).
-	Settings ProjectSettings `yaml:"settings,omitempty" json:"settings,omitzero" doc:"Limits for the runs of the project"`
+	// Settings control the runs of the project as a whole (roadmap S37) and hold the
+	// defaults for its workflows (R5b, before: the block workflow).
+	Settings ProjectSettings `yaml:"settings,omitempty" json:"settings,omitzero" doc:"Defaults and limits for the runs of the project"`
 
 	// Dir is the project directory as passed to LoadProject.
 	Dir string `yaml:"-" json:"-"`
@@ -47,14 +46,11 @@ type Project struct {
 	src *source
 }
 
-// ProjectWorkflowSettings are project-wide defaults for workflows.
-type ProjectWorkflowSettings struct {
-	// DefaultJoin applies to actions without "join" (ADR 0003); empty means all.
-	DefaultJoin JoinMode `yaml:"defaultJoin,omitempty" json:"defaultJoin,omitempty" doc:"When an action with several incoming links starts, if it sets no join: all (every link decided), first or each" schema:"enum=all|first|each,default=all"`
-}
-
 // ProjectSettings control the runs of a project.
 type ProjectSettings struct {
+	// DefaultJoin applies to actions without "join" (ADR 0003); empty means all. Until
+	// R5b it was workflow.defaultJoin.
+	DefaultJoin JoinMode `yaml:"defaultJoin,omitempty" json:"defaultJoin,omitempty" doc:"When an action with several incoming links starts, if it sets no join: all (every link decided), first or each" schema:"enum=all|first|each,default=all"`
 	// MaxConcurrentRuns limits the runs of the server that run at the same time; a
 	// start beyond it is rejected (KONZEPT, chapter 6.4). 0: no limit.
 	MaxConcurrentRuns int `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty" doc:"Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit" schema:"default=0"`
@@ -272,10 +268,10 @@ func ReadProject(name string, data []byte, envExists func(env string) bool) (*Pr
 
 func (p *Project) validate() Errors {
 	errs := checkHeader(p.src, p.Kind, KindProject, p.APIVersion, p.Name)
-	switch p.Workflow.DefaultJoin {
+	switch p.Settings.DefaultJoin {
 	case "", JoinAll, JoinFirst, JoinEach:
 	default:
-		errs = append(errs, p.src.errorf("$.workflow.defaultJoin", "invalid defaultJoin %q (expected all, first or each)", p.Workflow.DefaultJoin))
+		errs = append(errs, p.src.errorf("$.settings.defaultJoin", "invalid defaultJoin %q (expected all, first or each)", p.Settings.DefaultJoin))
 	}
 	if p.Settings.MaxConcurrentRuns < 0 {
 		errs = append(errs, p.src.errorf("$.settings.maxConcurrentRuns", "maxConcurrentRuns must not be negative"))

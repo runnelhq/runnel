@@ -37,7 +37,7 @@ actions:
   - id: report
     type: core.log
     with:
-      message: "{{ join(map(results.totals.output.items, .row.name + ': ' + string(.output.rows[0].orders) + ' orders, ' + string(.output.rows[0].total)), '; ') }}"
+      message: "{{ join(map(results.totals.output.items, .row.name + ': ' + string(.output.records[0].orders) + ' orders, ' + string(.output.records[0].total)), '; ') }}"
 links:
   - { from: start, to: list }
   - { from: list, to: totals }

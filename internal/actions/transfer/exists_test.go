@@ -23,8 +23,8 @@ func testExists(t *testing.T, srv *testServer) {
 		want []any
 	}{
 		{map[string]any{"path": "out/orders-*"}, []any{"out/orders-1.csv", "out/orders-2.csv", "out/orders-3"}},
-		{map[string]any{"path": "out/orders-*", "kind": "file"}, []any{"out/orders-1.csv", "out/orders-2.csv"}},
-		{map[string]any{"path": "out/orders-*", "kind": "folder"}, []any{"out/orders-3"}},
+		{map[string]any{"path": "out/orders-*", "include": "files"}, []any{"out/orders-1.csv", "out/orders-2.csv"}},
+		{map[string]any{"path": "out/orders-*", "include": "folders"}, []any{"out/orders-3"}},
 		{map[string]any{"path": "out/orders-1.csv"}, []any{"out/orders-1.csv"}},
 	}
 	for _, c := range cases {
@@ -38,9 +38,9 @@ func testExists(t *testing.T, srv *testServer) {
 		want string
 	}{
 		{map[string]any{"path": "out/ORDERS-*"}, `no file or folder matches "out/ORDERS-*" on the server`},
-		{map[string]any{"path": "out/orders-3", "kind": "file"}, `no file matches "out/orders-3" on the server`},
-		{map[string]any{"path": "missing/*.csv", "kind": "folder"}, `no folder matches "missing/*.csv" on the server`},
-		{map[string]any{"path": "out/*", "kind": "${KIND}"}, `invalid kind "${KIND}" (expected any, file or folder)`},
+		{map[string]any{"path": "out/orders-3", "include": "files"}, `no file matches "out/orders-3" on the server`},
+		{map[string]any{"path": "missing/*.csv", "include": "folders"}, `no folder matches "missing/*.csv" on the server`},
+		{map[string]any{"path": "out/*", "include": "${WHAT}"}, `invalid include "${WHAT}" (expected all, files or folders)`},
 	}
 	for _, c := range fails {
 		res, _, err := execute(context.Background(), t, existsDefinition, srv.conn(), c.with)
@@ -51,7 +51,9 @@ func testExists(t *testing.T, srv *testServer) {
 			t.Errorf("%v: output %v", c.with, res.Output)
 		}
 	}
-	actiontest.ConfigError(t, existsDefinition, map[string]any{"connection": "s", "path": "a", "kind": "link"}, `invalid kind "link" (expected any, file or folder)`)
+	actiontest.ConfigError(t, existsDefinition, map[string]any{"connection": "s", "path": "a", "include": "links"}, `invalid include "links" (expected all, files or folders)`)
+	// kind is include since R5b, as in transfer.list.
+	actiontest.ConfigError(t, existsDefinition, map[string]any{"connection": "s", "path": "a", "kind": "file"}, `unknown field "kind"`)
 }
 
 func TestExistsLimit(t *testing.T) {

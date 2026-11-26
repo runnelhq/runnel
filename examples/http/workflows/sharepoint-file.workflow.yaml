@@ -12,7 +12,7 @@ parameters:
 outputs:
   - name: ROWS
     type: integer
-    value: "{{ sum(map(results.read.output.items, len(.output.rows))) }}"
+    value: "{{ sum(map(results.read.output.items, len(.output.records))) }}"
 actions:
   - id: start
     type: core.start

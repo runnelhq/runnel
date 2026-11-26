@@ -48,7 +48,7 @@ links:
 apiVersion: runnel/v1
 name: e2e-onerror
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1 } }
+  - { id: gen, type: core.generate-rows, with: { count: 1 } }
   - { id: done, type: core.dummy }
 links:
   - { from: gen, to: done }

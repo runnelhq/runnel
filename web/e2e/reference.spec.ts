@@ -51,7 +51,7 @@ test("project.yaml shows its fields and inserts one", async ({ page }) => {
   // Fields in the file take one line with their line; the others show their short text.
   await expect(ref.getByTestId("field-defaultEnvironment")).toContainText("✓ line 6");
   const settings = ref.getByTestId("field-settings");
-  await expect(settings).toContainText("Limits for the runs of the project");
+  await expect(settings).toContainText("Defaults and limits for the runs of the project");
   await settings.click();
   await settings.getByRole("button", { name: "+ Insert" }).click();
   // Inserting goes through the file model: wait for it instead of reading once.

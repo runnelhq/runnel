@@ -63,7 +63,7 @@ const (
 const (
 	DefaultFileInterval = 10 * time.Second
 	// DefaultHTTPMaxConcurrent is the most runs of an http trigger at the same time if
-	// with.maxConcurrent is not set (R5a): a caller in the network cannot start any number.
+	// with.maxConcurrentRuns is not set (R5a): a caller in the network cannot start any number.
 	DefaultHTTPMaxConcurrent = 4
 	MinTriggerInterval       = time.Second
 )
@@ -140,9 +140,10 @@ type TriggerSettings struct {
 	// Response is accepted (default: 202 with the run id at once) or run (the caller
 	// waits for the answer of the run, at most timeout).
 	Response string `yaml:"response,omitempty" json:"response,omitempty" doc:"http: answer at once with 202 and the run id (accepted), or wait for the answer of the run (run)" schema:"enum=accepted|run,default=accepted,group=Answer"`
-	// MaxConcurrent limits the running runs of the trigger (http; nil: 4, 0: no own
-	// limit, only if set; R5a), see HTTPMaxConcurrent.
-	MaxConcurrent *int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty" doc:"http: most runs of this trigger at the same time; a request beyond it gets 429. 0: no own limit (only the limits of the project)" schema:"default=4,group=Answer"`
+	// MaxConcurrentRuns limits the running runs of the trigger (http; nil: 4, 0: no own
+	// limit, only if set; R5a), see HTTPMaxConcurrent. Named like settings.maxConcurrentRuns
+	// of the project (R5b, before: maxConcurrent).
+	MaxConcurrentRuns *int `yaml:"maxConcurrentRuns,omitempty" json:"maxConcurrentRuns,omitempty" doc:"http: most runs of this trigger at the same time; a request beyond it gets 429. 0: no own limit (only the limits of the project)" schema:"default=4,group=Answer"`
 	// Timeout is how long the caller waits with response: run (default 30s). History
 	// is all, errors or none: which runs are kept when they have ended.
 	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty" doc:"http: how long the caller waits for the answer with response: run" schema:"format=runnel-duration,default=30s,group=More"`
@@ -164,13 +165,13 @@ func (t *Trigger) PollInterval() time.Duration {
 	return d
 }
 
-// HTTPMaxConcurrent returns the most runs of an http trigger at the same time: with.maxConcurrent,
+// HTTPMaxConcurrent returns the most runs of an http trigger at the same time: with.maxConcurrentRuns,
 // DefaultHTTPMaxConcurrent if it is not set; 0 means no own limit.
 func (t *Trigger) HTTPMaxConcurrent() int {
-	if t.With.MaxConcurrent == nil {
+	if t.With.MaxConcurrentRuns == nil {
 		return DefaultHTTPMaxConcurrent
 	}
-	return *t.With.MaxConcurrent
+	return *t.With.MaxConcurrentRuns
 }
 
 // FileMode returns each or batch.
@@ -319,7 +320,7 @@ var fieldsOf = map[string][]string{
 	TriggerCron:     {"schedule", "timezone", "overlap", "history"},
 	TriggerInterval: {"every", "overlap", "history"},
 	TriggerFile:     {"folder", "pattern", "interval", "param", "mode", "existing", "overlap", "history"},
-	TriggerHTTP:     {"method", "path", "auth", "response", "timeout", "maxConcurrent", "history"},
+	TriggerHTTP:     {"method", "path", "auth", "response", "timeout", "maxConcurrentRuns", "history"},
 }
 
 // unusedFields reports fields under with: that the type does not use, e.g. schedule in
@@ -329,16 +330,11 @@ func (t *Trigger) unusedFields() Errors {
 		"schedule": t.With.Schedule != "", "timezone": t.With.Timezone != "", "overlap": t.With.Overlap != "",
 		"every": t.With.Every != "", "folder": t.With.Folder != "", "path": t.With.Path != "", "pattern": t.With.Pattern != "",
 		"interval": t.With.Interval != "", "param": t.With.Param != "", "mode": t.With.Mode != "", "existing": t.With.Existing != "",
-		"method": t.With.Method != "", "auth": t.With.Auth != nil, "response": t.With.Response != "", "maxConcurrent": t.With.MaxConcurrent != nil,
+		"method": t.With.Method != "", "auth": t.With.Auth != nil, "response": t.With.Response != "", "maxConcurrentRuns": t.With.MaxConcurrentRuns != nil,
 		"timeout": t.With.Timeout != "", "history": t.With.History != "",
 	}
 	var errs Errors
 	for _, f := range slices.Sorted(maps.Keys(set)) {
-		if f == "path" && set[f] && t.Type == TriggerFile {
-			// The folder of a file trigger was "path" before R5a.
-			errs = append(errs, t.src.errorf("$.with.path", "file triggers have no path; use folder for the folder to watch (renamed in R5a, like folder of file.list)"))
-			continue
-		}
 		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
 			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))
 		}
@@ -381,7 +377,7 @@ func (t *Trigger) checkInterval() Errors {
 func (t *Trigger) checkFile() Errors {
 	s, w := t.src, t.With
 	var errs Errors
-	if strings.TrimSpace(w.Folder) == "" && w.Path == "" {
+	if strings.TrimSpace(w.Folder) == "" {
 		errs = append(errs, s.errorf("$.with", `missing required field "folder" (the folder to watch, relative to the project or absolute)`))
 	}
 	if _, err := filepath.Match(strings.ToLower(t.FilePattern()), ""); err != nil {

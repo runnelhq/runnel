@@ -84,7 +84,7 @@ func Records(rows []map[string]any) ([]record.Record, error) {
 		for _, name := range slices.Sorted(maps.Keys(row)) {
 			v, err := record.Normalize(row[name])
 			if err != nil {
-				return nil, fmt.Errorf("rows[%d].%s: %w", i, name, err)
+				return nil, fmt.Errorf("records[%d].%s: %w", i, name, err)
 			}
 			out[i].Set(name, v)
 		}
@@ -106,7 +106,7 @@ func pipelineOutput(res pipeline.Result) map[string]any {
 	for i, r := range res.Rows {
 		rows[i] = transform.RecordValues(r)
 	}
-	return map[string]any{"transforms": transforms, "errors": errs, "rows": rows}
+	return map[string]any{"transforms": transforms, "errors": errs, "records": rows}
 }
 
 // forwardPipeline writes the events of a called pipeline to the log of the calling

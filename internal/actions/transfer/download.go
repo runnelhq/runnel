@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -36,17 +37,21 @@ var downloadDefinition = action.Definition{
 		Errors:  "Fails when nothing matches the source, the connection fails (host key, certificate or sign-in refused, no answer within timeout), a file is larger than maxSize, a name from the server is no safe local name, and with ifExists: fail (the default) when a local file exists, checked before anything is downloaded. A failed download leaves no half file.",
 		Limits: []string{
 			"timeout limits each file (default 10m); the timeout of the action limits all together.",
-			"maxSize limits each file; empty: no limit.",
+			"maxSize limits each file (default 1GB, as http.request with saveTo).",
 		},
 	},
 }
+
+// defaultMaxFile is the largest file without maxSize, as in http.request with saveTo
+// (R5b; before: no limit).
+const defaultMaxFile = 1 << 30
 
 type downloadAction struct {
 	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Source     string `json:"source" doc:"File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
 	Target     string `json:"target" doc:"Local folder, relative to the project folder or absolute; for a single file also a new file name" schema:"required,example=inbox/"`
 	IfExists   string `json:"ifExists" doc:"If a local file exists: replace it, skip it (it stays and is not in the output), or fail before anything is downloaded" schema:"enum=replace|skip|fail,default=fail"`
-	MaxSize    string `json:"maxSize" doc:"Largest file to download, e.g. 500MB; a larger one fails the action; empty: no limit" schema:"example=500MB"`
+	MaxSize    string `json:"maxSize" doc:"Largest file to download, e.g. 500MB or 5GB; a larger one fails the action" schema:"default=1GB"`
 	Timeout    string `json:"timeout" doc:"Longest time for one file, e.g. 30m; the timeout of the action limits all together" schema:"format=runnel-duration,default=10m"`
 }
 
@@ -56,7 +61,7 @@ func newDownload(with map[string]any) (action.Action, error) {
 		return nil, err
 	}
 	if !strings.Contains(a.MaxSize, "{{") && !strings.Contains(a.MaxSize, "${") {
-		if _, err := format.ParseSize("maxSize", a.MaxSize, 0); err != nil {
+		if _, err := format.ParseSize("maxSize", a.MaxSize, defaultMaxFile); err != nil {
 			return nil, err
 		}
 	}
@@ -71,7 +76,7 @@ func (a *downloadAction) Execute(ctx context.Context, ec *action.ExecContext) (a
 	if err != nil {
 		return action.Result{}, err
 	}
-	maxSize, err := format.ParseSize("maxSize", a.MaxSize, 0)
+	maxSize, err := format.ParseSize("maxSize", a.MaxSize, defaultMaxFile)
 	if err != nil {
 		return action.Result{}, err
 	}
@@ -181,7 +186,7 @@ func (d *downloader) download(remote string, info fs.FileInfo, local string) err
 		case errors.Is(err, errSkipped):
 			return nil
 		case errors.Is(err, errTooLarge):
-			return fmt.Errorf("cannot download %q: it is larger than maxSize %s", remote, d.a.MaxSize)
+			return fmt.Errorf("cannot download %q: it is larger than maxSize %s", remote, cmp.Or(d.a.MaxSize, "1GB"))
 		case err != nil:
 			return err
 		}

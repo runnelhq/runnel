@@ -197,16 +197,16 @@ func TestParseIntervalAndFileTriggers(t *testing.T) {
 	}
 }
 
-// The folder of a file trigger is folder (R5a); the old name path is an error that names
-// the new one. maxConcurrent of an http trigger is 4 unless set; an explicit 0 is no limit.
+// The folder of a file trigger is folder (R5a); the old name path is not used by file
+// triggers. maxConcurrentRuns of an http trigger is 4 unless set; an explicit 0 is no limit.
 func TestFileTriggerFolderAndHTTPLimit(t *testing.T) {
 	_, err := ParseTrigger("triggers/inbox.yaml", []byte(strings.Replace(fileSource, "folder: data/in", "path: data/in", 1)))
-	if err == nil || !strings.Contains(err.Error(), "triggers/inbox.yaml:7:9: file triggers have no path; use folder for the folder to watch") ||
-		strings.Contains(err.Error(), `missing required field "folder"`) {
+	if err == nil || !strings.Contains(err.Error(), "triggers/inbox.yaml:7:9: path is not used by file triggers (fields: folder,") ||
+		!strings.Contains(err.Error(), `missing required field "folder"`) {
 		t.Errorf("old name: %v", err)
 	}
 	base := "kind: Trigger\napiVersion: runnel/v1\nname: api\ntype: http\ntarget: workflows/import.workflow.yaml\nwith:\n  method: GET\n  path: /x\n  auth: none\n"
-	for extra, want := range map[string]int{"": DefaultHTTPMaxConcurrent, "  maxConcurrent: 0\n": 0, "  maxConcurrent: 2\n": 2} {
+	for extra, want := range map[string]int{"": DefaultHTTPMaxConcurrent, "  maxConcurrentRuns: 0\n": 0, "  maxConcurrentRuns: 2\n": 2} {
 		tr, err := ParseTrigger("triggers/api.yaml", []byte(base+extra))
 		if err != nil {
 			t.Fatal(err)
@@ -215,12 +215,22 @@ func TestFileTriggerFolderAndHTTPLimit(t *testing.T) {
 			t.Errorf("%q: %d, want %d", extra, got, want)
 		}
 	}
-	if _, err := ParseTrigger("triggers/api.yaml", []byte(base+"  maxConcurrent: -1\n")); err == nil || !strings.Contains(err.Error(), "maxConcurrent must not be negative") {
+	if _, err := ParseTrigger("triggers/api.yaml", []byte(base+"  maxConcurrentRuns: -1\n")); err == nil || !strings.Contains(err.Error(), "maxConcurrentRuns must not be negative") {
 		t.Errorf("negative: %v", err)
 	}
 	// An explicit 0 is a value: other trigger types report it as unused.
-	cron := "kind: Trigger\napiVersion: runnel/v1\nname: n\ntype: cron\ntarget: workflows/import.workflow.yaml\nwith:\n  schedule: \"@daily\"\n  maxConcurrent: 0\n"
-	if _, err := ParseTrigger("triggers/n.yaml", []byte(cron)); err == nil || !strings.Contains(err.Error(), "maxConcurrent is not used by cron triggers") {
+	cron := "kind: Trigger\napiVersion: runnel/v1\nname: n\ntype: cron\ntarget: workflows/import.workflow.yaml\nwith:\n  schedule: \"@daily\"\n  maxConcurrentRuns: 0\n"
+	if _, err := ParseTrigger("triggers/n.yaml", []byte(cron)); err == nil || !strings.Contains(err.Error(), "maxConcurrentRuns is not used by cron triggers") {
 		t.Errorf("cron: %v", err)
+	}
+}
+
+// maxConcurrent of an http trigger is maxConcurrentRuns since R5b; the old name is an
+// unknown field.
+func TestHTTPTriggerOldMaxConcurrent(t *testing.T) {
+	src := "kind: Trigger\napiVersion: runnel/v1\nname: api\ntype: http\ntarget: workflows/import.workflow.yaml\nwith:\n  method: GET\n  path: /x\n  auth: none\n  maxConcurrent: 2\n"
+	_, err := ParseTrigger("triggers/api.yaml", []byte(src))
+	if err == nil || !strings.Contains(err.Error(), `triggers/api.yaml:10:3: unknown field "maxConcurrent"`) {
+		t.Errorf("old name: %v", err)
 	}
 }

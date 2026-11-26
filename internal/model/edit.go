@@ -1209,7 +1209,7 @@ type PipelineEdit struct {
 	// Entries changes a parameter (E7c); at most one.
 	Entries []EntryEdit `json:"entries,omitempty"`
 	// Targets returns the fields of a transform type that name other transforms (format
-	// runnel-target, e.g. [default] and [cases * to] of core.switch): Rename changes them
+	// runnel-target, e.g. [else] and [cases * to] of core.switch): Rename changes them
 	// too. Set by the server from the registry; nil: none.
 	Targets func(typ string) [][]string `json:"-"`
 }

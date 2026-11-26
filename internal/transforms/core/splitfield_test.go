@@ -49,7 +49,7 @@ func TestSplitFieldInto(t *testing.T) {
 }
 
 func TestSplitFieldRows(t *testing.T) {
-	got := split(t, map[string]any{"field": "name", "separator": ";", "rows": true, "indexField": "pos"},
+	got := split(t, map[string]any{"field": "name", "separator": ";", "asRecords": true, "numberField": "pos"},
 		person(1, "a;b;;c"), person(2, ""), person(3, 7))
 	want := []string{
 		"[{id 1} {name a} {pos 1}]", "[{id 1} {name b} {pos 2}]", "[{id 1} {name c} {pos 3}]",
@@ -60,7 +60,7 @@ func TestSplitFieldRows(t *testing.T) {
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
-	got = split(t, map[string]any{"field": "name", "separator": ";", "rows": true, "keepEmpty": true}, person(1, "a;;b"))
+	got = split(t, map[string]any{"field": "name", "separator": ";", "asRecords": true, "keepEmpty": true}, person(1, "a;;b"))
 	if fmt.Sprint(got) != "[[{id 1} {name a}] [{id 1} {name }] [{id 1} {name b}]]" {
 		t.Errorf("keepEmpty: %v", got)
 	}
@@ -71,10 +71,13 @@ func TestSplitFieldErrors(t *testing.T) {
 		with map[string]any
 		want string
 	}{
-		{map[string]any{"field": "n", "separator": ";"}, "set rows: true"},
-		{map[string]any{"field": "n", "separator": ";", "rows": true, "into": []any{"a"}}, "choose one"},
-		{map[string]any{"field": "n", "separator": ";", "into": []any{"a"}, "indexField": "i"}, "only with rows"},
-		{map[string]any{"field": "n", "separator": "", "rows": true}, "separator"},
+		{map[string]any{"field": "n", "separator": ";"}, "set asRecords: true"},
+		// rows and indexField are asRecords and numberField since R5b.
+		{map[string]any{"field": "n", "separator": ";", "rows": true}, `unknown field "rows"`},
+		{map[string]any{"field": "n", "separator": ";", "asRecords": true, "indexField": "i"}, `unknown field "indexField"`},
+		{map[string]any{"field": "n", "separator": ";", "asRecords": true, "into": []any{"a"}}, "choose one"},
+		{map[string]any{"field": "n", "separator": ";", "into": []any{"a"}, "numberField": "i"}, "only with asRecords"},
+		{map[string]any{"field": "n", "separator": "", "asRecords": true}, "separator"},
 	} {
 		if _, err := newSplitField(tt.with); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%v: %v, want %q", tt.with, err, tt.want)
@@ -83,7 +86,7 @@ func TestSplitFieldErrors(t *testing.T) {
 }
 
 func TestSplitFieldSchema(t *testing.T) {
-	tr := transformtest.New(t, splitFieldDefinition, map[string]any{"field": "name", "separator": ";", "rows": true, "indexField": "pos"})
+	tr := transformtest.New(t, splitFieldDefinition, map[string]any{"field": "name", "separator": ";", "asRecords": true, "numberField": "pos"})
 	ic := transform.NewInitContext(record.Schema{}.With("name", record.String))
 	s, err := tr.(transform.Initializer).Init(ic)
 	if f, ok := s.Field("pos"); err != nil || !ok || f.Type != record.Int {
@@ -101,7 +104,7 @@ func TestSplitFieldSchema(t *testing.T) {
 }
 
 func BenchmarkSplitFieldRows(b *testing.B) {
-	tr, err := newSplitField(map[string]any{"field": "name", "separator": ";", "rows": true})
+	tr, err := newSplitField(map[string]any{"field": "name", "separator": ";", "asRecords": true})
 	if err != nil {
 		b.Fatal(err)
 	}

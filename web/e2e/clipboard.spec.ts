@@ -14,7 +14,7 @@ transforms:
   - id: gen
     type: core.generate-rows
     with:
-      rows: 3
+      count: 3
   - id: tag
     type: core.constant
     with:

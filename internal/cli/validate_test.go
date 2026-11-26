@@ -172,7 +172,7 @@ func TestValidatePipelines(t *testing.T) {
 		}
 		return path
 	}
-	write("ok.pipeline.yaml", "transforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 10 } }\n  - { id: log, type: core.log }\nlinks:\n  - { from: gen, to: log }\n")
+	write("ok.pipeline.yaml", "transforms:\n  - { id: gen, type: core.generate-rows, with: { count: 10 } }\n  - { id: log, type: core.log }\nlinks:\n  - { from: gen, to: log }\n")
 	code, out, errOut := run(t, "validate", dir)
 	if code != 0 || out != "1 pipeline file checked: 0 errors, 0 warnings\n" {
 		t.Errorf("valid: exit code %d, stdout %q, stderr %q", code, out, errOut)

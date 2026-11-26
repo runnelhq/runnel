@@ -16,7 +16,7 @@ import (
 
 func TestGenerateRows(t *testing.T) {
 	tr := transformtest.New(t, generateRowsDefinition, map[string]any{
-		"rows": "3", "rowNumberField": "n",
+		"count": "3", "numberField": "n",
 		"fields": []any{map[string]any{"name": "status", "value": "new"}, map[string]any{"name": "amount", "value": 1.5}},
 	})
 	out, _, err := transformtest.Run(context.Background(), tr)
@@ -27,15 +27,22 @@ func TestGenerateRows(t *testing.T) {
 		t.Errorf("record %s", got)
 	}
 	for _, with := range []map[string]any{
-		{"rows": "1", "fields": []any{map[string]any{"value": 1}}}, {}, {"rows": 5},
+		{"count": "1", "fields": []any{map[string]any{"value": 1}}}, {}, {"count": 5},
 	} {
 		if _, err := generateRowsDefinition.New(with); err == nil {
 			t.Errorf("%v accepted", with)
 		}
 	}
+	// rows and rowNumberField are count and numberField since R5b; the old names are
+	// unknown fields.
+	for _, old := range []string{"rows", "rowNumberField"} {
+		if _, err := generateRowsDefinition.New(map[string]any{"count": "1", old: "1"}); err == nil || !strings.Contains(err.Error(), `unknown field "`+old+`"`) {
+			t.Errorf("%s: %v", old, err)
+		}
+	}
 	// The number is checked when the pipeline runs: it may be a variable before.
 	for _, rows := range []string{"-1", "many", "${ROWS}"} {
-		tr := transformtest.New(t, generateRowsDefinition, map[string]any{"rows": rows})
+		tr := transformtest.New(t, generateRowsDefinition, map[string]any{"count": rows})
 		if _, _, err := transformtest.Run(context.Background(), tr); err == nil || !strings.Contains(err.Error(), "is not a whole number") {
 			t.Errorf("rows %q: %v", rows, err)
 		}
@@ -77,7 +84,7 @@ func TestLogWritesEveryNthRecord(t *testing.T) {
 
 func TestGenerateRowsSchema(t *testing.T) {
 	tr := transformtest.New(t, generateRowsDefinition, map[string]any{
-		"rows": "1", "rowNumberField": "n",
+		"count": "1", "numberField": "n",
 		"fields": []any{
 			map[string]any{"name": "status", "value": "new"},
 			map[string]any{"name": "count", "value": uint64(3)},

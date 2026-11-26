@@ -99,7 +99,7 @@ transforms:
   - id: rows
     type: core.generate-rows
     with:
-      rows: 1
+      count: 1
   - id: result
     type: test.to-result
     with:

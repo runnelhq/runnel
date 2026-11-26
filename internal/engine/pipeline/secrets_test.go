@@ -31,7 +31,7 @@ func TestPipelineSecrets(t *testing.T) {
 			}), nil
 		}})
 	p := parse(t, `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1 } }
+  - { id: gen, type: core.generate-rows, with: { count: 1 } }
   - { id: login, type: test.secret, with: { password: "${secret:pw}" } }
   - { id: end, type: core.dummy }
 links:
@@ -64,7 +64,7 @@ links:
 
 	// Outside a field for a secret, ${secret:…} stops the pipeline before it starts.
 	p = parse(t, `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: "${secret:pw}" } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: "${secret:pw}" } }
 `)
 	if _, err := Prepare(p, Options{Registry: reg, Scope: scope}); err == nil || !strings.Contains(err.Error(), "secrets (${secret:…}) are only allowed in fields for secrets") {
 		t.Errorf("secret outside its field: %v", err)

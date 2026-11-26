@@ -55,10 +55,6 @@ func newWriteFile(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
-	if a.Encoding == "utf-16le" {
-		// Until R5a; one name for the same encoding in reading and writing (ADR 0025).
-		return nil, errors.New(`invalid encoding "utf-16le": it is called utf-16 now (little endian with byte order mark, as in csv.output)`)
-	}
 	for _, c := range []struct{ field, value, allowed string }{
 		{"format", a.Format, "text|json"}, {"encoding", a.Encoding, "utf-8|utf-8-bom|windows-1252|utf-16"},
 		{"lineEnds", a.LineEnds, "keep|crlf|lf"}, {"ifExists", a.IfExists, "replace|append|fail"},

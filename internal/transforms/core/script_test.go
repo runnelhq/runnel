@@ -44,6 +44,7 @@ func TestScriptTransformConfig(t *testing.T) {
 		{map[string]any{"file": "scripts/a.ps1"}, "expected a .js file"},
 		{map[string]any{"script": "return ]"}, "script, line 1: syntax error"},
 		{map[string]any{"script": "return record", "init": "let x = ;"}, "init, line 1: syntax error"},
+		{map[string]any{"script": "return record", "timeout": "soon"}, `invalid timeout "soon"`},
 		{map[string]any{"script": "return record", "end": "return ]"}, "end, line 1: syntax error"},
 		{map[string]any{"script": "return record", "maxRecordTime": "soon"}, `invalid maxRecordTime "soon"`},
 		{map[string]any{"script": "return record", "maxRecordTime": "-1s"}, "invalid maxRecordTime"},
@@ -303,6 +304,17 @@ func TestScriptTransformInitEnd(t *testing.T) {
 	for _, w := range []map[string]any{{"script": "return record", "init": "throw new Error('no')"}, {"script": "return record", "end": "\nthrow new Error('no')"}} {
 		tr := transformtest.New(t, scriptDefinition, w)
 		if _, _, _, err := transformtest.RunWithErrorLink(context.Background(), tr, in...); err == nil || !strings.Contains(err.Error(), "line") || !strings.Contains(err.Error(), ": no") {
+			t.Errorf("%v: %v", w, err)
+		}
+	}
+	// init and end that do not end stop the pipeline after timeout (default 1m, R5b);
+	// the records keep maxRecordTime.
+	for _, w := range []map[string]any{
+		{"script": "return record", "init": "while (true) {}", "timeout": "50ms"},
+		{"script": "return record", "end": "while (true) {}", "timeout": "50ms", "maxRecordTime": "10s"},
+	} {
+		tr := transformtest.New(t, scriptDefinition, w)
+		if _, _, _, err := transformtest.RunWithErrorLink(context.Background(), tr, in...); err == nil || !strings.Contains(err.Error(), "took longer than allowed (timeout 50ms)") {
 			t.Errorf("%v: %v", w, err)
 		}
 	}

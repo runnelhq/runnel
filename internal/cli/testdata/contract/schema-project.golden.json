@@ -56,9 +56,9 @@
         "type": "string"
       }
     },
-    "workflow": {
+    "settings": {
       "type": "object",
-      "description": "Defaults for all workflows of the project",
+      "description": "Defaults and limits for the runs of the project",
       "properties": {
         "defaultJoin": {
           "type": "string",
@@ -69,14 +69,7 @@
             "each"
           ],
           "default": "all"
-        }
-      },
-      "additionalProperties": false
-    },
-    "settings": {
-      "type": "object",
-      "description": "Limits for the runs of the project",
-      "properties": {
+        },
         "maxConcurrentRuns": {
           "type": "integer",
           "description": "Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit",

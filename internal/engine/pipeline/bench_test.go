@@ -9,7 +9,7 @@ import (
 // dummy → dummy), without collecting the records.
 func BenchmarkRunChain(b *testing.B) {
 	p := parse(b, `transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 100000, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 100000, numberField: n } }
   - { id: a, type: core.dummy }
   - { id: z, type: core.dummy }
 links:

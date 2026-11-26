@@ -117,7 +117,7 @@ func TestRunPipeline(t *testing.T) {
 apiVersion: runnel/v1
 name: numbers
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 10, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 10, numberField: n } }
   - id: even
     type: core.filter
     with: { condition: "{{ record.n % 2 == 0 }}" }
@@ -151,7 +151,7 @@ func TestEditPipelineRenameTargets(t *testing.T) {
 apiVersion: runnel/v1
 name: route
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1 } }
+  - { id: gen, type: core.generate-rows, with: { count: 1 } }
   - id: check
     type: core.filter
     with:

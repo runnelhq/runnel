@@ -36,7 +36,7 @@ actions:
   - id: report
     type: core.log
     with:
-      message: "Packed {{ results.pack.output.files }} files ({{ results.pack.output.size }} bytes), unpacked {{ len(results.unpack.output) }} CSV files"
+      message: "Packed {{ results.pack.output.count }} files ({{ results.pack.output.size }} bytes), unpacked {{ len(results.unpack.output) }} CSV files"
 links:
   - { from: start, to: pack }
   - { from: pack, to: unpack }

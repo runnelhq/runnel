@@ -141,8 +141,33 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
 ## Nachtrag 2026-11-26 (R5a)
 
 - `file.write` nennt die Kodierung UTF-16 wie `csv.output` `utf-16` (Little Endian mit BOM, beim Anhängen ohne);
-  `utf-16le` ist ein Fehler mit dem neuen Namen.
+  `utf-16le` ist ein ungültiger Wert (mit den erlaubten Werten).
 - `maxRecords` von `core.stream-lookup` ist wie bei `core.to-result` und `http.response` Text mit einer ganzen Zahl ab
   1, sodass `${…}` möglich ist; eine Zahl ohne Variable wird schon beim Prüfen geprüft.
 - Der Datei-Trigger nennt den überwachten Ordner `with.folder` (wie `file.list`), nicht mehr `with.path`; `path` bei
-  `type: file` ist ein Fehler mit dem Hinweis auf `folder`. `with.path` bleibt der Pfad der Adresse eines HTTP-Triggers.
+  `type: file` ist wie jedes Feld eines anderen Trigger-Typs ein Fehler (`path is not used by file triggers`). `with.path` bleibt der Pfad der Adresse eines HTTP-Triggers.
+
+## Nachtrag 2026-11-26 (R5b)
+
+Weitere Regeln aus der Durchsicht der Namen vor 1.0 (Roadmap R5), mit den Bausteinen, die sie seitdem befolgen:
+
+| Regel | Name | Bausteine (vorher) |
+|---|---|---|
+| Welche Einträge eines Ordners zählen | `include: all\|files\|folders` | `file.list`, `transfer.list`; neu `file.exists`, `transfer.exists` mit Standard `all` (`kind: any\|file\|folder`) |
+| Anzahl als Ergebnis oder Vorgabe | `count` | `db.query`, `http.request`; neu `archive.create` (`output.files`), `core.generate-rows` (`rows`) |
+| Feld mit der laufenden Nummer ab 1 | `numberField` | `core.generate-rows` (`rowNumberField`), `core.split-field` (`indexField`) |
+| Datensätze als Liste in einen Baustein oder heraus | `records` | `core.run-pipeline` (`rows`, Ausgabe `output.rows`); `core.split-field` teilt in Datensätze mit `asRecords: true` (`rows: true`) |
+| Ziel für Datensätze, die nicht passen | `else` | `core.filter`; neu `core.switch` (`default`) – `default` ist sonst ein **Wert** (`core.map-values`, `return[].default`, Parameter) |
+| Lesart der Ausgabe eines Programms | `format: text\|json` → `output.value` | `shell.run`, `shell.powershell` (`json: true` → `output.json`), wie `file.read` |
+| Dauer als Ergebnis | `…Ms` als Zahl in Millisekunden | `shell.*` `output.durationMs` (`duration` als Text), wie `durationMs` der Läufe |
+| Gleichzeitige Läufe | `maxConcurrentRuns` | HTTP-Trigger (`maxConcurrent`), wie `settings.maxConcurrentRuns` |
+| Verteilung auf Daten-Links | `distribution: copy\|roundRobin` | Pipeline-Transforms (`distribute`) |
+
+- **Übergang:** keiner. Der alte Name ist ein unbekanntes Feld (`unknown field "kind"`), ein alter Wert ein ungültiger
+  Wert mit den erlaubten Werten; einen Alias gibt es nicht. Vor 1.0 keine Hinweise auf alte Namen; umbenannte Felder
+  sind unbekannte Felder (Entscheidung des Maintainers 2026-11-26). Das gilt auch für die Namen aus R5a. Die
+  Abkündigung mit `Deprecated` (ADR 0029) bleibt für die Zeit nach 1.0.
+- **Standardwerte statt „ohne Grenze“:** `maxWait` von `file.wait`/`transfer.wait` 1 h (`0`: bis zum Timeout der
+  Action), `timeout` von `core.script` 1 min (Action; im Transform für `init` und `end`), `maxSize` von
+  `transfer.download` 1 GB. Ein vergessener Wert hält so keinen Lauf unbegrenzt fest.
+- **Zahlen mit `${…}`** in allen Zahlenfeldern (Befund D2) folgen getrennt in R5b2.

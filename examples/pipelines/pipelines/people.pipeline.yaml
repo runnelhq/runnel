@@ -43,8 +43,8 @@ transforms:
     with:
       field: tags
       separator: "|"
-      rows: true
-      indexField: tagNo
+      asRecords: true
+      numberField: tagNo
   - id: write
     type: csv.output
     with:

@@ -13,7 +13,7 @@ actions / execution
   shell.powershell   PowerShell    Runs a PowerShell script with named parameters; output: exitCode, stdout, stderr and optionally JSON
   shell.run          Run Program   Starts a program with arguments, without a shell; output: exitCode, stdout and stderr
 actions / files
-  archive.create   Create Archive   Packs files and folders into a ZIP, TAR or TAR.GZ archive; output: path, files and size
+  archive.create   Create Archive   Packs files and folders into a ZIP, TAR or TAR.GZ archive; output: path, count and size
   archive.extract  Extract Archive  Unpacks a ZIP, TAR or TAR.GZ archive into a folder; output: the unpacked files
   file.copy        Copy Files       Copies files or folders; output: the copied files
   file.delete      Delete Files     Deletes files or folders; output: the deleted paths
@@ -62,7 +62,7 @@ transforms / flow
   core.switch  Switch  Passes each record to the link of the first case whose condition is true
 transforms / execution
   core.from-result  Records from Workflow  Passes on the records the calling workflow gave to the pipeline (rows)
-  core.to-result    Records to Workflow    Returns the records to the calling workflow (output.rows) and passes them on
+  core.to-result    Records to Workflow    Returns the records to the calling workflow (output.records) and passes them on
 transforms / combine
   core.dedupe         Remove Duplicates  Passes on the first record of each combination of values and drops repeated ones
   core.group-by       Group By           Combines records with the same values into one, with count, sum and other aggregates

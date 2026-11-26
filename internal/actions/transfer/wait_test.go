@@ -130,7 +130,7 @@ func testWaitErrors(t *testing.T, srv *testServer) {
 		want string
 	}{
 		{map[string]any{"path": "a", "interval": "1ms"}, "interval 1ms is too short (at least 10ms)"},
-		{map[string]any{"path": "a", "maxWait": "soon"}, `maxWait: "soon" is not a duration`},
+		{map[string]any{"path": "a", "maxWait": "soon"}, `maxWait: invalid duration "soon"`},
 		{map[string]any{"path": "a", "stableFor": "x"}, `stableFor: "x" is not a duration`},
 		{map[string]any{"path": "a", "timeout": "-1s"}, `timeout: "-1s" is not a duration`},
 		{map[string]any{"path": "in/["}, `invalid wildcard pattern "["`},

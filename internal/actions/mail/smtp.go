@@ -63,9 +63,11 @@ func newServer(name string, c connections.SMTP) (*server, error) {
 		if err := s.useOAuth(c); err != nil {
 			return nil, err
 		}
-	case auth == "password" || c.User != "":
+	case auth != "" && auth != "basic":
+		return nil, fmt.Errorf("invalid auth %q (expected basic, oauth2 or none)", auth)
+	case auth == "basic" || c.User != "":
 		if c.User == "" {
-			return nil, errors.New(`auth password needs a user`)
+			return nil, errors.New(`auth basic needs a user`)
 		}
 		// The password never travels unencrypted, except to the own computer.
 		if s.tls == "none" && !httpx.IsLoopback(s.addr) {

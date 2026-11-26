@@ -21,7 +21,7 @@ export interface Action {
   continueOnEntryError?: boolean;
   /** Pipelines: instances that share the incoming records (0 or missing: 1). */
   copies?: number;
-  /** Pipelines: copy (default) or distribute, for several outgoing data links. */
+  /** Pipelines: copy (default) or roundRobin, for several outgoing data links. */
   distribution?: string;
 }
 

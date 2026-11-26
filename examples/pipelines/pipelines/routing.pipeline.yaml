@@ -3,7 +3,7 @@
 # 1. Errors as a branch: a row whose amount is not a number ("k. A.") goes over the error
 #    link to out/orders-rejected.csv instead of stopping the pipeline.
 # 2. Split by condition with core.switch: every record goes to exactly one branch, the
-#    first case that is true decides (unpaid before large). A default catches the rest,
+#    first case that is true decides (unpaid before large). else catches the rest,
 #    so no record is dropped without notice.
 # 3. Each branch sets the same fields (route, action), so that the branches can be joined;
 #    a value without {{ … }} is fixed, e.g. route: unpaid.
@@ -42,7 +42,7 @@ transforms:
       cases:
         - { when: "{{ record.Bezahlt == 'nein' }}", to: unpaid }
         - { when: "{{ record.Betrag >= params.LARGE }}", to: large }
-      default: normal
+      else: normal
   - id: unpaid
     type: core.calculate
     with:

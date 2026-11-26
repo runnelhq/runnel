@@ -492,7 +492,7 @@ func renameResults(line string, renamed map[string]string, n int) (string, int) 
 }
 
 // targetKeys returns a pattern for "<key>: <id>" with the keys of the fields of a
-// transform type that name other transforms, e.g. to and default for core.switch;
+// transform type that name other transforms, e.g. to and else for core.switch;
 // without targets only "to"; nil if the type has none.
 func targetKeys(targets func(string) [][]string, typ string) *regexp.Regexp {
 	keys := []string{"to"}
@@ -510,8 +510,8 @@ func targetKeys(targets func(string) [][]string, typ string) *regexp.Regexp {
 	return regexp.MustCompile(`(\b(?:` + strings.Join(keys, "|") + `):\s*)(["']?)([A-Za-z][A-Za-z0-9_-]*)(["']?)(\s*(?:[,}#]|$))`)
 }
 
-// renameTargets changes "<key>: <id>" in a line of a pasted transform (to, default and
-// else of core.switch and core.filter, see targetKeys) to the renamed ids.
+// renameTargets changes "<key>: <id>" in a line of a pasted transform (to and else
+// of core.switch and core.filter, see targetKeys) to the renamed ids.
 func renameTargets(line string, renamed map[string]string, n int, ref *regexp.Regexp) (string, int) {
 	if len(renamed) == 0 || ref == nil || !strings.Contains(line, ":") {
 		return line, n

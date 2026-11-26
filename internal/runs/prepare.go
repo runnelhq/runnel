@@ -134,7 +134,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 
 	var defaultJoin model.JoinMode
 	if p.Project != nil {
-		defaultJoin = p.Project.Workflow.DefaultJoin
+		defaultJoin = p.Project.Settings.DefaultJoin
 	}
 	envName := ""
 	if p.Env != nil {

@@ -12,9 +12,9 @@ import (
 // joinPipeline: 1,000 orders (two per customer, customers 0 to 499) and 400 customers
 // (100 to 499), joined with tiny buffers, so that the two inputs must be read in step.
 const joinPipeline = `transforms:
-  - { id: orders, type: core.generate-rows, with: { rows: 1000, rowNumberField: n } }
+  - { id: orders, type: core.generate-rows, with: { count: 1000, numberField: n } }
   - { id: ordersKey, type: core.calculate, with: { fields: [ { name: customerId, value: "{{ int((record.n - 1) / 2) }}" } ] } }
-  - { id: customers, type: core.generate-rows, with: { rows: 400, rowNumberField: n } }
+  - { id: customers, type: core.generate-rows, with: { count: 400, numberField: n } }
   - { id: customersKey, type: core.calculate, with: { fields: [ { name: id, value: "{{ record.n + 99 }}" } ] } }
   - { id: join, type: core.merge-join, with: { left: ordersKey, right: customersKey, keys: [ { left: customerId, right: id } ], join: %s } }
   - { id: out, type: test.collect }
@@ -47,7 +47,7 @@ func TestPrepareMergeJoin(t *testing.T) {
 		"wrong source": {strings.Replace(fmt.Sprintf(joinPipeline, "inner"), "right: customersKey", "right: customers", 1),
 			`transform "join": no data link comes from "customers" (incoming: customersKey, ordersKey)`},
 		"same source": {`transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
   - { id: a, type: core.dummy }
   - { id: b, type: core.dummy }
   - { id: join, type: core.merge-join, with: { left: a, right: b, keys: [ { left: n } ] } }

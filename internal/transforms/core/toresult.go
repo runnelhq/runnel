@@ -14,17 +14,17 @@ import (
 
 // core.to-result adds the records to the result of the pipeline and passes them on
 // (roadmap S24a; Hop: "Copy rows to result"): core.run-pipeline returns them as
-// output.rows. They are held in memory, at most maxRecords.
+// output.records. They are held in memory, at most maxRecords.
 var toResultDefinition = transform.Definition{
 	Type:        "core.to-result",
 	Category:    transform.CategoryExecution,
 	Label:       "Records to Workflow",
-	Description: "Returns the records to the calling workflow (output.rows) and passes them on",
+	Description: "Returns the records to the calling workflow (output.records) and passes them on",
 	Example:     "maxRecords: 1000\n",
 	Config:      toResult{},
 	New:         newToResult,
 	Reference: action.Reference{
-		Records: "Passes all records on unchanged and adds them to the result of the pipeline: core.run-pipeline returns them as output.rows.",
+		Records: "Passes all records on unchanged and adds them to the result of the pipeline: core.run-pipeline returns them as output.records.",
 		Errors:  "Stops the pipeline when there are more records than maxRecords, or maxRecords is not a whole number of 1 or more.",
 		Limits:  []string{"maxRecords limits the records held in memory for the result (default 100,000)."},
 	},

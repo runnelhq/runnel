@@ -29,7 +29,7 @@ type SMTP struct {
 	Host     string `json:"host" doc:"Name or address of the mail server" schema:"required,example=smtp.example.com,group=Server"`
 	Port     string `json:"port" doc:"TCP port; empty: 587 with starttls, 465 with tls, 25 with none" schema:"example=587,group=Server"`
 	TLS      string `json:"tls" doc:"Encryption: starttls (port 587), tls (from the start, port 465) or none (only for a relay in a trusted network); the certificate is always checked" schema:"enum=starttls|tls|none,default=starttls,group=Security"`
-	Auth     string `json:"auth" doc:"Sign-in: password (user and password), oauth2 (an application registered in Microsoft Entra, e.g. for Office 365) or none (e.g. a relay that knows the sender by its address); empty: password if user is set" schema:"enum=password|oauth2|none,group=Sign-in"`
+	Auth     string `json:"auth" doc:"Sign-in: basic (user and password, as in the http connection), oauth2 (an application registered in Microsoft Entra, e.g. for Office 365) or none (e.g. a relay that knows the sender by its address); empty: basic if user is set" schema:"enum=basic|oauth2|none,group=Sign-in"`
 	User     string `json:"user" doc:"User name for the sign-in, often the mail address; with oauth2 the mailbox that sends" schema:"example=runnel@example.com,group=Sign-in"`
 	Password string `json:"password" doc:"Password of the user; use ${secret:NAME}" schema:"format=runnel-secret,group=Sign-in"`
 	From     string `json:"from" doc:"Sender of the mails if the action names none, e.g. Runnel <runnel@example.com>" schema:"example=runnel@example.com,group=Mail"`

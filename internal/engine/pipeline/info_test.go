@@ -11,9 +11,9 @@ import (
 
 // lookupPipeline: 50 customers as lookup data over an info link, 100 orders looked up.
 const lookupPipeline = `transforms:
-  - { id: customers, type: core.generate-rows, with: { rows: 50, rowNumberField: id } }
+  - { id: customers, type: core.generate-rows, with: { count: 50, numberField: id } }
   - { id: names, type: core.calculate, with: { fields: [ { name: name, value: "c{{ record.id }}" } ] } }
-  - { id: orders, type: core.generate-rows, with: { rows: 100, rowNumberField: customerId } }
+  - { id: orders, type: core.generate-rows, with: { count: 100, numberField: customerId } }
   - { id: lookup, type: core.stream-lookup, with: { keys: [ { field: customerId, lookupField: id } ], return: [ { lookupField: name, as: customer, default: unknown } ] %s } }
   - { id: out, type: test.collect }
   - { id: bad, type: test.collect }
@@ -106,23 +106,23 @@ func TestPrepareInfoLinkErrors(t *testing.T) {
 	lookup := "{ id: lookup, type: core.stream-lookup, with: { keys: [ { field: n } ], return: [ { lookupField: x } ] } }"
 	for name, tc := range map[string]struct{ body, want string }{
 		"no info link": {`transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
   - ` + lookup + `
 links:
   - { from: gen, to: lookup }
 `, `transform "lookup": core.stream-lookup needs an info link with the lookup data`},
 		"not a lookup": {`transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
-  - { id: other, type: core.generate-rows, with: { rows: 1 } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
+  - { id: other, type: core.generate-rows, with: { count: 1 } }
   - { id: pass, type: core.dummy }
 links:
   - { from: gen, to: pass }
   - { from: other, to: pass, type: info }
 `, `link #2 (other → pass): core.dummy takes no info link; only transforms for lookups do, e.g. core.stream-lookup`},
 		"two info links": {`transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
-  - { id: a, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
-  - { id: b, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
+  - { id: a, type: core.generate-rows, with: { count: 1, numberField: n } }
+  - { id: b, type: core.generate-rows, with: { count: 1, numberField: n } }
   - ` + lookup + `
 links:
   - { from: gen, to: lookup }
@@ -130,7 +130,7 @@ links:
   - { from: b, to: lookup, type: info }
 `, `link #3 (b → lookup): lookup takes one info link; link #2 already brings its lookup data`},
 		"same source": {`transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1, numberField: n } }
   - { id: pass, type: core.dummy }
   - ` + lookup + `
 links:

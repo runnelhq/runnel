@@ -564,7 +564,7 @@ func CheckConfig(s *Schema, with map[string]any) error {
 }
 
 // Paths returns the paths of the fields with the given format in a configuration, e.g.
-// [default] and [cases * to] for FormatTarget in core.switch; "*" stands for every item
+// [else] and [cases * to] for FormatTarget in core.switch; "*" stands for every item
 // of a list.
 func (s *Schema) Paths(format string) [][]string {
 	var out [][]string

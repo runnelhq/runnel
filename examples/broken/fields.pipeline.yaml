@@ -8,8 +8,8 @@ transforms:
   - id: numbers
     type: core.generate-rows
     with:
-      rows: 10
-      rowNumberField: n
+      count: 10
+      numberField: n
       fields:
         - { name: amount, value: 9.95 }
   - id: show

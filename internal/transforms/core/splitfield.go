@@ -27,21 +27,23 @@ var splitFieldDefinition = transform.Definition{
 	Reference: action.Reference{
 		Outputs: []action.OutputField{
 			{Name: "<into>", Type: "string", Description: "The parts in order; more parts stay together in the last field, missing ones are empty"},
-			{Name: "<indexField>", Type: "int", Description: "With rows, the position of the part, starting at 1"},
+			{Name: "<numberField>", Type: "int", Description: "With asRecords, the position of the part, starting at 1"},
 		},
-		Records: "With into, passes every record on with the parts; with rows, one record per part with field set to the part, and a record without a value once.",
+		Records: "With into, passes every record on with the parts; with asRecords, one record per part with field set to the part, and a record without a value once.",
 		Errors:  "Never fails while the pipeline runs.",
 	},
 }
 
+// splitField is the configuration; asRecords and numberField were rows and indexField
+// until R5b.
 type splitField struct {
-	Field      string   `json:"field" doc:"Field whose text is split" schema:"required,format=runnel-field,example=name"`
-	Separator  string   `json:"separator" doc:"Text between the parts, e.g. ; or , (with the space)" schema:"required,example=;"`
-	Into       []string `json:"into" doc:"Fields for the parts, in order; more parts than fields stay together in the last one, missing parts are empty. Not with rows"`
-	Rows       bool     `json:"rows" doc:"One record per part instead: the field holds the part, the other fields are copied"`
-	IndexField string   `json:"indexField" doc:"With rows: field for the position of the part, starting at 1"`
-	KeepEmpty  bool     `json:"keepEmpty" doc:"With rows: also a record for empty parts (a;;b); a record whose field is empty is always passed on once" schema:"default=false"`
-	Trim       bool     `json:"trim" doc:"Removes spaces around each part" schema:"default=false"`
+	Field       string   `json:"field" doc:"Field whose text is split" schema:"required,format=runnel-field,example=name"`
+	Separator   string   `json:"separator" doc:"Text between the parts, e.g. ; or , (with the space)" schema:"required,example=;"`
+	Into        []string `json:"into" doc:"Fields for the parts, in order; more parts than fields stay together in the last one, missing parts are empty. Not with asRecords"`
+	AsRecords   bool     `json:"asRecords" doc:"One record per part instead: the field holds the part, the other fields are copied"`
+	NumberField string   `json:"numberField" doc:"With asRecords: field for the position of the part, starting at 1"`
+	KeepEmpty   bool     `json:"keepEmpty" doc:"With asRecords: also a record for empty parts (a;;b); a record whose field is empty is always passed on once" schema:"default=false"`
+	Trim        bool     `json:"trim" doc:"Removes spaces around each part" schema:"default=false"`
 }
 
 func newSplitField(with map[string]any) (transform.Transform, error) {
@@ -54,12 +56,12 @@ func newSplitField(with map[string]any) (transform.Transform, error) {
 		return nil, errors.New("field: name the field whose text is split")
 	case t.Separator == "":
 		return nil, errors.New("separator: give the text between the parts")
-	case t.Rows && len(t.Into) > 0:
-		return nil, errors.New("into and rows: choose one – fields for the parts or one record per part")
-	case !t.Rows && len(t.Into) == 0:
-		return nil, errors.New("into: list the fields for the parts, or set rows: true for one record per part")
-	case !t.Rows && (t.IndexField != "" || t.KeepEmpty):
-		return nil, errors.New("indexField and keepEmpty apply only with rows: true")
+	case t.AsRecords && len(t.Into) > 0:
+		return nil, errors.New("into and asRecords: choose one – fields for the parts or one record per part")
+	case !t.AsRecords && len(t.Into) == 0:
+		return nil, errors.New("into: list the fields for the parts, or set asRecords: true for one record per part")
+	case !t.AsRecords && (t.NumberField != "" || t.KeepEmpty):
+		return nil, errors.New("numberField and keepEmpty apply only with asRecords: true")
 	}
 	for i, f := range t.Into {
 		if f == "" {
@@ -73,10 +75,10 @@ func newSplitField(with map[string]any) (transform.Transform, error) {
 func (t *splitField) Init(ic *transform.InitContext) (record.Schema, error) {
 	ic.Use(t.Field, "field")
 	s := ic.In
-	if t.Rows {
+	if t.AsRecords {
 		s = s.With(t.Field, record.String)
-		if t.IndexField != "" {
-			s = s.With(t.IndexField, record.Int)
+		if t.NumberField != "" {
+			s = s.With(t.NumberField, record.Int)
 		}
 		return s, nil
 	}
@@ -99,7 +101,7 @@ func (t *splitField) Process(ctx context.Context, in <-chan transform.Batch, out
 			v, _ := r.Get(t.Field)
 			text := expr.Format(v)
 			var err error
-			if t.Rows {
+			if t.AsRecords {
 				err = t.splitRows(r, v, text, out)
 			} else {
 				parts := strings.SplitN(text, t.Separator, len(t.Into))
@@ -136,8 +138,8 @@ func (t *splitField) splitRows(r record.Record, v any, text string, out *transfo
 	}
 	if len(parts) == 0 {
 		r.Set(t.Field, nil)
-		if t.IndexField != "" {
-			r.Set(t.IndexField, nil)
+		if t.NumberField != "" {
+			r.Set(t.NumberField, nil)
 		}
 		return out.Emit(r)
 	}
@@ -147,8 +149,8 @@ func (t *splitField) splitRows(r record.Record, v any, text string, out *transfo
 			c = r.Clone()
 		}
 		c.Set(t.Field, p)
-		if t.IndexField != "" {
-			c.Set(t.IndexField, int64(i+1))
+		if t.NumberField != "" {
+			c.Set(t.NumberField, int64(i+1))
 		}
 		if err := out.Emit(c); err != nil {
 			return err

@@ -13,7 +13,7 @@ func TestToRows(t *testing.T) {
 	if rows, err := toRows(nil); rows != nil || err != nil {
 		t.Errorf("nil: %v %v", rows, err)
 	}
-	if _, err := toRows(map[string]any{"a": 1}); err == nil || !strings.Contains(err.Error(), "rows must be a list") {
+	if _, err := toRows(map[string]any{"a": 1}); err == nil || !strings.Contains(err.Error(), "records must be a list") {
 		t.Errorf("object: %v", err)
 	}
 }

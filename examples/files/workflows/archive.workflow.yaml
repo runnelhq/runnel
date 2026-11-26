@@ -28,7 +28,7 @@ actions:
     type: file.exists
     with:
       path: ${INBOX}/*.csv
-      kind: file
+      include: files
   - id: folder
     type: file.mkdir
     with:

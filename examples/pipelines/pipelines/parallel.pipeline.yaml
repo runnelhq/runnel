@@ -3,7 +3,7 @@
 #   runnel run --param ROWS=10000000 examples/pipelines/pipelines/parallel.pipeline.yaml
 # - "check" runs in 4 copies that share the records; the order of the records is no
 #   longer fixed after it. Inputs and outputs cannot run in copies.
-# - "split" passes the records in turn to "left" and "right" (distribute) instead of
+# - "split" passes the records in turn to "left" and "right" (roundRobin) instead of
 #   giving every record to both (copy, the default).
 # - settings: larger batches and buffers; strict mode requires that the fields of all
 #   links are known, so a typo in a field name is always an error.
@@ -22,8 +22,8 @@ transforms:
   - id: numbers
     type: core.generate-rows
     with:
-      rows: ${ROWS}
-      rowNumberField: n
+      count: ${ROWS}
+      numberField: n
   - id: check
     type: core.filter
     copies: 4
@@ -31,7 +31,7 @@ transforms:
       condition: "{{ record.n % 3 == 0 }}"
   - id: split
     type: core.dummy
-    distribution: distribute
+    distribution: roundRobin
   - id: left
     type: core.dummy
   - id: right

@@ -250,7 +250,10 @@ func TestSendRunErrors(t *testing.T) {
 		{local, map[string]any{"to": "a@example.com", "attachments": []any{"missing.csv"}}, "attachment: open"},
 		{local, map[string]any{"to": "a@example.com", "attachments": []any{"big.bin"}}, "larger than 25 MB together"},
 		{map[string]any{"host": "smtp.example.com", "tls": "none", "user": "u", "password": "p"}, map[string]any{"to": "a@example.com"}, "the password would be sent unencrypted"},
-		{map[string]any{"host": "smtp.example.com", "auth": "password"}, map[string]any{"to": "a@example.com"}, "auth password needs a user"},
+		{map[string]any{"host": "smtp.example.com", "auth": "basic"}, map[string]any{"to": "a@example.com"}, "auth basic needs a user"},
+		// password is basic since R5b, as in the http connection.
+		{map[string]any{"host": "smtp.example.com", "auth": "password", "user": "u"}, map[string]any{"to": "a@example.com"}, `invalid auth "password" (expected basic, oauth2 or none)`},
+		{map[string]any{"host": "smtp.example.com", "auth": "plain", "user": "u"}, map[string]any{"to": "a@example.com"}, `invalid auth "plain" (expected basic, oauth2 or none)`},
 		{map[string]any{"host": "smtp.example.com", "port": "x"}, map[string]any{"to": "a@example.com"}, `port "x" is not a number`},
 	}
 	for _, c := range cases {

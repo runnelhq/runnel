@@ -12,5 +12,8 @@ transforms:
   - id: b
     type: core.dummy
     distribution: random
+  - id: c
+    type: core.dummy
+    distribution: distribute # roundRobin since R5b
 links:
   - { from: a, to: b }

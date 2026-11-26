@@ -44,7 +44,7 @@ with:
   auth: { token: ${env:CUSTOMER_API_TOKEN} }   # oder: auth: none
   response: run                            # accepted (Standard) | run
   timeout: 30s                             # nur bei run: ohne Antwort bis dahin 504
-  maxConcurrent: 10                        # gleichzeitige Läufe dieses Triggers, darüber 429 (Standard 4 seit R5a)
+  maxConcurrentRuns: 10                    # gleichzeitige Läufe dieses Triggers, darüber 429 (Standard 4 seit R5a; Name seit R5b)
   history: errors                          # all | errors | none (Standard: all bei accepted, errors bei run)
 ```
 
@@ -181,3 +181,11 @@ Alias für `http.respond` gibt es nicht, da noch kein Release erschienen ist; Wo
   `/api/v1/runs/<id>` entfällt: `status` ist sonst überall ein Zustand, und der Pfad zeigt auf die API des Servers auf
   `127.0.0.1`, die ein Aufrufer im Netz nicht erreicht. Der Header `Location` bleibt wie bisher. Bewusster Bruch vor 1.0
   (ADR 0029).
+
+## Nachtrag 2026-11-26 (R5b): `maxConcurrentRuns`
+
+- Die Grenze der gleichzeitigen Läufe eines HTTP-Triggers heißt `with.maxConcurrentRuns` wie `settings.maxConcurrentRuns`
+  in `project.yaml` und im Workflow: dieselbe Art Grenze mit derselben Antwort `429`. Standard (4) und Bedeutung von `0`
+  bleiben wie im Nachtrag R5a.
+- Der alte Name `maxConcurrent` ist ein unbekanntes Feld, ohne Übergangszeit (bewusster Bruch vor 1.0,
+  ADR 0029). Die `429`-Meldung nennt `maxConcurrentRuns`.

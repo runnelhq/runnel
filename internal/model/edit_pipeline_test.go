@@ -187,7 +187,7 @@ func TestEditPipelineTypedListAndTexts(t *testing.T) {
 }
 
 // Renaming a transform also changes the fields that name it (format runnel-target):
-// "to" in the cases of core.switch, default, else of core.filter; other values that
+// "to" in the cases and else of core.switch, else of core.filter; other values that
 // happen to be the same text stay.
 func TestEditPipelineRenameTargets(t *testing.T) {
 	src := `kind: Pipeline
@@ -201,7 +201,7 @@ transforms:
         - { when: "{{ record.small }}", to: small }
         - when: "{{ record.big }}"
           to: "small"
-      default: small
+      else: small
   - { id: check, type: core.filter, with: { condition: "{{ true }}", else: small } }
   - { id: note, type: core.log, with: { message: small } }
   - { id: small, type: core.dummy }
@@ -212,7 +212,7 @@ links:
 	targets := func(typ string) [][]string {
 		switch typ {
 		case "core.switch":
-			return [][]string{{"cases", "*", "to"}, {"default"}}
+			return [][]string{{"cases", "*", "to"}, {"else"}}
 		case "core.filter":
 			return [][]string{{"else"}}
 		}
@@ -222,7 +222,7 @@ links:
 	want := strings.NewReplacer(
 		`to: small }`, `to: tiny }`,
 		`to: "small"`, `to: tiny`, // like ids, without quotes
-		`default: small`, `default: tiny`,
+		"else: small\n", "else: tiny\n",
 		`else: small }`, `else: tiny }`,
 		`id: small,`, `id: tiny,`,
 	).Replace(src)
@@ -230,7 +230,7 @@ links:
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 	// Without the targets (e.g. a workflow) only id, links and layout change.
-	if got := editPipeline(t, src, PipelineEdit{Rename: map[string]string{"small": "tiny"}}); !strings.Contains(got, "default: small") {
+	if got := editPipeline(t, src, PipelineEdit{Rename: map[string]string{"small": "tiny"}}); !strings.Contains(got, "      else: small\n") {
 		t.Errorf("without targets:\n%s", got)
 	}
 }

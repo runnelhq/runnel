@@ -2,7 +2,7 @@
 # Called by workflows/files.workflow.yaml; started on its own, it gets no records.
 # - "in" passes on the records the workflow gave with rows (here: a file list).
 # - "large" keeps files of at least MIN_SIZE bytes, "fields" keeps name and size.
-# - "out" returns them to the workflow as output.rows.
+# - "out" returns them to the workflow as output.records.
 kind: Pipeline
 apiVersion: runnel/v1
 name: files

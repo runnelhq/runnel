@@ -26,7 +26,7 @@ var formFields = map[string][]string{
 	KindConnection:  {"name", "description", "type", "with."},
 	KindTrigger:     {"name", "description", "type", "target", "environment", "params.", "enabled", "with."},
 	KindEnvironment: {"name", "description", "variables.", "secretStore", "secrets."},
-	KindProject:     {"name", "description", "defaultEnvironment", "variables.", "secretStore", "secrets.", "workflow.", "settings."},
+	KindProject:     {"name", "description", "defaultEnvironment", "variables.", "secretStore", "secrets.", "settings."},
 }
 
 // fixedName are the kinds whose name the form does not change: it is the file name

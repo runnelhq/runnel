@@ -130,9 +130,8 @@ func TestForEachValidation(t *testing.T) {
 		{`{ id: a, type: test.ok, with: { value: "{{ row.x }}" } }`, "unknown name row"},
 		{`{ id: a, type: test.ok, parallel: 2 }`, "parallel is only possible with forEach"},
 		{`{ id: a, type: test.ok, continueOnEntryError: true }`, "continueOnEntryError is only possible with forEach"},
-		// The name until R5a, with the opposite meaning (A6).
-		{`{ id: a, type: test.ok, forEach: "{{ [1] }}", stopOnError: false }`, "stopOnError was replaced by continueOnEntryError with the opposite meaning: write continueOnEntryError: true"},
-		{`{ id: a, type: test.ok, forEach: "{{ [1] }}", stopOnError: true }`, "write continueOnEntryError: false"},
+		// The name until R5a, with the opposite meaning (A6), is an unknown field.
+		{`{ id: a, type: test.ok, forEach: "{{ [1] }}", stopOnError: false }`, `t.workflow.yaml:5:51: unknown field "stopOnError"`},
 		{`{ id: a, type: test.ok, forEach: "${LIST}" }`, "forEach must be an expression that returns a list"},
 		{`{ id: a, type: test.ok, forEach: "{{ rows }}" }`, "unknown name rows"},
 		{`{ id: a, type: test.ok, forEach: "{{ [1] }}", parallel: 100 }`, "parallel must be between 1 and 64"},

@@ -19,24 +19,25 @@ var generateRowsDefinition = transform.Definition{
 	Category:    transform.CategoryInput,
 	Label:       "Generate Rows",
 	Description: "Creates records with constant fields",
-	Example:     "rows: 10\nrowNumberField: n\nfields:\n  - { name: status, value: new }\n",
+	Example:     "count: 10\nnumberField: n\nfields:\n  - { name: status, value: new }\n",
 	Config:      generateRows{},
 	New:         newGenerateRows,
 	Reference: action.Reference{
 		Outputs: []action.OutputField{
 			{Name: "<fields[].name>", Type: "any", Description: "The constant value, with the type of the value"},
-			{Name: "<rowNumberField>", Type: "int", Description: "Number of the record, starting at 1"},
+			{Name: "<numberField>", Type: "int", Description: "Number of the record, starting at 1"},
 		},
-		Records: "Creates rows records with the same fields and passes them to all data links; it has no incoming links.",
-		Errors:  "Stops the pipeline when rows is not a whole number of 0 or more.",
+		Records: "Creates count records with the same fields and passes them to all data links; it has no incoming links.",
+		Errors:  "Stops the pipeline when count is not a whole number of 0 or more.",
 	},
 }
 
 type generateRows struct {
-	// Rows is text, so that it can be a variable (${ROWS}); it is checked when the pipeline runs.
-	Rows      string       `json:"rows" doc:"Number of records to create, e.g. 1000 or ${ROWS}" schema:"required,example=10"`
-	Fields    []constField `json:"fields" doc:"Fields of every record, with a constant value"`
-	RowNumber string       `json:"rowNumberField" doc:"Name of a field for the number of the record, starting at 1; empty: none"`
+	// Count is text, so that it can be a variable (${ROWS}); it is checked when the
+	// pipeline runs. Count and NumberField were rows and rowNumberField until R5b.
+	Count       string       `json:"count" doc:"Number of records to create, e.g. 1000 or ${ROWS}" schema:"required,example=10"`
+	Fields      []constField `json:"fields" doc:"Fields of every record, with a constant value"`
+	NumberField string       `json:"numberField" doc:"Name of a field for the number of the record, starting at 1; empty: none"`
 }
 
 type constField struct {
@@ -66,8 +67,8 @@ func newGenerateRows(with map[string]any) (transform.Transform, error) {
 // types of their values (ADR 0007).
 func (t *generateRows) Init(*transform.InitContext) (record.Schema, error) {
 	var s record.Schema
-	if t.RowNumber != "" {
-		s = s.With(t.RowNumber, record.Int)
+	if t.NumberField != "" {
+		s = s.With(t.NumberField, record.Int)
 	}
 	for _, f := range t.Fields {
 		s = s.With(f.Name, record.TypeOf(f.Value))
@@ -76,14 +77,14 @@ func (t *generateRows) Init(*transform.InitContext) (record.Schema, error) {
 }
 
 func (t *generateRows) Process(ctx context.Context, _ <-chan transform.Batch, out *transform.Output) error {
-	rows, err := strconv.ParseInt(strings.TrimSpace(t.Rows), 10, 64)
-	if err != nil || rows < 0 {
-		return fmt.Errorf("rows: %q is not a whole number of 0 or more", t.Rows)
+	count, err := strconv.ParseInt(strings.TrimSpace(t.Count), 10, 64)
+	if err != nil || count < 0 {
+		return fmt.Errorf("count: %q is not a whole number of 0 or more", t.Count)
 	}
-	for n := int64(1); n <= rows; n++ {
+	for n := int64(1); n <= count; n++ {
 		r := record.Make(len(t.Fields) + 1)
-		if t.RowNumber != "" {
-			r.Set(t.RowNumber, n)
+		if t.NumberField != "" {
+			r.Set(t.NumberField, n)
 		}
 		for _, f := range t.Fields {
 			r.Set(f.Name, f.Value)

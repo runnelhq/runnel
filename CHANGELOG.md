@@ -39,6 +39,10 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 - **Abkündigen** (ADR 0029): umbenannte Felder gelten unter beiden Namen, `validate` warnt mit Ersatz; im Katalog
   tragen sie `deprecated` und `x-runnel-replacement`. Abgekündigt ist noch nichts.
 - Relative Pfade beziehen sich auf den Projektordner (ADR 0020); dynamische Ziele mit `allowedTargets`.
+- **Zeitlimit für `core.script`:** `timeout` in der Action (Standard 1 min) und im Transform für `init` und `end`
+  (Standard 1 min je Teil; ADR 0028, Nachtrag R5b).
+- **Ausgaben:** `shell.run`/`shell.powershell` liefern `output.durationMs` (Laufzeit als Zahl in Millisekunden),
+  `archive.create` `output.count` (beide ersetzen bisherige Felder, siehe „Bruch“).
 
 ### Behoben
 
@@ -59,7 +63,9 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 
 ### Bruch
 
-Bewusste Änderungen aus der Durchsicht der Namen und Standardwerte vor 1.0 (R5a, ADR 0029):
+Bewusste Änderungen aus der Durchsicht der Namen und Standardwerte vor 1.0 (R5a, R5b, ADR 0029). Alte Namen sind
+unbekannte Felder (`unknown field "…"`), alte Werte ungültige Werte mit den erlaubten; einen Hinweis auf den neuen
+Namen gibt es nicht:
 
 - **Exit-Codes:** Ein falscher Aufruf endet bei allen Befehlen mit 2 statt 1, bei `runnel health` mit 3.
   `runnel validate` und `runnel triggers` enden mit 2, wenn nichts geprüft werden konnte (Pfad fehlt, kein Projekt,
@@ -77,6 +83,26 @@ Bewusste Änderungen aus der Durchsicht der Namen und Standardwerte vor 1.0 (R5a
 - **`core.stream-lookup`:** `maxRecords` ist Text (wie bei `core.to-result`); im Katalog Typ `string`.
 - **Secret-Quellen:** `secretStore` nimmt nur noch `env` und `inline` an; `shared` entfällt, `local` kommt mit dem
   lokalen Secret-Store (S39d) zurück (ADR 0022, Nachtrag R5a).
+- **HTTP-Trigger:** `with.maxConcurrent` heißt `with.maxConcurrentRuns` wie `settings.maxConcurrentRuns`
+  (ADR 0018, Nachtrag R5b).
+- **`project.yaml`:** `workflow.defaultJoin` heißt `settings.defaultJoin`; den Block `workflow:` gibt es nicht mehr
+  (ADR 0003, Nachtrag R5b).
+- **`file.exists`, `transfer.exists`:** `include: all|files|folders` (Standard `all`) wie bei `file.list` statt
+  `kind: any|file|folder`.
+- **Connections `postgres`, `sqlserver`:** `connectTimeout` heißt `timeout` wie bei den übrigen Typen.
+  **`smtp`:** `auth: password` heißt `auth: basic` wie bei `http`; unbekannte Werte von `auth` sind ein Fehler
+  (ADR 0022, Nachtrag R5b).
+- **`shell.run`, `shell.powershell`:** `json: true` heißt `format: json`, der Wert steht in `output.value` statt
+  `output.json`; `output.duration` (Text) ist `output.durationMs` (Zahl) (ADR 0023, Nachtrag R5b).
+- **`core.generate-rows`:** `rows` heißt `count`, `rowNumberField` heißt `numberField`. **`core.split-field`:**
+  `rows: true` heißt `asRecords: true`, `indexField` heißt `numberField`. **`core.run-pipeline`:** `rows` heißt `records`,
+  die zurückgegebenen Datensätze stehen in `output.records` statt `output.rows` (ADR 0025, Nachtrag R5b).
+- **`core.switch`:** `default` heißt `else` wie bei `core.filter`.
+- **Pipelines:** `distribution: distribute` heißt `distribution: roundRobin`.
+- **`archive.create`:** `output.files` heißt `output.count`.
+- **Standardwerte:** `maxWait` von `file.wait` und `transfer.wait` ist 1 h statt „unbegrenzt“ (`0`: bis zum Timeout der
+  Action); `core.script` endet nach 1 min (`timeout`); `transfer.download` lädt Dateien bis 1 GB (`maxSize`) statt ohne
+  Grenze.
 
 ## Frühere Versionen
 

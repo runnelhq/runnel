@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -26,14 +27,14 @@ var waitDefinition = action.Definition{
 	Reference: action.Reference{
 		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the matching files, sorted"}},
 		Errors:  "Fails when no file matches after maxWait, or the files still change in size after maxWait (stableFor), and when the folder cannot be read.",
-		Limits:  []string{"Looks every interval (default 5s, at least 10ms); without maxWait it waits until the timeout of the action or the end of the run."},
+		Limits:  []string{"Looks every interval (default 5s, at least 10ms); maxWait limits the wait (default 1h; 0: until the timeout of the action or the end of the run)."},
 	},
 }
 
 type wait struct {
 	Path      string `json:"path" doc:"File to wait for, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
 	Interval  string `json:"interval" doc:"How often to look, e.g. 5s or 1m" schema:"format=runnel-duration,default=5s"`
-	MaxWait   string `json:"maxWait" doc:"Give up and fail after this time; empty: wait until the action's timeout or the end of the run" schema:"format=runnel-duration,example=30m"`
+	MaxWait   string `json:"maxWait" doc:"Give up and fail after this time; 0: wait until the action's timeout or the end of the run" schema:"format=runnel-duration,default=1h"`
 	StableFor string `json:"stableFor" doc:"The size of the files must not change for this time, e.g. 10s; empty: do not check" schema:"format=runnel-duration,example=10s"`
 }
 
@@ -56,7 +57,7 @@ func (a *wait) Execute(ctx context.Context, ec *action.ExecContext) (action.Resu
 	if interval < 10*time.Millisecond {
 		return action.Result{}, fmt.Errorf("interval %s is too short (at least 10ms)", interval)
 	}
-	maxWait, err := duration("maxWait", a.MaxWait, 0)
+	maxWait, err := MaxWait(a.MaxWait)
 	if err != nil {
 		return action.Result{}, err
 	}
@@ -99,6 +100,16 @@ func (a *wait) Execute(ctx context.Context, ec *action.ExecContext) (action.Resu
 			return action.Result{}, ctx.Err()
 		}
 	}
+}
+
+// DefaultMaxWait is how long file.wait and transfer.wait wait without maxWait (R5b): a
+// forgotten value does not block a run for ever.
+const DefaultMaxWait = time.Hour
+
+// MaxWait reads maxWait of file.wait and transfer.wait: empty is DefaultMaxWait, 0 no
+// limit of its own.
+func MaxWait(text string) (time.Duration, error) {
+	return duration("maxWait", strings.TrimSpace(text), DefaultMaxWait)
 }
 
 // duration reads an optional duration field.

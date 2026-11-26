@@ -121,6 +121,20 @@ func TestHistorySettings(t *testing.T) {
 	}
 }
 
+// The default join of the project is settings.defaultJoin (R5b); the old block workflow
+// is an unknown field.
+func TestDefaultJoinSettings(t *testing.T) {
+	const head = "kind: Project\napiVersion: runnel/v1\nname: p\n"
+	p, err := ReadProject("project.yaml", []byte(head+"settings:\n  defaultJoin: first\n"), nil)
+	if err != nil || p.Settings.DefaultJoin != JoinFirst {
+		t.Fatalf("%v %+v", err, p)
+	}
+	_, err = ReadProject("project.yaml", []byte(head+"workflow:\n  defaultJoin: first\n"), nil)
+	if err == nil || !strings.Contains(err.Error(), `project.yaml:4:1: unknown field "workflow"`) {
+		t.Errorf("old block: %v", err)
+	}
+}
+
 // settings.onError names a workflow of the project (ADR 0027); none only in workflows
 // and pipelines.
 func TestOnErrorSettings(t *testing.T) {

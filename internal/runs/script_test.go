@@ -119,7 +119,7 @@ parameters:
   - name: LABEL
     default: total
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1000, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 1000, numberField: n } }
   - id: js
     type: core.script
     copies: 4

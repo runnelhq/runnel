@@ -40,7 +40,7 @@ func powershell(t *testing.T, dir string, with map[string]any) (map[string]any, 
 	return out, logs, err
 }
 
-// Parameters keep their type; json reads the last JSON value after other output; the
+// Parameters keep their type; format: json reads the last JSON value after other output; the
 // secret from env does not appear in the output.
 func TestPowerShell(t *testing.T) {
 	needPowerShell(t)
@@ -49,13 +49,13 @@ func TestPowerShell(t *testing.T) {
 Write-Output "Grüße an $Name"
 Write-Output "token $env:TOKEN"
 [pscustomobject]@{ name = $Name; twice = $Count * 2; tags = $Tags.Count; flag = $Flag } | ConvertTo-Json`
-	out, _, err := powershell(t, dir, map[string]any{"script": script, "json": true,
+	out, _, err := powershell(t, dir, map[string]any{"script": script, "format": "json",
 		"params": map[string]any{"Name": "Ada; Remove-Item *", "Count": 21, "Tags": []any{"a", "b"}, "Flag": true},
 		"env":    map[string]any{"TOKEN": "s3cret-value"}})
 	if err != nil {
 		t.Fatalf("%v\n%#v", err, out)
 	}
-	j := out["json"].(map[string]any)
+	j := out["value"].(map[string]any)
 	if j["name"] != "Ada; Remove-Item *" || j["twice"] != float64(42) || j["tags"] != float64(2) || j["flag"] != true {
 		t.Errorf("json %#v", j)
 	}

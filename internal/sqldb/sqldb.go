@@ -111,9 +111,9 @@ func sqlServerSource(reg *connection.Registry, c connection.Resolved) (string, s
 	if err := reg.Decode(c, &cfg); err != nil {
 		return "", "", err
 	}
-	timeout, err := seconds(cfg.ConnectTimeout)
+	timeout, err := seconds(cfg.Timeout)
 	if err != nil {
-		return "", "", fmt.Errorf("connection %s: connectTimeout: %w", c.Name, err)
+		return "", "", fmt.Errorf("connection %s: timeout: %w", c.Name, err)
 	}
 	u := url.URL{Scheme: "sqlserver", Host: cfg.Host}
 	switch {
@@ -148,9 +148,9 @@ func postgresSource(reg *connection.Registry, c connection.Resolved) (string, st
 	if err := reg.Decode(c, &cfg); err != nil {
 		return "", "", err
 	}
-	timeout, err := seconds(cfg.ConnectTimeout)
+	timeout, err := seconds(cfg.Timeout)
 	if err != nil {
-		return "", "", fmt.Errorf("connection %s: connectTimeout: %w", c.Name, err)
+		return "", "", fmt.Errorf("connection %s: timeout: %w", c.Name, err)
 	}
 	port := cmp.Or(cfg.Port, "5432")
 	if err := checkPort(port); err != nil {

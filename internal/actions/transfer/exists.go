@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
 )
@@ -16,7 +17,7 @@ var existsDefinition = action.Definition{
 	Category:    action.CategoryNetwork,
 	Label:       "File Exists on Server",
 	Description: "Checks whether files or folders exist on a server (SFTP, FTPS or FTP); output: the matching paths",
-	Example:     "connection: partner-sftp\npath: /outgoing/orders-*.csv\nkind: file\n",
+	Example:     "connection: partner-sftp\npath: /outgoing/orders-*.csv\ninclude: files\n",
 	Config:      existsAction{},
 	New:         newExists,
 	Reference: action.Reference{
@@ -32,7 +33,7 @@ var existsDefinition = action.Definition{
 type existsAction struct {
 	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Path       string `json:"path" doc:"File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
-	Kind       string `json:"kind" doc:"What has to exist" schema:"enum=any|file|folder,default=any"`
+	Include    string `json:"include" doc:"What has to exist: files, folders or all (both)" schema:"enum=all|files|folders,default=all"`
 	Timeout    string `json:"timeout" doc:"Longest time for the check, e.g. 1m; the timeout of the action limits all together" schema:"format=runnel-duration,default=10m"`
 }
 
@@ -41,7 +42,7 @@ func newExists(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
-	return a, checkChoice("kind", a.Kind, "any", "file", "folder")
+	return a, checkChoice("include", a.Include, "all", "files", "folders")
 }
 
 func (a *existsAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
@@ -52,7 +53,8 @@ func (a *existsAction) Execute(ctx context.Context, ec *action.ExecContext) (act
 	if err != nil {
 		return action.Result{}, err
 	}
-	if err := checkKind(a.Kind); err != nil {
+	kind, err := kindOf(a.Include)
+	if err != nil {
 		return action.Result{}, err
 	}
 	s, err := open(ctx, ec, a.Connection)
@@ -62,30 +64,34 @@ func (a *existsAction) Execute(ctx context.Context, ec *action.ExecContext) (act
 	defer s.close()
 	var found []string
 	err = s.within(ctx, timeout, "checking "+a.Path, func() (err error) {
-		found, err = s.matchKind(a.Path, a.Kind)
+		found, err = s.matchKind(a.Path, kind)
 		return err
 	})
 	if err != nil {
 		return action.Result{Output: []any{}}, err
 	}
 	if len(found) == 0 {
-		return action.Result{Output: []any{}}, fmt.Errorf("no %s matches %q on the server", kindName(a.Kind), a.Path)
+		return action.Result{Output: []any{}}, fmt.Errorf("no %s matches %q on the server", kindName(kind), a.Path)
 	}
-	ec.Logf(slog.LevelDebug, "found %d %s for %s on %s", len(found), kindNames(a.Kind, len(found)), a.Path, s.addr)
+	ec.Logf(slog.LevelDebug, "found %d %s for %s on %s", len(found), kindNames(kind, len(found)), a.Path, s.addr)
 	return action.Result{Output: list(found)}, nil
 }
 
-// checkKind checks the value of kind when the action runs.
-func checkKind(kind string) error {
-	switch kind {
-	case "", "any", "file", "folder":
-		return nil
+// kindOf checks the value of include when the action runs and returns the kind of
+// matchKind: file, folder or any. include is called as in transfer.list (R5b, before:
+// kind any|file|folder).
+func kindOf(include string) (string, error) {
+	switch include {
+	case "", "all":
+		return "any", nil
+	case "files", "folders":
+		return strings.TrimSuffix(include, "s"), nil
 	}
-	return fmt.Errorf("invalid kind %q (expected any, file or folder)", kind)
+	return "", fmt.Errorf("invalid include %q (expected all, files or folders)", include)
 }
 
-// matchKind matches a path on the server and keeps only files, folders or both (kind any
-// or ""); at most maxEntries.
+// matchKind matches a path on the server and keeps only files, folders or both (kind
+// file, folder or any); at most maxEntries.
 func (s *session) matchKind(p, kind string) ([]string, error) {
 	found, err := s.find(p, true, maxEntries)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/paths"
@@ -17,7 +18,7 @@ var existsDefinition = action.Definition{
 	Category:    action.CategoryFiles,
 	Label:       "File Exists",
 	Description: "Checks whether files or folders exist; output: the matching paths",
-	Example:     "path: inbox/orders-*.csv\nkind: file\n",
+	Example:     "path: inbox/orders-*.csv\ninclude: files\n",
 	Config:      exists{},
 	New:         newExists,
 	Reference: action.Reference{
@@ -28,7 +29,20 @@ var existsDefinition = action.Definition{
 
 type exists struct {
 	Path string `json:"path" doc:"File or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=C:\\in\\*.csv"`
-	Kind string `json:"kind" doc:"What has to exist" schema:"enum=any|file|folder,default=any"`
+	// Include is called as in file.list (R5b, before: kind any|file|folder).
+	Include string `json:"include" doc:"What has to exist: files, folders or all (both)" schema:"enum=all|files|folders,default=all"`
+}
+
+// includeKinds maps the values of include to the kinds of matchKind.
+var includeKinds = map[string]string{"": "any", "all": "any", "files": "file", "folders": "folder"}
+
+// kindOf returns the kind of matchKind for a value of include.
+func kindOf(include string) (string, error) {
+	kind, ok := includeKinds[include]
+	if !ok {
+		return "", fmt.Errorf("invalid include %q (expected all, files or folders)", include)
+	}
+	return kind, nil
 }
 
 func newExists(with map[string]any) (action.Action, error) {
@@ -36,31 +50,35 @@ func newExists(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
-	return a, nil
+	if strings.Contains(a.Include, "${") || strings.Contains(a.Include, "{{") {
+		return a, nil // checked once it is resolved
+	}
+	_, err := kindOf(a.Include)
+	return a, err
 }
 
 func (a *exists) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
 	if err := ctx.Err(); err != nil {
 		return action.Result{}, err
 	}
-	found, err := matchKind(paths.Resolve(ctx, a.Path), a.Kind)
+	kind, err := kindOf(a.Include)
+	if err != nil {
+		return action.Result{}, err
+	}
+	found, err := matchKind(paths.Resolve(ctx, a.Path), kind)
 	if err != nil {
 		return action.Result{}, err
 	}
 	if len(found) == 0 {
-		return action.Result{Output: []any{}}, fmt.Errorf("no %s matches %q", kindName(a.Kind), a.Path)
+		return action.Result{Output: []any{}}, fmt.Errorf("no %s matches %q", kindName(kind), a.Path)
 	}
-	ec.Logf(slog.LevelDebug, "found %d %s for %s", len(found), kindNames(a.Kind, len(found)), a.Path)
+	ec.Logf(slog.LevelDebug, "found %d %s for %s", len(found), kindNames(kind, len(found)), a.Path)
 	return action.Result{Output: list(found)}, nil
 }
 
-// matchKind matches a path and keeps only files, folders or both (kind any or "").
+// matchKind matches a path and keeps only files, folders or both (kind file, folder or
+// any).
 func matchKind(path, kind string) ([]string, error) {
-	switch kind {
-	case "", "any", "file", "folder":
-	default:
-		return nil, fmt.Errorf("invalid kind %q (expected any, file or folder)", kind)
-	}
 	all, err := match(path)
 	if err != nil {
 		return nil, err

@@ -154,13 +154,13 @@ export function SettingsForm(props: {
         </Section>
 
         {!env && (
-          <Section title="Defaults and limits" folded={!more} onToggle={() => setMore((m) => !m)} summary="workflow.defaultJoin, settings.maxConcurrentRuns">
-            <Field label="Join of all workflows" fieldKey="workflow.defaultJoin" problems={at("$.workflow.defaultJoin")} help="When an action with several incoming links starts, if it sets no join">
+          <Section title="Defaults and limits" folded={!more} onToggle={() => setMore((m) => !m)} summary="settings.defaultJoin, settings.maxConcurrentRuns">
+            <Field label="Join of all workflows" fieldKey="settings.defaultJoin" problems={at("$.settings.defaultJoin")} help="When an action with several incoming links starts, if it sets no join">
               {(f) => (
                 <select
                   id={f.id}
-                  value={String(data.workflow?.defaultJoin ?? "")}
-                  onChange={(e) => void change({ field: "workflow.defaultJoin", value: e.target.value || null })}
+                  value={String(data.settings?.defaultJoin ?? "")}
+                  onChange={(e) => void change({ field: "settings.defaultJoin", value: e.target.value || null })}
                   className={inputClass(f.invalid) + " cursor-pointer"}
                 >
                   <option value="">Not set (all)</option>

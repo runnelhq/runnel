@@ -183,7 +183,7 @@
           "default": "accepted",
           "x-runnel-group": "Answer"
         },
-        "maxConcurrent": {
+        "maxConcurrentRuns": {
           "type": "integer",
           "description": "http: most runs of this trigger at the same time; a request beyond it gets 429. 0: no own limit (only the limits of the project)",
           "default": 4,

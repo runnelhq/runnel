@@ -32,5 +32,6 @@ type SQLServer struct {
 	Password               string `json:"password" doc:"Password of the login; use ${secret:NAME}" schema:"format=runnel-secret,group=Sign-in"`
 	Encrypt                string `json:"encrypt" doc:"Encryption of the connection: true, strict (TDS 8) or false (only the login)" schema:"enum=true|strict|false,default=true,group=Security"`
 	TrustServerCertificate bool   `json:"trustServerCertificate" doc:"Accept any certificate of the server, e.g. a self-signed one; validate warns" schema:"default=false,group=Security"`
-	ConnectTimeout         string `json:"connectTimeout" doc:"Longest time to connect" schema:"format=runnel-duration,default=30s,group=More"`
+	// Timeout is called as in the other connection types (R5b, before: connectTimeout).
+	Timeout string `json:"timeout" doc:"Longest time to connect; queries and statements have their own timeout in the action or transform" schema:"format=runnel-duration,default=30s,group=More"`
 }

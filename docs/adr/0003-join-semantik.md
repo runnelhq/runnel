@@ -31,8 +31,8 @@ Die Join-Semantik ist **pro Action konfigurierbar**, mit einem projektweiten Sta
 
 ```yaml
 # project.yaml
-workflow:
-  defaultJoin: all          # all | first | each
+settings:
+  defaultJoin: all          # all | first | each (bis R5b unter workflow:, siehe Nachtrag)
 ```
 
 ```yaml
@@ -44,7 +44,7 @@ actions:
     joinTimeout: 30m        # nur bei 'all': maximale Wartezeit, danach Fehlschlag der Action
 ```
 
-Rangfolge: Action (`join`) > Projekt (`workflow.defaultJoin`) > eingebauter Standard (`all`).
+Rangfolge: Action (`join`) > Projekt (`settings.defaultJoin`, bis R5b `workflow.defaultJoin`) > eingebauter Standard (`all`).
 
 ### Dead-Path-Elimination
 
@@ -114,7 +114,15 @@ Ergänzende Festlegungen aus der Implementierung (`internal/engine/workflow/sche
   aller Actions *hinter* dem Ziel werden zurückgesetzt. Zwischenergebnisse einer Iteration (z. B. ein Fehlschlag vor
   der Wiederholung) wirken dabei schon auf Joins außerhalb der Schleife. Für reine Wiederholungen ist `retry` (S07)
   der einfachere Weg.
-- **Projektstandard:** `workflow.defaultJoin` in `project.yaml`.
+- **Projektstandard:** `workflow.defaultJoin` in `project.yaml` (seit R5b `settings.defaultJoin`, siehe Nachtrag).
 - **`joinTimeout`** (S07): Die Wartezeit beginnt, sobald der erste eingehende Link gefeuert hat. Läuft sie ab, startet
   die Action nicht, sondern gilt als fehlgeschlagen ("join timeout: still waiting for …"); ihre Fehler-Links werden
   verfolgt, später eintreffende Links ignoriert.
+
+## Nachtrag 2026-11-26 (R5b): `settings.defaultJoin`
+
+- Der Projektstandard steht unter `settings` von `project.yaml` (`settings.defaultJoin`), neben `maxConcurrentRuns`,
+  `history` und `onError`: Workflow- und Pipeline-Dateien haben alles Steuernde unter `settings`, und `workflow:` hatte
+  nur diesen einen Wert. Werte und Rangfolge bleiben.
+- Der Block `workflow:` ist ein unbekanntes Feld (bewusster Bruch vor 1.0, ADR 0029).
+  Das Formular von `project.yaml` im Editor und `/forms/edit` setzen `settings.defaultJoin`.

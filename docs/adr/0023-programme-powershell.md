@@ -65,7 +65,7 @@ Betrachtete Alternativen:
 | `env` | Zusätzliche Umgebungsvariablen. Die Werte sind Felder für Secrets (`${secret:…}` erlaubt, ADR 0022). Die Umgebung des Runnel-Prozesses wird geerbt. |
 | `input` | Optionaler Text für stdin. Ohne `input` ist stdin sofort geschlossen, damit ein Programm, das auf eine Eingabe wartet, nicht hängt. |
 | `encoding` | Kodierung von stdout und stderr: `auto` (Standard), `utf-8`, `oem`, `windows-1252`. Siehe Abschnitt 4. |
-| `json` | `true`: stdout wird als JSON gelesen und als `output.json` weitergegeben. |
+| `json` | `true`: stdout wird als JSON gelesen und als `output.json` weitergegeben. Seit R5b `format: json` → `output.value` (Nachtrag). |
 | `timeout` | Standard 10m. |
 
 **Batch-Dateien:** `.bat` und `.cmd` laufen unter Windows immer über `cmd.exe`. Dort kann ein Argument mit `&`, `|`,
@@ -88,7 +88,7 @@ auf eine `.ps1` oder eine Umgebungsvariable. Das gilt auch dann, wenn Go sie mas
     params:
       Folder: ${ARCHIVE_DIR}
       Days: "{{ params.KEEP_DAYS }}"
-    json: true
+    format: json                         # bis R5b: json: true
     edition: auto                        # auto | pwsh | windows
 ```
 
@@ -109,7 +109,7 @@ auf eine `.ps1` oder eine Umgebungsvariable. Das gilt auch dann, wenn Go sie mas
   - `auto` nimmt PowerShell 7 (`pwsh`), wenn vorhanden, sonst Windows PowerShell 5.1 (`powershell.exe`).
   - `pwsh` und `windows` erzwingen eine Edition.
   - Unter Linux gibt es nur `pwsh`.
-- **Ergebnis:** wie `shell.run`. Mit `json: true` wird der zuletzt ausgegebene JSON-Wert gelesen, typisch aus
+- **Ergebnis:** wie `shell.run`. Mit `json: true` (seit R5b `format: json`) wird der zuletzt ausgegebene JSON-Wert gelesen, typisch aus
   `ConvertTo-Json`. Ein Text, der kein JSON ist, ist dann ein Fehler.
 
 ### 4. Gemeinsame Ausführung
@@ -125,7 +125,8 @@ auf eine `.ps1` oder eine Umgebungsvariable. Das gilt auch dann, wenn Go sie mas
   - stdout und stderr werden je bis 1 MB gehalten (`maxOutput`). Was darüber hinausgeht, wird verworfen, mit
     `truncated: true` im Output und einer Warnung im Log.
   - Beide Ströme werden laufend gelesen, damit volle Puffer das Programm nicht blockieren.
-- **Output der Action:** `exitCode`, `stdout`, `stderr`, `truncated`, `duration` und bei `json: true` zusätzlich `json`.
+- **Output der Action:** `exitCode`, `stdout`, `stderr`, `truncated`, `duration` und bei `json: true` zusätzlich `json`
+  (seit R5b `durationMs` und `value`, siehe Nachtrag).
 - **Erfolg:** Der Exit-Code steht in `okCodes`. Sonst schlägt die Action fehl. Die Meldung nennt Exit-Code und die
   letzten Zeilen von stderr; Retry und `when: failure` greifen wie bei jeder Action.
 - **Log:**
@@ -218,3 +219,13 @@ Mit dem Maintainer bestätigt:
   `ConvertTo-Json` nach anderen Ausgaben). Gilt seitdem auch für `shell.run`.
 - **Tests:** Die Skriptläufe brauchen PowerShell und laufen in der CI (Linux mit `pwsh`, Windows mit beiden
   Editionen); fehlt PowerShell in der CI, schlagen sie fehl statt übersprungen zu werden.
+
+## Nachtrag 2026-11-26 (R5b): `format` und `durationMs`
+
+- `shell.run` und `shell.powershell` lesen stdout mit `format: text|json` (Standard `text`) statt `json: true`; mit
+  `json` steht der Wert in `output.value` statt `output.json`. Das folgt ADR 0025 („Lesart einer Datei: `format`“) und
+  `file.read` (`format: json` → `output.value`). Andere Werte von `format` sind ein Fehler.
+- Die Laufzeit heißt `output.durationMs` und ist eine Zahl in Millisekunden statt des Texts `duration` (`"1.25s"`), wie
+  `durationMs` der Läufe in der API und `results.<id>.durationMs`; mit Text ließ sich nicht rechnen.
+- Der alte Name `json` ist ein unbekanntes Feld (bewusster Bruch vor 1.0, ADR 0029); Ausdrücke mit
+  `output.json` oder `output.duration` liefern nichts mehr und müssen angepasst werden.

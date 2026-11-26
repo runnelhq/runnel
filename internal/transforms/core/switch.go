@@ -14,26 +14,27 @@ import (
 )
 
 // core.switch passes each record to one of its outgoing links: the first case whose
-// condition is true decides, else the default.
+// condition is true decides, else the transform of else (as in core.filter; until R5b:
+// default).
 var switchDefinition = transform.Definition{
 	Parallel:     true,
 	Type:         "core.switch",
 	Category:     transform.CategoryFlow,
 	Label:        "Switch",
 	Description:  "Passes each record to the link of the first case whose condition is true",
-	Example:      "cases:\n  - { when: \"{{ record.umsatz >= 10000 }}\", to: key-accounts }\n  - { when: \"{{ record.umsatz > 0 }}\", to: standard }\ndefault: others\n",
+	Example:      "cases:\n  - { when: \"{{ record.umsatz >= 10000 }}\", to: key-accounts }\n  - { when: \"{{ record.umsatz > 0 }}\", to: standard }\nelse: others\n",
 	Config:       switchRecords{},
 	New:          newSwitch,
 	RecordErrors: true,
 	Reference: action.Reference{
-		Records: "Passes each record to the transform of the first case whose condition is true, else to default; without default, the others are dropped and counted in the log.",
+		Records: "Passes each record to the transform of the first case whose condition is true, else to the transform of else; without else, the others are dropped and counted in the log.",
 		Errors:  "A record whose condition cannot be evaluated goes to the error link; without one, the pipeline stops.",
 	},
 }
 
 type switchRecords struct {
-	Cases   []switchCase `json:"cases" doc:"Conditions in order; the first one that is true decides" schema:"required"`
-	Default string       `json:"default" doc:"Transform for records that match no case; empty: they are dropped" schema:"format=runnel-target,example=others"`
+	Cases []switchCase `json:"cases" doc:"Conditions in order; the first one that is true decides" schema:"required"`
+	Else  string       `json:"else" doc:"Transform for records that match no case; empty: they are dropped" schema:"format=runnel-target,example=others"`
 
 	conds []*transform.Expression
 }
@@ -61,7 +62,7 @@ func newSwitch(with map[string]any) (transform.Transform, error) {
 	return t, nil
 }
 
-// Init checks the conditions and the targets: every "to" and the default must be reached
+// Init checks the conditions and the targets: every "to" and else must be reached
 // by a data link, and a data link no case leads to gets a warning. The records stay as
 // they are.
 func (t *switchRecords) Init(ic *transform.InitContext) (record.Schema, error) {
@@ -82,12 +83,12 @@ func (t *switchRecords) Init(ic *transform.InitContext) (record.Schema, error) {
 		}
 		check(c.To, fmt.Sprintf("cases[%d].to", i))
 	}
-	if t.Default != "" {
-		check(t.Default, "default")
+	if t.Else != "" {
+		check(t.Else, "else")
 	}
 	for _, target := range ic.Targets {
 		if !used[target] {
-			ic.Warn("", fmt.Sprintf("the link to %q gets no records: no case and not the default leads there", target))
+			ic.Warn("", fmt.Sprintf("the link to %q gets no records: no case and not else leads there", target))
 		}
 	}
 	return ic.In, nil
@@ -117,12 +118,12 @@ func (t *switchRecords) Process(ctx context.Context, in <-chan transform.Batch, 
 					continue records
 				}
 			}
-			if t.Default == "" {
+			if t.Else == "" {
 				dropped++
 				continue
 			}
 			defaults++
-			if err := out.EmitTo(t.Default, r); err != nil {
+			if err := out.EmitTo(t.Else, r); err != nil {
 				return err
 			}
 		}
@@ -142,14 +143,14 @@ func (t *switchRecords) Process(ctx context.Context, in <-chan transform.Batch, 
 	for i, c := range t.Cases {
 		add(c.To, counts[i])
 	}
-	if t.Default != "" {
-		add(t.Default, defaults)
+	if t.Else != "" {
+		add(t.Else, defaults)
 	}
 	parts := make([]string, 0, len(order)+2)
 	for _, target := range order {
 		parts = append(parts, fmt.Sprintf("%s %d", target, perTarget[target]))
 	}
-	if t.Default == "" {
+	if t.Else == "" {
 		parts = append(parts, fmt.Sprintf("dropped %d", dropped))
 	}
 	if failed > 0 {
