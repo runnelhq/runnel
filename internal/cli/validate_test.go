@@ -151,10 +151,14 @@ func TestValidateProject(t *testing.T) {
 
 	var all strings.Builder
 	for _, args := range [][]string{
-		{"validate", okProject},                                                         // all environments
-		{"validate", "--environment", "dev", okProject},                                 // only dev: API_URL is defined
-		{"validate", "--environment", "dev", "--param", "UNDEFINED_USER=me", okProject}, // parameter defines the variable
-		{"validate", "internal/model/testdata/project/invalid"},                         // errors in project and environments
+		// all environments
+		{"validate", okProject},
+		// only dev: API_URL is defined
+		{"validate", "--environment", "dev", okProject},
+		// parameter defines the variable
+		{"validate", "--environment", "dev", "--param", "UNDEFINED_USER=me", okProject},
+		// errors in project and environments
+		{"validate", "internal/model/testdata/project/invalid"},
 	} {
 		code, out, errOut := run(t, args...)
 		all.WriteString("$ runnel " + strings.Join(args, " ") + "\n" + out + errOut)
