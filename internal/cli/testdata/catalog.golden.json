@@ -1,4 +1,5 @@
 {
+  "version": "dev",
   "actions": [
     {
       "type": "archive.create",
@@ -4038,6 +4039,712 @@
       },
       "example": "path: out/orders.xml\nroot: orders\nrecord: order\nfields:\n  - { name: id, as: \"@id\" }\n  - { name: customer, as: customer/name }\n  - { name: amount }\n",
       "recordErrors": true
+    }
+  ],
+  "connectionTypes": [
+    {
+      "type": "ftp",
+      "label": "FTP",
+      "description": "A server for file transfer over FTP without encryption; only with insecure: true",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Name or address of the server",
+            "examples": [
+              "ftp.example.com"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "port": {
+            "type": "string",
+            "description": "TCP port; empty: 21",
+            "examples": [
+              "21"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "insecure": {
+            "type": "boolean",
+            "description": "Required: FTP sends the password and all data unencrypted; set it only for a server without TLS in a trusted network. validate warns",
+            "default": false,
+            "x-runnel-group": "Security"
+          },
+          "user": {
+            "type": "string",
+            "description": "User name for the sign-in",
+            "examples": [
+              "runnel"
+            ],
+            "x-runnel-group": "Sign-in"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the user; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time to connect and sign in",
+            "format": "runnel-duration",
+            "default": "15s",
+            "x-runnel-group": "More"
+          }
+        },
+        "required": [
+          "host",
+          "user"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "ftps",
+      "label": "FTPS",
+      "description": "A server for file transfer over FTP with TLS",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Name or address of the server",
+            "examples": [
+              "ftp.example.com"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "port": {
+            "type": "string",
+            "description": "TCP port; empty: 21 with explicit, 990 with implicit",
+            "examples": [
+              "21"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "tls": {
+            "type": "string",
+            "description": "How TLS starts: explicit (AUTH TLS on the usual port 21) or implicit (from the start, port 990)",
+            "enum": [
+              "explicit",
+              "implicit"
+            ],
+            "default": "explicit",
+            "x-runnel-group": "Security"
+          },
+          "serverName": {
+            "type": "string",
+            "description": "Name in the certificate of the server if it differs from host, e.g. when host is an address",
+            "examples": [
+              "ftp.example.com"
+            ],
+            "x-runnel-group": "Security"
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA256 fingerprint of the certificate of a server with its own (self-signed) certificate, e.g. AB:CD:…; several separated by spaces. With it Runnel accepts only this certificate; without it the certificate must be trusted by Windows",
+            "examples": [
+              "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89"
+            ],
+            "x-runnel-group": "Security"
+          },
+          "user": {
+            "type": "string",
+            "description": "User name for the sign-in",
+            "examples": [
+              "runnel"
+            ],
+            "x-runnel-group": "Sign-in"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the user; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time to connect and sign in",
+            "format": "runnel-duration",
+            "default": "15s",
+            "x-runnel-group": "More"
+          }
+        },
+        "required": [
+          "host",
+          "user"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "http",
+      "label": "HTTP API",
+      "description": "An HTTP API with its base address and sign-in, e.g. a REST API",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "description": "Base address of the API; url of http.request is relative to it, e.g. orders?status=open",
+            "examples": [
+              "https://api.example.com/v1/"
+            ],
+            "x-runnel-group": "API"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers of every request, e.g. Accept; values may use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "More",
+            "additionalProperties": {
+              "type": "string",
+              "format": "runnel-secret"
+            }
+          },
+          "auth": {
+            "type": "string",
+            "description": "Sign-in: none, bearer (token), basic (user and password), apiKey (key in a header or the query) or oauth2 (client credentials)",
+            "enum": [
+              "none",
+              "bearer",
+              "basic",
+              "apiKey",
+              "oauth2"
+            ],
+            "default": "none",
+            "x-runnel-group": "Sign-in"
+          },
+          "token": {
+            "type": "string",
+            "description": "Token for Authorization: Bearer; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-only": {
+              "auth": [
+                "bearer"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "user": {
+            "type": "string",
+            "description": "User name",
+            "examples": [
+              "runnel"
+            ],
+            "x-runnel-only": {
+              "auth": [
+                "basic"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the user; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-only": {
+              "auth": [
+                "basic"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "The key; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-only": {
+              "auth": [
+                "apiKey"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "apiKeyName": {
+            "type": "string",
+            "description": "Name of the header or query parameter that carries the key",
+            "default": "X-API-Key",
+            "x-runnel-only": {
+              "auth": [
+                "apiKey"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "apiKeyIn": {
+            "type": "string",
+            "description": "Where the key goes: header or query",
+            "enum": [
+              "header",
+              "query"
+            ],
+            "default": "header",
+            "x-runnel-only": {
+              "auth": [
+                "apiKey"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "tokenUrl": {
+            "type": "string",
+            "description": "Token address of the provider (https://), e.g. https://login.microsoftonline.com/\u003ctenant\u003e/oauth2/v2.0/token",
+            "examples": [
+              "https://login.example.com/oauth2/token"
+            ],
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Client ID of the registered application",
+            "examples": [
+              "runnel"
+            ],
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "clientSecret": {
+            "type": "string",
+            "description": "Client secret of the application; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope of the token, e.g. https://graph.microsoft.com/.default; empty: none",
+            "examples": [
+              "api://erp/.default"
+            ],
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          }
+        },
+        "required": [
+          "baseUrl"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "postgres",
+      "label": "PostgreSQL",
+      "description": "A PostgreSQL database",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Name or address of the server",
+            "examples": [
+              "db01.example.local"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "port": {
+            "type": "string",
+            "description": "TCP port; empty: 5432",
+            "examples": [
+              "5432"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "database": {
+            "type": "string",
+            "description": "Name of the database",
+            "examples": [
+              "shop"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "user": {
+            "type": "string",
+            "description": "User name",
+            "examples": [
+              "runnel"
+            ],
+            "x-runnel-group": "Sign-in"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the user; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "sslMode": {
+            "type": "string",
+            "description": "TLS: verify-full (encrypted, certificate and name checked), verify-ca, require (encrypted, not checked) or disable",
+            "enum": [
+              "verify-full",
+              "verify-ca",
+              "require",
+              "disable"
+            ],
+            "default": "verify-full",
+            "x-runnel-group": "Security"
+          },
+          "connectTimeout": {
+            "type": "string",
+            "description": "Longest time to connect",
+            "format": "runnel-duration",
+            "default": "30s",
+            "x-runnel-group": "More"
+          }
+        },
+        "required": [
+          "host",
+          "database",
+          "user"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "sftp",
+      "label": "SFTP",
+      "description": "A server for file transfer over SSH",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Name or address of the server",
+            "examples": [
+              "sftp.example.com"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "port": {
+            "type": "string",
+            "description": "TCP port; empty: 22",
+            "examples": [
+              "22"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "hostKey": {
+            "type": "string",
+            "description": "Fingerprint of the host key as ssh-keygen -l shows it, e.g. SHA256:…; several separated by spaces. Without it Runnel does not connect and names the fingerprint of the server to check",
+            "examples": [
+              "SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg"
+            ],
+            "x-runnel-group": "Security"
+          },
+          "user": {
+            "type": "string",
+            "description": "User name for the sign-in",
+            "examples": [
+              "runnel"
+            ],
+            "x-runnel-group": "Sign-in"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the user; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "privateKey": {
+            "type": "string",
+            "description": "Private key in PEM format (OpenSSH, PKCS#1 or PKCS#8), instead of or together with password; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "passphrase": {
+            "type": "string",
+            "description": "Passphrase of a protected privateKey; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time to connect and sign in",
+            "format": "runnel-duration",
+            "default": "15s",
+            "x-runnel-group": "More"
+          }
+        },
+        "required": [
+          "host",
+          "user"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "smtp",
+      "label": "SMTP",
+      "description": "A mail server for sending mails",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Name or address of the mail server",
+            "examples": [
+              "smtp.example.com"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "port": {
+            "type": "string",
+            "description": "TCP port; empty: 587 with starttls, 465 with tls, 25 with none",
+            "examples": [
+              "587"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "tls": {
+            "type": "string",
+            "description": "Encryption: starttls (port 587), tls (from the start, port 465) or none (only for a relay in a trusted network); the certificate is always checked",
+            "enum": [
+              "starttls",
+              "tls",
+              "none"
+            ],
+            "default": "starttls",
+            "x-runnel-group": "Security"
+          },
+          "auth": {
+            "type": "string",
+            "description": "Sign-in: password (user and password), oauth2 (an application registered in Microsoft Entra, e.g. for Office 365) or none (e.g. a relay that knows the sender by its address); empty: password if user is set",
+            "enum": [
+              "password",
+              "oauth2",
+              "none"
+            ],
+            "x-runnel-group": "Sign-in"
+          },
+          "user": {
+            "type": "string",
+            "description": "User name for the sign-in, often the mail address; with oauth2 the mailbox that sends",
+            "examples": [
+              "runnel@example.com"
+            ],
+            "x-runnel-group": "Sign-in"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the user; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "from": {
+            "type": "string",
+            "description": "Sender of the mails if the action names none, e.g. Runnel \u003crunnel@example.com\u003e",
+            "examples": [
+              "runnel@example.com"
+            ],
+            "x-runnel-group": "Mail"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time to connect and send one mail, including the token request of oauth2",
+            "format": "runnel-duration",
+            "default": "1m",
+            "x-runnel-group": "More"
+          },
+          "tenant": {
+            "type": "string",
+            "description": "Tenant in Microsoft Entra (ID or domain, e.g. contoso.onmicrosoft.com); gives the token address",
+            "examples": [
+              "contoso.onmicrosoft.com"
+            ],
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Application (client) ID of the registered application",
+            "examples": [
+              "00000000-0000-0000-0000-000000000000"
+            ],
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "clientSecret": {
+            "type": "string",
+            "description": "Client secret of the application; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope of the token",
+            "default": "https://outlook.office365.com/.default",
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          },
+          "tokenUrl": {
+            "type": "string",
+            "description": "Token address of another provider (https://); empty: that of the tenant at Microsoft",
+            "examples": [
+              "https://login.example.com/oauth2/token"
+            ],
+            "x-runnel-only": {
+              "auth": [
+                "oauth2"
+              ]
+            },
+            "x-runnel-group": "Sign-in"
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "sqlite",
+      "label": "SQLite",
+      "description": "A database in a single file, e.g. for local data and tests",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Database file, relative to the project folder; created with its folder if it does not exist",
+            "examples": [
+              "data/app.db"
+            ],
+            "x-runnel-group": "Database"
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Open the database for reading only",
+            "default": false,
+            "x-runnel-group": "Database"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "sqlserver",
+      "label": "SQL Server",
+      "description": "A Microsoft SQL Server database, with a user or with the Windows account Runnel runs as",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Name or address of the server",
+            "examples": [
+              "db01.example.local"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "port": {
+            "type": "string",
+            "description": "TCP port; empty: 1433, or the port of the instance",
+            "examples": [
+              "1433"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "instance": {
+            "type": "string",
+            "description": "Named instance, e.g. SQLEXPRESS (needs the SQL Server Browser service); instead of a port",
+            "x-runnel-group": "More"
+          },
+          "database": {
+            "type": "string",
+            "description": "Name of the database",
+            "examples": [
+              "ERP"
+            ],
+            "x-runnel-group": "Server"
+          },
+          "user": {
+            "type": "string",
+            "description": "SQL Server login; empty: the Windows account Runnel runs as (Windows only)",
+            "x-runnel-group": "Sign-in"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password of the login; use ${secret:NAME}",
+            "format": "runnel-secret",
+            "x-runnel-group": "Sign-in"
+          },
+          "encrypt": {
+            "type": "string",
+            "description": "Encryption of the connection: true, strict (TDS 8) or false (only the login)",
+            "enum": [
+              "true",
+              "strict",
+              "false"
+            ],
+            "default": "true",
+            "x-runnel-group": "Security"
+          },
+          "trustServerCertificate": {
+            "type": "boolean",
+            "description": "Accept any certificate of the server, e.g. a self-signed one; validate warns",
+            "default": false,
+            "x-runnel-group": "Security"
+          },
+          "connectTimeout": {
+            "type": "string",
+            "description": "Longest time to connect",
+            "format": "runnel-duration",
+            "default": "30s",
+            "x-runnel-group": "More"
+          }
+        },
+        "required": [
+          "host",
+          "database"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

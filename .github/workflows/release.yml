@@ -112,4 +112,5 @@ jobs:
           if [[ "$VERSION" == *-* ]]; then
             flags+=(--prerelease)
           fi
-          gh release create "$VERSION" dist/*.zip dist/*.tar.gz dist/*.cdx.json dist/SHA256SUMS "${flags[@]}"
+          gh release create "$VERSION" dist/*.zip dist/*.tar.gz dist/*.cdx.json \
+            dist/runnel-catalog.json dist/runnel-expressions.json dist/SHA256SUMS "${flags[@]}"

@@ -68,7 +68,7 @@ sbom: $(CYCLONEDX_GOMOD)
 	node scripts/merge-sbom.mjs bin/runnel-windows-amd64.cdx.json bin/web.cdx.json
 	node scripts/merge-sbom.mjs bin/runnel-linux-amd64.cdx.json bin/web.cdx.json
 
-## package: build release archives (zip/tar.gz), SBOMs and SHA256SUMS into dist/
+## package: build release archives (zip/tar.gz), SBOMs, runnel-catalog.json, runnel-expressions.json and SHA256SUMS into dist/
 package: dist notices sbom
 	./scripts/package.sh $(VERSION)
 

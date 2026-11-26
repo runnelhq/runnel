@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Packages the binaries from bin/ into release archives in dist/, copies the SBOMs and writes SHA256SUMS.
+# Packages the binaries from bin/ into release archives in dist/, copies the SBOMs, writes the
+# reference of the building blocks and expressions (roadmap E15a) and SHA256SUMS.
 # Usage: scripts/package.sh <version>   (expects "make dist notices sbom" to have run)
 set -euo pipefail
 
@@ -28,7 +29,11 @@ stage "$linux" bin/runnel-linux-amd64 runnel
 tar -czf "dist/$linux.tar.gz" -C dist/stage "$linux"
 cp bin/runnel-linux-amd64.cdx.json "dist/$linux.cdx.json"
 
+# Machine-readable reference of this version, from the Linux binary (the release runs on Linux).
+bin/runnel-linux-amd64 catalog --json > dist/runnel-catalog.json
+bin/runnel-linux-amd64 catalog --expressions --json > dist/runnel-expressions.json
+
 rm -rf dist/stage
-(cd dist && sha256sum ./*.zip ./*.tar.gz ./*.cdx.json | sed 's# \./# #' > SHA256SUMS)
+(cd dist && sha256sum ./*.zip ./*.tar.gz ./*.cdx.json ./runnel-catalog.json ./runnel-expressions.json | sed 's# \./# #' > SHA256SUMS)
 
 ls -l dist

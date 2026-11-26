@@ -1,0 +1,47 @@
+names
+  params   map  Parameters of the workflow, with their declared type
+  vars     map  All variables of the run as text: parameters, project, environment
+  env      map  Environment variables of the operating system
+  run      map  The current run
+  result   map  Result of the action the link starts from (in link conditions)
+  results  map  Results of the actions that have run, by action id
+  row      any  The current entry of forEach; only in actions with forEach
+  request  map  The request of the caller of an http trigger; nil if the run was not started by one
+functions / Date
+  today()                    date     Today, 00:00 local time
+  now()                      date     The current date and time
+  formatDate(date, pattern)  string   Writes a date as text. Pattern letters: yyyy year, MM month, dd day, HH:mm:ss time, EEE weekday, MMMM month name, 'text' in quotes
+  parseDate(text, pattern)   date     Reads a date from text with a pattern like formatDate
+  addDays(date, n)           date     Adds days; negative numbers go back
+  addHours(date, n)          date     Adds hours
+  addMonths(date, n)         date     Adds months
+  dayOfWeek(date)            integer  Weekday: 1 Monday … 7 Sunday
+  diffDays(from, to)         integer  Days from one date to another
+functions / Text
+  upper(text)                       string  Text in capital letters
+  lower(text)                       string  Text in small letters
+  trim(text)                        string  Removes spaces at the start and end
+  replace(text, old, new)           string  Replaces all occurrences
+  replaceRegex(text, pattern, new)  string  Replaces every match of a regular expression (write patterns with \ in backticks, e.g. `\d+`); new may use groups as $1 or ${name}, $$ for a $
+  split(text, separator)            list    Splits text into a list
+  padLeft(text, length, fill)       string  Fills on the left up to a length, e.g. 007; fill defaults to a space
+  padRight(text, length, fill)      string  Fills on the right up to a length
+  substr(text, start, length)       string  Part of a text, counting from 0; length is optional
+  left(text, n)                     string  The first n characters
+  right(text, n)                    string  The last n characters
+  concat(separator, a, b, …)        string  Joins values with a separator and leaves out empty ones, so no separator stands alone; lists count with their entries
+  normalize(text)                   string  Replaces umlauts and ß, joins spaces – e.g. for file names
+functions / Paths
+  basename(path)  string  Last part of a path or address, e.g. the file name; / and \ both separate
+  dirname(path)   string  The path without its last part, e.g. the folder of a file; empty without a folder
+  ext(path)       string  Ending of the file name with its dot, e.g. .zip; empty without one
+functions / Numbers and lists
+  len(value)               integer  Number of characters, entries of a list or keys of a map
+  round(number)            number   Rounds to a whole number
+  sum(list)                number   Sum of a list of numbers
+  map(list, .field)        list     Takes a field of each entry, e.g. the sizes of files
+  filter(list, condition)  list     Keeps the entries for which the condition is true
+  join(list, separator)    string   Joins a list of texts
+functions / Empty values
+  coalesce(a, b, …)  any   The first value that is not empty
+  isEmpty(value)     bool  Whether a value is empty: nothing, empty text, list or map

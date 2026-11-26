@@ -1,0 +1,20 @@
+connection sftp – SFTP
+A server for file transfer over SSH
+
+Fields (with:):
+  host        Name or address of the server
+              string, required, e.g. sftp.example.com
+  port        TCP port; empty: 22
+              string, e.g. 22
+  hostKey     Fingerprint of the host key as ssh-keygen -l shows it, e.g. SHA256:…; several separated by spaces. Without it Runnel does not connect and names the fingerprint of the server to check
+              string, e.g. SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg
+  user        User name for the sign-in
+              string, required, e.g. runnel
+  password    Password of the user; use ${secret:NAME}
+              string
+  privateKey  Private key in PEM format (OpenSSH, PKCS#1 or PKCS#8), instead of or together with password; use ${secret:NAME}
+              string
+  passphrase  Passphrase of a protected privateKey; use ${secret:NAME}
+              string
+  timeout     Longest time to connect and sign in
+              string, duration, default 15s

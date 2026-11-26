@@ -11,11 +11,22 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 )
 
+// Expressions is the reference of expressions: their names and functions. The server and
+// "runnel catalog --expressions" (roadmap E15a) return it.
+type Expressions struct {
+	Roots     []expr.Doc `json:"roots"`
+	Functions []expr.Doc `json:"functions"`
+}
+
+// NewExpressions returns the reference of the built-in names and functions.
+func NewExpressions() Expressions {
+	return Expressions{Roots: expr.Roots, Functions: expr.Functions}
+}
+
 // expressionsResponse is the reference for the expression editor (roadmap S35): the
 // names and functions of expressions and the variables of the project.
 type expressionsResponse struct {
-	Roots     []expr.Doc `json:"roots"`
-	Functions []expr.Doc `json:"functions"`
+	Expressions
 	// Variables of the project and the default environment, as written in the files.
 	Variables []variableDoc `json:"variables"`
 }
@@ -28,7 +39,7 @@ type variableDoc struct {
 }
 
 func (s *Server) handleExpressions(w http.ResponseWriter, _ *http.Request) {
-	res := expressionsResponse{Roots: expr.Roots, Functions: expr.Functions, Variables: []variableDoc{}}
+	res := expressionsResponse{Expressions: NewExpressions(), Variables: []variableDoc{}}
 	p, err := model.LoadProject(s.dir)
 	var diags model.Errors
 	if errors.As(err, &diags) && diags.HasErrors() || err != nil && !errors.As(err, &diags) {
