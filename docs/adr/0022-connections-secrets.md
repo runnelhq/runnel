@@ -522,3 +522,47 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   mit Standardwert nicht als fehlende Variable.
 - `${secret:NAME:-text}` ist ein Fehler: Ein Standardwert für ein Secret stünde im Klartext in einer Datei des Projekts,
   was diese ADR gerade vermeidet. Ein fehlendes Secret bleibt ein Fehler beim Start des Laufs.
+
+## Nachtrag 2026-11-26 (S57a): Dateitransfer mit `sftp`
+
+- **Teilung:** S57a bringt den Typ `sftp` und `transfer.upload`, `transfer.download`, `transfer.list`; S57b die übrigen
+  Actions (`delete`, `move`, `mkdir`, `exists`, `wait`), S57c die Typen `ftps` und `ftp` mit der Auswahl der
+  FTP-Bibliothek.
+- **Felder der Connection:** `host`, `port` (leer: 22), `hostKey`, `user`, `password` (Secret), `privateKey` (Secret,
+  PEM-Text im Format OpenSSH, PKCS#1 oder PKCS#8), `passphrase` (Secret) und `timeout` (Standard 15 s für Verbinden und
+  Anmelden). Mit Schlüssel und Passwort versucht Runnel zuerst den Schlüssel; das Passwort geht auch als
+  `keyboard-interactive` (eine verdeckte Frage), weil manche Server es nur so annehmen.
+- **`hostKey`:** ein oder mehrere SHA256-Fingerprints (durch Leerzeichen oder Kommas getrennt, mit oder ohne
+  `SHA256:`), so wie `ssh-keygen -l` sie zeigt; MD5-Fingerprints sind ein Fehler. Das Feld ist im Schema nicht Pflicht,
+  damit „Test connection“ mit einer neuen Connection den Fingerprint des Servers nennen kann; ohne `hostKey` verbindet
+  sich aber kein Lauf, und `validate` warnt. Die Meldung nennt Fingerprint und Schlüsseltyp des Servers mit dem Hinweis,
+  ihn mit dem Administrator des Servers zu prüfen; bei Abweichung zusätzlich, dass der Server ersetzt worden sein oder
+  jemand dazwischen sitzen kann.
+- **Eine Verbindung je Ausführung:** Jede Ausführung einer Action öffnet eine SSH-Verbindung und schließt sie am Ende.
+  Einen Pool über Actions hinweg gibt es vorerst nicht; er lohnt erst bei vielen kleinen Actions hintereinander
+  (S57b, `transfer.wait`).
+- **Optionen wie `file.*` (ADR 0025):** `transfer.upload` und `transfer.download` haben `source`, `target` und
+  `ifExists` wie `file.copy` (Standard `fail`, geprüft vor dem ersten Schreiben; Ordner rekursiv; mehrere Quellen oder
+  `/` am Ende des Ziels gehen in den Zielordner), `transfer.list` hat `folder`, `pattern`, `recursive` und `include` wie
+  `file.list`. Output wie dort: die Pfade der geschriebenen Dateien bzw. Einträge mit `path`, `name`, `size`,
+  `modified`, `folder`.
+- **Pfade auf dem Server** sind POSIX-Pfade mit `/`; relative beziehen sich auf den Ordner nach der Anmeldung.
+  Platzhalter unterscheiden dort Groß- und Kleinschreibung (wie auf den meisten Servern; lokal unter Windows nicht).
+  Lokale Pfade gelten relativ zum Projektordner (ADR 0020).
+- **Temporäre Dateien:** Hochladen schreibt `.<name>.<zufall>.tmp` im Zielordner und benennt die Datei erst vollständig
+  um, mit `posix-rename@openssh.com`, wo der Server es kann (ersetzt in einem Schritt), sonst durch Löschen der alten
+  Datei und `rename`. Herunterladen schreibt lokal ebenso über eine temporäre Datei. Bricht die Verbindung ab, kann die
+  temporäre Datei auf dem Server zurückbleiben (TESTPLAN K15); die Zieldatei ist nie halb geschrieben. Die Änderungszeit
+  bleibt in beide Richtungen erhalten.
+- **Grenzen:** `timeout` je Datei (bzw. für die ganze Liste und für das Prüfen der Ziele), Standard 10 Minuten; danach
+  schließt Runnel die Verbindung, die Action schlägt fehl. Das `timeout` der Action begrenzt alles zusammen. `maxSize`
+  beim Download ist optional (leer: ohne Grenze) und wird vor und während der Übertragung geprüft. `transfer.list`
+  liefert höchstens 10000 Einträge, mehr ist ein Fehler (die Liste liegt im Ergebnis des Laufs).
+- **Sicherheit:** Namen vom Server, die lokal kein einfacher Dateiname sind (`..`, `/`, `\`, unter Windows Laufwerke
+  und reservierte Namen wie `NUL`), sind beim Herunterladen ein Fehler; so kann ein Server nichts außerhalb des
+  Zielordners schreiben. Verknüpfungen auf dem Server werden nicht verfolgt. Passwort, Schlüssel und Passphrase stehen
+  in keiner Meldung.
+- **Verbindung testen:** meldet sich an und liest den Ordner nach der Anmeldung („signed in to … as …; folder … has
+  … entries“); geschrieben wird nichts.
+- **Abhängigkeiten:** `github.com/pkg/sftp` v1.13.12 (BSD-2-Clause) mit `github.com/kr/fs` v0.1.0 (BSD-3-Clause) und
+  `golang.org/x/crypto/ssh` (BSD-3-Clause, `x/crypto` war schon indirekt im Modul).

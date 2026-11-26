@@ -42,3 +42,11 @@ func TestUnknownType(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 }
+
+// sftp is tested by transfer.Check (tests with a server there); here only that Run uses it.
+func TestSFTP(t *testing.T) {
+	c := connection.Resolved{Name: "files", Type: connections.TypeSFTP, With: map[string]any{"host": "127.0.0.1", "port": "1", "user": "runnel", "password": "pw", "timeout": "2s"}}
+	if _, err := Run(context.Background(), c); err == nil || !strings.Contains(err.Error(), "connection files: cannot connect to 127.0.0.1:1") {
+		t.Errorf("%v", err)
+	}
+}

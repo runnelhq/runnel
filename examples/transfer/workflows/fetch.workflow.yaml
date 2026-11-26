@@ -1,0 +1,36 @@
+# Lists the CSV files in /outgoing on the server and downloads them into inbox/; files
+# that are already there stay (ifExists: skip).
+#   runnel run -v examples/transfer/workflows/fetch.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: fetch
+actions:
+  - id: start
+    type: core.start
+  - id: list
+    type: transfer.list
+    with:
+      connection: partner-sftp
+      folder: /outgoing
+      pattern: "*.csv"
+  - id: download
+    type: transfer.download
+    with:
+      connection: partner-sftp
+      source: /outgoing/*.csv
+      target: inbox/
+      ifExists: skip
+      maxSize: 100MB
+  - id: done
+    type: core.log
+    with:
+      message: "Found {{ len(results.list.output) }} files on the server, downloaded {{ len(results.download.output) }}"
+  - id: nothing
+    type: core.log
+    with:
+      message: No CSV files on the server
+links:
+  - { from: start, to: list }
+  - { from: list, to: download, when: "{{ len(result.output) > 0 }}" }
+  - { from: list, to: nothing, when: "{{ len(result.output) == 0 }}" }
+  - { from: download, to: done }

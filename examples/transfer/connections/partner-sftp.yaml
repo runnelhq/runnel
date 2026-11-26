@@ -1,0 +1,15 @@
+# The SFTP server of a partner. The password comes from the environment variable
+# SFTP_PASSWORD; for a key use privateKey: ${secret:env/SFTP_KEY} (the key in PEM format)
+# and, if it is protected, passphrase. hostKey is required: Runnel connects only to the
+# server with this fingerprint.
+kind: Connection
+apiVersion: runnel/v1
+name: partner-sftp
+description: SFTP server of the partner
+type: sftp
+with:
+  host: ${SFTP_HOST}
+  user: ${SFTP_USER}
+  password: ${secret:env/SFTP_PASSWORD}
+  hostKey: ${SFTP_HOST_KEY}
+  timeout: 15s

@@ -15,6 +15,7 @@ import (
 	"github.com/runnelhq/runnel/internal/actions/http"
 	"github.com/runnelhq/runnel/internal/actions/mail"
 	"github.com/runnelhq/runnel/internal/actions/shell"
+	"github.com/runnelhq/runnel/internal/actions/transfer"
 )
 
 // namespaces lists the Register functions of all built-in namespaces.
@@ -27,6 +28,7 @@ var namespaces = []func(*action.Registry){
 	http.Register,
 	mail.Register,
 	shell.Register,
+	transfer.Register,
 }
 
 // Builtin returns a new registry with all built-in actions.

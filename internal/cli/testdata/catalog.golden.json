@@ -1381,6 +1381,198 @@
         "additionalProperties": false
       },
       "example": "program: robocopy\nargs: [ data/out, \"\\\\\\\\server\\\\share\\\\in\", \"*.csv\", /MIR ]\nokCodes: [ 0, 1, 2, 3 ]\ntimeout: 10m\n"
+    },
+    {
+      "type": "transfer.download",
+      "kind": "action",
+      "category": "network",
+      "label": "Download Files",
+      "description": "Downloads files or folders from a server (SFTP); output: the downloaded files",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively",
+            "examples": [
+              "/outgoing/*.csv"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Local folder, relative to the project folder or absolute; for a single file also a new file name",
+            "examples": [
+              "inbox/"
+            ]
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "If a local file exists: replace it, skip it (it stays and is not in the output), or fail before anything is downloaded",
+            "enum": [
+              "replace",
+              "skip",
+              "fail"
+            ],
+            "default": "fail"
+          },
+          "maxSize": {
+            "type": "string",
+            "description": "Largest file to download, e.g. 500MB; a larger one fails the action; empty: no limit",
+            "examples": [
+              "500MB"
+            ]
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for one file, e.g. 30m; the timeout of the action limits all together",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "connection",
+          "source",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: inbox/\nifExists: replace\n"
+    },
+    {
+      "type": "transfer.list",
+      "kind": "action",
+      "category": "network",
+      "label": "List Files on Server",
+      "description": "Lists the files of a folder on a server (SFTP); output: path, name, size, modified and folder of each entry",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "folder": {
+            "type": "string",
+            "description": "Folder on the server, e.g. /outgoing (relative: to the folder after the sign-in, . is that folder)",
+            "examples": [
+              "/outgoing"
+            ]
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Names to include, with wildcards that match case-sensitively, e.g. *.csv",
+            "default": "*"
+          },
+          "recursive": {
+            "type": "boolean",
+            "description": "Also list the subfolders",
+            "default": false
+          },
+          "include": {
+            "type": "string",
+            "description": "What to list",
+            "enum": [
+              "files",
+              "folders",
+              "all"
+            ],
+            "default": "files"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for the listing, e.g. 1m; the timeout of the action limits all together",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "connection",
+          "folder"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\nfolder: /outgoing\npattern: \"*.csv\"\n"
+    },
+    {
+      "type": "transfer.upload",
+      "kind": "action",
+      "category": "network",
+      "label": "Upload Files",
+      "description": "Uploads files or folders to a server (SFTP); output: the uploaded files",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "Local file or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv",
+            "examples": [
+              "outbox/*.csv"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Folder on the server, e.g. /incoming/ (relative: to the folder after the sign-in); for a single file also a new file name",
+            "examples": [
+              "/incoming/"
+            ]
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "If a file exists on the server: replace it, skip it (it stays and is not in the output), or fail before anything is uploaded",
+            "enum": [
+              "replace",
+              "skip",
+              "fail"
+            ],
+            "default": "fail"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for one file, e.g. 30m; the timeout of the action limits all together",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "connection",
+          "source",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\nsource: outbox/*.csv\ntarget: /incoming/\n"
     }
   ],
   "transforms": [
