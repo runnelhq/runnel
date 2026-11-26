@@ -129,8 +129,13 @@ Gilt für alles Sichtbare: Editor, Website, Installer, Tray, Grafiken, Dokumente
   (`S38b1`, `S38b2` …; Kern vor Erweiterungen, Server vor Editor) und die Teilung in der Roadmap vermerkt.
 - **Lauffähig nach jedem PR:** `main` baut, alle Tests sind grün, nichts ist „halb fertig“ freigeschaltet; jeder Schritt
   nennt unter „Prüfen“, wie man das Ergebnis ausprobiert (bei Bedarf mit Beispiel unter `examples/`).
-- **Doku im selben PR:** betroffene Stellen in Konzept, Roadmap (Schritt mit ✅ markieren), ADRs, README, `docs/dev/`.
-  Neue Pakete, Befehle oder Make-Ziele → Struktur- und Befehlstabelle in dieser Datei.
+- **Doku im selben PR:** betroffene Stellen in Konzept, Roadmap (Schritt mit ✅ markieren), ADRs, README, `docs/dev/`;
+  für Anwender sichtbare Änderungen ein Eintrag in [CHANGELOG.md](CHANGELOG.md) unter „Unveröffentlicht“ (Neu,
+  Behoben, Abgekündigt, Bruch; ADR 0029). Neue Pakete, Befehle oder Make-Ziele → Struktur- und Befehlstabelle in
+  dieser Datei.
+- **Stabilität (ADR 0029):** Ab `v1.0.0` nur additive Änderungen an den Zusagen (Dateiformate, Ausdrücke, CLI mit
+  Exit-Codes und `--json`, Plugin-Protokoll, HTTP-Trigger, öffentliche Endpunkte in `docs/dev/API.md`); Umbenennen
+  oder Entfernen nur über Abkündigung bis zur nächsten Major-Version. Die PR-Vorlage fragt danach.
 - **ADR nötig** bei: neuem Dateityp oder `kind`, geänderter Ausführungssemantik, neuer Laufzeitabhängigkeit, neuer
   Netzwerk- oder Sicherheitsgrenze, Namens- oder Sprachregeln, Abkehr von einer bestehenden ADR. **Nicht nötig** bei
   neuen Actions/Transforms nach bestehenden Regeln, neuen Optionen und Editor-Funktionen nach freigegebenem Mockup.

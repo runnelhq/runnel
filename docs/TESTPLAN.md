@@ -147,7 +147,7 @@ Ergebnisse bitte als GitHub-Issue mit Testnummer, Windows-Version und Ausgabe fe
 | K6 | ~~Keine Korrekturvorschläge bei unbekannten Feldern~~ – behoben: alle unbekannten Felder werden gemeldet, nach Position sortiert, mit Vorschlag (`unknown field "tpye" (did you mean "type"?)`) | – |
 | K7 | ~~Ausdrücke `{{ … }}` werden noch nicht ausgewertet~~ – behoben mit S08b (Bedingungen, Outputs, Konfiguration) | – |
 | K8 | Die YAML-Bibliothek stürzt bei bestimmten fehlerhaften Eingaben ab; Runnel fängt das ab und meldet „the file could not be read“ | Fehlerbericht an `goccy/go-yaml` (Eingabe in `internal/model/testdata/fuzz/`) |
-| K9 | `runnel.exe` ist nicht signiert (SmartScreen-Warnung) | Code-Signing vor 1.0 (Roadmap) |
+| K9 | `runnel.exe` ist nicht signiert (SmartScreen-Warnung) | Code-Signing nach 1.0 (Roadmap, Backlog; Entscheidung des Maintainers 2026-11-26) |
 | K10 | Läufe aufgerufener Workflows erscheinen nicht als eigene Läufe, nur im Log der Action (`params` lassen sich seit E7c im Panel bearbeiten) | eigene Läufe mit der Lauf-Historie (S26) |
 | K12 | Strg+C und Exit-Code 130 sind unter Windows nur über die CI (Build) abgedeckt, nicht automatisch getestet | manueller Test W9/W10 |
 | K13 | ~~Der Editor speichert immer als UTF-8 ohne BOM, auch Dateien, die als UTF-16, UTF-8 mit BOM oder Windows-1252 geöffnet wurden (seit E9/E10 auch Projekt-, Environment- und Trigger-Dateien); Runnel liest sie danach weiter richtig, die Kodierung der Datei ändert sich aber~~ – behoben: der Editor speichert in der Kodierung, in der die Datei geöffnet wurde; ein Zeichen, das Windows-1252 nicht kennt, wird beim Speichern mit Zeile und Spalte gemeldet statt ersetzt | – |
