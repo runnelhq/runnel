@@ -89,7 +89,7 @@ my-project/
 │   ├─ dev.yaml              # Variablen je Umgebung
 │   └─ prod.yaml
 ├─ connections/
-│   └─ erp-sql.yaml          # DB-/HTTP-/SMTP-/SFTP-Verbindungen (ohne Klartext-Secrets, ADR 0022)
+│   └─ erp-sql.yaml          # DB-/HTTP-/SMTP-/SFTP-/FTPS-Verbindungen (ohne Klartext-Secrets, ADR 0022)
 ├─ secret-stores/
 │   └─ company-vault.yaml    # Secret-Quellen, z. B. ein Tresor (ohne Werte, ADR 0022)
 ├─ triggers/
@@ -361,7 +361,7 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | Excel | Lesen mit eigenem Reader (`internal/xlsx`: `archive/zip`, `encoding/xml`, seit S67a), Schreiben mit `xuri/excelize/v2` (seit S67b) – [ADR 0024](adr/0024-excel-lesen-schreiben.md) |
 | CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
 | SFTP (seit S57a) | `pkg/sftp` v1.13.12 (BSD-2-Clause, mit `kr/fs`, BSD-3-Clause) + `golang.org/x/crypto/ssh` (BSD-3-Clause) |
-| FTP/FTPS | offen; Auswahl mit S57c (Lizenz MIT-kompatibel) |
+| FTP/FTPS (seit S57c) | `jlaffaye/ftp` v0.2.4 (ISC); für Tests `fclairamb/ftpserverlib` v0.32.7 (MIT) mit `spf13/afero` v1.15.0 (Apache-2.0), nicht in der exe |
 | Mail | Go-Standardbibliothek (`net/smtp`, `mime`, seit S62a); OAuth2 (Client Credentials, `XOAUTH2`) für Office 365 seit S62b ohne Bibliothek (`internal/oauth`) |
 | Logging | `log/slog` (strukturiert, JSON) |
 | WebView2-Fenster | `jchv/go-webview2` oder Wails v2 |
@@ -1029,7 +1029,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal; im Netz nur mit TLS – eigenes oder selbst erzeugtes Zertifikat – oder ausdrücklich `--triggers-insecure`, seit S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrent` ([ADR 0018](adr/0018-http-trigger.md)) |
 | Plugins | Start erst nach Freigabe je Projekt auf dem Rechner (`runnel plugins trust`, SHA-256 über den Plugin-Ordner, gespeichert außerhalb des Projekts; jede Änderung macht sie ungültig). Ohne Freigabe kein Code, auch nicht beim Prüfen oder Öffnen ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag) |
 | Datenbanken | Werte nur als Parameter (`@name`), Ausdrücke im SQL-Text sind ein Fehler; Bezeichner nur über geprüfte Felder; TLS mit Zertifikatsprüfung, Abschalten nur ausdrücklich mit Warnung ([ADR 0022](adr/0022-connections-secrets.md)) |
-| Connections | Zugangsdaten einer HTTP-Connection nur an deren Host; SFTP nur mit bekanntem Hostschlüssel; FTP ohne TLS nur mit `insecure: true` und Warnung; „Test connection“ nur für gespeicherte Connections, 15 s |
+| Connections | Zugangsdaten einer HTTP-Connection nur an deren Host; SFTP nur mit bekanntem Hostschlüssel; FTPS nur mit vertrauenswürdigem Zertifikat oder dessen Fingerprint, TLS ab 1.2; FTP ohne TLS nur mit `insecure: true` und Warnung; „Test connection“ nur für gespeicherte Connections, 15 s |
 | Skripte | JS-Sandbox mit Zeit-/Speicherlimit; Shell/PowerShell-Actions per Projekteinstellung deaktivierbar |
 | Dienstkonto | Empfehlung: dedizierter Dienstbenutzer mit minimalen Rechten (bzw. gMSA in Domänen) |
 | Audit | Dateiänderungen über den Editor, manuelle Starts und Abbrüche werden mit Client-Informationen (IP, Rechnername, User-Agent) protokolliert |
@@ -1149,7 +1149,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen (`core.check`, seit S10), Log schreiben, Schleife (ForEach über Liste/Dateien) |
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript (`core.script`, seit S73a, [ADR 0028](adr/0028-javascript-core-script.md)), PowerShell (`shell.powershell`, seit S61), Programm starten (`shell.run`, seit S60, [ADR 0023](adr/0023-programme-powershell.md)) |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
-| Netzwerk | HTTP-Request (`http.request`, seit S10; mit `http`-Connection für Basis-Adresse und Anmeldung seit S63a, `Retry-After` seit S63b, Paginierung mit `paginate` seit S63c, Download als Datei mit `saveTo` seit S63d), HTTP-Antwort (`http.response`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`, Protokoll in der Connection: `transfer.upload`, `transfer.download` und `transfer.list` über eine `sftp`-Connection seit S57a, `transfer.delete`, `transfer.move`, `transfer.mkdir`, `transfer.exists` und `transfer.wait` seit S57b, `ftps`/`ftp` mit S57c), Mail senden (`mail.send`, seit S62a: über eine `smtp`-Connection, Text und HTML, Anhänge), Mail abrufen (IMAP) |
+| Netzwerk | HTTP-Request (`http.request`, seit S10; mit `http`-Connection für Basis-Adresse und Anmeldung seit S63a, `Retry-After` seit S63b, Paginierung mit `paginate` seit S63c, Download als Datei mit `saveTo` seit S63d), HTTP-Antwort (`http.response`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`, Protokoll in der Connection: `transfer.upload`, `transfer.download` und `transfer.list` über eine `sftp`-Connection seit S57a, `transfer.delete`, `transfer.move`, `transfer.mkdir`, `transfer.exists` und `transfer.wait` seit S57b, über `ftps`- und `ftp`-Connections seit S57c), Mail senden (`mail.send`, seit S62a: über eine `smtp`-Connection, Text und HTML, Anhänge), Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Abfrage in den Workflow (`db.query`, seit S59: Zeilen, Anzahl, erster Wert – deckt auch „Tabelle existiert“ und „Zeilen zählen“ ab) |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,

@@ -7,12 +7,15 @@ toolchain go1.26.11
 require (
 	github.com/dop251/goja v0.0.0-20261125210501-5e92a7e24d0c
 	github.com/expr-lang/expr v1.17.8
+	github.com/fclairamb/ftpserverlib v0.32.7
 	github.com/goccy/go-yaml v1.19.2
 	github.com/jackc/pgx/v5 v5.13.0
+	github.com/jlaffaye/ftp v0.2.4
 	github.com/microsoft/go-mssqldb v1.12.0
 	github.com/pkg/sftp v1.13.12
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/shopspring/decimal v1.6.0
+	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/xuri/excelize/v2 v2.11.1
 	golang.org/x/crypto v0.58.0

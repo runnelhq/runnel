@@ -599,7 +599,7 @@ export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
   }
 }
 
-/** The sign of a connection type (mockup S39b): cylinder for databases, a page for SQLite, globe for http, envelope for smtp, two servers for sftp. */
+/** The sign of a connection type (mockup S39b): cylinder for databases, a page for SQLite, globe for http, envelope for smtp, two servers for sftp, ftps and ftp. */
 export function ConnectionIcon({ type, ...p }: P & { type: string }) {
   switch (type) {
     case "sqlite":
@@ -618,6 +618,8 @@ export function ConnectionIcon({ type, ...p }: P & { type: string }) {
         </Icon>
       );
     case "sftp":
+    case "ftps":
+    case "ftp":
       return (
         <Icon {...p}>
           <path d="M4 4h16v6H4zM4 14h16v6H4zM7.5 7h.01M7.5 17h.01M12 10v4" />

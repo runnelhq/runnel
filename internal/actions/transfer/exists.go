@@ -15,14 +15,14 @@ var existsDefinition = action.Definition{
 	Type:        "transfer.exists",
 	Category:    action.CategoryNetwork,
 	Label:       "File Exists on Server",
-	Description: "Checks whether files or folders exist on a server (SFTP); output: the matching paths",
+	Description: "Checks whether files or folders exist on a server (SFTP, FTPS or FTP); output: the matching paths",
 	Example:     "connection: partner-sftp\npath: /outgoing/orders-*.csv\nkind: file\n",
 	Config:      existsAction{},
 	New:         newExists,
 }
 
 type existsAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Path       string `json:"path" doc:"File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
 	Kind       string `json:"kind" doc:"What has to exist" schema:"enum=any|file|folder,default=any"`
 	Timeout    string `json:"timeout" doc:"Longest time for the check, e.g. 1m; the timeout of the action limits all together" schema:"format=runnel-duration,default=10m"`

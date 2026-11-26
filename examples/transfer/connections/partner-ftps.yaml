@@ -1,0 +1,17 @@
+# The FTPS server of a partner (FTP with TLS, S57c). The password comes from the
+# environment variable FTPS_PASSWORD. The certificate of the server must be trusted by
+# Windows; for a server with its own (self-signed) certificate set fingerprint to its
+# SHA256 fingerprint, which "Test connection" names. For a server that speaks TLS from the
+# start (port 990) set tls: implicit. A server without TLS needs type: ftp with
+# insecure: true, and validate warns about it.
+kind: Connection
+apiVersion: runnel/v1
+name: partner-ftps
+description: FTPS server of the partner
+type: ftps
+with:
+  host: ${FTPS_HOST}
+  tls: explicit
+  user: ${FTPS_USER}
+  password: ${secret:env/FTPS_PASSWORD}
+  timeout: 15s

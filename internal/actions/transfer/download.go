@@ -27,14 +27,14 @@ var downloadDefinition = action.Definition{
 	Type:        "transfer.download",
 	Category:    action.CategoryNetwork,
 	Label:       "Download Files",
-	Description: "Downloads files or folders from a server (SFTP); output: the downloaded files",
+	Description: "Downloads files or folders from a server (SFTP, FTPS or FTP); output: the downloaded files",
 	Example:     "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: inbox/\nifExists: replace\n",
 	Config:      downloadAction{},
 	New:         newDownload,
 }
 
 type downloadAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Source     string `json:"source" doc:"File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
 	Target     string `json:"target" doc:"Local folder, relative to the project folder or absolute; for a single file also a new file name" schema:"required,example=inbox/"`
 	IfExists   string `json:"ifExists" doc:"If a local file exists: replace it, skip it (it stays and is not in the output), or fail before anything is downloaded" schema:"enum=replace|skip|fail,default=fail"`

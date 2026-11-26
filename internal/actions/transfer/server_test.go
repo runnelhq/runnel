@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"log/slog"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
@@ -21,17 +23,22 @@ import (
 	"github.com/runnelhq/runnel/internal/connections"
 )
 
-// testServer is an SSH server with SFTP on 127.0.0.1 for the tests: it serves the files
-// of root and accepts the password "secret-pw" or the key of clientKey for the user runnel.
+// testServer is a server on 127.0.0.1 for the tests: SSH with SFTP (newTestServer) or FTP
+// with or without TLS (newFTPServer). It serves the files of root and accepts the password
+// "secret-pw" (or, with SFTP, the key of clientKey) for the user runnel.
 type testServer struct {
+	typ         string // the type of the connection: sftp, ftps or ftp
 	root        string
 	port        string
-	fingerprint string
+	fingerprint string            // of the host key (sftp) or the certificate (ftps)
+	cert        *x509.Certificate // ftps
+	times       bool              // the server keeps and reports modification times exactly
 	clientKey   ed25519.PrivateKey
+	fields      map[string]any // of the connection besides host, port, user and password
 
 	mu       sync.Mutex
 	conns    []net.Conn
-	accepted int // connections so far
+	accepted int // connections so far (control connections with FTP)
 }
 
 const testPassword = "secret-pw"
@@ -54,7 +61,8 @@ func newTestServer(t testing.TB) *testServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := &testServer{root: t.TempDir(), fingerprint: ssh.FingerprintSHA256(hostKey.PublicKey()), clientKey: clientPriv}
+	srv := &testServer{typ: connections.TypeSFTP, root: t.TempDir(), fingerprint: ssh.FingerprintSHA256(hostKey.PublicKey()), clientKey: clientPriv, times: true}
+	srv.fields = map[string]any{"hostKey": srv.fingerprint}
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
 			if c.User() == "runnel" && string(pw) == testPassword {
@@ -155,9 +163,21 @@ func (srv *testServer) serve(conn net.Conn, config *ssh.ServerConfig) {
 	}
 }
 
-// conn returns the fields of a connection to the server with the password.
+// conn returns the fields of a connection to the server with the password; "type" is the
+// type of the connection (execute and resolved take it out).
 func (srv *testServer) conn() map[string]any {
-	return map[string]any{"host": "127.0.0.1", "port": srv.port, "user": "runnel", "password": testPassword, "hostKey": srv.fingerprint}
+	with := map[string]any{"type": srv.typ, "host": "127.0.0.1", "port": srv.port, "user": "runnel", "password": testPassword}
+	maps.Copy(with, srv.fields)
+	return with
+}
+
+// eachServer runs a test against an SFTP server, an FTPS server and an FTP server without
+// MLST, MLSD and MFMT (listings with LIST, no modification times).
+func eachServer(t *testing.T, test func(t *testing.T, srv *testServer)) {
+	t.Helper()
+	t.Run("sftp", func(t *testing.T) { test(t, newTestServer(t)) })
+	t.Run("ftps", func(t *testing.T) { test(t, newFTPServer(t, connections.TypeFTPS)) })
+	t.Run("ftp", func(t *testing.T) { test(t, newFTPServer(t, connections.TypeFTP, withoutMLST)) })
 }
 
 // keyPEM returns the client key in the OpenSSH format, protected if passphrase is set.
@@ -199,7 +219,8 @@ func read(t testing.TB, dir, name string) string {
 	return string(data)
 }
 
-// execute runs an action with the connection "sftp" of the given fields.
+// execute runs an action with the connection "sftp" of the given fields (of type sftp
+// unless "type" says otherwise).
 func execute(ctx context.Context, t testing.TB, def action.Definition, conn, with map[string]any) (action.Result, []string, error) {
 	t.Helper()
 	with["connection"] = "sftp"
@@ -214,7 +235,7 @@ func execute(ctx context.Context, t testing.TB, def action.Definition, conn, wit
 			if name != "sftp" {
 				return connection.Resolved{}, errors.New("unknown connection")
 			}
-			return connection.Resolved{Name: name, Type: connections.TypeSFTP, With: conn}, nil
+			return resolved(conn), nil
 		},
 	}
 	res, err := a.Execute(ctx, ec)

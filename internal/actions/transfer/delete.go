@@ -18,14 +18,14 @@ var deleteDefinition = action.Definition{
 	Type:        "transfer.delete",
 	Category:    action.CategoryNetwork,
 	Label:       "Delete Files on Server",
-	Description: "Deletes files or folders on a server (SFTP); output: the deleted paths",
+	Description: "Deletes files or folders on a server (SFTP, FTPS or FTP); output: the deleted paths",
 	Example:     "connection: partner-sftp\npath: /outgoing/*.csv\n",
 	Config:      deleteAction{},
 	New:         newDelete,
 }
 
 type deleteAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Path       string `json:"path" doc:"File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
 	Recursive  bool   `json:"recursive" doc:"Also delete folders with everything in them" schema:"default=false"`
 	IfMissing  string `json:"ifMissing" doc:"If nothing matches the path: skip (nothing is deleted) or fail" schema:"enum=skip|fail,default=skip"`
@@ -94,7 +94,7 @@ func (s *session) removeAll(ctx context.Context, p string, info fs.FileInfo) err
 	}
 	var err error
 	if !info.IsDir() {
-		err = s.sftp.Remove(p)
+		err = s.fs.Remove(p)
 	} else {
 		entries, rerr := s.readDir(p)
 		if rerr != nil {
@@ -108,7 +108,7 @@ func (s *session) removeAll(ctx context.Context, p string, info fs.FileInfo) err
 				return err
 			}
 		}
-		err = s.sftp.RemoveDirectory(p)
+		err = s.fs.RemoveDir(p)
 	}
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("cannot delete %q on the server: %w", p, plain(err))

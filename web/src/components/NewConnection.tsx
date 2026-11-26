@@ -61,7 +61,7 @@ export function NewConnectionDialog(props: { exists: (path: string) => boolean; 
       <div role="radiogroup" aria-labelledby="new-connection-type" className="grid grid-cols-3 gap-2">
         {types.map((t) => {
           const [label, ...rest] = (variants[t].description ?? t).split(": ");
-          const net = t === "http" || t === "smtp" || t === "sftp";
+          const net = t === "http" || t === "smtp" || t === "sftp" || t === "ftps" || t === "ftp";
           return (
             <button
               key={t}

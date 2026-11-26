@@ -2,6 +2,7 @@ package conntest
 
 import (
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,15 +39,24 @@ func TestSQLite(t *testing.T) {
 }
 
 func TestUnknownType(t *testing.T) {
-	if _, err := Run(context.Background(), connection.Resolved{Name: "x", Type: "ftp"}); err == nil || !strings.Contains(err.Error(), "cannot be tested yet") {
+	if _, err := Run(context.Background(), connection.Resolved{Name: "x", Type: "imap"}); err == nil || !strings.Contains(err.Error(), "cannot be tested yet") {
 		t.Errorf("%v", err)
 	}
 }
 
-// sftp is tested by transfer.Check (tests with a server there); here only that Run uses it.
-func TestSFTP(t *testing.T) {
-	c := connection.Resolved{Name: "files", Type: connections.TypeSFTP, With: map[string]any{"host": "127.0.0.1", "port": "1", "user": "runnel", "password": "pw", "timeout": "2s"}}
-	if _, err := Run(context.Background(), c); err == nil || !strings.Contains(err.Error(), "connection files: cannot connect to 127.0.0.1:1") {
-		t.Errorf("%v", err)
+// sftp, ftps and ftp are tested by transfer.Check (tests with a server there); here only
+// that Run uses it.
+func TestTransfer(t *testing.T) {
+	for typ, fields := range map[string]map[string]any{
+		connections.TypeSFTP: {},
+		connections.TypeFTPS: {},
+		connections.TypeFTP:  {"insecure": true},
+	} {
+		with := map[string]any{"host": "127.0.0.1", "port": "1", "user": "runnel", "password": "pw", "timeout": "2s"}
+		maps.Copy(with, fields)
+		c := connection.Resolved{Name: "files", Type: typ, With: with}
+		if _, err := Run(context.Background(), c); err == nil || !strings.Contains(err.Error(), "connection files: cannot connect to 127.0.0.1:1") {
+			t.Errorf("%s: %v", typ, err)
+		}
 	}
 }

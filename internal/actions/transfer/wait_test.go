@@ -31,7 +31,10 @@ func waitAsync(ctx context.Context, t *testing.T, srv *testServer, with map[stri
 }
 
 func TestWait(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testWait)
+}
+
+func testWait(t *testing.T, srv *testServer) {
 	done := waitAsync(context.Background(), t, srv, map[string]any{"path": "in/*.csv", "interval": "20ms", "stableFor": "100ms"})
 	time.Sleep(100 * time.Millisecond)
 	writeFile(t, srv.root, "in/a.csv", "a")
@@ -54,7 +57,10 @@ func TestWait(t *testing.T) {
 }
 
 func TestWaitMaxWait(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testWaitMaxWait)
+}
+
+func testWaitMaxWait(t *testing.T, srv *testServer) {
 	start := time.Now()
 	_, _, err := execute(context.Background(), t, waitDefinition, srv.conn(), map[string]any{"path": "in/*.csv", "interval": "20ms", "maxWait": "100ms"})
 	if err == nil || err.Error() != `no file matching "in/*.csv" on the server after 100ms` {
@@ -73,7 +79,10 @@ func TestWaitMaxWait(t *testing.T) {
 
 // A dropped connection is opened again; the wait goes on.
 func TestWaitReconnect(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testWaitReconnect)
+}
+
+func testWaitReconnect(t *testing.T, srv *testServer) {
 	done := waitAsync(context.Background(), t, srv, map[string]any{"path": "in/a.csv", "interval": "20ms"})
 	time.Sleep(100 * time.Millisecond)
 	srv.drop()
@@ -93,7 +102,10 @@ func TestWaitReconnect(t *testing.T) {
 }
 
 func TestWaitCancel(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testWaitCancel)
+}
+
+func testWaitCancel(t *testing.T, srv *testServer) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := waitAsync(ctx, t, srv, map[string]any{"path": "in/a.csv", "interval": "20ms"})
 	time.Sleep(50 * time.Millisecond)
@@ -109,7 +121,10 @@ func TestWaitCancel(t *testing.T) {
 }
 
 func TestWaitErrors(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testWaitErrors)
+}
+
+func testWaitErrors(t *testing.T, srv *testServer) {
 	cases := []struct {
 		with map[string]any
 		want string

@@ -11,7 +11,10 @@ import (
 )
 
 func TestMkdir(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testMkdir)
+}
+
+func testMkdir(t *testing.T, srv *testServer) {
 	res, logs, err := execute(context.Background(), t, mkdirDefinition, srv.conn(), map[string]any{"path": "archive/2026/11/"})
 	if err != nil || res.Output != "archive/2026/11" {
 		t.Fatalf("%v %v", res.Output, err)

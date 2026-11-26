@@ -11,7 +11,10 @@ import (
 )
 
 func TestExists(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testExists)
+}
+
+func testExists(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "out/orders-1.csv", "1")
 	writeFile(t, srv.root, "out/orders-2.csv", "2")
 	writeFile(t, srv.root, "out/orders-3/x.csv", "folder")

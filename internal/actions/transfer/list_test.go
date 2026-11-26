@@ -11,7 +11,10 @@ import (
 )
 
 func TestList(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testList)
+}
+
+func testList(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "out/b.csv", "bb")
 	writeFile(t, srv.root, "out/a.csv", "a")
 	writeFile(t, srv.root, "out/notes.txt", "n")
@@ -55,7 +58,10 @@ func TestList(t *testing.T) {
 }
 
 func TestListErrors(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testListErrors)
+}
+
+func testListErrors(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "file.txt", "x")
 	cases := []struct {
 		with map[string]any

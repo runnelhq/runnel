@@ -7,11 +7,15 @@
 # Then run:
 #   runnel run -v examples/transfer/workflows/fetch.workflow.yaml
 #   runnel run -v examples/transfer/workflows/send.workflow.yaml
+# send-ftps sends the same files to an FTPS server (S57c): set FTPS_HOST and FTPS_USER
+# below and the password in FTPS_PASSWORD.
 kind: Project
 apiVersion: runnel/v1
 name: transfer
-description: Fetches and sends CSV files through an sftp connection
+description: Fetches and sends CSV files through an sftp or ftps connection
 variables:
   SFTP_HOST: sftp.example.com
   SFTP_USER: runnel
   SFTP_HOST_KEY: SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg
+  FTPS_HOST: ftp.example.com
+  FTPS_USER: runnel

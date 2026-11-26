@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"net"
 	"os"
 	"slices"
@@ -28,15 +30,32 @@ import (
 // says otherwise.
 const defaultConnectTimeout = 15 * time.Second
 
-// session is one SSH connection with SFTP for one execution of an action. Cancelling the
-// context of the execution closes it, so that no call on the server blocks the run.
+// session is one connection to a server for one execution of an action: SSH with SFTP or
+// FTP with or without TLS. Cancelling the context of the execution closes it, so that no
+// call on the server blocks the run.
 type session struct {
-	addr, user  string
-	ssh         *ssh.Client
-	sftp        *sftp.Client
-	posixRename bool
-	stop        func() bool
-	dead        atomic.Bool
+	addr, user string
+	fs         remoteFS
+	stop       func() bool
+	dead       atomic.Bool
+}
+
+// remoteFS is what the actions need from a server, whatever the protocol (sftpFS, ftpFS).
+// Paths are POSIX paths; a missing entry is fs.ErrNotExist.
+type remoteFS interface {
+	Stat(p string) (fs.FileInfo, error)  // links count as what they point to where the server tells
+	Lstat(p string) (fs.FileInfo, error) // links count as links
+	ReadDir(dir string) ([]fs.FileInfo, error)
+	MkdirAll(dir string) error
+	Create(p string, r io.Reader) error // a new file with the content of r
+	Retrieve(p string, w io.Writer) error
+	Chtimes(p string, t time.Time) // where the server can; otherwise nothing
+	Rename(from, to string, replace bool) error
+	Remove(p string) error
+	RemoveDir(p string) error
+	Getwd() (string, error)
+	Lost(err error) bool // the connection dropped
+	Close()              // ends the connection; calls on the server fail from then on
 }
 
 // open resolves the connection of an action and connects to its server.
@@ -51,16 +70,26 @@ func open(ctx context.Context, ec *action.ExecContext, name string) (*session, e
 	return connect(ctx, conn)
 }
 
-// connect signs in to the server of a resolved connection of type sftp.
+// connect signs in to the server of a resolved connection of type sftp, ftps or ftp.
 func connect(ctx context.Context, c connection.Resolved) (*session, error) {
-	if c.Type != connections.TypeSFTP {
-		return nil, fmt.Errorf("connection %s has type %s, not sftp", c.Name, c.Type)
+	var s *session
+	var err error
+	switch c.Type {
+	case connections.TypeSFTP:
+		var cfg connections.SFTP
+		if err := connections.Builtin().Decode(c, &cfg); err != nil {
+			return nil, err
+		}
+		s, err = dial(ctx, cfg)
+	case connections.TypeFTPS, connections.TypeFTP:
+		cfg, cerr := ftpConfigOf(c)
+		if cerr != nil {
+			return nil, cerr
+		}
+		s, err = dialFTP(ctx, cfg)
+	default:
+		return nil, fmt.Errorf("connection %s has type %s, not sftp, ftps or ftp", c.Name, c.Type)
 	}
-	var cfg connections.SFTP
-	if err := connections.Builtin().Decode(c, &cfg); err != nil {
-		return nil, err
-	}
-	s, err := dial(ctx, cfg)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -73,23 +102,9 @@ func connect(ctx context.Context, c connection.Resolved) (*session, error) {
 
 // dial connects, checks the host key and signs in, all within timeout of the connection.
 func dial(ctx context.Context, cfg connections.SFTP) (*session, error) {
-	host, port := strings.TrimSpace(cfg.Host), strings.TrimSpace(cfg.Port)
-	if host == "" {
-		return nil, errors.New("host is empty")
-	}
-	if port == "" {
-		port = "22"
-	}
-	if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
-		return nil, fmt.Errorf("port: %q is not a TCP port", cfg.Port)
-	}
-	timeout := defaultConnectTimeout
-	if strings.TrimSpace(cfg.Timeout) != "" {
-		d, err := model.Duration(cfg.Timeout).Value()
-		if err != nil || d <= 0 {
-			return nil, fmt.Errorf("timeout: %q is not a duration like 15s", cfg.Timeout)
-		}
-		timeout = d
+	addr, timeout, err := address(cfg.Host, cfg.Port, "22", cfg.Timeout)
+	if err != nil {
+		return nil, err
 	}
 	want, err := fingerprints(cfg.HostKey)
 	if err != nil {
@@ -99,7 +114,7 @@ func dial(ctx context.Context, cfg connections.SFTP) (*session, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &session{addr: net.JoinHostPort(host, port), user: cfg.User}
+	s := &session{addr: addr, user: cfg.User}
 	config := &ssh.ClientConfig{
 		User: cfg.User,
 		Auth: auth,
@@ -143,28 +158,49 @@ func dial(ctx context.Context, cfg connections.SFTP) (*session, error) {
 	return nil, fmt.Errorf("cannot connect to %s: %w", s.addr, plainSSH(err))
 }
 
+// address checks host, port (empty: fallback) and timeout of a connection.
+func address(host, port, fallback, timeout string) (string, time.Duration, error) {
+	host, port = strings.TrimSpace(host), strings.TrimSpace(port)
+	if host == "" {
+		return "", 0, errors.New("host is empty")
+	}
+	if port == "" {
+		port = fallback
+	}
+	if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
+		return "", 0, fmt.Errorf("port: %q is not a TCP port", port)
+	}
+	d := defaultConnectTimeout
+	if strings.TrimSpace(timeout) != "" {
+		v, err := model.Duration(timeout).Value()
+		if err != nil || v <= 0 {
+			return "", 0, fmt.Errorf("timeout: %q is not a duration like 15s", timeout)
+		}
+		d = v
+	}
+	return net.JoinHostPort(host, port), d, nil
+}
+
 // handshake speaks SSH on conn and starts SFTP.
 func (s *session) handshake(conn net.Conn, config *ssh.ClientConfig) error {
 	c, chans, reqs, err := ssh.NewClientConn(conn, s.addr, config)
 	if err != nil {
 		return err
 	}
-	s.ssh = ssh.NewClient(c, chans, reqs)
-	if s.sftp, err = sftp.NewClient(s.ssh); err != nil {
+	f := &sftpFS{ssh: ssh.NewClient(c, chans, reqs)}
+	s.fs = f
+	if f.sftp, err = sftp.NewClient(f.ssh); err != nil {
 		return fmt.Errorf("the server offers no SFTP: %w", err)
 	}
-	_, s.posixRename = s.sftp.HasExtension("posix-rename@openssh.com")
+	_, f.posixRename = f.sftp.HasExtension("posix-rename@openssh.com")
 	return nil
 }
 
 // closeConn ends the connection; calls on the server fail from then on.
 func (s *session) closeConn() {
 	s.dead.Store(true)
-	if s.sftp != nil {
-		_ = s.sftp.Close()
-	}
-	if s.ssh != nil {
-		_ = s.ssh.Close()
+	if s.fs != nil {
+		s.fs.Close()
 	}
 }
 
@@ -235,12 +271,13 @@ type signInError struct{ msg string }
 
 func (e *signInError) Error() string { return e.msg }
 
-// refused reports whether the server refused Runnel (host key, sign-in): trying again
+// refused reports whether the server refused Runnel (host key, certificate, sign-in): trying again
 // does not help and may lock the account.
 func refused(err error) bool {
 	_, hostKey := errors.AsType[*hostKeyError](err)
 	_, signIn := errors.AsType[*signInError](err)
-	return hostKey || signIn
+	_, cert := errors.AsType[*certError](err)
+	return hostKey || signIn || cert
 }
 
 // signIn returns the methods of the sign-in: the key, then the password. The messages

@@ -416,7 +416,7 @@ func TestConnectionSchema(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &sc); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(sc.Properties["type"].Enum, " "); got != "http postgres sftp smtp sqlite sqlserver" {
+	if got := strings.Join(sc.Properties["type"].Enum, " "); got != "ftp ftps http postgres sftp smtp sqlite sqlserver" {
 		t.Errorf("types: %s", got)
 	}
 	v := sc.Properties["with"].Variants

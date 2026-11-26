@@ -6,13 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/paths"
 )
 
 // BenchmarkTransfer uploads and downloads against the test server on this computer:
 // many small files (one connection per execution, a temporary file and a rename each)
 // and one large file (throughput of SFTP); it deletes and moves many files with a pattern
-// (one call on the server per file).
+// (one call on the server per file). The same upload and download of 16 MB over FTPS.
 func BenchmarkTransfer(b *testing.B) {
 	srv := newTestServer(b)
 	project := b.TempDir()
@@ -45,6 +46,27 @@ func BenchmarkTransfer(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
 			if _, _, err := execute(ctx, b, downloadDefinition, srv.conn(), map[string]any{"source": "large/big.bin", "target": "out/big.bin", "ifExists": "replace"}); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	// FTPS: TLS on the control connection and on one data connection per file.
+	ftps := newFTPServer(b, connections.TypeFTPS)
+	writeFile(b, ftps.root, "large/big.bin", strings.Repeat("x", 16<<20))
+	b.Run("ftps-upload-16MB", func(b *testing.B) {
+		b.SetBytes(16 << 20)
+		b.ReportAllocs()
+		for b.Loop() {
+			if _, _, err := execute(ctx, b, uploadDefinition, ftps.conn(), map[string]any{"source": "large/big.bin", "target": "in/big.bin", "ifExists": "replace"}); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("ftps-download-16MB", func(b *testing.B) {
+		b.SetBytes(16 << 20)
+		b.ReportAllocs()
+		for b.Loop() {
+			if _, _, err := execute(ctx, b, downloadDefinition, ftps.conn(), map[string]any{"source": "large/big.bin", "target": "out/ftps.bin", "ifExists": "replace"}); err != nil {
 				b.Fatal(err)
 			}
 		}
