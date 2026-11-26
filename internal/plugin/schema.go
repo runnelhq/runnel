@@ -83,7 +83,16 @@ func (t *pluginTransform) Init(ic *transform.InitContext) (record.Schema, error)
 			config[prop.Name] = ""
 		}
 	}
-	params := map[string]any{"type": t.typ, "config": config, "input": ic.In, "targets": ic.Targets}
+	// Lists go as [], never as null: SDKs may read null as an error (ADR 0019).
+	in := ic.In
+	if in.Fields == nil {
+		in.Fields = []record.FieldDef{}
+	}
+	targets := ic.Targets
+	if targets == nil {
+		targets = []string{}
+	}
+	params := map[string]any{"type": t.typ, "config": config, "input": in, "targets": targets}
 	raw, err := json.Marshal(params)
 	if err != nil {
 		return record.OpenSchema(), err

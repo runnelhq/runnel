@@ -250,6 +250,15 @@ func initSchema(params json.RawMessage) any {
 	_ = json.Unmarshal(params, &p)
 	config, _ := json.Marshal(p.Config)
 	problems := []any{map[string]any{"path": "", "message": fmt.Sprintf("init got %s, targets %v", config, p.Targets), "warning": true}}
+	// Lists come as [], never as null (ADR 0019, Nachtrag Rust-SDK): a strict SDK refuses null.
+	var raw struct {
+		Input   struct{ Fields json.RawMessage } `json:"input"`
+		Targets json.RawMessage                  `json:"targets"`
+	}
+	_ = json.Unmarshal(params, &raw)
+	if string(raw.Input.Fields) == "null" || string(raw.Targets) == "null" {
+		problems = append(problems, map[string]any{"path": "", "message": "init got null instead of a list"})
+	}
 	if p.Type == "demo.count" {
 		return map[string]any{"output": map[string]any{"fields": countFields}, "problems": problems}
 	}
