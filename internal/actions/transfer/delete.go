@@ -22,6 +22,14 @@ var deleteDefinition = action.Definition{
 	Example:     "connection: partner-sftp\npath: /outgoing/*.csv\n",
 	Config:      deleteAction{},
 	New:         newDelete,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the deleted files and folders on the server"}},
+		Errors:  "Fails before deleting anything when a match is a folder and recursive is not set, and when the connection fails (host key, certificate or sign-in refused, no answer within timeout). Nothing to delete is no error, except with ifMissing: fail.",
+		Limits: []string{
+			"A path with wildcards may match at most 10,000 entries.",
+			"timeout limits each match with its content (default 10m).",
+		},
+	},
 }
 
 type deleteAction struct {

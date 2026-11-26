@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/sqldb"
@@ -23,6 +24,11 @@ var tableInputDefinition = transform.Definition{
 	Example:     "connection: app-db\nsql: SELECT id, name, amount FROM orders WHERE status = @status\nparams:\n  status: open\n",
 	Config:      tableInput{},
 	New:         newTableInput,
+	Reference: action.Reference{
+		Records: "Creates one record per row of the query, one field per column in their order with the type the database returns, and passes it to all data links; it has no incoming links.",
+		Errors:  "Stops the pipeline when the connection cannot be opened, a parameter @name has no value, the database rejects the query, a column name appears twice, or reading all rows takes longer than timeout.",
+		Limits:  []string{"timeout limits the query with reading all rows (default 5m); the rows are read as a stream."},
+	},
 }
 
 type tableInput struct {

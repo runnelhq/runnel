@@ -20,6 +20,10 @@ var existsDefinition = action.Definition{
 	Example:     "path: inbox/orders-*.csv\nkind: file\n",
 	Config:      exists{},
 	New:         newExists,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the matching files or folders, sorted"}},
+		Errors:  "Fails when nothing of the kind matches the path, so that success and failure links can branch, and when the folder cannot be read.",
+	},
 }
 
 type exists struct {

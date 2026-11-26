@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
@@ -23,6 +24,11 @@ var constantDefinition = transform.Definition{
 	Example:     "fields:\n  - { name: source, value: runnel }\n  - { name: batch, value: \"{{ params.BATCH }}\" }\n",
 	Config:      constant{},
 	New:         newConstant,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "The value, with its type; an existing field keeps its position"}},
+		Records: "Passes every record on with the fields set.",
+		Errors:  "Stops the pipeline when it starts if a value cannot be evaluated; never for a single record.",
+	},
 }
 
 type constant struct {

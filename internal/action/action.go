@@ -178,6 +178,8 @@ type Definition struct {
 	// Schema is the schema of the configuration where it does not come from Config, as
 	// for actions of plugins (describe, ADR 0019).
 	Schema *schema.Schema
+	// Reference documents the output, the errors and the limits of the action (E15b).
+	Reference
 	// New creates an action from its "with" configuration. It is called once before
 	// the run with the configuration as written (to report unknown or missing fields
 	// early) and again before each execution with variables resolved. New must only
@@ -198,7 +200,38 @@ type Descriptor struct {
 	Example string `json:"example,omitempty"`
 	// Plugin: see Definition.Plugin.
 	Plugin string `json:"plugin,omitempty"`
+	Reference
 }
+
+// Reference documents what a type gives, how it fails and its limits, for the catalog,
+// the website and the help of the editor (roadmap E15b). Transforms use it too; plugins
+// may describe the same keys (ADR 0019). Texts are English sentences with a final period.
+type Reference struct {
+	// Outputs are, for an action, the parts of result.output by their path, e.g.
+	// "output.status" or "output[].path" ("output" for the whole value); for a
+	// transform, the fields it adds or changes. A name from the configuration is written
+	// as the path of its field in angle brackets, e.g. "<name>" or "<fields[].name>".
+	Outputs []OutputField `json:"outputs,omitempty"`
+	// Records tells, for a transform only, which records it passes on and over which
+	// links (data links, targets, error link).
+	Records string `json:"records,omitempty"`
+	// Errors tells when the type fails and, for a transform, which records go to the
+	// error link; also what ifExists and ifMissing do.
+	Errors string `json:"errors,omitempty"`
+	// Limits are limits of size, number and time, with their defaults.
+	Limits []string `json:"limits,omitempty"`
+}
+
+// OutputField is a part of the output of an action or a field set by a transform.
+type OutputField struct {
+	Name string `json:"name"`
+	// Type is one of OutputTypes for actions, a record type (or "any") for transforms.
+	Type        string `json:"type"`
+	Description string `json:"description"`
+}
+
+// OutputTypes are the types of the output of actions, as expressions see it.
+var OutputTypes = []string{"string", "integer", "number", "boolean", "datetime", "list", "object", "any"}
 
 // Registry holds the available action types. Transforms have a registry of their own,
 // so that the same type name may exist as action and as transform (ADR 0013).
@@ -240,6 +273,7 @@ func (r *Registry) Register(d Definition) {
 		Schema:      s,
 		Example:     d.Example,
 		Plugin:      d.Plugin,
+		Reference:   d.Reference,
 	}
 }
 

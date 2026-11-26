@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -21,6 +22,7 @@ var dummyDefinition = transform.Definition{
 		}
 		return dummy{}, nil
 	},
+	Reference: action.Reference{Records: "Passes all records on unchanged to all data links.", Errors: "Never fails."},
 }
 
 type dummy struct{}

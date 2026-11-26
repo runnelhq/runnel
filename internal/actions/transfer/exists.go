@@ -19,6 +19,14 @@ var existsDefinition = action.Definition{
 	Example:     "connection: partner-sftp\npath: /outgoing/orders-*.csv\nkind: file\n",
 	Config:      existsAction{},
 	New:         newExists,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the matching files or folders on the server"}},
+		Errors:  "Fails when nothing of the kind matches the path, so that success and failure links can branch, and when the connection fails (host key, certificate or sign-in refused, no answer within timeout).",
+		Limits: []string{
+			"A path with wildcards may match at most 10,000 entries.",
+			"timeout limits the check (default 10m).",
+		},
+	},
 }
 
 type existsAction struct {

@@ -135,7 +135,11 @@ der Form, in der `/catalog` (E2) sie ausliefert.
 - Golden-Dateien (`internal/cli/testdata/catalog*.golden*`) zeigen jede Änderung an Descriptors im PR-Diff.
 - Die Tag-Syntax erlaubt keine Kommas in Werten von `default`, `enum` und `example`.
 
-## Nachtrag 2026-11-21 (E14a)
+## Nachträge (zusammengefasst 2026-11-26, E14a bis E15b)
+
+Die Nachträge E14a, E14b und S58 sind mit E15b nach Themen zusammengefasst ([Regel](README.md#nachträge)).
+
+### Optionen und Formate im Schema (E14a, E14b)
 
 - **Option `only=<feld>:<a>|<b>`:** Eine Eigenschaft gilt nur, wenn eine Geschwister-Eigenschaft einen der Werte hat
   (z. B. `separator` von `core.group-by` nur bei `function: concat`). Im Schema steht sie als
@@ -143,9 +147,6 @@ der Form, in der `/catalog` (E2) sie ausliefert.
   Ein Name, der keine Geschwister-Eigenschaft ist, ist ein Fehler beim Erzeugen des Schemas.
 - **`runnel-text`** kennzeichnet auch Bedingungen in Listen (`when` von `core.switch`): lange Texte, die der Editor als
   Karte statt als Tabellenzelle zeigt (Mockup E14).
-
-## Nachtrag 2026-11-22 (E14b)
-
 - **Formate für den Editor:** `runnel-field` kennzeichnet den Namen eines Felds der eingehenden Datensätze (der Editor
   bietet die bekannten Felder an), `runnel-target` die Id eines Transforms, zu dem ein Daten-Link führt (`to` und
   `default` von `core.switch`). An einer Liste von Texten (`[]string`, z. B. `groupBy`) gilt das Format für jeden Text
@@ -154,12 +155,50 @@ der Form, in der `/catalog` (E2) sie ausliefert.
   sagt `infoInput`, dass ein Transform Nachschlagedaten über einen Info-Link annimmt. Seit S23c kennzeichnet
   `runnel-source` die ID eines Transforms, von dem ein Daten-Link zu diesem kommt (`left`/`right` von
   `core.merge-join`); der Editor bietet die Quellen der eingehenden Links an.
-- **`example` im Descriptor** von Actions und Transforms: die `with:`-Werte eines kleinen Beispiels in YAML
+
+### Beispiel im Descriptor (E14b)
+
+- **`example`** im Descriptor von Actions und Transforms: die `with:`-Werte eines kleinen Beispiels in YAML
   (`Definition.Example`), angezeigt im Abschnitt „Help“ des Panels. Pflicht für jeden Baustein mit Konfiguration (seit
   dem Fix nach E14b; vorher nur für Transforms mit Listen); die Vertragstests lesen es wie eine Workflow- bzw.
   Pipeline-Datei und prüfen, dass `New` es annimmt. Bausteine ohne Konfiguration zeigen in „Help“ nur `id` und `type`.
 
-## Nachtrag 2026-11-22 (S58): Schemas der Dateiarten
+### Ergebnis, Fehler und Grenzen (E15b)
+
+Der Descriptor beschreibt zusätzlich, was ein Baustein liefert, wann er scheitert und welche Grenzen gelten – für
+`runnel catalog`, die Referenz auf der Website und die Hilfe im Editor. Die Schlüssel kommen hinzu, die übrigen
+bleiben unverändert; leere fehlen im JSON:
+
+```json
+{
+  "type": "file.read",
+  "outputs": [
+    {"name": "output.content", "type": "string", "description": "The text of the file"},
+    {"name": "output.size", "type": "integer", "description": "Size of the file in bytes"}
+  ],
+  "errors": "Fails when the file is missing (unless ifMissing: empty), is a folder, is larger than maxSize, …",
+  "limits": ["maxSize limits the file (default 10MB); its content becomes part of the result of the run."]
+}
+```
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `outputs` | Actions: Teile von `result.output` mit Pfad (`output`, `output.status`, `output[].path`) und Typ (`string`, `integer`, `number`, `boolean`, `datetime`, `list`, `object`, `any`). Transforms: Felder, die sie setzen, mit Typ nach ADR 0007 oder `any`; ein Name aus der Konfiguration als `<feld>` (z. B. `<fields[].name>`) |
+| `records` | nur Transforms: welche Datensätze sie über welche Links weitergeben (Daten-Links, Ziele, Eingaben ohne eingehende Links) |
+| `errors` | wann der Baustein scheitert, bei Transforms was auf den Fehler-Link geht und was die Pipeline anhält; Verhalten von `ifExists`/`ifMissing` |
+| `limits` | Grenzen für Größe, Anzahl, Zeit und Speicher mit Standardwerten |
+
+- Texte englisch (ADR 0015); `errors`, `records` und `limits` als Sätze mit Punkt, `description` eines Ausgabefelds wie
+  `doc` ohne Punkt.
+- In Go ist es `action.Reference`, eingebettet in Definition und Descriptor von Actions und Transforms. Die
+  Vertragstests verlangen `errors` für jeden Baustein, `records` für jeden Transform und `outputs` für jede Action mit
+  `output` (Ausnahmen stehen als Liste im Test).
+- Connection-Typen bekommen die Schlüssel nicht: Ihre Felder beschreibt das Schema, Grenzen und Fehler gehören zu den
+  Bausteinen, die sie nutzen.
+- **Plugins** dürfen dieselben Schlüssel in `describe` liefern, alle optional (ADR 0019); Runnel übernimmt sie
+  ungeprüft in den Katalog, `records` nur bei Transforms.
+
+### Schemas der Dateiarten (S58)
 
 Derselbe Mechanismus beschreibt auch die Dateiarten `Project`, `Environment` und `Trigger`: Die Strukturen in
 `internal/model` tragen `doc`- und `schema`-Tags, `schema.ForFile` liest die Feldnamen aus den `yaml`-Tags (die

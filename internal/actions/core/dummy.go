@@ -17,6 +17,7 @@ var dummyDefinition = action.Definition{
 	Label:       "Dummy",
 	Description: "Does nothing; collects branches into one point",
 	New:         newDummy,
+	Reference:   action.Reference{Errors: "Never fails."},
 }
 
 type dummy struct{}

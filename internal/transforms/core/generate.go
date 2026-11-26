@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -21,6 +22,14 @@ var generateRowsDefinition = transform.Definition{
 	Example:     "rows: 10\nrowNumberField: n\nfields:\n  - { name: status, value: new }\n",
 	Config:      generateRows{},
 	New:         newGenerateRows,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "<fields[].name>", Type: "any", Description: "The constant value, with the type of the value"},
+			{Name: "<rowNumberField>", Type: "int", Description: "Number of the record, starting at 1"},
+		},
+		Records: "Creates rows records with the same fields and passes them to all data links; it has no incoming links.",
+		Errors:  "Stops the pipeline when rows is not a whole number of 0 or more.",
+	},
 }
 
 type generateRows struct {

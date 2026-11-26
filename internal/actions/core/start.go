@@ -14,6 +14,7 @@ var startDefinition = action.Definition{
 	Label:       "Start",
 	Description: "Entry point of the workflow",
 	New:         newStart,
+	Reference:   action.Reference{Errors: "Never fails."},
 }
 
 type start struct{}

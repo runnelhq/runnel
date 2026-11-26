@@ -10,6 +10,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -28,6 +29,11 @@ var calculateDefinition = transform.Definition{
 	Example:      "fields:\n  - { name: total, value: \"{{ record.price * record.quantity }}\" }\n  - { name: label, value: \"{{ upper(record.name) }}: {{ record.total }}\" }\n",
 	Config:       calculate{},
 	New:          newCalculate,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "The result, with the type of the expression; text around {{ … }} gives text"}},
+		Records: "Passes every record on with the fields set, in their order.",
+		Errors:  "A record for which an expression cannot be evaluated goes unchanged to the error link; without one, the pipeline stops.",
+	},
 }
 
 type calculate struct {

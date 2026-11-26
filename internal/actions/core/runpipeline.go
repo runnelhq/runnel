@@ -25,6 +25,15 @@ var runPipelineDefinition = action.Definition{
 	Example:     "pipeline: pipelines/customers.pipeline.yaml\nparams:\n  BATCH: \"42\"\n",
 	Config:      runPipeline{},
 	New:         newRunPipeline,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.transforms", Type: "object", Description: "Counts per transform id: read, written and errors"},
+			{Name: "output.errors", Type: "integer", Description: "Records that went to error links, in all transforms"},
+			{Name: "output.rows", Type: "list", Description: "The records that reached core.to-result, each as an object"},
+		},
+		Errors: "Fails when the pipeline stops with an error or cannot be started (file outside the project folder or missing, parameter not declared or invalid), when the pipeline is not in allowedTargets and when rows is not a list. Records on error links do not fail the action.",
+		Limits: []string{"output.rows holds at most maxRecords of core.to-result (default 100,000)."},
+	},
 }
 
 type runPipeline struct {

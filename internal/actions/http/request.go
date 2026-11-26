@@ -38,6 +38,26 @@ var requestDefinition = action.Definition{
 	Example:     "connection: shop-api\nurl: orders\nquery:\n  status: open\n",
 	Config:      requestAction{},
 	New:         newRequest,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.status", Type: "integer", Description: "HTTP status of the answer (the last one with paginate)"},
+			{Name: "output.headers", Type: "object", Description: "Headers of the answer with lowercase names; several values joined with a comma"},
+			{Name: "output.body", Type: "any", Description: "The answer: a value for JSON, else text; not with paginate or a saved file"},
+			{Name: "output.items", Type: "list", Description: "With paginate, the items of all pages"},
+			{Name: "output.count", Type: "integer", Description: "With paginate, the number of items"},
+			{Name: "output.pages", Type: "integer", Description: "With paginate, the number of pages read"},
+			{Name: "output.path", Type: "string", Description: "With saveTo, the path of the saved file"},
+			{Name: "output.size", Type: "integer", Description: "With saveTo, the size of the saved file in bytes"},
+			{Name: "output.skipped", Type: "boolean", Description: "With saveTo and ifExists: skip, true if the file existed and nothing was requested"},
+		},
+		Errors: "Fails on status 400 and above (unless failOnError: false; the message shows the beginning of the answer), when there is no answer within timeout, the answer is larger than maxSize, the API asks to wait longer than retryAfter.maxWait, or paginate exceeds its limits or leads to another host. With saveTo and ifExists: fail, fails before the request when the file exists; a failed download leaves no file.",
+		Limits: []string{
+			"timeout limits each request (default 60s; with paginate per page); the timeout of the action limits all together.",
+			"maxSize limits the answer (default 10MB, per page with paginate) or with saveTo the file (default 1GB).",
+			"After 429 or 503 with Retry-After, the request is repeated at most retryAfter.maxRetries times (default 3), waiting at most retryAfter.maxWait (default 1m).",
+			"paginate reads at most maxPages pages (default 100) and maxItems items (default 10,000), all on the host of the first page.",
+		},
+	},
 }
 
 type requestAction struct {

@@ -18,6 +18,7 @@ var logDefinition = action.Definition{
 	Example:     "message: \"Imported {{ results.import.output.write.written }} records\"\nlevel: info\n",
 	Config:      logAction{},
 	New:         newLog,
+	Reference:   action.Reference{Errors: "Fails only for an invalid level."},
 }
 
 type logAction struct {

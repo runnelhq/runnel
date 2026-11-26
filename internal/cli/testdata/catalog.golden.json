@@ -52,7 +52,25 @@
         ],
         "additionalProperties": false
       },
-      "example": "source: out/export\ntarget: archive/export.zip\n"
+      "example": "source: out/export\ntarget: archive/export.zip\n",
+      "outputs": [
+        {
+          "name": "output.path",
+          "type": "string",
+          "description": "Path of the archive"
+        },
+        {
+          "name": "output.files",
+          "type": "integer",
+          "description": "Number of entries packed: files and empty folders"
+        },
+        {
+          "name": "output.size",
+          "type": "integer",
+          "description": "Size of the archive in bytes"
+        }
+      ],
+      "errors": "Fails when nothing matches the source, the format is not known from the ending, a file cannot be read, or the archive exists with ifExists: fail. The archive is written to a temporary file first, so a failure leaves an existing archive as it was. Links and special files are left out with a warning."
     },
     {
       "type": "archive.extract",
@@ -123,7 +141,19 @@
         ],
         "additionalProperties": false
       },
-      "example": "source: inbox/delivery.zip\ntarget: inbox/delivery\npattern: \"*.csv\"\n"
+      "example": "source: inbox/delivery.zip\ntarget: inbox/delivery\npattern: \"*.csv\"\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the unpacked files"
+        }
+      ],
+      "errors": "Fails before anything is written when an entry would leave the folder (.., absolute paths, drive letters, reserved names on Windows), the limits are exceeded or, with ifExists: fail (the default), a file exists. Also fails when the archive cannot be read or unpacks to more than maxSize while writing. Links and special files are left out with a warning.",
+      "limits": [
+        "maxSize limits the total size of the unpacked files (default 1GB); it is counted again while writing, as an archive may state less than it holds.",
+        "maxFiles limits the number of entries in the archive (default 10,000)."
+      ]
     },
     {
       "type": "core.abort",
@@ -142,7 +172,8 @@
         },
         "additionalProperties": false
       },
-      "example": "message: \"No orders found in ${INBOX}\"\n"
+      "example": "message: \"No orders found in ${INBOX}\"\n",
+      "errors": "Ends the workflow as failed at once, with the message: failure links are not followed and actions still running are cancelled."
     },
     {
       "type": "core.check",
@@ -175,7 +206,15 @@
         ],
         "additionalProperties": false
       },
-      "example": "condition: \"{{ len(results.list.output) \u003e 0 }}\"\nmessage: No order files in the inbox\n"
+      "example": "condition: \"{{ len(results.list.output) \u003e 0 }}\"\nmessage: No order files in the inbox\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "boolean",
+          "description": "true if the condition is true"
+        }
+      ],
+      "errors": "Fails with the message (or \"the condition is false\") when the condition is false, and when it is neither true nor false; the failure link can report it."
     },
     {
       "type": "core.dummy",
@@ -187,7 +226,8 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": false
-      }
+      },
+      "errors": "Never fails."
     },
     {
       "type": "core.log",
@@ -224,7 +264,8 @@
         ],
         "additionalProperties": false
       },
-      "example": "message: \"Imported {{ results.import.output.write.written }} records\"\nlevel: info\n"
+      "example": "message: \"Imported {{ results.import.output.write.written }} records\"\nlevel: info\n",
+      "errors": "Fails only for an invalid level."
     },
     {
       "type": "core.run-pipeline",
@@ -264,7 +305,28 @@
         ],
         "additionalProperties": false
       },
-      "example": "pipeline: pipelines/customers.pipeline.yaml\nparams:\n  BATCH: \"42\"\n"
+      "example": "pipeline: pipelines/customers.pipeline.yaml\nparams:\n  BATCH: \"42\"\n",
+      "outputs": [
+        {
+          "name": "output.transforms",
+          "type": "object",
+          "description": "Counts per transform id: read, written and errors"
+        },
+        {
+          "name": "output.errors",
+          "type": "integer",
+          "description": "Records that went to error links, in all transforms"
+        },
+        {
+          "name": "output.rows",
+          "type": "list",
+          "description": "The records that reached core.to-result, each as an object"
+        }
+      ],
+      "errors": "Fails when the pipeline stops with an error or cannot be started (file outside the project folder or missing, parameter not declared or invalid), when the pipeline is not in allowedTargets and when rows is not a list. Records on error links do not fail the action.",
+      "limits": [
+        "output.rows holds at most maxRecords of core.to-result (default 100,000)."
+      ]
     },
     {
       "type": "core.run-workflow",
@@ -301,7 +363,15 @@
         ],
         "additionalProperties": false
       },
-      "example": "workflow: workflows/import-region.workflow.yaml\nparams:\n  REGION: north\n"
+      "example": "workflow: workflows/import-region.workflow.yaml\nparams:\n  REGION: north\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "object",
+          "description": "The outputs of the called workflow by name, e.g. output.ROWS"
+        }
+      ],
+      "errors": "Fails when the workflow fails, cannot be started (file outside the project folder or missing, parameter not declared or invalid, calls itself) or is not in allowedTargets; cancelling the run cancels the called workflow."
     },
     {
       "type": "core.script",
@@ -332,7 +402,20 @@
         },
         "additionalProperties": false
       },
-      "example": "params:\n  orders: \"{{ results.load.output.rows }}\"\n  rate: 0.19\nscript: |\n  const sum = params.orders.reduce((s, o) =\u003e s + Number(o.amount), 0);\n  console.log(`${params.orders.length} orders`);\n  return { net: sum, gross: sum * (1 + params.rate) };\n"
+      "example": "params:\n  orders: \"{{ results.load.output.rows }}\"\n  rate: 0.19\nscript: |\n  const sum = params.orders.reduce((s, o) =\u003e s + Number(o.amount), 0);\n  console.log(`${params.orders.length} orders`);\n  return { net: sum, gross: sum * (1 + params.rate) };\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "any",
+          "description": "The value of return, e.g. a number, text, list or object; null without return"
+        }
+      ],
+      "errors": "Fails on a syntax error, an exception (with the line), a result that cannot be converted, a missing or too large script file, and when the timeout of the action or a cancelled run interrupts the script.",
+      "limits": [
+        "The result may be at most 16 MiB as JSON and nested at most 100 levels; a script file or module may be at most 4 MiB.",
+        "The console keeps at most 1,000 lines per call, each cut at 8 KiB.",
+        "No access to files, network, processes or environment variables; require loads modules from scripts/ of the project only."
+      ]
     },
     {
       "type": "core.start",
@@ -344,7 +427,8 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": false
-      }
+      },
+      "errors": "Never fails."
     },
     {
       "type": "core.success",
@@ -363,7 +447,8 @@
         },
         "additionalProperties": false
       },
-      "example": "message: Nothing to import today\n"
+      "example": "message: Nothing to import today\n",
+      "errors": "Never fails. Ends the workflow as successful at once: its links are not followed and actions still running are cancelled."
     },
     {
       "type": "core.wait",
@@ -389,7 +474,8 @@
         ],
         "additionalProperties": false
       },
-      "example": "duration: 30s\n"
+      "example": "duration: 30s\n",
+      "errors": "Fails for an empty or invalid duration; ends early, as failed, when the run is cancelled or the timeout of the action is reached."
     },
     {
       "type": "db.execute",
@@ -442,7 +528,18 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: app-db\nsql: DELETE FROM orders WHERE created \u003c @before\nparams:\n  before: ${CUTOFF_DATE}\n"
+      "example": "connection: app-db\nsql: DELETE FROM orders WHERE created \u003c @before\nparams:\n  before: ${CUTOFF_DATE}\n",
+      "outputs": [
+        {
+          "name": "output.rowsAffected",
+          "type": "integer",
+          "description": "Rows changed by the statement; -1 if the database does not tell"
+        }
+      ],
+      "errors": "Fails when the connection cannot be opened, a parameter @name has no value, the database rejects the statement, or it takes longer than timeout.",
+      "limits": [
+        "timeout limits the statement (default 5m)."
+      ]
     },
     {
       "type": "db.query",
@@ -500,7 +597,34 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: app-db\nsql: SELECT COUNT(*) AS open FROM orders WHERE status = @status\nparams:\n  status: open\n"
+      "example": "connection: app-db\nsql: SELECT COUNT(*) AS open FROM orders WHERE status = @status\nparams:\n  status: open\n",
+      "outputs": [
+        {
+          "name": "output.rows",
+          "type": "list",
+          "description": "The rows, each an object with the columns by name"
+        },
+        {
+          "name": "output.count",
+          "type": "integer",
+          "description": "Number of rows"
+        },
+        {
+          "name": "output.first",
+          "type": "object",
+          "description": "The first row; null without rows"
+        },
+        {
+          "name": "output.value",
+          "type": "any",
+          "description": "The first column of the first row, e.g. of SELECT COUNT(*); null without rows"
+        }
+      ],
+      "errors": "Fails when the connection cannot be opened, a parameter @name has no value, the database rejects the query, a column name appears twice, the query returns more than maxRows rows, or it takes longer than timeout.",
+      "limits": [
+        "maxRows limits the rows (default 1000); they are held in memory and in the result of the run, so larger results belong into a pipeline with db.table-input.",
+        "timeout limits the query (default 1m)."
+      ]
     },
     {
       "type": "file.copy",
@@ -543,7 +667,15 @@
         ],
         "additionalProperties": false
       },
-      "example": "source: inbox/*.csv\ntarget: archive/\nifExists: replace\n"
+      "example": "source: inbox/*.csv\ntarget: archive/\nifExists: replace\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the copied files in the target, without skipped ones"
+        }
+      ],
+      "errors": "Fails when nothing matches the source, and with ifExists: fail (the default) when a file exists in the target, checked before anything is copied; a file and a folder of the same name always conflict. A cancelled run stops between two blocks."
     },
     {
       "type": "file.delete",
@@ -582,7 +714,15 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: out/*.tmp\n"
+      "example": "path: out/*.tmp\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the deleted files and folders"
+        }
+      ],
+      "errors": "Fails before deleting anything when a match is a folder and recursive is not set. Nothing to delete is no error, except with ifMissing: fail."
     },
     {
       "type": "file.exists",
@@ -617,7 +757,15 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: inbox/orders-*.csv\nkind: file\n"
+      "example": "path: inbox/orders-*.csv\nkind: file\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the matching files or folders, sorted"
+        }
+      ],
+      "errors": "Fails when nothing of the kind matches the path, so that success and failure links can branch, and when the folder cannot be read."
     },
     {
       "type": "file.list",
@@ -662,7 +810,38 @@
         ],
         "additionalProperties": false
       },
-      "example": "folder: inbox\npattern: \"*.csv\"\n"
+      "example": "folder: inbox\npattern: \"*.csv\"\n",
+      "outputs": [
+        {
+          "name": "output[].path",
+          "type": "string",
+          "description": "Path of the entry; the list is sorted by path"
+        },
+        {
+          "name": "output[].name",
+          "type": "string",
+          "description": "Name of the file or folder"
+        },
+        {
+          "name": "output[].size",
+          "type": "integer",
+          "description": "Size in bytes"
+        },
+        {
+          "name": "output[].modified",
+          "type": "datetime",
+          "description": "Time of the last change, to the second"
+        },
+        {
+          "name": "output[].folder",
+          "type": "boolean",
+          "description": "true for a folder"
+        }
+      ],
+      "errors": "Fails when the folder does not exist or cannot be read; an empty folder gives an empty list.",
+      "limits": [
+        "All entries are held in memory as the output; for very many files use the transform file.list."
+      ]
     },
     {
       "type": "file.mkdir",
@@ -687,7 +866,15 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: \"archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n"
+      "example": "path: \"archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "string",
+          "description": "Path of the folder, relative paths with the project folder in front"
+        }
+      ],
+      "errors": "Fails when a file of that name exists or the folder cannot be created; an existing folder is no error."
     },
     {
       "type": "file.move",
@@ -730,7 +917,15 @@
         ],
         "additionalProperties": false
       },
-      "example": "source: inbox/orders.csv\ntarget: done/\n"
+      "example": "source: inbox/orders.csv\ntarget: done/\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "New paths of the moved files and folders, without skipped ones"
+        }
+      ],
+      "errors": "Fails when nothing matches the source, and with ifExists: fail (the default) when a file exists in the target, checked before anything is moved; also when a copied source across drives cannot be deleted."
     },
     {
       "type": "file.read",
@@ -790,7 +985,43 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: config/customers.json\nformat: json\n"
+      "example": "path: config/customers.json\nformat: json\n",
+      "outputs": [
+        {
+          "name": "output.content",
+          "type": "string",
+          "description": "The text of the file"
+        },
+        {
+          "name": "output.lines",
+          "type": "list",
+          "description": "With format: lines, the lines without line ends"
+        },
+        {
+          "name": "output.value",
+          "type": "any",
+          "description": "With format: json, the value"
+        },
+        {
+          "name": "output.size",
+          "type": "integer",
+          "description": "Size of the file in bytes"
+        },
+        {
+          "name": "output.modified",
+          "type": "datetime",
+          "description": "Time of the last change; missing for a missing file"
+        },
+        {
+          "name": "output.missing",
+          "type": "boolean",
+          "description": "true if the file does not exist (ifMissing: empty); else not set"
+        }
+      ],
+      "errors": "Fails when the file is missing (unless ifMissing: empty), is a folder, is larger than maxSize, cannot be decoded or, with format: json, is not exactly one valid JSON value.",
+      "limits": [
+        "maxSize limits the file (default 10MB); its content becomes part of the result of the run."
+      ]
     },
     {
       "type": "file.wait",
@@ -837,7 +1068,18 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: inbox/*.csv\nmaxWait: 30m\nstableFor: 10s\n"
+      "example": "path: inbox/*.csv\nmaxWait: 30m\nstableFor: 10s\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the matching files, sorted"
+        }
+      ],
+      "errors": "Fails when no file matches after maxWait, or the files still change in size after maxWait (stableFor), and when the folder cannot be read.",
+      "limits": [
+        "Looks every interval (default 5s, at least 10ms); without maxWait it waits until the timeout of the action or the end of the run."
+      ]
     },
     {
       "type": "file.write",
@@ -905,7 +1147,20 @@
         ],
         "additionalProperties": false
       },
-      "example": "path: out/status.json\nformat: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n"
+      "example": "path: out/status.json\nformat: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n",
+      "outputs": [
+        {
+          "name": "output.path",
+          "type": "string",
+          "description": "Path of the file, relative paths with the project folder in front"
+        },
+        {
+          "name": "output.size",
+          "type": "integer",
+          "description": "Bytes written by this action (appended ones with ifExists: append)"
+        }
+      ],
+      "errors": "Fails with ifExists: fail when the file exists, when the content cannot be written as JSON or in the encoding, and when the file cannot be written; replace writes a temporary file first, so a failure leaves the old file."
     },
     {
       "type": "http.request",
@@ -1108,7 +1363,61 @@
         },
         "additionalProperties": false
       },
-      "example": "connection: shop-api\nurl: orders\nquery:\n  status: open\n"
+      "example": "connection: shop-api\nurl: orders\nquery:\n  status: open\n",
+      "outputs": [
+        {
+          "name": "output.status",
+          "type": "integer",
+          "description": "HTTP status of the answer (the last one with paginate)"
+        },
+        {
+          "name": "output.headers",
+          "type": "object",
+          "description": "Headers of the answer with lowercase names; several values joined with a comma"
+        },
+        {
+          "name": "output.body",
+          "type": "any",
+          "description": "The answer: a value for JSON, else text; not with paginate or a saved file"
+        },
+        {
+          "name": "output.items",
+          "type": "list",
+          "description": "With paginate, the items of all pages"
+        },
+        {
+          "name": "output.count",
+          "type": "integer",
+          "description": "With paginate, the number of items"
+        },
+        {
+          "name": "output.pages",
+          "type": "integer",
+          "description": "With paginate, the number of pages read"
+        },
+        {
+          "name": "output.path",
+          "type": "string",
+          "description": "With saveTo, the path of the saved file"
+        },
+        {
+          "name": "output.size",
+          "type": "integer",
+          "description": "With saveTo, the size of the saved file in bytes"
+        },
+        {
+          "name": "output.skipped",
+          "type": "boolean",
+          "description": "With saveTo and ifExists: skip, true if the file existed and nothing was requested"
+        }
+      ],
+      "errors": "Fails on status 400 and above (unless failOnError: false; the message shows the beginning of the answer), when there is no answer within timeout, the answer is larger than maxSize, the API asks to wait longer than retryAfter.maxWait, or paginate exceeds its limits or leads to another host. With saveTo and ifExists: fail, fails before the request when the file exists; a failed download leaves no file.",
+      "limits": [
+        "timeout limits each request (default 60s; with paginate per page); the timeout of the action limits all together.",
+        "maxSize limits the answer (default 10MB, per page with paginate) or with saveTo the file (default 1GB).",
+        "After 429 or 503 with Retry-After, the request is repeated at most retryAfter.maxRetries times (default 3), waiting at most retryAfter.maxWait (default 1m).",
+        "paginate reads at most maxPages pages (default 100) and maxItems items (default 10,000), all on the host of the first page."
+      ]
     },
     {
       "type": "http.response",
@@ -1141,7 +1450,23 @@
         },
         "additionalProperties": false
       },
-      "example": "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n"
+      "example": "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n",
+      "outputs": [
+        {
+          "name": "output.sent",
+          "type": "boolean",
+          "description": "true if this was the answer to the caller"
+        },
+        {
+          "name": "output.status",
+          "type": "integer",
+          "description": "The status of the answer"
+        }
+      ],
+      "errors": "Fails only for a status that is not a number from 200 to 599. Without a waiting caller, or when the caller has been answered already, it sends nothing (sent: false) and the workflow goes on.",
+      "limits": [
+        "The caller waits only for the response timeout of the trigger; later answers are not sent."
+      ]
     },
     {
       "type": "mail.send",
@@ -1228,7 +1553,29 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: mail\nto: ${ADMIN_MAIL}\nsubject: \"Import failed: {{ run.id }}\"\nbody: \"{{ run.lastError }}\"\n"
+      "example": "connection: mail\nto: ${ADMIN_MAIL}\nsubject: \"Import failed: {{ run.id }}\"\nbody: \"{{ run.lastError }}\"\n",
+      "outputs": [
+        {
+          "name": "output.messageId",
+          "type": "string",
+          "description": "Message-ID of the mail"
+        },
+        {
+          "name": "output.recipients",
+          "type": "integer",
+          "description": "Number of recipients in to, cc and bcc"
+        },
+        {
+          "name": "output.size",
+          "type": "integer",
+          "description": "Size of the mail in bytes"
+        }
+      ],
+      "errors": "Fails when the mail has no sender or recipient, an address or attachment is invalid, the attachments are too large, the server cannot be reached within the timeout of the connection, refuses the sign-in or a recipient, or accepts no mail of this size.",
+      "limits": [
+        "Attachments may be at most 25 MB together.",
+        "The timeout of the connection limits connecting and sending (default 1m)."
+      ]
     },
     {
       "type": "shell.powershell",
@@ -1297,7 +1644,44 @@
         },
         "additionalProperties": false
       },
-      "example": "script: |\n  param([string]$Folder)\n  Get-ChildItem $Folder | Select-Object Name, Length | ConvertTo-Json\nparams:\n  Folder: data\njson: true\n"
+      "example": "script: |\n  param([string]$Folder)\n  Get-ChildItem $Folder | Select-Object Name, Length | ConvertTo-Json\nparams:\n  Folder: data\njson: true\n",
+      "outputs": [
+        {
+          "name": "output.exitCode",
+          "type": "integer",
+          "description": "Exit code of PowerShell"
+        },
+        {
+          "name": "output.stdout",
+          "type": "string",
+          "description": "Standard output; values of env are hidden"
+        },
+        {
+          "name": "output.stderr",
+          "type": "string",
+          "description": "Error output; values of env are hidden"
+        },
+        {
+          "name": "output.truncated",
+          "type": "boolean",
+          "description": "true if stdout or stderr was longer than maxOutput"
+        },
+        {
+          "name": "output.duration",
+          "type": "string",
+          "description": "Running time, e.g. 1.25s"
+        },
+        {
+          "name": "output.json",
+          "type": "any",
+          "description": "With json, the last JSON value of stdout, e.g. of ConvertTo-Json"
+        }
+      ],
+      "errors": "Fails when the edition is not installed, the script file is missing, the script ends with an exit code other than 0 (an uncaught error included), it runs longer than timeout (it is ended with all processes it started), or with json stdout holds no JSON.",
+      "limits": [
+        "timeout limits the script (default 10m).",
+        "maxOutput limits stdout and stderr each (default 1MB, at most 1GB); more is dropped."
+      ]
     },
     {
       "type": "shell.run",
@@ -1381,7 +1765,44 @@
         ],
         "additionalProperties": false
       },
-      "example": "program: robocopy\nargs: [ data/out, \"\\\\\\\\server\\\\share\\\\in\", \"*.csv\", /MIR ]\nokCodes: [ 0, 1, 2, 3 ]\ntimeout: 10m\n"
+      "example": "program: robocopy\nargs: [ data/out, \"\\\\\\\\server\\\\share\\\\in\", \"*.csv\", /MIR ]\nokCodes: [ 0, 1, 2, 3 ]\ntimeout: 10m\n",
+      "outputs": [
+        {
+          "name": "output.exitCode",
+          "type": "integer",
+          "description": "Exit code of the program"
+        },
+        {
+          "name": "output.stdout",
+          "type": "string",
+          "description": "Standard output, decoded; values of env are hidden"
+        },
+        {
+          "name": "output.stderr",
+          "type": "string",
+          "description": "Error output, decoded; values of env are hidden"
+        },
+        {
+          "name": "output.truncated",
+          "type": "boolean",
+          "description": "true if stdout or stderr was longer than maxOutput"
+        },
+        {
+          "name": "output.duration",
+          "type": "string",
+          "description": "Running time, e.g. 1.25s"
+        },
+        {
+          "name": "output.json",
+          "type": "any",
+          "description": "With json, the last JSON value of stdout"
+        }
+      ],
+      "errors": "Fails when the program is not found, its exit code is not in okCodes (default 0; the message shows the last lines of stderr), it runs longer than timeout (it is ended with all processes it started), or with json stdout holds no JSON. Arguments of .bat and .cmd files with characters that cmd.exe interprets are refused.",
+      "limits": [
+        "timeout limits the program (default 10m).",
+        "maxOutput limits stdout and stderr each (default 1MB, at most 1GB); more is dropped."
+      ]
     },
     {
       "type": "transfer.delete",
@@ -1440,7 +1861,19 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\npath: /outgoing/*.csv\n"
+      "example": "connection: partner-sftp\npath: /outgoing/*.csv\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the deleted files and folders on the server"
+        }
+      ],
+      "errors": "Fails before deleting anything when a match is a folder and recursive is not set, and when the connection fails (host key, certificate or sign-in refused, no answer within timeout). Nothing to delete is no error, except with ifMissing: fail.",
+      "limits": [
+        "A path with wildcards may match at most 10,000 entries.",
+        "timeout limits each match with its content (default 10m)."
+      ]
     },
     {
       "type": "transfer.download",
@@ -1510,7 +1943,19 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: inbox/\nifExists: replace\n"
+      "example": "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: inbox/\nifExists: replace\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Local paths of the downloaded files, without skipped ones"
+        }
+      ],
+      "errors": "Fails when nothing matches the source, the connection fails (host key, certificate or sign-in refused, no answer within timeout), a file is larger than maxSize, a name from the server is no safe local name, and with ifExists: fail (the default) when a local file exists, checked before anything is downloaded. A failed download leaves no half file.",
+      "limits": [
+        "timeout limits each file (default 10m); the timeout of the action limits all together.",
+        "maxSize limits each file; empty: no limit."
+      ]
     },
     {
       "type": "transfer.exists",
@@ -1565,7 +2010,19 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\npath: /outgoing/orders-*.csv\nkind: file\n"
+      "example": "connection: partner-sftp\npath: /outgoing/orders-*.csv\nkind: file\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the matching files or folders on the server"
+        }
+      ],
+      "errors": "Fails when nothing of the kind matches the path, so that success and failure links can branch, and when the connection fails (host key, certificate or sign-in refused, no answer within timeout).",
+      "limits": [
+        "A path with wildcards may match at most 10,000 entries.",
+        "timeout limits the check (default 10m)."
+      ]
     },
     {
       "type": "transfer.list",
@@ -1630,7 +2087,39 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\nfolder: /outgoing\npattern: \"*.csv\"\n"
+      "example": "connection: partner-sftp\nfolder: /outgoing\npattern: \"*.csv\"\n",
+      "outputs": [
+        {
+          "name": "output[].path",
+          "type": "string",
+          "description": "Path of the entry on the server; the list is sorted by path"
+        },
+        {
+          "name": "output[].name",
+          "type": "string",
+          "description": "Name of the file or folder"
+        },
+        {
+          "name": "output[].size",
+          "type": "integer",
+          "description": "Size in bytes"
+        },
+        {
+          "name": "output[].modified",
+          "type": "datetime",
+          "description": "Time of the last change, to the second"
+        },
+        {
+          "name": "output[].folder",
+          "type": "boolean",
+          "description": "true for a folder"
+        }
+      ],
+      "errors": "Fails when the folder does not exist on the server, the connection fails (host key, certificate or sign-in refused, no answer within timeout), or there are more entries than the limit.",
+      "limits": [
+        "At most 10,000 entries, as they are held in the result of the run; narrow the list with pattern or without recursive.",
+        "timeout limits the listing (default 10m)."
+      ]
     },
     {
       "type": "transfer.mkdir",
@@ -1675,7 +2164,18 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\npath: \"/outgoing/archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n"
+      "example": "connection: partner-sftp\npath: \"/outgoing/archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "string",
+          "description": "Path of the folder on the server"
+        }
+      ],
+      "errors": "Fails when a file of that name exists, the folder cannot be created, or the connection fails (host key, certificate or sign-in refused, no answer within timeout); an existing folder is no error.",
+      "limits": [
+        "timeout limits creating the folder (default 10m)."
+      ]
     },
     {
       "type": "transfer.move",
@@ -1738,7 +2238,19 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: /outgoing/archive/\n"
+      "example": "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: /outgoing/archive/\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "New paths on the server, without skipped ones"
+        }
+      ],
+      "errors": "Fails when nothing matches the source, the connection fails (host key, certificate or sign-in refused, no answer within timeout), the server cannot rename (e.g. to another file system), and with ifExists: fail (the default) when a file exists in the target, checked before anything is moved.",
+      "limits": [
+        "A path with wildcards may match at most 10,000 entries.",
+        "timeout limits each file or folder (default 10m)."
+      ]
     },
     {
       "type": "transfer.upload",
@@ -1801,7 +2313,18 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\nsource: outbox/*.csv\ntarget: /incoming/\n"
+      "example": "connection: partner-sftp\nsource: outbox/*.csv\ntarget: /incoming/\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the uploaded files on the server, without skipped ones"
+        }
+      ],
+      "errors": "Fails when nothing matches the source, the connection fails (host key, certificate or sign-in refused, no answer within timeout), and with ifExists: fail (the default) when a file exists on the server, checked before anything is uploaded. Each file is written to a temporary name and renamed when complete.",
+      "limits": [
+        "timeout limits each file (default 10m); the timeout of the action limits all together."
+      ]
     },
     {
       "type": "transfer.wait",
@@ -1868,7 +2391,20 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: partner-sftp\npath: /outgoing/*.csv\ninterval: 1m\nmaxWait: 2h\nstableFor: 30s\n"
+      "example": "connection: partner-sftp\npath: /outgoing/*.csv\ninterval: 1m\nmaxWait: 2h\nstableFor: 30s\n",
+      "outputs": [
+        {
+          "name": "output",
+          "type": "list",
+          "description": "Paths of the matching files on the server, sorted"
+        }
+      ],
+      "errors": "Fails when no file matches after maxWait, or the files still change in size after maxWait (stableFor), and when the first connection fails or a host key, certificate or sign-in is refused. A dropped connection or a look longer than timeout is retried at the next look.",
+      "limits": [
+        "Looks every interval (default 5s, at least 10ms); without maxWait it waits until the timeout of the action or the end of the run.",
+        "timeout limits each look (default 1m).",
+        "A path with wildcards may match at most 10,000 entries."
+      ]
     }
   ],
   "transforms": [
@@ -1919,7 +2455,16 @@
       },
       "example": "fields:\n  - { name: total, value: \"{{ record.price * record.quantity }}\" }\n  - { name: label, value: \"{{ upper(record.name) }}: {{ record.total }}\" }\n",
       "recordErrors": true,
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The result, with the type of the expression; text around {{ … }} gives text"
+        }
+      ],
+      "records": "Passes every record on with the fields set, in their order.",
+      "errors": "A record for which an expression cannot be evaluated goes unchanged to the error link; without one, the pipeline stops."
     },
     {
       "type": "core.constant",
@@ -1961,7 +2506,16 @@
         "additionalProperties": false
       },
       "example": "fields:\n  - { name: source, value: runnel }\n  - { name: batch, value: \"{{ params.BATCH }}\" }\n",
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The value, with its type; an existing field keeps its position"
+        }
+      ],
+      "records": "Passes every record on with the fields set.",
+      "errors": "Stops the pipeline when it starts if a value cannot be evaluated; never for a single record."
     },
     {
       "type": "core.convert",
@@ -2024,7 +2578,16 @@
       },
       "example": "fields:\n  - { name: kdnr, type: int }\n  - { name: umsatz, type: decimal, format: \"#.##0,00\" }\n",
       "recordErrors": true,
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The value converted to the type of the field"
+        }
+      ],
+      "records": "Passes every record on with the fields converted; a field missing in a record stays missing.",
+      "errors": "A record with a value that cannot be converted goes unchanged to the error link; without one, the pipeline stops with record and field. Numbers are not rounded: 1.5 is no int."
     },
     {
       "type": "core.dedupe",
@@ -2052,7 +2615,12 @@
         },
         "additionalProperties": false
       },
-      "example": "fields: [email]\nignoreCase: true\n"
+      "example": "fields: [email]\nignoreCase: true\n",
+      "records": "Passes on the first record of each combination of values at once and drops the repeated ones; the log counts them.",
+      "errors": "Never fails while the pipeline runs.",
+      "limits": [
+        "Holds the combinations seen in memory; it grows with the number of different records."
+      ]
     },
     {
       "type": "core.dummy",
@@ -2065,7 +2633,9 @@
         "type": "object",
         "additionalProperties": false
       },
-      "parallel": true
+      "parallel": true,
+      "records": "Passes all records on unchanged to all data links.",
+      "errors": "Never fails."
     },
     {
       "type": "core.filter",
@@ -2100,7 +2670,9 @@
       },
       "example": "condition: \"{{ record.umsatz \u003e 0 \u0026\u0026 record.ort != '' }}\"\nelse: rejected\n",
       "recordErrors": true,
-      "parallel": true
+      "parallel": true,
+      "records": "Passes the records for which the condition is true to the data links; the others go to the transform named in else, or are dropped and counted in the log.",
+      "errors": "A record whose condition cannot be evaluated goes to the error link; without one, the pipeline stops."
     },
     {
       "type": "core.from-result",
@@ -2112,7 +2684,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": false
-      }
+      },
+      "records": "Passes on the records given to the run (rows of core.run-pipeline, the JSON list of a request to an http trigger), their fields in the order of their names; none when the pipeline is started on its own.",
+      "errors": "Never fails while the pipeline runs."
     },
     {
       "type": "core.generate-rows",
@@ -2164,7 +2738,21 @@
         ],
         "additionalProperties": false
       },
-      "example": "rows: 10\nrowNumberField: n\nfields:\n  - { name: status, value: new }\n"
+      "example": "rows: 10\nrowNumberField: n\nfields:\n  - { name: status, value: new }\n",
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The constant value, with the type of the value"
+        },
+        {
+          "name": "\u003crowNumberField\u003e",
+          "type": "int",
+          "description": "Number of the record, starting at 1"
+        }
+      ],
+      "records": "Creates rows records with the same fields and passes them to all data links; it has no incoming links.",
+      "errors": "Stops the pipeline when rows is not a whole number of 0 or more."
     },
     {
       "type": "core.group-by",
@@ -2244,7 +2832,24 @@
         "additionalProperties": false
       },
       "example": "groupBy: [Datum]\naggregates:\n  - { name: orders, function: count }\n  - { name: total, function: sum, field: Betrag }\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "outputs": [
+        {
+          "name": "\u003cgroupBy\u003e",
+          "type": "any",
+          "description": "The values of the group, with their type"
+        },
+        {
+          "name": "\u003caggregates[].name\u003e",
+          "type": "any",
+          "description": "The aggregate: int for count and countDistinct, text for concat, decimal for avg of int, else the type of the field"
+        }
+      ],
+      "records": "Passes on one record per group, with only the group fields and the aggregates, in the order the groups first appeared, once its input has ended; without groupBy exactly one record, also for no input.",
+      "errors": "A record with a value that does not fit its function (e.g. text in sum) goes to the error link and counts in no group; without one, the pipeline stops.",
+      "limits": [
+        "Holds one entry per group in memory; it grows with the number of groups, not of records."
+      ]
     },
     {
       "type": "core.log",
@@ -2284,7 +2889,9 @@
         "additionalProperties": false
       },
       "example": "fields: [kdnr, name]\n",
-      "parallel": true
+      "parallel": true,
+      "records": "Passes all records on unchanged to all data links; writes every n-th of them (every) to the run log.",
+      "errors": "Stops the pipeline only for an invalid level."
     },
     {
       "type": "core.map-values",
@@ -2347,7 +2954,16 @@
         "additionalProperties": false
       },
       "example": "field: status\nas: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003cas\u003e",
+          "type": "any",
+          "description": "The new value; without as, it replaces the value of field"
+        }
+      ],
+      "records": "Passes every record on with the value replaced by the table, the default, or unchanged.",
+      "errors": "Never fails while the pipeline runs."
     },
     {
       "type": "core.merge-join",
@@ -2422,7 +3038,12 @@
         ],
         "additionalProperties": false
       },
-      "example": "left: orders\nright: customers\nkeys:\n  - { left: customerId, right: id }\njoin: left\n"
+      "example": "left: orders\nright: customers\nkeys:\n  - { left: customerId, right: id }\njoin: left\n",
+      "records": "Passes on one record per pair of left and right records with the same keys (n × m for repeated keys): the left fields, then the right fields the left records do not have. With join: left also left records without a partner, with full also right ones; their missing fields are empty.",
+      "errors": "Stops the pipeline when an input is not sorted by the keys in ascending order, or when keys cannot be compared (e.g. text with a number).",
+      "limits": [
+        "Holds only the records of one key of each input in memory, so the inputs may be of any size."
+      ]
     },
     {
       "type": "core.script",
@@ -2507,7 +3128,21 @@
       },
       "example": "fields:\n  - { name: name, type: string }\n  - { name: amount, type: decimal }\nscript: |\n  if (!record.name) return null; // drop the record\n  return { name: record.name.trim(), amount: record.amount };\n",
       "recordErrors": true,
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "A declared field, converted to its type; without fields the types follow the values"
+        }
+      ],
+      "records": "Passes on what the script returns for each record: an object as one record, a list as several, null as none; end may return further records after the last one.",
+      "errors": "A record whose script throws an exception, returns a value that cannot be converted or takes longer than maxRecordTime goes to the error link; without one, the pipeline stops. A syntax error, a missing script file and errors in init or end stop the pipeline.",
+      "limits": [
+        "maxRecordTime limits the time per record (default 1s); init and end have no limit of their own.",
+        "The console keeps at most 1,000 lines per copy, each cut at 8 KiB; a script file or module may be at most 4 MiB.",
+        "No access to files, network, processes or environment variables; require loads modules from scripts/ of the project only."
+      ]
     },
     {
       "type": "core.select-fields",
@@ -2559,7 +3194,16 @@
         "additionalProperties": false
       },
       "example": "fields:\n  - { name: kdnr, as: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].as\u003e",
+          "type": "any",
+          "description": "A kept field under its new name"
+        }
+      ],
+      "records": "Passes every record on with only the fields listed in fields (in this order; a missing one is empty), or without the fields listed in remove.",
+      "errors": "Never fails while the pipeline runs."
     },
     {
       "type": "core.sequence",
@@ -2602,7 +3246,19 @@
         ],
         "additionalProperties": false
       },
-      "example": "name: position\nstart: 10\nstep: 10\ngroupBy: [Nr]\n"
+      "example": "name: position\nstart: 10\nstep: 10\ngroupBy: [Nr]\n",
+      "outputs": [
+        {
+          "name": "\u003cname\u003e",
+          "type": "int",
+          "description": "The number of the record, from start in steps of step"
+        }
+      ],
+      "records": "Passes every record on with the number, in the order they arrive.",
+      "errors": "Stops the pipeline when start or step is not a whole number.",
+      "limits": [
+        "With groupBy, one counter per group is kept in memory."
+      ]
     },
     {
       "type": "core.sort",
@@ -2652,7 +3308,12 @@
         "additionalProperties": false
       },
       "example": "fields:\n  - { name: total, descending: true }\n  - { name: name, ignoreCase: true }\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "records": "Passes all records on, sorted and stable, once its input has ended; empty values come last.",
+      "errors": "A record whose value cannot be sorted together with the values before (another kind, e.g. text among numbers) goes to the error link; without one, the pipeline stops.",
+      "limits": [
+        "Holds all records in memory until its input has ended."
+      ]
     },
     {
       "type": "core.split-field",
@@ -2712,7 +3373,21 @@
         "additionalProperties": false
       },
       "example": "field: name\nseparator: \", \"\ninto: [lastName, firstName]\n",
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003cinto\u003e",
+          "type": "string",
+          "description": "The parts in order; more parts stay together in the last field, missing ones are empty"
+        },
+        {
+          "name": "\u003cindexField\u003e",
+          "type": "int",
+          "description": "With rows, the position of the part, starting at 1"
+        }
+      ],
+      "records": "With into, passes every record on with the parts; with rows, one record per part with field set to the part, and a record without a value once.",
+      "errors": "Never fails while the pipeline runs."
     },
     {
       "type": "core.stream-lookup",
@@ -2814,7 +3489,19 @@
       },
       "example": "keys:\n  - { field: customerId, lookupField: id }\nreturn:\n  - { lookupField: name, as: customerName }\n",
       "recordErrors": true,
-      "infoInput": true
+      "infoInput": true,
+      "outputs": [
+        {
+          "name": "\u003creturn[].as\u003e",
+          "type": "any",
+          "description": "The value of the lookup field, or its default; without as, under the name of the lookup field"
+        }
+      ],
+      "records": "Reads the info link to the end first, then passes every record of the data links on with the returned fields; with notFound: drop, records without a match are dropped.",
+      "errors": "With notFound: error or multiple: error, such a record goes to the error link; without one, the pipeline stops. More lookup records than maxRecords and a missing info link stop the pipeline.",
+      "limits": [
+        "maxRecords limits the lookup records held in memory (default 100,000)."
+      ]
     },
     {
       "type": "core.switch",
@@ -2872,7 +3559,9 @@
       },
       "example": "cases:\n  - { when: \"{{ record.umsatz \u003e= 10000 }}\", to: key-accounts }\n  - { when: \"{{ record.umsatz \u003e 0 }}\", to: standard }\ndefault: others\n",
       "recordErrors": true,
-      "parallel": true
+      "parallel": true,
+      "records": "Passes each record to the transform of the first case whose condition is true, else to default; without default, the others are dropped and counted in the log.",
+      "errors": "A record whose condition cannot be evaluated goes to the error link; without one, the pipeline stops."
     },
     {
       "type": "core.to-result",
@@ -2892,7 +3581,12 @@
         },
         "additionalProperties": false
       },
-      "example": "maxRecords: 1000\n"
+      "example": "maxRecords: 1000\n",
+      "records": "Passes all records on unchanged and adds them to the result of the pipeline: core.run-pipeline returns them as output.rows.",
+      "errors": "Stops the pipeline when there are more records than maxRecords, or maxRecords is not a whole number of 1 or more.",
+      "limits": [
+        "maxRecords limits the records held in memory for the result (default 100,000)."
+      ]
     },
     {
       "type": "csv.input",
@@ -2990,7 +3684,19 @@
       },
       "example": "path: data/orders.csv\ndelimiter: \";\"\nfields:\n  - { name: Nr, type: int }\n  - { name: Betrag, type: decimal, format: \"#.##0,00\" }\n",
       "recordErrors": true,
-      "detectFields": true
+      "detectFields": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The column with the type of the field; without fields, every column as text, named by the header or field1, field2 …"
+        }
+      ],
+      "records": "Creates one record per row (without the header) and passes it to all data links; it has no incoming links.",
+      "errors": "A row with another number of values than the first, or with a value that does not fit its type, goes with its values as text to the error link, the message with file, line and column; without one, the pipeline stops. A missing file, a column missing in the header and other errors in the CSV (e.g. a stray quote) stop the pipeline.",
+      "limits": [
+        "The file is read as a stream, so it may be larger than the memory."
+      ]
     },
     {
       "type": "csv.output",
@@ -3084,7 +3790,9 @@
         "additionalProperties": false
       },
       "example": "path: out/orders.csv\nfields:\n  - { name: Datum, format: dd.MM.yyyy }\n  - { name: Betrag, format: \"#.##0,00\" }\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "records": "Passes every written record on unchanged to all data links.",
+      "errors": "A record with a value that cannot be written in its format or encoding goes to the error link and is not written; without one, the pipeline stops. With ifExists: fail, an existing file stops the pipeline before anything is written. Except with ifExists: append, the file is written to a temporary file first and replaces an existing one only once all records are written, so a failure leaves the old file."
     },
     {
       "type": "db.lookup",
@@ -3212,7 +3920,19 @@
       },
       "example": "connection: app-db\ntable: customers\nkeys:\n  - { field: customerId, column: id }\nreturn:\n  - { column: name, as: customerName }\n",
       "recordErrors": true,
-      "parallel": true
+      "parallel": true,
+      "outputs": [
+        {
+          "name": "\u003creturn[].as\u003e",
+          "type": "any",
+          "description": "The value of the column, or its default; without as, under the name of the column"
+        }
+      ],
+      "records": "Passes every record on with the returned columns; with notFound: drop, records without a matching row are dropped.",
+      "errors": "With notFound: error or multiple: error, such a record goes to the error link; without one, the pipeline stops. A failing query or one longer than timeout stops the pipeline.",
+      "limits": [
+        "cache keeps the results of the last keys in memory (default 1000); timeout limits each query (default 30s)."
+      ]
     },
     {
       "type": "db.table-input",
@@ -3265,7 +3985,12 @@
         ],
         "additionalProperties": false
       },
-      "example": "connection: app-db\nsql: SELECT id, name, amount FROM orders WHERE status = @status\nparams:\n  status: open\n"
+      "example": "connection: app-db\nsql: SELECT id, name, amount FROM orders WHERE status = @status\nparams:\n  status: open\n",
+      "records": "Creates one record per row of the query, one field per column in their order with the type the database returns, and passes it to all data links; it has no incoming links.",
+      "errors": "Stops the pipeline when the connection cannot be opened, a parameter @name has no value, the database rejects the query, a column name appears twice, or reading all rows takes longer than timeout.",
+      "limits": [
+        "timeout limits the query with reading all rows (default 5m); the rows are read as a stream."
+      ]
     },
     {
       "type": "db.table-output",
@@ -3324,7 +4049,12 @@
         "additionalProperties": false
       },
       "example": "connection: app-db\ntable: orders\nfields: [id, customer, amount]\ncommitSize: 1000\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "records": "Passes every written record on unchanged to all data links, once its transaction is committed.",
+      "errors": "When a transaction fails, its rows are written again one by one with an error link, so that only the failing records go there; without one, the pipeline stops and the transactions committed before stay.",
+      "limits": [
+        "commitSize rows per transaction (default 1000); timeout limits each transaction (default 5m)."
+      ]
     },
     {
       "type": "db.upsert",
@@ -3400,7 +4130,12 @@
         "additionalProperties": false
       },
       "example": "connection: app-db\ntable: customers\nkeys: [id]\nfields: [id, name, email]\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "records": "Passes every written record on unchanged to all data links, once its transaction is committed.",
+      "errors": "When a transaction fails, its rows are written again one by one with an error link, so that only the failing records go there; without one, the pipeline stops and the transactions committed before stay.",
+      "limits": [
+        "commitSize rows per transaction (default 1000); timeout limits each transaction (default 5m)."
+      ]
     },
     {
       "type": "excel.input",
@@ -3503,7 +4238,19 @@
       },
       "example": "path: data/orders.xlsx\nsheet: Orders\nrange: A3\nfields:\n  - { name: Nr, type: int }\n  - { name: Date, type: date }\n  - { name: Amount, type: decimal }\n",
       "recordErrors": true,
-      "detectFields": true
+      "detectFields": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The cell with the type of the field; without fields, every column with the type of its cells (text, int, decimal, bool, date, datetime)"
+        }
+      ],
+      "records": "Creates one record per row of the table and passes it to all data links; it has no incoming links.",
+      "errors": "A row with an error value like #N/A in a cell, or a value that does not fit its type, goes to the error link with the cell in the message; without one, the pipeline stops. A missing sheet or column, .xls, .xlsb and workbooks with a password stop the pipeline.",
+      "limits": [
+        "The sheet is read as a stream; its XML may unpack to at most 4 GB, the shared texts to 256 MB."
+      ]
     },
     {
       "type": "excel.output",
@@ -3593,7 +4340,12 @@
         "additionalProperties": false
       },
       "example": "path: out/orders.xlsx\nsheet: Orders\nfields:\n  - { name: Nr }\n  - { name: Amount, format: \"#.##0,00\" }\n  - { name: Date, format: dd.MM.yyyy }\n  - { name: Share, excelFormat: 0.0% }\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "records": "Passes every written record on unchanged to all data links.",
+      "errors": "A record with a value Excel cannot hold (more than 32,767 characters in a cell, a date before 1900, NaN) goes to the error link and is not written; without one, the pipeline stops. More than 1,048,576 rows, more than 16,384 columns and an existing workbook with ifExists: fail stop the pipeline. With replace, the workbook is written to a temporary file first.",
+      "limits": [
+        "The rows go through temporary files; the finished workbook is packed in memory at the end."
+      ]
     },
     {
       "type": "file.list",
@@ -3638,7 +4390,41 @@
         ],
         "additionalProperties": false
       },
-      "example": "folder: inbox\npattern: \"*.csv\"\nrecursive: true\n"
+      "example": "folder: inbox\npattern: \"*.csv\"\nrecursive: true\n",
+      "outputs": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Path of the entry"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the file or folder"
+        },
+        {
+          "name": "extension",
+          "type": "string",
+          "description": "Ending of the name with the dot, e.g. .csv; empty for folders"
+        },
+        {
+          "name": "size",
+          "type": "int",
+          "description": "Size in bytes"
+        },
+        {
+          "name": "modified",
+          "type": "datetime",
+          "description": "Time of the last change, to the second"
+        },
+        {
+          "name": "folder",
+          "type": "bool",
+          "description": "true for a folder"
+        }
+      ],
+      "records": "Creates one record per entry of the folder, in the order of their paths; it has no incoming links.",
+      "errors": "Stops the pipeline when the folder does not exist or cannot be read."
     },
     {
       "type": "http.response",
@@ -3683,7 +4469,12 @@
         },
         "additionalProperties": false
       },
-      "example": "status: 200\nsingle: true\n"
+      "example": "status: 200\nsingle: true\n",
+      "records": "Passes all records on unchanged to all data links. Once its input has ended, it answers the waiting caller with them as a JSON list (with single, the first record), if it received any; with whenEmpty also without, as a fallback.",
+      "errors": "Stops the pipeline when there are more records than maxRecords or the status is invalid. Without a waiting caller, or when the caller has been answered already, it sends nothing.",
+      "limits": [
+        "maxRecords limits the records held in memory for the answer (default 10,000)."
+      ]
     },
     {
       "type": "json.input",
@@ -3783,7 +4574,19 @@
       },
       "example": "path: data/orders.json\nrecords: data.items\nfields:\n  - { name: id, type: int }\n  - { name: city, from: address.city }\n",
       "recordErrors": true,
-      "detectFields": true
+      "detectFields": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The value at from with the type of the field; without fields, every key with its value (whole numbers int, others decimal, objects and lists json)"
+        }
+      ],
+      "records": "Creates one record per object and passes it to all data links; it has no incoming links.",
+      "errors": "A broken line of NDJSON goes to the error link with its text in the field line, a value that does not fit its type with the record; without one, the pipeline stops. Broken JSON, a missing records path and a key that appears twice in an object stop the pipeline.",
+      "limits": [
+        "The file is read as a stream; a line of NDJSON may be at most 64 MiB."
+      ]
     },
     {
       "type": "json.output",
@@ -3863,7 +4666,9 @@
         "additionalProperties": false
       },
       "example": "path: out/orders.json\nfields:\n  - { name: id }\n  - { name: day, format: dd.MM.yyyy }\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "records": "Passes every written record on unchanged to all data links.",
+      "errors": "A record with a value that cannot be written (e.g. in its format) goes to the error link and is not written; without one, the pipeline stops. With ifExists: fail, an existing file stops the pipeline. The file is written to a temporary file first and replaces an existing one only once all records are written, so a failure leaves the old file."
     },
     {
       "type": "xml.input",
@@ -3945,7 +4750,19 @@
       },
       "example": "path: data/orders.xml\nrecords: orders/order\nfields:\n  - { name: id, from: \"@id\", type: int }\n  - { name: customer, from: customer/name }\n  - { name: amount, type: decimal }\n",
       "recordErrors": true,
-      "detectFields": true
+      "detectFields": true,
+      "outputs": [
+        {
+          "name": "\u003cfields[].name\u003e",
+          "type": "any",
+          "description": "The value at from with the type of the field; without fields, attributes as @name, child elements as text, objects or lists, own text as #text"
+        }
+      ],
+      "records": "Creates one record per element that matches records and passes it to all data links; it has no incoming links.",
+      "errors": "A record with a value that does not fit its type goes to the error link with its line; without one, the pipeline stops. Broken XML stops the pipeline with the line.",
+      "limits": [
+        "The file is read as a stream; a record may be at most 16 MiB and nested at most 256 levels deep. External entities are not resolved."
+      ]
     },
     {
       "type": "xml.output",
@@ -4038,7 +4855,9 @@
         "additionalProperties": false
       },
       "example": "path: out/orders.xml\nroot: orders\nrecord: order\nfields:\n  - { name: id, as: \"@id\" }\n  - { name: customer, as: customer/name }\n  - { name: amount }\n",
-      "recordErrors": true
+      "recordErrors": true,
+      "records": "Passes every written record on unchanged to all data links.",
+      "errors": "A record with an invalid element or attribute name, a control character or a doubled attribute goes to the error link and is not written; without one, the pipeline stops. With ifExists: fail, an existing file stops the pipeline. The file is written to a temporary file first and replaces an existing one only once all records are written, so a failure leaves the old file."
     }
   ],
   "connectionTypes": [

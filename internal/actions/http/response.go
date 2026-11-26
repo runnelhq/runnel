@@ -21,6 +21,14 @@ var responseDefinition = action.Definition{
 	Example:     "status: 404\nbody:\n  error: \"customer {{ params.KDNR }} not found\"\n",
 	Config:      responseAction{},
 	New:         newResponse,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.sent", Type: "boolean", Description: "true if this was the answer to the caller"},
+			{Name: "output.status", Type: "integer", Description: "The status of the answer"},
+		},
+		Errors: "Fails only for a status that is not a number from 200 to 599. Without a waiting caller, or when the caller has been answered already, it sends nothing (sent: false) and the workflow goes on.",
+		Limits: []string{"The caller waits only for the response timeout of the trigger; later answers are not sent."},
+	},
 }
 
 type responseAction struct {

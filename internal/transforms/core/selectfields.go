@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -21,6 +22,11 @@ var selectFieldsDefinition = transform.Definition{
 	Example:     "fields:\n  - { name: kdnr, as: externalId }\n  - { name: name }\n# or instead of fields:\n# remove: [telefon]\n",
 	Config:      selectFields{},
 	New:         newSelectFields,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].as>", Type: "any", Description: "A kept field under its new name"}},
+		Records: "Passes every record on with only the fields listed in fields (in this order; a missing one is empty), or without the fields listed in remove.",
+		Errors:  "Never fails while the pipeline runs.",
+	},
 }
 
 type selectFields struct {

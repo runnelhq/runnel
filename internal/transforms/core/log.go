@@ -9,6 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -24,6 +25,10 @@ var logDefinition = transform.Definition{
 	Example:     "fields: [kdnr, name]\n",
 	Config:      logRecords{},
 	New:         newLog,
+	Reference: action.Reference{
+		Records: "Passes all records on unchanged to all data links; writes every n-th of them (every) to the run log.",
+		Errors:  "Stops the pipeline only for an invalid level.",
+	},
 }
 
 type logRecords struct {

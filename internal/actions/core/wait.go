@@ -19,6 +19,9 @@ var waitDefinition = action.Definition{
 	Example:     "duration: 30s\n",
 	Config:      wait{},
 	New:         newWait,
+	Reference: action.Reference{
+		Errors: "Fails for an empty or invalid duration; ends early, as failed, when the run is cancelled or the timeout of the action is reached.",
+	},
 }
 
 type wait struct {

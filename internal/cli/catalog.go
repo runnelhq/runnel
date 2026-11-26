@@ -115,18 +115,19 @@ type entry struct {
 	kind                              string // action, transform or connection
 	typ, category, label, description string
 	schema                            *schema.Schema
+	ref                               action.Reference
 }
 
 func actionEntry(d action.Descriptor) entry {
-	return entry{"action", d.Type, d.Category, d.Label, d.Description, d.Schema}
+	return entry{"action", d.Type, d.Category, d.Label, d.Description, d.Schema, d.Reference}
 }
 
 func transformEntry(d transform.Descriptor) entry {
-	return entry{"transform", d.Type, d.Category, d.Label, d.Description, d.Schema}
+	return entry{"transform", d.Type, d.Category, d.Label, d.Description, d.Schema, d.Reference}
 }
 
 func connectionEntry(d connection.Descriptor) entry {
-	return entry{"connection", d.Type, "", d.Label, d.Description, d.Schema}
+	return entry{"connection", d.Type, "", d.Label, d.Description, d.Schema, action.Reference{}}
 }
 
 func entries(acts []action.Descriptor, trs []transform.Descriptor, conns []connection.Descriptor) []entry {
@@ -256,10 +257,33 @@ func printDescriptor(w io.Writer, e entry) error {
 		p.printf("\nFields (with:):\n")
 		printFields(p, e.schema, "")
 	}
+	printReference(p, e)
 	if p.err != nil {
 		return p.err
 	}
 	return tw.Flush()
+}
+
+// printReference describes the output, the records, the errors and the limits of a type
+// (roadmap E15b).
+func printReference(p *printer, e entry) {
+	if len(e.ref.Outputs) > 0 {
+		p.printf("\n%s\n", map[string]string{"action": "Output (result.output):", "transform": "Fields set:"}[e.kind])
+		for _, o := range e.ref.Outputs {
+			p.printf("  %s\t%s\t%s\n", o.Name, o.Type, o.Description)
+		}
+	}
+	for _, s := range []struct{ title, text string }{{"Records", e.ref.Records}, {"Errors", e.ref.Errors}} {
+		if s.text != "" {
+			p.printf("\n%s:\n  %s\n", s.title, s.text)
+		}
+	}
+	if len(e.ref.Limits) > 0 {
+		p.printf("\nLimits:\n")
+		for _, l := range e.ref.Limits {
+			p.printf("  - %s\n", l)
+		}
+	}
 }
 
 func printFields(p *printer, s *schema.Schema, prefix string) {

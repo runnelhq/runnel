@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -30,6 +31,12 @@ var inputDefinition = transform.Definition{
 	Config:       input{},
 	New:          newInput,
 	DetectFields: detectFields,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "The value at from with the type of the field; without fields, every key with its value (whole numbers int, others decimal, objects and lists json)"}},
+		Records: "Creates one record per object and passes it to all data links; it has no incoming links.",
+		Errors:  "A broken line of NDJSON goes to the error link with its text in the field line, a value that does not fit its type with the record; without one, the pipeline stops. Broken JSON, a missing records path and a key that appears twice in an object stop the pipeline.",
+		Limits:  []string{"The file is read as a stream; a line of NDJSON may be at most 64 MiB."},
+	},
 }
 
 type input struct {

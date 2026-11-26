@@ -21,6 +21,10 @@ var deleteDefinition = action.Definition{
 	Example:     "path: out/*.tmp\n",
 	Config:      deleteAction{},
 	New:         newDelete,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the deleted files and folders"}},
+		Errors:  "Fails before deleting anything when a match is a folder and recursive is not set. Nothing to delete is no error, except with ifMissing: fail.",
+	},
 }
 
 type deleteAction struct {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
@@ -27,6 +28,12 @@ var inputDefinition = transform.Definition{
 	Config:       input{},
 	New:          newInput,
 	DetectFields: detectFields,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "The cell with the type of the field; without fields, every column with the type of its cells (text, int, decimal, bool, date, datetime)"}},
+		Records: "Creates one record per row of the table and passes it to all data links; it has no incoming links.",
+		Errors:  "A row with an error value like #N/A in a cell, or a value that does not fit its type, goes to the error link with the cell in the message; without one, the pipeline stops. A missing sheet or column, .xls, .xlsb and workbooks with a password stop the pipeline.",
+		Limits:  []string{"The sheet is read as a stream; its XML may unpack to at most 4 GB, the shared texts to 256 MB."},
+	},
 }
 
 type input struct {

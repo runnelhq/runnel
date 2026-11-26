@@ -25,6 +25,15 @@ var scriptDefinition = action.Definition{
 	Example:     "params:\n  orders: \"{{ results.load.output.rows }}\"\n  rate: 0.19\nscript: |\n  const sum = params.orders.reduce((s, o) => s + Number(o.amount), 0);\n  console.log(`${params.orders.length} orders`);\n  return { net: sum, gross: sum * (1 + params.rate) };\n",
 	Config:      scriptAction{},
 	New:         newScript,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "any", Description: "The value of return, e.g. a number, text, list or object; null without return"}},
+		Errors:  "Fails on a syntax error, an exception (with the line), a result that cannot be converted, a missing or too large script file, and when the timeout of the action or a cancelled run interrupts the script.",
+		Limits: []string{
+			"The result may be at most 16 MiB as JSON and nested at most 100 levels; a script file or module may be at most 4 MiB.",
+			"The console keeps at most 1,000 lines per call, each cut at 8 KiB.",
+			"No access to files, network, processes or environment variables; require loads modules from scripts/ of the project only.",
+		},
+	},
 }
 
 type scriptAction struct {

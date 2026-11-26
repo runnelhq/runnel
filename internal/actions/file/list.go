@@ -23,6 +23,17 @@ var listDefinition = action.Definition{
 	Example:     "folder: inbox\npattern: \"*.csv\"\n",
 	Config:      listAction{},
 	New:         newList,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output[].path", Type: "string", Description: "Path of the entry; the list is sorted by path"},
+			{Name: "output[].name", Type: "string", Description: "Name of the file or folder"},
+			{Name: "output[].size", Type: "integer", Description: "Size in bytes"},
+			{Name: "output[].modified", Type: "datetime", Description: "Time of the last change, to the second"},
+			{Name: "output[].folder", Type: "boolean", Description: "true for a folder"},
+		},
+		Errors: "Fails when the folder does not exist or cannot be read; an empty folder gives an empty list.",
+		Limits: []string{"All entries are held in memory as the output; for very many files use the transform file.list."},
+	},
 }
 
 type listAction struct {

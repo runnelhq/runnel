@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -24,6 +25,11 @@ var sortDefinition = transform.Definition{
 	Config:       sortRecords{},
 	New:          newSort,
 	RecordErrors: true,
+	Reference: action.Reference{
+		Records: "Passes all records on, sorted and stable, once its input has ended; empty values come last.",
+		Errors:  "A record whose value cannot be sorted together with the values before (another kind, e.g. text among numbers) goes to the error link; without one, the pipeline stops.",
+		Limits:  []string{"Holds all records in memory until its input has ended."},
+	},
 }
 
 type sortRecords struct {

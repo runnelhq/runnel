@@ -31,6 +31,14 @@ var downloadDefinition = action.Definition{
 	Example:     "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: inbox/\nifExists: replace\n",
 	Config:      downloadAction{},
 	New:         newDownload,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Local paths of the downloaded files, without skipped ones"}},
+		Errors:  "Fails when nothing matches the source, the connection fails (host key, certificate or sign-in refused, no answer within timeout), a file is larger than maxSize, a name from the server is no safe local name, and with ifExists: fail (the default) when a local file exists, checked before anything is downloaded. A failed download leaves no half file.",
+		Limits: []string{
+			"timeout limits each file (default 10m); the timeout of the action limits all together.",
+			"maxSize limits each file; empty: no limit.",
+		},
+	},
 }
 
 type downloadAction struct {

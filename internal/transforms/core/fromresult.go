@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -18,6 +19,10 @@ var fromResultDefinition = transform.Definition{
 	Description: "Passes on the records the calling workflow gave to the pipeline (rows)",
 	Config:      fromResult{},
 	New:         newFromResult,
+	Reference: action.Reference{
+		Records: "Passes on the records given to the run (rows of core.run-pipeline, the JSON list of a request to an http trigger), their fields in the order of their names; none when the pipeline is started on its own.",
+		Errors:  "Never fails while the pipeline runs.",
+	},
 }
 
 func newFromResult(with map[string]any) (transform.Transform, error) {

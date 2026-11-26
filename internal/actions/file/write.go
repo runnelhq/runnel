@@ -32,6 +32,13 @@ var writeDefinition = action.Definition{
 	Example:     "path: out/status.json\nformat: json\ncontent: \"{{ {'run': run.id, 'ok': true} }}\"\n",
 	Config:      writeFile{},
 	New:         newWriteFile,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.path", Type: "string", Description: "Path of the file, relative paths with the project folder in front"},
+			{Name: "output.size", Type: "integer", Description: "Bytes written by this action (appended ones with ifExists: append)"},
+		},
+		Errors: "Fails with ifExists: fail when the file exists, when the content cannot be written as JSON or in the encoding, and when the file cannot be written; replace writes a temporary file first, so a failure leaves the old file.",
+	},
 }
 
 type writeFile struct {

@@ -24,6 +24,21 @@ var runDefinition = action.Definition{
 	Example:     "program: robocopy\nargs: [ data/out, \"\\\\\\\\server\\\\share\\\\in\", \"*.csv\", /MIR ]\nokCodes: [ 0, 1, 2, 3 ]\ntimeout: 10m\n",
 	Config:      runAction{},
 	New:         newRun,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.exitCode", Type: "integer", Description: "Exit code of the program"},
+			{Name: "output.stdout", Type: "string", Description: "Standard output, decoded; values of env are hidden"},
+			{Name: "output.stderr", Type: "string", Description: "Error output, decoded; values of env are hidden"},
+			{Name: "output.truncated", Type: "boolean", Description: "true if stdout or stderr was longer than maxOutput"},
+			{Name: "output.duration", Type: "string", Description: "Running time, e.g. 1.25s"},
+			{Name: "output.json", Type: "any", Description: "With json, the last JSON value of stdout"},
+		},
+		Errors: "Fails when the program is not found, its exit code is not in okCodes (default 0; the message shows the last lines of stderr), it runs longer than timeout (it is ended with all processes it started), or with json stdout holds no JSON. Arguments of .bat and .cmd files with characters that cmd.exe interprets are refused.",
+		Limits: []string{
+			"timeout limits the program (default 10m).",
+			"maxOutput limits stdout and stderr each (default 1MB, at most 1GB); more is dropped.",
+		},
+	},
 }
 
 type runAction struct {

@@ -30,6 +30,14 @@ var createDefinition = action.Definition{
 	Example:     "source: out/export\ntarget: archive/export.zip\n",
 	Config:      create{},
 	New:         newCreate,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.path", Type: "string", Description: "Path of the archive"},
+			{Name: "output.files", Type: "integer", Description: "Number of entries packed: files and empty folders"},
+			{Name: "output.size", Type: "integer", Description: "Size of the archive in bytes"},
+		},
+		Errors: "Fails when nothing matches the source, the format is not known from the ending, a file cannot be read, or the archive exists with ifExists: fail. The archive is written to a temporary file first, so a failure leaves an existing archive as it was. Links and special files are left out with a warning.",
+	},
 }
 
 type create struct {

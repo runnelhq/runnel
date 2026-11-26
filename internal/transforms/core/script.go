@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -32,6 +33,16 @@ var scriptDefinition = transform.Definition{
 	Example:      "fields:\n  - { name: name, type: string }\n  - { name: amount, type: decimal }\nscript: |\n  if (!record.name) return null; // drop the record\n  return { name: record.name.trim(), amount: record.amount };\n",
 	Config:       scriptTransform{},
 	New:          newScript,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "A declared field, converted to its type; without fields the types follow the values"}},
+		Records: "Passes on what the script returns for each record: an object as one record, a list as several, null as none; end may return further records after the last one.",
+		Errors:  "A record whose script throws an exception, returns a value that cannot be converted or takes longer than maxRecordTime goes to the error link; without one, the pipeline stops. A syntax error, a missing script file and errors in init or end stop the pipeline.",
+		Limits: []string{
+			"maxRecordTime limits the time per record (default 1s); init and end have no limit of their own.",
+			"The console keeps at most 1,000 lines per copy, each cut at 8 KiB; a script file or module may be at most 4 MiB.",
+			"No access to files, network, processes or environment variables; require loads modules from scripts/ of the project only.",
+		},
+	},
 }
 
 type scriptTransform struct {

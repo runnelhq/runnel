@@ -24,6 +24,15 @@ var waitDefinition = action.Definition{
 	Example:     "connection: partner-sftp\npath: /outgoing/*.csv\ninterval: 1m\nmaxWait: 2h\nstableFor: 30s\n",
 	Config:      waitAction{},
 	New:         newWait,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the matching files on the server, sorted"}},
+		Errors:  "Fails when no file matches after maxWait, or the files still change in size after maxWait (stableFor), and when the first connection fails or a host key, certificate or sign-in is refused. A dropped connection or a look longer than timeout is retried at the next look.",
+		Limits: []string{
+			"Looks every interval (default 5s, at least 10ms); without maxWait it waits until the timeout of the action or the end of the run.",
+			"timeout limits each look (default 1m).",
+			"A path with wildcards may match at most 10,000 entries.",
+		},
+	},
 }
 
 type waitAction struct {
