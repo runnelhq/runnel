@@ -28,6 +28,7 @@ import { exprContext, locate, useReference, type ExprContext } from "../expressi
 import { useConnections } from "../reference";
 import { SecretInput } from "./SecretField";
 import { ExpressionInput } from "./ExpressionInput";
+import { ScriptInput, type ScriptContext } from "./ScriptInput";
 import { ExpressionDialog } from "./ExpressionDialog";
 import { ListField } from "./ListField";
 
@@ -182,7 +183,10 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
         p.path === `${base}.${field}` ||
         p.path?.startsWith(`${base}.${field}.`) ||
         p.path?.startsWith(`${base}.${field}[`) ||
-        (name !== undefined && p.path === `${base}.with` && p.message.includes(`field "${name}"`)),
+        (name !== undefined &&
+          p.path === `${base}.with` &&
+          // e.g. 'field "x" …' or, for code (core.script), 'script, line 2: syntax error: …'
+          (p.message.includes(`field "${name}"`) || p.message.includes(`): ${name}, line `))),
     );
     found.forEach((p) => used.add(p));
     return found;
@@ -205,8 +209,19 @@ function ActionProperties(props: PropertiesProps & { action: Action; index: numb
     sources: [...new Set((workflow.links ?? []).filter((l) => l.to === action.id && l.type !== "info" && !l.disabled).map((l) => l.from))],
     targets: (workflow.links ?? []).filter((l) => l.from === action.id && (l.type ?? "data") === "data" && !l.disabled).map((l) => l.to),
   };
+  // The code of core.script is JavaScript (S73c): script, and in pipelines also init and end.
+  const params = action.with?.params;
+  const scriptCtx = (name: string): ScriptContext | undefined =>
+    action.type === "core.script" && name !== "file"
+      ? {
+          record: pipeline && name === "script",
+          fields: listEnv.fields,
+          params: params && typeof params === "object" && !Array.isArray(params) ? Object.keys(params) : [],
+        }
+      : undefined;
   const field = ([name, s]: [string, Schema]) => (
     <SchemaField
+      script={scriptCtx(name)}
       key={name}
       name={name}
       schema={s}
@@ -638,6 +653,8 @@ export function SchemaField(props: {
   /** Sets a list (E14); without them, lists are changed in the YAML view. */
   onChangeList?: (list: KeyValue[][] | null) => void;
   onChangeTexts?: (texts: string[] | null) => void;
+  /** The field holds JavaScript (core.script, S73c): a code field with its suggestions. */
+  script?: ScriptContext;
   /** Fields of the incoming records and targets of the data links, offered in lists (E14b). */
   listEnv?: {
     fields: { name: string; type?: string }[] | null;
@@ -783,6 +800,21 @@ export function SchemaField(props: {
     s.default !== undefined ? `${String(s.default)} (default)` : example !== undefined ? `e.g. ${String(example)}` : undefined;
   let help = s.description;
   if (props.required && !help) help = "Required";
+  if (s.format === "runnel-script" && props.script && (value === undefined || value === null || typeof value === "string")) {
+    return (
+      <ScriptField
+        label={label}
+        fieldKey={key}
+        name={name}
+        required={props.required}
+        help={help}
+        problems={props.problems}
+        value={value ?? ""}
+        ctx={props.script}
+        onCommit={(v) => props.onChange(v === "" ? null : v)}
+      />
+    );
+  }
   if (!numeric) {
     // Text fields take ${…} variables and {{ … }} expressions (roadmap S35a).
     const text = value === undefined || value === null ? "" : String(value);
@@ -959,6 +991,34 @@ function ExpressionField(props: {
           )}
         </>
       )}
+    </Field>
+  );
+}
+
+/** JavaScript of core.script (S73c): problems of the code are marked at their line. */
+function ScriptField(props: {
+  label: string;
+  fieldKey: string;
+  name: string;
+  required?: boolean;
+  help?: string;
+  problems: Problem[];
+  value: string;
+  ctx: ScriptContext;
+  onCommit: (value: string) => void;
+}) {
+  const { problems, name } = props;
+  const lines = useMemo(
+    () =>
+      problems.flatMap((p) => {
+        const m = new RegExp(`\\b${name}, line (\\d+): `).exec(p.message);
+        return m ? [{ line: Number(m[1]), message: p.message }] : [];
+      }),
+    [problems, name],
+  );
+  return (
+    <Field label={props.label} fieldKey={props.fieldKey} required={props.required} help={props.help} problems={problems}>
+      {(p) => <ScriptInput labelId={p.labelId} invalid={p.invalid} value={props.value} problems={lines} ctx={props.ctx} onCommit={props.onCommit} />}
     </Field>
   );
 }

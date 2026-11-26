@@ -212,3 +212,23 @@ Typen, `fields`, `init`/`end`, Fehler-Link, Benchmark; **S73c** Editor (Hervorhe
   das Ziel, nicht deutlich darüber. Die Kosten liegen überwiegend in goja
   (Objekte anlegen, Spread, Eigenschaften lesen); Laufzeit und übersetzter Code werden je Kopie wiederverwendet. Mehr
   Durchsatz bringt `copies`.
+
+## Nachtrag 2026-11-26 (S73c): Editor
+
+- **Felder:** Code-Feld (`web/src/components/ScriptInput.tsx`) für `script` der Action und `script`, `init` und `end`
+  des Transforms; `file` bleibt ein Textfeld. `shell.powershell` (ebenfalls `runnel-script`) behält das bisherige Feld
+  ohne Hervorhebung. Die Wahl trifft der Editor über Typ `core.script` und Format `runnel-script`; das Schema bleibt
+  unverändert.
+- **Abhängigkeiten:** `@codemirror/lang-javascript` 6.2.5 (MIT) mit den neuen transitiven Paketen `@lezer/javascript`
+  1.5.7 und `@codemirror/lint` 6.9.8 (beide MIT); `@codemirror/language` 6.13.1 und `@lezer/highlight` 1.2.5 waren schon
+  transitiv vorhanden und sind jetzt direkt und exakt eingetragen, weil der Editor sie importiert.
+- **Vervollständigung:** `record` nur in `script` des Transforms (in `init` und `end` gibt es keinen Datensatz), mit
+  den Feldern des eingehenden Schemas, wenn es bekannt ist; `params` mit den Schlüsseln aus `params` des Schritts
+  (aufgelöste Werte kennt der Editor nicht); `console` mit `log`, `info`, `warn`, `error`; `require('…')` mit den
+  `.js`-Dateien unter `scripts/`. Dazu Schlüsselwörter, Snippets und lokale Namen des JavaScript-Modus.
+- **Tastatur:** Tab rückt ein (wie im YAML-Editor), damit Code ohne Umweg eingerückt werden kann. Damit Tastatur-Nutzer
+  nicht festsitzen, verlässt **Esc und dann Tab** das Feld (eingebaut in CodeMirror, ebenso Strg+M); Esc schließt
+  zuerst nur eine sichtbare Vorschlagsliste.
+- **Syntaxfehler:** Die Action prüft die Syntax von `script` jetzt schon beim Prüfen (wie der Transform seit S73b), damit
+  der Editor und `runnel validate` den Fehler vor dem Lauf zeigen. Die Meldung (`script, line 3: syntax error: …`)
+  steht am Feld, die Zeile wird markiert.
