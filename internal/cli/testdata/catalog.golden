@@ -9,6 +9,7 @@ actions / general
 actions / execution
   core.run-pipeline  Run Pipeline  Runs a pipeline with parameters; output: the counts of its transforms
   core.run-workflow  Run Workflow  Runs another workflow with parameters; output: its outputs
+  core.script        JavaScript    Runs JavaScript with params; output: the value of return
   shell.powershell   PowerShell    Runs a PowerShell script with named parameters; output: exitCode, stdout, stderr and optionally JSON
   shell.run          Run Program   Starts a program with arguments, without a shell; output: exitCode, stdout and stderr
 actions / files

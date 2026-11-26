@@ -2,6 +2,7 @@ package runs
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
@@ -24,13 +25,21 @@ func resolveSecrets(w *model.Workflow, scope *vars.Scope, reg *action.Registry) 
 	isSecret := ActionSecretField(reg)
 	var errs model.Errors
 	for i, a := range w.Actions {
-		for field, v := range a.With {
+		check := func(field string, v any, onlySecrets bool) {
 			text, ok := v.(string)
-			if !ok || !isSecret(a.Type, field) {
-				continue
+			if !ok || !isSecret(a.Type, field) || onlySecrets && !strings.Contains(text, "${secret:") {
+				return
 			}
 			if _, err := scope.ExpandSecret(text); err != nil {
 				errs = append(errs, w.ErrorAt(fmt.Sprintf("$.actions[%d].with.%s", i, field), "action %q: %s: %v", a.ID, field, err))
+			}
+		}
+		for field, v := range a.With {
+			check(field, v, false)
+			if m, ok := v.(map[string]any); ok { // e.g. env of shell.run, params of core.script
+				for name, x := range m {
+					check(field+"."+name, x, true)
+				}
 			}
 		}
 	}

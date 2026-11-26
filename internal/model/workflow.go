@@ -370,7 +370,12 @@ func (w *Workflow) validate() error {
 		if a.Parallel < 0 || a.Parallel > MaxParallel {
 			add(path+".parallel", "%s: parallel must be between 1 and %d", label, MaxParallel)
 		}
-		checkWith(path+".with", label, a.With, roots)
+		with := a.With
+		if field, ok := CodeFields[a.Type]; ok && with != nil {
+			with = maps.Clone(with)
+			delete(with, field) // code, not expressions (ADR 0028)
+		}
+		checkWith(path+".with", label, with, roots)
 		switch a.Join {
 		case "", JoinAll, JoinFirst, JoinEach:
 		default:

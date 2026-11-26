@@ -303,6 +303,37 @@
       "example": "workflow: workflows/import-region.workflow.yaml\nparams:\n  REGION: north\n"
     },
     {
+      "type": "core.script",
+      "kind": "action",
+      "category": "execution",
+      "label": "JavaScript",
+      "description": "Runs JavaScript with params; output: the value of return",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "JavaScript, the body of a function: params holds the values, return gives output; ${…} and {{ … }} in it are plain text",
+            "format": "runnel-script"
+          },
+          "file": {
+            "type": "string",
+            "description": "A .js file instead of script, relative to the project folder, e.g. scripts/total.js",
+            "format": "runnel-script"
+          },
+          "params": {
+            "type": "object",
+            "description": "Values for the script as params.NAME; may use ${…} and {{ … }}, a value of its own may be ${secret:…}",
+            "format": "runnel-params",
+            "additionalProperties": {}
+          }
+        },
+        "additionalProperties": false
+      },
+      "example": "params:\n  orders: \"{{ results.load.output.rows }}\"\n  rate: 0.19\nscript: |\n  const sum = params.orders.reduce((s, o) =\u003e s + Number(o.amount), 0);\n  console.log(`${params.orders.length} orders`);\n  return { net: sum, gross: sum * (1 + params.rate) };\n"
+    },
+    {
       "type": "core.start",
       "kind": "action",
       "category": "general",

@@ -20,9 +20,31 @@ type scalar struct {
 
 var simpleKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// scalars returns all string values of the document (not the mapping keys).
+// CodeFields are the fields of action types that hold code of a script language and are
+// passed as written (ADR 0028): ${…} and {{ … }} in them are part of the code, e.g. a
+// template literal of JavaScript, not references or expressions.
+var CodeFields = map[string]string{"core.script": "script"}
+
+// codePaths returns the paths of the fields with code in the actions of a document.
+func codePaths(body ast.Node) map[string]bool {
+	out := map[string]bool{}
+	for i, item := range seqValues(unwrap(valueOf(entries(body), "actions"))) {
+		typ, ok := unwrap(valueOf(entries(unwrap(item)), "type")).(*ast.StringNode)
+		if !ok {
+			continue
+		}
+		if field, ok := CodeFields[typ.Value]; ok {
+			out[fmt.Sprintf("$.actions[%d].with.%s", i, field)] = true
+		}
+	}
+	return out
+}
+
+// scalars returns all string values of the document (not the mapping keys), without
+// the fields with code (CodeFields).
 func (s *source) scalars() []scalar {
 	var res []scalar
+	code := codePaths(s.body)
 	var walk func(n ast.Node, path string)
 	walk = func(n ast.Node, path string) {
 		switch n := n.(type) {
@@ -35,10 +57,12 @@ func (s *source) scalars() []scalar {
 			if t := n.Key.GetToken(); t != nil {
 				key = t.Value
 			}
+			child := keyPath(path, key)
 			if simpleKey.MatchString(key) {
-				walk(n.Value, path+"."+key)
-			} else {
-				walk(n.Value, keyPath(path, key))
+				child = path + "." + key
+			}
+			if !code[child] {
+				walk(n.Value, child)
 			}
 		case *ast.SequenceNode:
 			for i, v := range n.Values {

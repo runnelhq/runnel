@@ -51,6 +51,11 @@ test("the tab bar has no scroll bar; the line between explorer and palette can b
   const pane = page.getByTestId("explorer-pane");
   const palette = page.getByRole("region", { name: "Palette" });
   const split = page.getByRole("separator", { name: "Resize explorer and palette" });
+  // Start from the smallest explorer, so that the drag has room however many files the example has.
+  const initial = (await pane.boundingBox())!;
+  await split.focus();
+  await page.keyboard.press("Home");
+  await expect(pane).toHaveJSProperty("offsetHeight", 120);
   const before = (await pane.boundingBox())!;
   const paletteBefore = (await palette.boundingBox())!;
   const handle = (await split.boundingBox())!;
@@ -69,5 +74,5 @@ test("the tab bar has no scroll bar; the line between explorer and palette can b
   await page.keyboard.press("ArrowUp");
   await expect(pane).toHaveJSProperty("offsetHeight", Math.round(after.height) - 16);
   await split.dblclick();
-  await expect.poll(async () => Math.round((await pane.boundingBox())!.height)).toBe(Math.round(before.height));
+  await expect.poll(async () => Math.round((await pane.boundingBox())!.height)).toBe(Math.round(initial.height));
 });

@@ -1,0 +1,38 @@
+# Runs JavaScript with core.script (S73a, ADR 0028): values come only as params, the
+# code returns the output, console.log writes to the run log. ${…} in the code is a
+# template literal of JavaScript, not a variable of Runnel.
+#   runnel run -v examples/hello/workflows/script.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: script
+parameters:
+  - name: RATE
+    type: number
+    default: "0.19"
+outputs:
+  - name: GROSS
+    value: "{{ results.total.output.gross }}"
+actions:
+  - id: start
+    type: core.start
+  - id: total
+    type: core.script
+    timeout: 10s
+    with:
+      params:
+        orders:
+          - { id: 1, amount: "12.50" }
+          - { id: 2, amount: "7.25" }
+        rate: "{{ params.RATE }}"
+      script: |
+        const { round2, sum } = require('./scripts/util.js');
+        const net = sum(params.orders, 'amount');
+        console.log(`${params.orders.length} orders, net ${net}`);
+        return { net: round2(net), gross: round2(net * (1 + params.rate)) };
+  - id: report
+    type: core.log
+    with:
+      message: "Gross {{ results.total.output.gross }}"
+links:
+  - { from: start, to: total }
+  - { from: total, to: report }

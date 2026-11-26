@@ -109,13 +109,16 @@ func secretField(s *schema.Schema, field string) bool {
 	if s == nil {
 		return false
 	}
-	// A value in a mapping of secrets, e.g. env.TOKEN of shell.run.
+	// A value in a mapping of secrets, e.g. env.TOKEN of shell.run, or in the params of
+	// a script (ADR 0028), e.g. params.TOKEN of core.script, but not nested deeper.
+	rest := ""
 	if i := strings.IndexAny(field, ".["); i >= 0 {
-		field = field[:i]
+		field, rest = field[:i], field[i:]
 	}
 	for _, p := range s.Properties {
 		if p.Name == field {
-			return p.Schema.Format == schema.FormatSecret
+			return p.Schema.Format == schema.FormatSecret ||
+				p.Schema.Format == schema.FormatParams && rest != "" && strings.Count(rest, ".")+strings.Count(rest, "[") == 1
 		}
 	}
 	return false
