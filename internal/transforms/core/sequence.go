@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -33,16 +32,24 @@ var sequenceDefinition = transform.Definition{
 
 type sequence struct {
 	Name string `json:"name" doc:"Name of the field for the number; an existing field of the same name gets the number" schema:"required,example=position"`
-	// Start and Step are text, so that they can be variables (${START}); they are checked
-	// when the pipeline runs.
+	// Start and Step are text, so that they can be variables (${START}; number fields, R5b2).
 	Start   string   `json:"start" doc:"Number of the first record, e.g. 1 or ${START}" schema:"default=1"`
 	Step    string   `json:"step" doc:"Difference between two numbers, e.g. 10 for 10, 20, 30; may be negative" schema:"default=1"`
 	GroupBy []string `json:"groupBy" doc:"Fields whose values form a group that counts on its own from start; empty: one count for all records" schema:"format=runnel-field"`
+
+	start, step int64
 }
 
 func newSequence(with map[string]any) (transform.Transform, error) {
 	t := &sequence{}
 	if err := transform.DecodeConfig(with, t); err != nil {
+		return nil, err
+	}
+	var err error
+	if t.start, err = wholeNumber("start", t.Start, 1); err != nil {
+		return nil, err
+	}
+	if t.step, err = wholeNumber("step", t.Step, 1); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(t.Name) == "" {
@@ -64,28 +71,18 @@ func (t *sequence) Init(ic *transform.InitContext) (record.Schema, error) {
 	return ic.In.With(t.Name, record.Int), nil
 }
 
-// wholeNumber reads start or step: a whole number, possibly from a variable.
+// wholeNumber reads start or step: a whole number, possibly from a variable; empty if it
+// is not set (or not resolved yet).
 func wholeNumber(field, s string, empty int64) (int64, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return empty, nil
-	}
-	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("%s: %q is not a whole number", field, s)
+	n, ok, err := transform.ParseWholeNumber(field, s)
+	if err != nil || !ok {
+		return empty, err
 	}
 	return n, nil
 }
 
 func (t *sequence) Process(ctx context.Context, in <-chan transform.Batch, out *transform.Output) error {
-	start, err := wholeNumber("start", t.Start, 1)
-	if err != nil {
-		return err
-	}
-	step, err := wholeNumber("step", t.Step, 1)
-	if err != nil {
-		return err
-	}
+	start, step := t.start, t.step
 	next := start
 	groups := map[string]int64{}
 	var key strings.Builder

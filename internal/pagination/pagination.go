@@ -29,6 +29,9 @@ const (
 	DefaultMaxItems = 10000
 )
 
+// ErrNeedsSize is the error of Check for sizeParam without size.
+var ErrNeedsSize = errors.New("paginate: sizeParam needs size")
+
 // Config describes the paging of an API; it is the option paginate of http.request.
 type Config struct {
 	Style     string `json:"style" doc:"How the next page is found: link (header Link rel=next), url (address in the body), cursor (value in the body as query parameter), page (page number) or offset (items read so far)" schema:"required,enum=link|url|cursor|page|offset"`
@@ -57,7 +60,7 @@ func (c *Config) Check() error {
 		return errors.New("paginate: size, maxPages and maxItems must not be negative")
 	}
 	if c.SizeParam != "" && c.Size == 0 {
-		return errors.New("paginate: sizeParam needs size")
+		return ErrNeedsSize
 	}
 	return nil
 }

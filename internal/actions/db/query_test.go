@@ -83,7 +83,8 @@ func TestQueryErrors(t *testing.T) {
 		want string
 	}{
 		{map[string]any{"sql": "SELECT * FROM orders", "maxRows": "2"}, "the query returns more than 2 rows (maxRows); read larger results in a pipeline with db.table-input"},
-		{map[string]any{"sql": "SELECT * FROM orders", "maxRows": "none"}, `maxRows "none" is not a whole number of at least 1`},
+		{map[string]any{"sql": "SELECT * FROM orders", "maxRows": "none"}, `field "maxRows": expected a whole number, got "none"`},
+		{map[string]any{"sql": "SELECT * FROM orders", "maxRows": "0"}, `maxRows "0" is not a whole number of at least 1`},
 		{map[string]any{"sql": "SELECT id, id FROM orders"}, `the query returns the column "id" twice`},
 		{map[string]any{"sql": "SELECT * FROM missing"}, "connection test: SQL logic error: no such table: missing"},
 		{map[string]any{"sql": "SELECT * FROM orders WHERE id = @id"}, "parameter @id has no value under params"},

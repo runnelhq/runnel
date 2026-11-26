@@ -43,8 +43,10 @@ type streamLookup struct {
 	Return   []streamLookupReturn `json:"return" doc:"Fields of the matching lookup record added to the record" schema:"required"`
 	NotFound string               `json:"notFound" doc:"Records without a matching lookup record: keep them with the defaults, drop them, or treat them as errors (error link)" schema:"enum=keep|drop|error,default=keep"`
 	Multiple string               `json:"multiple" doc:"Several matching lookup records: take the first in the order they arrived, or treat the record as an error" schema:"enum=first|error,default=first"`
-	// MaxRecords is text, so that it can be a variable, like in core.to-result (R5a).
+	// MaxRecords is text, so that it can be a variable, like in core.to-result (R5a, R5b2).
 	MaxRecords string `json:"maxRecords" doc:"Most records of the lookup data held in memory; more stop the pipeline (for larger tables use db.lookup)" schema:"default=100000"`
+
+	maxRecords int64
 }
 
 type streamLookupKey struct {
@@ -101,11 +103,9 @@ func newStreamLookup(with map[string]any) (transform.Transform, error) {
 	default:
 		return nil, fmt.Errorf("invalid multiple %q (expected first or error)", t.Multiple)
 	}
-	if !strings.Contains(t.MaxRecords, "${") {
-		// A variable is checked once it is resolved, before the pipeline runs.
-		if _, err := maxRecords(t.MaxRecords, defaultMaxLookupRecords); err != nil {
-			return nil, err
-		}
+	var err error
+	if t.maxRecords, err = transform.ParseMaxRecords(t.MaxRecords, defaultMaxLookupRecords); err != nil {
+		return nil, err
 	}
 	return t, nil
 }
@@ -204,10 +204,7 @@ func (t *streamLookup) Process(ctx context.Context, in <-chan transform.Batch, o
 // load reads the lookup data into a table by key.
 func (t *streamLookup) load(ctx context.Context, info <-chan transform.Batch, from string, out *transform.Output) (map[string]*lookupEntry, int, error) {
 	out.Logf(slog.LevelDebug, "waiting for the lookup data from %s (info link)", from)
-	most, err := maxRecords(t.MaxRecords, defaultMaxLookupRecords)
-	if err != nil {
-		return nil, 0, err
-	}
+	most := t.maxRecords
 	table := map[string]*lookupEntry{}
 	n := 0
 	for b := range info {

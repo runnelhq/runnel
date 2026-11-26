@@ -71,9 +71,16 @@ func TestRespond(t *testing.T) {
 	if out := res.Output.(map[string]any); err != nil || out["sent"] != false || out["status"] != 200 || len(logs) != 1 || logs[0].Level != slog.LevelDebug {
 		t.Errorf("without caller: %v %v %v", out, logs, err)
 	}
-	for _, status := range []string{"abc", "99", "600", "103"} {
-		a = actiontest.New(t, responseDefinition, map[string]any{"status": status})
-		if _, _, err := actiontest.Execute(context.Background(), a); err == nil || !strings.Contains(err.Error(), "invalid status") {
+	// The status is checked with the configuration (number fields, R5b2); a variable or
+	// an expression once it is resolved.
+	for status, want := range map[string]string{"abc": `field "status": expected a whole number, got "abc"`,
+		"99": "invalid status", "600": "invalid status", "103": "invalid status"} {
+		if _, err := responseDefinition.New(map[string]any{"status": status}); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("status %s: %v", status, err)
+		}
+	}
+	for _, status := range []string{"${STATUS}", "{{ 404 }}"} {
+		if _, err := responseDefinition.New(map[string]any{"status": status}); err != nil {
 			t.Errorf("status %s: %v", status, err)
 		}
 	}

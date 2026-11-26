@@ -24,10 +24,12 @@ internal/transforms/<namensraum>/
   (KONZEPT Kap. 12.2).
 - **Namen der Parameter** nach [ADR 0025](../adr/0025-einheitliche-parameter.md), wie bei Actions; in Pipelines
   `maxRecords`, bei Dateien `fields[].from` (Lesen) und `fields[].as` (Schreiben), `fields[].format` als Runnel-Muster.
-- **Konfiguration** wie bei Actions mit `transform.DecodeConfig` und Tags (`doc`, `schema`). Felder, die `${…}` enthalten
-  dürfen, als `string` anlegen – auch Zahlen (z. B. `rows`); die Engine schreibt eine Zahl in so einem Feld als Text.
-  Der Wert wird in `Process` geprüft, nicht in `New`: `runnel validate` ruft `New` mit den Variablen, wie sie in der Datei
-  stehen.
+- **Konfiguration** wie bei Actions mit `transform.DecodeConfig` und Tags (`doc`, `schema`). Zahlenfelder als `int`
+  anlegen: `DecodeConfig` nimmt eine Zahl, eine Zahl als Text und `${…}` an (nicht `{{ … }}`), andere Texte sind ein
+  Fehler mit dem Namen des Felds ([ADR 0014, Nachtrag R5b2](../adr/0014-action-descriptor-schema.md)). Übrige Felder,
+  die `${…}` enthalten dürfen, als `string` anlegen; die Engine schreibt eine Zahl in so einem Feld als Text, eine Zahl
+  darin liest `transform.ParseWholeNumber` nach derselben Regel. `runnel validate` ruft `New` mit den Variablen, wie sie
+  in der Datei stehen, der Lauf mit den aufgelösten: Werte mit `${…}` erst dann prüfen.
 - **Für den Editor (E14):** Namen vorhandener Felder der eingehenden Datensätze mit `schema:"format=runnel-field"` (auch an
   Listen von Texten wie `groupBy`), Ziele von Daten-Links mit `format=runnel-target`, Felder der Nachschlagedaten auf dem Info-Link mit
   `format=runnel-info-field` (S23b2), Quellen eingehender Links mit `format=runnel-source` (S23c), Eigenschaften, die nur für einige

@@ -213,10 +213,11 @@ func TestRunPipelineExample(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
 	}
-	// A value that is not a whole number is reported when the transform runs.
-	code, out, _ = run(t, "run", "--param", "ROWS=-5", "examples/pipelines/pipelines/numbers.pipeline.yaml")
-	if code != 1 || !strings.Contains(out, `[numbers] failed after`) || !strings.Contains(out, `count: "-5" is not a whole number of 0 or more`) {
-		t.Errorf("exit code %d:\n%s", code, out)
+	// A variable that is not a valid number stops the run before it starts, with the
+	// position of the transform (number fields, R5b2).
+	code, out, errOut = run(t, "run", "--param", "ROWS=-5", "examples/pipelines/pipelines/numbers.pipeline.yaml")
+	if code != 2 || !strings.Contains(errOut, `numbers.pipeline.yaml:19:7: error: transform "numbers" (core.generate-rows): count: "-5" is not a whole number of 0 or more`) {
+		t.Errorf("exit code %d:\n%s%s", code, out, errOut)
 	}
 }
 

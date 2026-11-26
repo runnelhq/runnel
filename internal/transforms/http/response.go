@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -49,6 +47,9 @@ type response struct {
 	Single     bool              `json:"single" doc:"Answer with the first record as an object instead of a list" schema:"default=false"`
 	WhenEmpty  bool              `json:"whenEmpty" doc:"Fallback: answer also without records, but only if no other http.response answers (e.g. 404)" schema:"default=false"`
 	MaxRecords string            `json:"maxRecords" doc:"Most records in the answer; more stop the pipeline, as they are held in memory" schema:"default=10000"`
+
+	status     int
+	maxRecords int64
 }
 
 func newResponse(with map[string]any) (transform.Transform, error) {
@@ -56,22 +57,19 @@ func newResponse(with map[string]any) (transform.Transform, error) {
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
+	// Number fields as text (R5b2): checked here, before the pipeline runs.
+	var err error
+	if t.status, err = action.ParseStatus(t.Status, false); err != nil {
+		return nil, err
+	}
+	if t.maxRecords, err = transform.ParseMaxRecords(t.MaxRecords, DefaultMaxRows); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 
 func (t *response) Process(ctx context.Context, in <-chan transform.Batch, out *transform.Output) error {
-	status, err := action.ParseStatus(t.Status)
-	if err != nil {
-		return err
-	}
-	limit := int64(DefaultMaxRows)
-	if s := strings.TrimSpace(t.MaxRecords); s != "" {
-		n, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || n < 1 {
-			return fmt.Errorf("maxRecords: %q is not a whole number of 1 or more", t.MaxRecords)
-		}
-		limit = n
-	}
+	status, limit := t.status, t.maxRecords
 	caller := out.HasCaller()
 	var records []record.Record
 	var n int64

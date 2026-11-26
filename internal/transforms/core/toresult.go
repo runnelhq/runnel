@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
-	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
@@ -34,8 +32,10 @@ var toResultDefinition = transform.Definition{
 const DefaultMaxResultRows = 100_000
 
 type toResult struct {
-	// MaxRecords is text, so that it can be a variable; checked when the pipeline runs.
+	// MaxRecords is text, so that it can be a variable (number fields, R5b2).
 	MaxRecords string `json:"maxRecords" doc:"Most records to return; more stop the pipeline, as they are held in memory" schema:"default=100000"`
+
+	limit int64
 }
 
 func newToResult(with map[string]any) (transform.Transform, error) {
@@ -43,28 +43,15 @@ func newToResult(with map[string]any) (transform.Transform, error) {
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
+	var err error
+	if t.limit, err = transform.ParseMaxRecords(t.MaxRecords, DefaultMaxResultRows); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 
-// maxRecords reads a setting maxRecords: text, so that it can be a variable ${…} (ADR
-// 0025), with a whole number of 1 or more; def if it is empty.
-func maxRecords(text string, def int64) (int64, error) {
-	s := strings.TrimSpace(text)
-	if s == "" {
-		return def, nil
-	}
-	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || n < 1 {
-		return 0, fmt.Errorf("maxRecords: %q is not a whole number of 1 or more", text)
-	}
-	return n, nil
-}
-
 func (t *toResult) Process(_ context.Context, in <-chan transform.Batch, out *transform.Output) error {
-	limit, err := maxRecords(t.MaxRecords, DefaultMaxResultRows)
-	if err != nil {
-		return err
-	}
+	limit := t.limit
 	var n int64
 	for b := range in {
 		for _, r := range b {

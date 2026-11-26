@@ -41,6 +41,11 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 - Relative Pfade beziehen sich auf den Projektordner (ADR 0020); dynamische Ziele mit `allowedTargets`.
 - **Zeitlimit für `core.script`:** `timeout` in der Action (Standard 1 min) und im Transform für `init` und `end`
   (Standard 1 min je Teil; ADR 0028, Nachtrag R5b).
+- **Zahlenfelder mit Variablen:** Alle Zahlenfelder der Bausteine nehmen eine Zahl oder `${…}` an, in Actions auch
+  `{{ … }}` – z. B. `commitSize`, `cache`, `every`, `maxFiles`, `paginate.maxPages`, `retryAfter.maxRetries`
+  (ADR 0014, Nachtrag R5b2). Ein Text, der keine Zahl ist, meldet `field "commitSize": expected a whole number, got
+  "abc"`: als Zahl in der Datei schon `runnel validate` (auch bei `count`, `start`/`step`, `status`, `maxRows` und
+  `maxRecords`, bisher erst im Lauf), aus einer Variablen der Start des Laufs (Pipeline: Exit-Code 2 statt 1).
 - **Ausgaben:** `shell.run`/`shell.powershell` liefern `output.durationMs` (Laufzeit als Zahl in Millisekunden),
   `archive.create` `output.count` (beide ersetzen bisherige Felder, siehe „Bruch“).
 
