@@ -444,6 +444,18 @@ const actionIcons: Record<string, ReactNode> = {
   "transfer.upload": <path d="M4 3h16v7H4zM7.5 6.5h.01M12 21v-8M8.5 16.5L12 13l3.5 3.5" />,
   "transfer.download": <path d="M4 3h16v7H4zM7.5 6.5h.01M12 13v8M8.5 17.5L12 21l3.5-3.5" />,
   "transfer.list": <path d="M4 3h16v7H4zM7.5 6.5h.01M6 14h12M6 17.5h12M6 21h8" />,
+  // S57b: the server with the sign of the file action of the same name below it.
+  "transfer.delete": <path d="M4 3h16v7H4zM7.5 6.5h.01M9 14l6 6M15 14l-6 6" />,
+  "transfer.exists": <path d="M4 3h16v7H4zM7.5 6.5h.01M8 17l3 3 5-6" />,
+  "transfer.mkdir": <path d="M4 3h16v7H4zM7.5 6.5h.01M12 13v8M8 17h8" />,
+  "transfer.move": <path d="M4 3h16v7H4zM7.5 6.5h.01M6 17h11M14 14l3 3-3 3" />,
+  "transfer.wait": (
+    <>
+      <path d="M4 3h16v7H4zM7.5 6.5h.01" />
+      <circle cx="12" cy="17" r="4" />
+      <path d="M12 15v2l1.5 1" />
+    </>
+  ),
   "mail.send": (
     <>
       <rect x="3" y="5" width="14" height="11" rx="1.5" />

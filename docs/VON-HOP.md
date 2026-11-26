@@ -101,6 +101,7 @@ Noch ohne Entsprechung, teils im [Backlog](ROADMAP.md#backlog):
 | File exists, Wait for file | `file.exists`, `file.wait` |
 | Copy files, Move files, Delete files, Create a folder | `file.copy`, `file.move`, `file.delete`, `file.mkdir` |
 | Zip file, Unzip file | `archive.create`, `archive.extract` |
+| Get a file with SFTP, Put a file with SFTP, FTP delete | `transfer.download`, `transfer.upload`, `transfer.delete`; dazu `transfer.list`, `transfer.move`, `transfer.mkdir`, `transfer.exists`, `transfer.wait` wie die `file.*`-Actions (Server, Anmeldung und Hostschlüssel in einer `sftp`-Connection; FTPS/FTP mit S57c) |
 
 ## Bewusst anders
 

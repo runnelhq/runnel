@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -35,6 +36,7 @@ type session struct {
 	sftp        *sftp.Client
 	posixRename bool
 	stop        func() bool
+	dead        atomic.Bool
 }
 
 // open resolves the connection of an action and connects to its server.
@@ -136,7 +138,7 @@ func dial(ctx context.Context, cfg connections.SFTP) (*session, error) {
 		return nil, ke
 	}
 	if strings.Contains(err.Error(), "unable to authenticate") {
-		return nil, fmt.Errorf("sign-in to %s as %s failed: wrong user, password or key", s.addr, cfg.User)
+		return nil, &signInError{fmt.Sprintf("sign-in to %s as %s failed: wrong user, password or key", s.addr, cfg.User)}
 	}
 	return nil, fmt.Errorf("cannot connect to %s: %w", s.addr, plainSSH(err))
 }
@@ -157,6 +159,7 @@ func (s *session) handshake(conn net.Conn, config *ssh.ClientConfig) error {
 
 // closeConn ends the connection; calls on the server fail from then on.
 func (s *session) closeConn() {
+	s.dead.Store(true)
 	if s.sftp != nil {
 		_ = s.sftp.Close()
 	}
@@ -164,6 +167,9 @@ func (s *session) closeConn() {
 		_ = s.ssh.Close()
 	}
 }
+
+// closed reports whether the connection was closed (timeout of a call, cancelled run).
+func (s *session) closed() bool { return s.dead.Load() }
 
 // close ends the session at the end of an execution.
 func (s *session) close() {
@@ -223,6 +229,19 @@ func checkHostKey(addr string, key ssh.PublicKey, want []string) error {
 type hostKeyError struct{ msg string }
 
 func (e *hostKeyError) Error() string { return e.msg }
+
+// signInError is a refused sign-in.
+type signInError struct{ msg string }
+
+func (e *signInError) Error() string { return e.msg }
+
+// refused reports whether the server refused Runnel (host key, sign-in): trying again
+// does not help and may lock the account.
+func refused(err error) bool {
+	_, hostKey := errors.AsType[*hostKeyError](err)
+	_, signIn := errors.AsType[*signInError](err)
+	return hostKey || signIn
+}
 
 // signIn returns the methods of the sign-in: the key, then the password. The messages
 // never contain the values.
