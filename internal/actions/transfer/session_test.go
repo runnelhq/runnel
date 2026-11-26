@@ -197,7 +197,7 @@ func TestLocalName(t *testing.T) {
 		}
 	}
 	if runtime.GOOS == "windows" {
-		for _, name := range []string{"C:x", "NUL", "con.txt"} {
+		for _, name := range []string{"C:x", "NUL", "con.txt", "com1.csv", "aux. ", "CONIN$"} {
 			if localName(name) {
 				t.Errorf("localName(%q) = true", name)
 			}

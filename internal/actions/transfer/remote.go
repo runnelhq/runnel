@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -70,7 +71,21 @@ func localWildcard(p string) bool {
 // localName reports whether a name from the server is safe as the name of a local file:
 // one element, not "." or "..", no separator, drive or reserved name (Windows).
 func localName(name string) bool {
-	return name != "" && name != "." && !strings.ContainsAny(name, `/\`) && filepath.IsLocal(name)
+	return name != "" && name != "." && !strings.ContainsAny(name, `/\`) && filepath.IsLocal(name) &&
+		(runtime.GOOS != "windows" || !deviceName(name))
+}
+
+// deviceName reports Windows device names such as CON, NUL or COM1, also with an extension:
+// filepath.IsLocal accepts "con.txt", but Windows still opens the device for it.
+func deviceName(name string) bool {
+	base, _, _ := strings.Cut(strings.ToUpper(strings.TrimRight(name, ". ")), ".")
+	base = strings.TrimRight(base, " ")
+	switch base {
+	case "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$":
+		return true
+	}
+	return len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) &&
+		base[3] >= '0' && base[3] <= '9'
 }
 
 // plain returns the reason of an error of the server without the prefix of the library.
