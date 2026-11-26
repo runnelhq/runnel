@@ -592,3 +592,45 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
 - **Sicherheit:** Namen aus einer Ordnerliste des Servers, die `""`, `.`, `..` sind oder `/` enthalten, sind für alle
   `transfer.*`-Actions ein Fehler (sonst könnte etwa ein rekursives Löschen den übergeordneten Ordner treffen); beim
   Löschen und Verschieben zusätzlich Namen mit `\`, weil Windows-Server ihn als Trennzeichen lesen.
+
+## Nachtrag 2026-11-26 (S57c): `ftps` und `ftp`
+
+- **Bibliothek:** `github.com/jlaffaye/ftp` v0.2.4 (ISC, veröffentlicht am 22.08.2026; Releases 2022 und 2023,
+  seit Juni 2026 wieder gepflegt mit v0.2.1 bis v0.2.4). Sie kann explizites (`AUTH TLS`) und implizites TLS, `EPSV` mit Rückfall auf `PASV` (die Adresse
+  aus der Antwort auf `PASV` wird nicht verwendet, sondern die des Servers – Schutz vor Umleitung), `MLST`/`MLSD` mit
+  Rückfall auf `LIST` (Formate von Unix- und Windows-Servern), `MFMT`, `PBSZ`/`PROT P` und lehnt Befehle mit
+  Zeilenumbruch ab. Keine weiteren Abhängigkeiten. Für die Tests ein FTP-Server im Testprozess:
+  `github.com/fclairamb/ftpserverlib` v0.32.7 (MIT, 01.11.2026; v0.33.x war jünger als zwei Wochen) mit
+  `github.com/spf13/afero` v1.15.0 (Apache-2.0); beide nur in Tests, nicht in der exe und nicht in den
+  Third-Party-Hinweisen.
+- **Felder `ftps`:** `host`, `port` (leer: 21 bei `tls: explicit`, 990 bei `tls: implicit`), `tls` (Standard
+  `explicit`), `serverName` (Name im Zertifikat, wenn `host` eine Adresse ist), `fingerprint`, `user`, `password`
+  (Secret), `timeout` (Standard 15 s für Verbinden und Anmelden).
+- **Zertifikat:** TLS ab 1.2. Ohne `fingerprint` muss das Zertifikat für `serverName` bzw. `host` gültig und vom
+  System vertraut sein (unter Windows der Zertifikatsspeicher). Mit `fingerprint` – ein oder mehrere
+  SHA256-Fingerprints des Zertifikats als 64 Hex-Ziffern, mit oder ohne Doppelpunkte, wie FileZilla Server oder
+  `openssl x509 -fingerprint -sha256` sie zeigen – gilt nur ein Zertifikat mit diesem Fingerprint, auch ein
+  selbst signiertes; Name und Ablauf werden dann nicht geprüft. Die Meldung nennt den Fingerprint des Servers zum
+  Prüfen, wie bei `hostKey`. Übersprungen wird die Prüfung nie. Technisch prüft Runnel selbst in
+  `VerifyConnection` (deshalb `InsecureSkipVerify` in der TLS-Konfiguration), damit die Meldung den Fingerprint
+  nennen kann; Datenverbindungen werden genauso geprüft und nehmen die TLS-Sitzung der Steuerverbindung wieder auf.
+  Server, die das Wiederaufnehmen mit Session-ID verlangen (TLS 1.2 ohne Tickets, z. B. vsftpd mit
+  `require_ssl_reuse`), kann Go nicht bedienen (Testplan W69).
+- **`ftp`:** dieselben Felder ohne TLS und mit `insecure`. Ohne `insecure: true` baut Runnel keine Verbindung auf
+  („ftp sends the password and all data unencrypted …“); `validate` warnt in beiden Fällen (ohne `insecure`, dass
+  kein Lauf sich verbindet; mit, dass Passwort und Daten unverschlüsselt sind).
+- **Gleiche Bedeutung wie `sftp`:** Die Actions sprechen über eine kleine Schnittstelle (`remoteFS`) mit dem Server;
+  SFTP und FTP sind je eine Datei. Temporäre Datei und Umbenennen mit `RNFR`/`RNTO`; weil Server sich beim
+  vorhandenen Ziel unterschiedlich verhalten, löscht Runnel es vorher (wie der Rückfall in S57a). Grenzen,
+  `timeout`, `maxSize`, `ifExists`, unsichere Namen und `transfer.wait` wie bei `sftp`: Ein Fehler beim Anmelden
+  (Antwort 530/430) oder ein abgelehntes Zertifikat beendet das Warten sofort; eine abgebrochene Verbindung (auch
+  Antwort 421) wird beim nächsten Blick neu aufgebaut. Ein `timeout` schließt die Steuerverbindung und alle
+  Datenverbindungen.
+- **Abweichungen durch FTP:** Nur passiver Modus. `MLST` für einzelne Einträge, wo vorhanden, sonst die Liste des
+  übergeordneten Ordners. Die Einträge `.` und `..` einer Liste sind bei FTP üblich und werden übersprungen statt
+  abgelehnt; andere unsichere Namen bleiben ein Fehler. Die Änderungszeit bleibt beim Hochladen nur mit `MFMT`
+  erhalten, sonst wird sie still nicht gesetzt; mit `LIST` sind Zeiten oft nur auf die Minute oder den Tag genau.
+  Verknüpfungen zeigt FTP meist nicht (der Server löst sie auf); wo `LIST` sie zeigt, ist ihr Ziel unbekannt –
+  `transfer.download` lehnt sie ab, `delete` und `move` behandeln sie als Eintrag für sich (TESTPLAN K16).
+- **Verbindung testen:** wie bei `sftp`, „signed in to … as …; folder … has … entries“; geschrieben wird nichts.
+- **Größe:** S57c blieb nach Absprache mit dem Maintainer ein Schritt (Schnittstelle, beide Typen, Editor).

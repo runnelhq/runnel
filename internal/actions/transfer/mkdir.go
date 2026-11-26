@@ -17,14 +17,14 @@ var mkdirDefinition = action.Definition{
 	Type:        "transfer.mkdir",
 	Category:    action.CategoryNetwork,
 	Label:       "Create Folder on Server",
-	Description: "Creates a folder with its parent folders on a server (SFTP); output: the path",
+	Description: "Creates a folder with its parent folders on a server (SFTP, FTPS or FTP); output: the path",
 	Example:     "connection: partner-sftp\npath: \"/outgoing/archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n",
 	Config:      mkdirAction{},
 	New:         newMkdir,
 }
 
 type mkdirAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Path       string `json:"path" doc:"Folder to create on the server, e.g. /outgoing/archive (relative: to the folder after the sign-in)" schema:"required,example=/outgoing/archive"`
 	Timeout    string `json:"timeout" doc:"Longest time to create the folder, e.g. 1m; the timeout of the action limits all together" schema:"format=runnel-duration,default=10m"`
 }
@@ -65,7 +65,7 @@ func (a *mkdirAction) Execute(ctx context.Context, ec *action.ExecContext) (acti
 		case info != nil:
 			return nil
 		}
-		if err := s.sftp.MkdirAll(folder); err != nil {
+		if err := s.fs.MkdirAll(folder); err != nil {
 			return fmt.Errorf("cannot create folder %q on the server: %w", a.Path, plain(err))
 		}
 		created = true

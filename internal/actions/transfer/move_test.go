@@ -10,7 +10,10 @@ import (
 )
 
 func TestMove(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testMove)
+}
+
+func testMove(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "out/a.csv", "a")
 	writeFile(t, srv.root, "out/b.csv", "b")
 	writeFile(t, srv.root, "out/notes.txt", "n")
@@ -41,7 +44,10 @@ func TestMove(t *testing.T) {
 }
 
 func TestMoveIfExists(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testMoveIfExists)
+}
+
+func testMoveIfExists(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "in/a.csv", "new a")
 	writeFile(t, srv.root, "in/b.csv", "new b")
 	writeFile(t, srv.root, "done/b.csv", "old b")
@@ -69,14 +75,19 @@ func TestMoveIfExists(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.close()
-	s.posixRename = false
+	if f, ok := s.fs.(*sftpFS); ok {
+		f.posixRename = false // FTP has no other way
+	}
 	if err := s.move(movePair{from: "c.csv", to: "done/c.csv"}, "replace"); err != nil || read(t, srv.root, "done/c.csv") != "new c" {
 		t.Errorf("without posix-rename: %v", err)
 	}
 }
 
 func TestMoveErrors(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testMoveErrors)
+}
+
+func testMoveErrors(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "dir/a.csv", "a")
 	writeFile(t, srv.root, "file.csv", "f")
 	writeFile(t, srv.root, "other/dir/x.csv", "x")

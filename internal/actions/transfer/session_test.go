@@ -14,8 +14,16 @@ import (
 	"github.com/runnelhq/runnel/internal/connections"
 )
 
+// resolved returns the connection "sftp" of the given fields, of type sftp unless "type"
+// says otherwise.
 func resolved(with map[string]any) connection.Resolved {
-	return connection.Resolved{Name: "sftp", Type: connections.TypeSFTP, With: with}
+	typ, _ := with["type"].(string)
+	if typ == "" {
+		typ = connections.TypeSFTP
+	}
+	with = maps.Clone(with)
+	delete(with, "type")
+	return connection.Resolved{Name: "sftp", Type: typ, With: with}
 }
 
 // Check signs in and lists the folder without writing (Test connection, ADR 0022).
@@ -126,7 +134,7 @@ func TestSignIn(t *testing.T) {
 		}
 	}
 	// The wrong type of connection.
-	if _, err := connect(context.Background(), connection.Resolved{Name: "mail", Type: connections.TypeSMTP, With: map[string]any{"host": "x"}}); err == nil || err.Error() != "connection mail has type smtp, not sftp" {
+	if _, err := connect(context.Background(), connection.Resolved{Name: "mail", Type: connections.TypeSMTP, With: map[string]any{"host": "x"}}); err == nil || err.Error() != "connection mail has type smtp, not sftp, ftps or ftp" {
 		t.Errorf("%v", err)
 	}
 }

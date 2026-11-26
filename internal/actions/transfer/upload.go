@@ -26,14 +26,14 @@ var uploadDefinition = action.Definition{
 	Type:        "transfer.upload",
 	Category:    action.CategoryNetwork,
 	Label:       "Upload Files",
-	Description: "Uploads files or folders to a server (SFTP); output: the uploaded files",
+	Description: "Uploads files or folders to a server (SFTP, FTPS or FTP); output: the uploaded files",
 	Example:     "connection: partner-sftp\nsource: outbox/*.csv\ntarget: /incoming/\n",
 	Config:      uploadAction{},
 	New:         newUpload,
 }
 
 type uploadAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Source     string `json:"source" doc:"Local file or folder, relative to the project folder or absolute; wildcards are allowed in the name, e.g. *.csv" schema:"required,example=outbox/*.csv"`
 	Target     string `json:"target" doc:"Folder on the server, e.g. /incoming/ (relative: to the folder after the sign-in); for a single file also a new file name" schema:"required,example=/incoming/"`
 	IfExists   string `json:"ifExists" doc:"If a file exists on the server: replace it, skip it (it stays and is not in the output), or fail before anything is uploaded" schema:"enum=replace|skip|fail,default=fail"`
@@ -160,7 +160,7 @@ func (a *uploadAction) upload(ctx context.Context, s *session, timeout time.Dura
 		remote := path.Join(dst, filepath.ToSlash(rel))
 		if d.IsDir() {
 			return s.within(ctx, timeout, "creating "+remote, func() error {
-				if err := s.sftp.MkdirAll(remote); err != nil {
+				if err := s.fs.MkdirAll(remote); err != nil {
 					return fmt.Errorf("cannot create folder %q on the server: %w", remote, plain(err))
 				}
 				return nil

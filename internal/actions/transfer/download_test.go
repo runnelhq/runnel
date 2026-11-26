@@ -16,7 +16,10 @@ import (
 )
 
 func TestDownload(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testDownload)
+}
+
+func testDownload(t *testing.T, srv *testServer) {
 	project := t.TempDir()
 	ctx := paths.WithBase(context.Background(), project)
 	writeFile(t, srv.root, "outgoing/a.csv", "a")
@@ -37,7 +40,7 @@ func TestDownload(t *testing.T) {
 	if read(t, inbox, "a.csv") != "a" || read(t, inbox, "b.csv") != "bb" {
 		t.Error("wrong files")
 	}
-	if info, err := os.Stat(filepath.Join(inbox, "a.csv")); err != nil || !info.ModTime().Equal(old) {
+	if info, err := os.Stat(filepath.Join(inbox, "a.csv")); srv.times && (err != nil || !info.ModTime().Equal(old)) {
 		t.Errorf("modification time not kept: %v", err)
 	}
 	if logs[len(logs)-1] != "downloaded 2 files from 127.0.0.1:"+srv.port+" to inbox/" {
@@ -75,7 +78,10 @@ func TestDownload(t *testing.T) {
 }
 
 func TestDownloadFolder(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testDownloadFolder)
+}
+
+func testDownloadFolder(t *testing.T, srv *testServer) {
 	project := t.TempDir()
 	ctx := paths.WithBase(context.Background(), project)
 	writeFile(t, srv.root, "export/x.csv", "x")
@@ -91,7 +97,10 @@ func TestDownloadFolder(t *testing.T) {
 }
 
 func TestDownloadErrors(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testDownloadErrors)
+}
+
+func testDownloadErrors(t *testing.T, srv *testServer) {
 	project := t.TempDir()
 	ctx := paths.WithBase(context.Background(), project)
 	writeFile(t, srv.root, "big.bin", strings.Repeat("x", 2048))
@@ -118,7 +127,10 @@ func TestDownloadErrors(t *testing.T) {
 
 // A download that fails halfway leaves neither the target nor a temporary file.
 func TestDownloadNoHalfFile(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testDownloadNoHalfFile)
+}
+
+func testDownloadNoHalfFile(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "small.bin", "x")
 	writeFile(t, srv.root, "big.bin", strings.Repeat("x", 1<<20))
 	s, err := connect(context.Background(), resolved(srv.conn()))
@@ -142,7 +154,10 @@ func TestDownloadUnsafeName(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows does not allow \\ in names of files on the test server")
 	}
-	srv := newTestServer(t)
+	eachServer(t, testDownloadUnsafeName)
+}
+
+func testDownloadUnsafeName(t *testing.T, srv *testServer) {
 	project := t.TempDir()
 	ctx := paths.WithBase(context.Background(), filepath.Join(project, "p"))
 	writeFile(t, srv.root, `out/..\evil.txt`, "evil")

@@ -7,20 +7,20 @@ import (
 	"github.com/runnelhq/runnel/internal/connection"
 )
 
-// Check signs in to the server of an sftp connection and lists the folder after the
-// sign-in, without writing anything (Test connection in the editor, ADR 0022 section 8).
-// An unknown host key fails with the fingerprint of the server to check.
+// Check signs in to the server of an sftp, ftps or ftp connection and lists the folder
+// after the sign-in, without writing anything (Test connection in the editor, ADR 0022
+// section 8). An unknown host key or certificate fails with the fingerprint to check.
 func Check(ctx context.Context, c connection.Resolved) (string, error) {
 	s, err := connect(ctx, c)
 	if err != nil {
 		return "", err
 	}
 	defer s.close()
-	dir, err := s.sftp.Getwd()
+	dir, err := s.fs.Getwd()
 	if err != nil {
 		dir = "."
 	}
-	entries, err := s.sftp.ReadDir(".")
+	entries, err := s.fs.ReadDir(".")
 	if err != nil {
 		if ctx.Err() != nil {
 			return "", ctx.Err()

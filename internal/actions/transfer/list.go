@@ -20,14 +20,14 @@ var listDefinition = action.Definition{
 	Type:        "transfer.list",
 	Category:    action.CategoryNetwork,
 	Label:       "List Files on Server",
-	Description: "Lists the files of a folder on a server (SFTP); output: path, name, size, modified and folder of each entry",
+	Description: "Lists the files of a folder on a server (SFTP, FTPS or FTP); output: path, name, size, modified and folder of each entry",
 	Example:     "connection: partner-sftp\nfolder: /outgoing\npattern: \"*.csv\"\n",
 	Config:      listAction{},
 	New:         newList,
 }
 
 type listAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Folder     string `json:"folder" doc:"Folder on the server, e.g. /outgoing (relative: to the folder after the sign-in, . is that folder)" schema:"required,example=/outgoing"`
 	Pattern    string `json:"pattern" doc:"Names to include, with wildcards that match case-sensitively, e.g. *.csv" schema:"default=*"`
 	Recursive  bool   `json:"recursive" doc:"Also list the subfolders" schema:"default=false"`

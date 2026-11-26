@@ -55,7 +55,7 @@ export function ConnectionForm(props: {
   const variant = schema.properties?.with?.["x-runnel-variants"]?.[data.type];
   const label = variant?.description?.split(": ")[0] ?? data.type;
   const what = variant?.description?.split(": ").slice(1).join(": ") ?? "";
-  const net = data.type === "http" || data.type === "smtp" || data.type === "sftp";
+  const net = data.type === "http" || data.type === "smtp" || data.type === "sftp" || data.type === "ftps" || data.type === "ftp";
 
   // Sections in the order of their first field; "More" is folded and comes last.
   const sections = new Map<string, [string, Schema][]>();

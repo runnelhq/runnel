@@ -15,7 +15,10 @@ import (
 )
 
 func TestUpload(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testUpload)
+}
+
+func testUpload(t *testing.T, srv *testServer) {
 	project := t.TempDir()
 	ctx := paths.WithBase(context.Background(), project)
 	writeFile(t, project, "outbox/a.csv", "a")
@@ -35,7 +38,7 @@ func TestUpload(t *testing.T) {
 	if read(t, srv.root, "incoming/a.csv") != "a" || read(t, srv.root, "incoming/b.csv") != "bb" || read(t, srv.root, "incoming/c.txt") != "" {
 		t.Error("wrong files on the server")
 	}
-	if info, err := os.Stat(filepath.Join(srv.root, "incoming", "a.csv")); err != nil || !info.ModTime().Equal(old) {
+	if info, err := os.Stat(filepath.Join(srv.root, "incoming", "a.csv")); srv.times && (err != nil || !info.ModTime().Equal(old)) {
 		t.Errorf("modification time not kept: %v %v", info, err)
 	}
 	if logs[len(logs)-1] != "uploaded 2 files to incoming/ on 127.0.0.1:"+srv.port {
@@ -83,7 +86,10 @@ func TestUpload(t *testing.T) {
 }
 
 func TestUploadFolder(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testUploadFolder)
+}
+
+func testUploadFolder(t *testing.T, srv *testServer) {
 	project := t.TempDir()
 	ctx := paths.WithBase(context.Background(), project)
 	writeFile(t, project, "data/x.csv", "x")
@@ -130,7 +136,10 @@ func TestUploadErrors(t *testing.T) {
 
 // A failed upload leaves no half file under the name of the target.
 func TestUploadTimeout(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testUploadTimeout)
+}
+
+func testUploadTimeout(t *testing.T, srv *testServer) {
 	project := t.TempDir()
 	ctx := paths.WithBase(context.Background(), project)
 	writeFile(t, project, "big.bin", strings.Repeat("x", 8<<20))
@@ -159,7 +168,7 @@ func TestRenameWithoutPosixRename(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.close()
-	s.posixRename = false
+	s.fs.(*sftpFS).posixRename = false
 	info, _ := os.Stat(local)
 	if err := s.put(local, info, "a.csv", "replace"); err != nil {
 		t.Fatal(err)

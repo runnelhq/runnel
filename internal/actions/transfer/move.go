@@ -21,14 +21,14 @@ var moveDefinition = action.Definition{
 	Type:        "transfer.move",
 	Category:    action.CategoryNetwork,
 	Label:       "Move Files on Server",
-	Description: "Moves or renames files or folders on a server (SFTP); output: the new paths",
+	Description: "Moves or renames files or folders on a server (SFTP, FTPS or FTP); output: the new paths",
 	Example:     "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: /outgoing/archive/\n",
 	Config:      moveAction{},
 	New:         newMove,
 }
 
 type moveAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Source     string `json:"source" doc:"File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
 	Target     string `json:"target" doc:"Folder on the same server, e.g. /outgoing/archive/; for a single file or folder also a new name" schema:"required,example=/outgoing/archive/"`
 	IfExists   string `json:"ifExists" doc:"If a file exists in the target: replace it, skip it (the source stays and is not in the output), or fail before anything is moved" schema:"enum=replace|skip|fail,default=fail"`
@@ -155,11 +155,11 @@ func (s *session) move(p movePair, ifExists string) error {
 		return fmt.Errorf("cannot move %q into itself (%q)", p.from, p.to)
 	}
 	if dir := path.Dir(p.to); dir != "." {
-		if err := s.sftp.MkdirAll(dir); err != nil {
+		if err := s.fs.MkdirAll(dir); err != nil {
 			return fmt.Errorf("cannot create folder %q on the server: %w", dir, plain(err))
 		}
 	}
-	if err := s.rename(p.from, p.to, existing != nil); err != nil {
+	if err := s.fs.Rename(p.from, p.to, existing != nil); err != nil {
 		return fmt.Errorf("cannot move %q to %q on the server: %w", p.from, p.to, plain(err))
 	}
 	return nil

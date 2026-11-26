@@ -1,0 +1,23 @@
+# Uploads the CSV files of outbox/ into /incoming on the FTPS server, like send does over
+# SFTP: the action is the same, only the connection differs (S57c).
+#   runnel run -v examples/transfer/workflows/send-ftps.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: send-ftps
+actions:
+  - id: start
+    type: core.start
+  - id: upload
+    type: transfer.upload
+    with:
+      connection: partner-ftps
+      source: outbox/*.csv
+      target: /incoming/
+      ifExists: replace
+  - id: done
+    type: core.log
+    with:
+      message: "Uploaded {{ len(result.output) }} files"
+links:
+  - { from: start, to: upload }
+  - { from: upload, to: done }

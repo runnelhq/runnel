@@ -14,7 +14,10 @@ import (
 )
 
 func TestDelete(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testDelete)
+}
+
+func testDelete(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, "out/a.csv", "a")
 	writeFile(t, srv.root, "out/b.csv", "b")
 	writeFile(t, srv.root, "out/C.CSV", "upper case does not match")
@@ -56,7 +59,10 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDeleteErrors(t *testing.T) {
-	srv := newTestServer(t)
+	eachServer(t, testDeleteErrors)
+}
+
+func testDeleteErrors(t *testing.T, srv *testServer) {
 	cases := []struct {
 		with map[string]any
 		want string
@@ -118,7 +124,10 @@ func TestDeleteUnsafeName(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows does not allow \\ in names of files on the test server")
 	}
-	srv := newTestServer(t)
+	eachServer(t, testDeleteUnsafeName)
+}
+
+func testDeleteUnsafeName(t *testing.T, srv *testServer) {
 	writeFile(t, srv.root, `out/..\evil.txt`, "evil")
 	_, _, err := execute(context.Background(), t, deleteDefinition, srv.conn(), map[string]any{"path": "out", "recursive": true})
 	if err == nil || !strings.Contains(err.Error(), `the server sent the unsafe name "..\\evil.txt"`) {

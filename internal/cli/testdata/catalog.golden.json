@@ -1387,7 +1387,7 @@
       "kind": "action",
       "category": "network",
       "label": "Delete Files on Server",
-      "description": "Deletes files or folders on a server (SFTP); output: the deleted paths",
+      "description": "Deletes files or folders on a server (SFTP, FTPS or FTP); output: the deleted paths",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1400,7 +1400,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "path": {
@@ -1444,7 +1446,7 @@
       "kind": "action",
       "category": "network",
       "label": "Download Files",
-      "description": "Downloads files or folders from a server (SFTP); output: the downloaded files",
+      "description": "Downloads files or folders from a server (SFTP, FTPS or FTP); output: the downloaded files",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1457,7 +1459,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "source": {
@@ -1512,7 +1516,7 @@
       "kind": "action",
       "category": "network",
       "label": "File Exists on Server",
-      "description": "Checks whether files or folders exist on a server (SFTP); output: the matching paths",
+      "description": "Checks whether files or folders exist on a server (SFTP, FTPS or FTP); output: the matching paths",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1525,7 +1529,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "path": {
@@ -1565,7 +1571,7 @@
       "kind": "action",
       "category": "network",
       "label": "List Files on Server",
-      "description": "Lists the files of a folder on a server (SFTP); output: path, name, size, modified and folder of each entry",
+      "description": "Lists the files of a folder on a server (SFTP, FTPS or FTP); output: path, name, size, modified and folder of each entry",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1578,7 +1584,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "folder": {
@@ -1628,7 +1636,7 @@
       "kind": "action",
       "category": "network",
       "label": "Create Folder on Server",
-      "description": "Creates a folder with its parent folders on a server (SFTP); output: the path",
+      "description": "Creates a folder with its parent folders on a server (SFTP, FTPS or FTP); output: the path",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1641,7 +1649,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "path": {
@@ -1671,7 +1681,7 @@
       "kind": "action",
       "category": "network",
       "label": "Move Files on Server",
-      "description": "Moves or renames files or folders on a server (SFTP); output: the new paths",
+      "description": "Moves or renames files or folders on a server (SFTP, FTPS or FTP); output: the new paths",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1684,7 +1694,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "source": {
@@ -1732,7 +1744,7 @@
       "kind": "action",
       "category": "network",
       "label": "Upload Files",
-      "description": "Uploads files or folders to a server (SFTP); output: the uploaded files",
+      "description": "Uploads files or folders to a server (SFTP, FTPS or FTP); output: the uploaded files",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1745,7 +1757,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "source": {
@@ -1793,7 +1807,7 @@
       "kind": "action",
       "category": "network",
       "label": "Wait for File on Server",
-      "description": "Waits until files exist on a server (SFTP); output: the matching paths",
+      "description": "Waits until files exist on a server (SFTP, FTPS or FTP); output: the matching paths",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -1806,7 +1820,9 @@
               "partner-sftp"
             ],
             "x-runnel-connection": [
-              "sftp"
+              "sftp",
+              "ftps",
+              "ftp"
             ]
           },
           "path": {

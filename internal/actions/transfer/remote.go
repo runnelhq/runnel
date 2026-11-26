@@ -121,7 +121,7 @@ func plain(err error) error {
 
 // stat returns the entry of a path on the server; a missing path is nil without error.
 func (s *session) stat(p string) (fs.FileInfo, error) {
-	info, err := s.sftp.Stat(p)
+	info, err := s.fs.Stat(p)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -133,7 +133,7 @@ func (s *session) stat(p string) (fs.FileInfo, error) {
 
 // readDir returns the entries of a folder on the server sorted by name.
 func (s *session) readDir(dir string) ([]fs.FileInfo, error) {
-	entries, err := s.sftp.ReadDir(dir)
+	entries, err := s.fs.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read folder %q on the server: %w", dir, plain(err))
 	}
@@ -220,7 +220,7 @@ func (s *session) lookup(p string, follow bool) (fs.FileInfo, error) {
 	if follow {
 		return s.stat(p)
 	}
-	info, err := s.sftp.Lstat(p)
+	info, err := s.fs.Lstat(p)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -288,7 +288,7 @@ func (s *session) put(local string, info fs.FileInfo, remote, ifExists string) (
 		}
 	}
 	dir := path.Dir(remote)
-	if err := s.sftp.MkdirAll(dir); err != nil {
+	if err := s.fs.MkdirAll(dir); err != nil {
 		return fmt.Errorf("cannot create folder %q on the server: %w", dir, plain(err))
 	}
 	in, err := os.Open(local)
@@ -297,41 +297,18 @@ func (s *session) put(local string, info fs.FileInfo, remote, ifExists string) (
 	}
 	defer func() { _ = in.Close() }()
 	tmp := path.Join(dir, tempName(path.Base(remote)))
-	out, err := s.sftp.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
-	if err != nil {
-		return fmt.Errorf("cannot write to %q on the server: %w", dir, plain(err))
-	}
-	defer func() {
-		if err != nil {
-			_ = out.Close()
-			_ = s.sftp.Remove(tmp)
-		}
-	}()
-	if _, err = out.ReadFrom(in); err != nil {
+	if err = s.fs.Create(tmp, in); err != nil {
+		_ = s.fs.Remove(tmp)
 		return fmt.Errorf("cannot upload %q to %q: %w", local, remote, plain(err))
 	}
-	if err = out.Close(); err != nil {
-		return fmt.Errorf("cannot write %q on the server: %w", remote, plain(err))
-	}
-	_ = s.sftp.Chtimes(tmp, info.ModTime(), info.ModTime())
-	if err = s.rename(tmp, remote, existing != nil); err != nil {
+	s.fs.Chtimes(tmp, info.ModTime())
+	// The server renames the complete file; where it cannot replace in one step, the
+	// existing file is removed first (ADR 0022, S57a).
+	if err = s.fs.Rename(tmp, remote, existing != nil); err != nil {
+		_ = s.fs.Remove(tmp)
 		return fmt.Errorf("cannot write %q on the server: %w", remote, plain(err))
 	}
 	return nil
-}
-
-// rename gives a complete temporary file its name: atomically where the server can
-// (posix-rename@openssh.com), otherwise by removing an existing file first.
-func (s *session) rename(from, to string, exists bool) error {
-	if s.posixRename {
-		return s.sftp.PosixRename(from, to)
-	}
-	if exists {
-		if err := s.sftp.Remove(to); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-	}
-	return s.sftp.Rename(from, to)
 }
 
 // get downloads one file via a temporary local file, which it renames when complete; at
@@ -357,11 +334,6 @@ func (s *session) get(remote string, info fs.FileInfo, local, ifExists string, l
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("cannot create folder %q: %w", dir, plain(err))
 	}
-	in, err := s.sftp.Open(remote)
-	if err != nil {
-		return fmt.Errorf("cannot open %q on the server: %w", remote, plain(err))
-	}
-	defer func() { _ = in.Close() }()
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(local)+".*.tmp")
 	if err != nil {
 		return fmt.Errorf("cannot write to %q: %w", dir, plain(err))
@@ -372,7 +344,7 @@ func (s *session) get(remote string, info fs.FileInfo, local, ifExists string, l
 			_ = os.Remove(tmp.Name())
 		}
 	}()
-	if _, err = in.WriteTo(&limitWriter{w: tmp, left: limit}); err != nil {
+	if err = s.fs.Retrieve(remote, &limitWriter{w: tmp, left: limit}); err != nil {
 		if errors.Is(err, errTooLarge) {
 			return fmt.Errorf("cannot download %q: %w", remote, errTooLarge)
 		}

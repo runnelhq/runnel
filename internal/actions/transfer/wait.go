@@ -2,35 +2,32 @@ package transfer
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
 	"slices"
 	"time"
 
-	"github.com/pkg/sftp"
-
 	"github.com/runnelhq/runnel/internal/action"
 )
 
 // transfer.wait waits until files exist on the server of a connection and, optionally,
 // until their size has stopped changing, like file.wait. It looks every interval over one
-// SSH connection; if the connection drops (or a look takes longer than timeout), it
-// connects again at the next look. A refused host key or sign-in ends the wait. Output: the
+// connection; if it drops (or a look takes longer than timeout), it connects again at the
+// next look. A refused host key, certificate or sign-in ends the wait. Output: the
 // matching paths.
 var waitDefinition = action.Definition{
 	Type:        "transfer.wait",
 	Category:    action.CategoryNetwork,
 	Label:       "Wait for File on Server",
-	Description: "Waits until files exist on a server (SFTP); output: the matching paths",
+	Description: "Waits until files exist on a server (SFTP, FTPS or FTP); output: the matching paths",
 	Example:     "connection: partner-sftp\npath: /outgoing/*.csv\ninterval: 1m\nmaxWait: 2h\nstableFor: 30s\n",
 	Config:      waitAction{},
 	New:         newWait,
 }
 
 type waitAction struct {
-	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp,example=partner-sftp"`
+	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Path       string `json:"path" doc:"File to wait for on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
 	Interval   string `json:"interval" doc:"How often to look, e.g. 5s or 1m" schema:"format=runnel-duration,default=5s"`
 	MaxWait    string `json:"maxWait" doc:"Give up and fail after this time; empty: wait until the action's timeout or the end of the run" schema:"format=runnel-duration,example=2h"`
@@ -105,7 +102,7 @@ func (a *waitAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 			switch {
 			case ctx.Err() != nil:
 				return action.Result{}, ctx.Err()
-			case err != nil && (s.closed() || errors.Is(err, sftp.ErrSSHFxConnectionLost)):
+			case err != nil && (s.closed() || s.fs.Lost(err)):
 				// The connection dropped or the look took too long: connect again next time.
 				ec.Logf(slog.LevelWarn, "lost the connection to %s while waiting for %s: %v", s.addr, a.Path, err)
 				s.close()
