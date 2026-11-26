@@ -167,7 +167,7 @@ dauerhafter Mechanismus für umbenannte Felder; Test für Golden-Dateien gegen d
   Monitoring-Werkzeuge es erwarten). Nichts wird gestartet. Vorher war es 1 – bei `run` „Lauf fehlgeschlagen“, bei
   `validate` „Fehler gefunden“.
 - `runnel validate`: 0 keine Fehler, 1 Fehler gefunden (mit `--strict` auch Warnungen), 2 nichts geprüft (falsche
-  Argumente, Pfad fehlt, keine Dateien gefunden, ungültiges `--param` oder `--env`). `runnel triggers`: 1 Fehler in
+  Argumente, Pfad fehlt, keine Dateien gefunden, ungültiges `--param` oder `--environment`). `runnel triggers`: 1 Fehler in
   Trigger-Dateien, 2 kein Projekt oder falscher Aufruf.
 - Umsetzung in `internal/cli/root.go`: Fehler von Cobra beim Lesen der Flags (`SetFlagErrorFunc`) und beim Prüfen der
   Argumente und Flag-Gruppen (`Args` jedes Befehls) sind Aufruffehler; die Hilfe jedes Befehls nennt die Exit-Codes.

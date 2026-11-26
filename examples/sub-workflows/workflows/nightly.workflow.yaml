@@ -13,14 +13,14 @@ apiVersion: runnel/v1
 name: nightly
 parameters:
   - name: SOUTH_ORDERS
-    type: integer
+    type: int
     default: "25"
   - name: IMPORT
     description: Workflow that imports the south; one of workflows/import-*.workflow.yaml
     default: workflows/import-region.workflow.yaml
 outputs:
   - name: TOTAL
-    type: integer
+    type: int
     value: "{{ results.north.output.IMPORTED + results.south.output.IMPORTED }}"
 actions:
   - id: start

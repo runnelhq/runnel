@@ -50,7 +50,7 @@ Derselbe Vertrag gilt für Sub-Workflows, Agenten-Werkzeuge, MCP-Tools und Webho
 ```yaml
 parameters:
   - name: CUSTOMER_ID
-    type: integer            # string (Standard) | integer | number | boolean | json
+    type: int                # string (Standard) | int | decimal | float | bool | date | datetime | json
     description: Kundennummer im ERP
     required: true
   - name: MODE
@@ -63,7 +63,9 @@ outputs:
     value: "${SYNC_STATUS}"  # ab S08 auch Ausdrücke {{ … }}
 ```
 
-- `type`, `enum` und `description` ergeben das **Eingabe-Schema** (JSON Schema) eines Werkzeugs.
+- `type`, `enum` und `description` ergeben das **Eingabe-Schema** (JSON Schema) eines Werkzeugs. Die Typen sind die
+  der Records (ADR 0007, Nachtrag R5c); der MCP-Server bildet sie auf JSON-Schema-Typen ab (`int` → `integer`, `bool`
+  → `boolean` …).
 - `outputs` werden ausgewertet, wenn der Workflow erfolgreich endet, und bilden sein **Ergebnis**.
 - Parameter ohne `type` bleiben Text – bestehende Dateien bleiben gültig.
 

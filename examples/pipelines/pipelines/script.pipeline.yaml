@@ -14,7 +14,7 @@ name: script
 parameters:
   - name: RATE
     description: VAT rate
-    type: number
+    type: float
     default: "0.19"
 transforms:
   - id: read

@@ -5,18 +5,23 @@ parameters:
   - name: A
     type: text
   - name: B
-    type: integer
+    type: int
     default: many
   - name: C
     enum: [x, y]
     default: z
   - name: D
-    type: boolean
+    type: bool
     enum: [true, maybe]
   - name: A
+  - name: E
+    type: integer
+  - name: F
+    type: date
+    default: 01.11.2026
 outputs:
   - name: OUT
-    type: integer
+    type: int
     value: "1.5"
   - name: OUT
     value: x

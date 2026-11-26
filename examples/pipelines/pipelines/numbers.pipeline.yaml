@@ -10,7 +10,7 @@ apiVersion: runnel/v1
 name: numbers
 parameters:
   - name: ROWS
-    type: integer
+    type: int
     default: "1000"
 transforms:
   - id: numbers

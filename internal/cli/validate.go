@@ -43,7 +43,7 @@ func newValidateCommand() *cobra.Command {
 			"Without a path, the current directory is checked.\n\n" +
 			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
 			"are checked as well. Variables are checked against every environment of the project,\n" +
-			"or only against the one given with --env.\n\n" +
+			"or only against the one given with --environment.\n\n" +
 			"Exit codes: 0 no errors, 1 an error was found (or a warning, with --strict),\n" +
 			"2 nothing checked (invalid arguments, a path that does not exist, no files found).",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -51,7 +51,7 @@ func newValidateCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&opts.strict, "strict", false, "treat warnings as errors")
-	cmd.Flags().StringVar(&opts.env, "env", "", "check variables only against this environment of the project")
+	cmd.Flags().StringVar(&opts.env, "environment", "", "check variables only against this environment of the project")
 	cmd.Flags().StringArrayVar(&opts.params, "param", nil, "parameter `KEY=VALUE` passed at start (repeatable)")
 	return cmd
 }
@@ -159,7 +159,7 @@ func (v *validator) file(file string) error {
 		return err
 	}
 	if !found && v.opts.env != "" {
-		return fmt.Errorf("--env %s: no project (%s) found for %s", v.opts.env, model.ProjectFile, file)
+		return fmt.Errorf("--environment %s: no project (%s) found for %s", v.opts.env, model.ProjectFile, file)
 	}
 	projectDir := ""
 	if root, found, _ := model.FindProjectDir(filepath.Dir(file)); found {

@@ -4,23 +4,32 @@ apiVersion: runnel/v1
 name: typed
 parameters:
   - name: CUSTOMER_ID
-    type: integer
+    type: int
     description: Customer number in the ERP
     required: true
   - name: MODE
     enum: [full, delta]
     default: delta
   - name: LIMIT
-    type: number
+    type: float
     default: 2.5
+  - name: AMOUNT
+    type: decimal
+    default: "12.50"
+  - name: SINCE
+    type: date
+    default: "2026-11-01"
+  - name: AT
+    type: datetime
+    default: "2026-11-01T06:00:00Z"
   - name: DRY_RUN
-    type: boolean
+    type: bool
     default: "false"
   - name: FILTER
     type: json
     default: '{"country": "DE"}'
   - name: RETRIES
-    type: integer
+    type: int
     enum: [1, 3, 5]
     default: ${DEFAULT_RETRIES}
 outputs:
@@ -28,7 +37,7 @@ outputs:
     description: Result of the sync
     value: synced ${CUSTOMER_ID}
   - name: COUNT
-    type: integer
+    type: int
     value: "42"
 actions:
   - { id: start, type: core.start }

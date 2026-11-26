@@ -20,7 +20,7 @@ runnel validate examples/hello
 ```
 
 ```bash
-runnel validate --env prod examples/hello
+runnel validate --environment prod examples/hello
 ```
 
 ```bash

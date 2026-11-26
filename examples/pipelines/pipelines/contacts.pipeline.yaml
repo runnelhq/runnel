@@ -16,7 +16,7 @@ parameters:
     default: out/contacts.csv
   - name: VAT
     description: VAT rate
-    type: number
+    type: decimal
     default: "0.19"
 transforms:
   - id: read

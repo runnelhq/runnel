@@ -33,13 +33,13 @@ const (
 // Health is the body of GET /health: the overall status, the checks with their reason
 // and the details they are made from. Built from memory and a few file system calls.
 type Health struct {
-	Status    string        `json:"status"`
-	Version   string        `json:"version"`
-	Uptime    int64         `json:"uptime"` // seconds
-	StartedAt time.Time     `json:"startedAt"`
-	Project   HealthProject `json:"project"`
-	Checks    []HealthCheck `json:"checks"`
-	Scheduler struct {
+	Status        string        `json:"status"`
+	Version       string        `json:"version"`
+	UptimeSeconds int64         `json:"uptimeSeconds"`
+	StartedAt     time.Time     `json:"startedAt"`
+	Project       HealthProject `json:"project"`
+	Checks        []HealthCheck `json:"checks"`
+	Scheduler     struct {
 		Running bool `json:"running"`
 		// Triggers is the number of triggers loaded, Active of those enabled.
 		Triggers int `json:"triggers"`
@@ -88,7 +88,7 @@ type HealthCheck struct {
 type FailedRun struct {
 	ID      string    `json:"id"`
 	Time    time.Time `json:"time"`
-	File    string    `json:"file"`
+	Path    string    `json:"path"`
 	Trigger string    `json:"trigger,omitempty"`
 	Error   string    `json:"error,omitempty"`
 }
@@ -116,7 +116,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 // health collects the state of the server; the checks set the overall status.
 func (s *Server) health() Health {
 	now := s.now()
-	h := Health{Status: HealthOK, Version: version.Get().Version, StartedAt: s.started, Uptime: int64(now.Sub(s.started) / time.Second),
+	h := Health{Status: HealthOK, Version: version.Get().Version, StartedAt: s.started, UptimeSeconds: int64(now.Sub(s.started) / time.Second),
 		Project: HealthProject{Name: s.projectName, Dir: s.dir}, Checks: []HealthCheck{}}
 	check := func(name, status, msg string) {
 		h.Checks = append(h.Checks, HealthCheck{Name: name, Status: status, Message: msg})
@@ -152,9 +152,9 @@ func (s *Server) health() Health {
 	rh := s.runs.Health()
 	h.Runs.Running, h.Runs.OnErrorQueue = rh.Running, s.onError.Len()
 	if r := rh.LastFailed; r != nil {
-		f := &FailedRun{ID: r.ID, Time: r.Started, File: r.Path, Trigger: r.Trigger, Error: r.Error}
-		if r.Finished != nil {
-			f.Time = *r.Finished
+		f := &FailedRun{ID: r.ID, Time: r.StartedAt, Path: r.Path, Trigger: r.Trigger, Error: r.Error}
+		if r.FinishedAt != nil {
+			f.Time = *r.FinishedAt
 		}
 		h.Runs.LastFailed = f
 	}

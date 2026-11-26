@@ -8,7 +8,7 @@ apiVersion: runnel/v1
 name: files
 parameters:
   - name: MIN_SIZE
-    type: integer
+    type: int
     default: "160"
 transforms:
   - id: in

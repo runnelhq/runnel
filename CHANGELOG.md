@@ -68,13 +68,13 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 
 ### Bruch
 
-Bewusste Änderungen aus der Durchsicht der Namen und Standardwerte vor 1.0 (R5a, R5b, ADR 0029). Alte Namen sind
-unbekannte Felder (`unknown field "…"`), alte Werte ungültige Werte mit den erlaubten; einen Hinweis auf den neuen
-Namen gibt es nicht:
+Bewusste Änderungen aus der Durchsicht der Namen und Standardwerte vor 1.0 (R5a, R5b, R5c, ADR 0029). Alte Namen sind
+unbekannte Felder (`unknown field "…"`) bzw. Flags (`unknown flag`), alte Werte ungültige Werte mit den erlaubten; einen
+Hinweis auf den neuen Namen gibt es nicht:
 
 - **Exit-Codes:** Ein falscher Aufruf endet bei allen Befehlen mit 2 statt 1, bei `runnel health` mit 3.
   `runnel validate` und `runnel triggers` enden mit 2, wenn nichts geprüft werden konnte (Pfad fehlt, kein Projekt,
-  ungültiges `--param`/`--env`); 1 heißt nur noch „Fehler gefunden“.
+  ungültiges `--param`/`--environment`); 1 heißt nur noch „Fehler gefunden“.
 - **Ausdrücke:** Nur die Funktionen der Referenz (`runnel catalog --expressions`) sind aufrufbar; andere Built-ins von
   expr-lang wie `date()`, `duration()`, `type()` oder `repeat()` sind ein Fehler mit ähnlichen Funktionen
   (ADR 0006, Nachtrag R5a).
@@ -108,6 +108,16 @@ Namen gibt es nicht:
 - **Standardwerte:** `maxWait` von `file.wait` und `transfer.wait` ist 1 h statt „unbegrenzt“ (`0`: bis zum Timeout der
   Action); `core.script` endet nach 1 min (`timeout`); `transfer.download` lädt Dateien bis 1 GB (`maxSize`) statt ohne
   Grenze.
+- **CLI:** `--env` heißt `--environment` (`runnel run`, `runnel validate`) wie `environment` in Triggern und der API;
+  `runnel health --service <name>` heißt `--service-name <name>`, damit `--service` überall ein Schalter für das
+  Dienstkonto ist (wie bei `runnel plugins trust --service`).
+- **API und `runnel runs --json`:** Ein Lauf (`GET /api/v1/runs`, `GET /api/v1/runs/{id}`) nennt Start und Ende
+  `startedAt` und `finishedAt` statt `started` und `finished`, ebenso je Action; der Name des Workflows bzw. der
+  Pipeline heißt `name` statt `workflow`. `GET /api/v1/health` (und `runnel health --json`): `uptime` heißt
+  `uptimeSeconds`, `runs.lastFailed.file` heißt `path`.
+- **Typen von Parametern und Outputs:** dieselben wie bei Feldern in Pipelines – `string`, `int`, `decimal`, `float`,
+  `bool`, `date`, `datetime`, `json` – statt `integer`, `number`, `boolean` (ADR 0007, Nachtrag R5c); neu sind damit
+  `decimal` (exakt), `date` und `datetime`. `bool` nimmt auch `1`/`0` und `yes`/`no` an.
 
 ## Frühere Versionen
 

@@ -84,7 +84,7 @@ Abfragen an die Datenbank; `Cache-Control: no-store`. Statuscode `200` bei `ok` 
 {
   "status": "degraded",
   "version": "v0.2.0",
-  "uptime": 7384,
+  "uptimeSeconds": 7384,
   "startedAt": "2026-11-26T08:00:00+01:00",
   "project": {"name": "hello", "dir": "D:\\flows\\hello"},
   "checks": [
@@ -98,7 +98,7 @@ Abfragen an die Datenbank; `Cache-Control: no-store`. Statuscode `200` bei `ok` 
   ],
   "scheduler": {"running": true, "triggers": 5, "active": 4, "problems": [Problem …]},
   "runs": {"running": 0, "onErrorQueue": 0,
-           "lastFailed": {"id": "01JD…", "time": "…", "file": "workflows/import.workflow.yaml", "trigger": "cron:nightly", "error": "…"}},
+           "lastFailed": {"id": "01JD…", "time": "…", "path": "workflows/import.workflow.yaml", "trigger": "cron:nightly", "error": "…"}},
   "history": {"enabled": true, "path": "C:\\ProgramData\\runnel\\history\\hello-1a2b3c4d\\runs.db", "writable": true, "sizeBytes": 3145728},
   "disk": {"path": "C:\\ProgramData\\runnel\\history", "freeBytes": 53687091200, "totalBytes": 107374182400},
   "listener": {"configured": "127.0.0.1:7301", "running": true, "address": "127.0.0.1:7301", "tls": true, "notAfter": "2028-11-20T10:00:00Z"}
@@ -118,9 +118,9 @@ im Monitoring). Die Prüfungen:
 | `listener` (nur mit `--triggers`) | offen, oder kein HTTP-Trigger aktiv | ein HTTP-Trigger ist aktiv, der Listener aber nicht offen (Port belegt, siehe Server-Log) | – |
 | `certificate` (nur mit HTTPS) | gültig noch mindestens 14 Tage | läuft in weniger als 14 Tagen ab oder ist abgelaufen | – |
 
-Weitere Angaben: `uptime` in Sekunden seit `startedAt`; `scheduler.triggers` geladene, `active` davon eingeschaltete
-Trigger; `runs.running` laufende Läufe, `lastFailed` der letzte fehlgeschlagene Lauf seit dem Start (auch von Hand
-gestartete; sie ändern den Status nicht), `onErrorQueue` fehlgeschlagene Läufe, die auf ihren Fehler-Workflow warten
+Weitere Angaben: `uptimeSeconds` seit `startedAt` (bis R5c `uptime`); `scheduler.triggers` geladene, `active` davon
+eingeschaltete Trigger; `runs.running` laufende Läufe, `lastFailed` der letzte fehlgeschlagene Lauf seit dem Start
+mit der Datei in `path` (bis R5c `file`; auch von Hand gestartete; sie ändern den Status nicht), `onErrorQueue` fehlgeschlagene Läufe, die auf ihren Fehler-Workflow warten
 (ADR 0027); `history.sizeBytes` mit dem Write-Ahead-Log; `disk.path` der Datenordner (Ordner der Run-Historien, ohne
 Historie der Projektordner); `listener.notAfter` das Ende des Zertifikats, bei eigenen Zertifikaten das zuletzt
 geladene. Der Stand der Läufe gilt seit dem Start des Servers (aus dem Speicher, nicht aus der Historie); „schreibbar“
@@ -232,13 +232,13 @@ die **gespeicherte** Datei; vorher wird sie wie bei `runnel run` geprüft. Seit 
   "id": "01M7T2X0AHHW9G9ZAV04RRCXJC",
   "path": "workflows/parallel.workflow.yaml",
   "kind": "workflow",
-  "workflow": "parallel",
+  "name": "parallel",
   "trigger": "cron:nightly",
   "client": "127.0.0.1",
   "environment": "dev",
   "status": "running",
-  "started": "2026-11-19T14:20:50.898Z",
-  "finished": "2026-11-19T14:20:52.899Z",
+  "startedAt": "2026-11-19T14:20:50.898Z",
+  "finishedAt": "2026-11-19T14:20:52.899Z",
   "durationMs": 2001,
   "error": "…",
   "outputs": { "MESSAGE": "Hello" }
@@ -252,11 +252,12 @@ fehlgeschlagenen Lauf, den er meldet; leer, wenn dieser vor dem Start scheiterte
 `trigger`) starten keinen Fehler-Workflow.
 
 `status` eines Laufs: `running`, `succeeded`, `failed`, `cancelled`. `GET /runs/{id}` ergänzt `actions` – je Action
-`id`, `type`, `status` (`pending`, `waiting`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), Zeiten, `durationMs`,
+`id`, `type`, `status` (`pending`, `waiting`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), `startedAt`, `finishedAt`, `durationMs`,
 `error` und `runs` (Anzahl Ausführungen bei Schleifen) – und `log` (`time`, `level`, `actionId`, `message`; höchstens
 5.000 Zeilen, ältere entfallen mit `logTruncated: true`).
 
-Bei einem Pipeline-Lauf ist `kind` `pipeline` und `workflow` der Name der Pipeline. Seine Transforms erscheinen als
+`name` ist der Name des Workflows, bei einem Pipeline-Lauf (`kind` `pipeline`) der Name der Pipeline. Bis R5c hießen
+die Felder `workflow`, `started` und `finished` (auch je Action). Bei einem Pipeline-Lauf erscheinen die Transforms als
 `actions` (Ereignisse `action.started`, `action.finished`), ein beendeter Transform zusätzlich mit `counts`
 (`read`, `written`, `errors`). `linkRows` zählt die Datensätze je Link (Index in `links`); ein Link ist gezählt, sobald
 der Transform davor beendet ist. Das Ereignis `action.finished` eines Transforms trägt `counts` und `linkRows` seiner

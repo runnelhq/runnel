@@ -111,3 +111,24 @@ unbekannten Feldern werden zu Fehlern. Gedacht für produktive, stabile Pipeline
 - Bei offenen Schemas fallen Tippfehler in Feldnamen ggf. erst zur Laufzeit auf (abgemildert durch Warnungen und Vorschau).
 - Ohne Felddefinition sind CSV-Werte Text; wer rechnen will, muss Typen angeben oder konvertieren.
 - Jeder Transform muss seine Schema-Ableitung in `Init` sorgfältig implementieren (Teil der Tests).
+
+## Nachtrag 2026-11-26 (R5c)
+
+- **Typen von Parametern und Outputs** (`parameters[].type`, `outputs[].type` in Workflows und Pipelines) nutzen
+  dieselbe Liste wie `fields[].type`: `string` (Standard), `int`, `decimal`, `float`, `bool`, `date`, `datetime`,
+  `json`; `binary` nicht, weil sich ein Wert aus Text ohne Kodierung nicht eindeutig lesen lässt. Die früheren Namen
+  `integer`, `number`, `boolean` sind unbekannte Werte (Fehler wie bei jedem anderen ungültigen Typ, vor 1.0 ohne
+  Abkündigung).
+- **Lesen aus Text:** Werte von `--param`, aus `params` von Triggern und Aufrufen (`core.run-*`), aus `POST /runs`, aus
+  dem Body eines HTTP-Triggers und aus `default` sind Text und werden wie ein Feld ohne `format` gelesen
+  (`internal/format`): Zahlen als `1234.5` ohne Tausendertrennzeichen, `bool` als `true`/`false`, `1`/`0`, `yes`/`no`,
+  `date` als `2026-11-20`, `datetime` nach ISO 8601 (ohne Zone in lokaler Zeit), `json` als beliebiger JSON-Wert.
+  Leerzeichen am Rand zählen außer bei `string` nicht; ein leerer Text ist kein Wert eines anderen Typs. `enum` vergleicht
+  wie Records (`1` = `1.0`).
+- **In Ausdrücken** (`params.NAME`) haben die Werte die Darstellung der Records; ein `date` ist wie bei Feldern eine Zeit
+  um Mitternacht in lokaler Zeit (für `today()`, `formatDate()`, `<`). Als Variable `${NAME}` bleibt der Wert Text.
+- **Fehler-Workflow (ADR 0027):** Die `FAILED_…`-Parameter bleiben `string`, auch `FAILED_STARTED`/`FAILED_FINISHED`
+  – sie sind leer, wenn der Lauf nicht starten konnte.
+- **JSON Schema:** Ein MCP-Server (ADR 0012) bildet die Typen an seiner eigenen Grenze ab (`int` → `integer`,
+  `decimal`/`float` → `number`, `bool` → `boolean`, `date`/`datetime` → `string` mit `format: date`/`date-time`, `json`
+  ohne Einschränkung); die Dateiformate behalten das Vokabular dieser ADR.

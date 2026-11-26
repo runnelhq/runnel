@@ -89,8 +89,8 @@ test("changes the fields of a parameter", async ({ page }) => {
 
   // A type that does not fit the default is reported at the field and in Problems.
   await openRow(page, "parameters", 0);
-  await field(page, "parameters[0].type").getByRole("combobox").selectOption("integer");
-  await expect(field(page, "parameters[0].default").getByRole("alert")).toContainText("is not an integer");
+  await field(page, "parameters[0].type").getByRole("combobox").selectOption("int");
+  await expect(field(page, "parameters[0].default").getByRole("alert")).toContainText("is not a whole number");
   await expect(row(page, "parameters", 0)).toContainText("✖");
   await page.getByTestId("error-count").first().click();
   const problems = page.getByRole("region", { name: "Problems and log" }).getByRole("table").getByRole("row");

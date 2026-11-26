@@ -13,7 +13,7 @@ name: customers
 parameters:
   - name: BATCH
     description: Number of the import batch
-    type: integer
+    type: int
     default: "1"
   - name: OUTPUT
     description: CSV file to write

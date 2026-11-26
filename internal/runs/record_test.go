@@ -59,7 +59,7 @@ func TestRunsInHistory(t *testing.T) {
 	m2, _, _ := withHistory(t, dir)
 	list := list(m2)
 	if len(list) != 1 || list[0].ID != run.ID || list[0].Status != workflow.Succeeded || list[0].Trigger != "cron:nightly" ||
-		list[0].Params["DELAY"] != "5ms" || list[0].Finished == nil || list[0].Workflow != "test" {
+		list[0].Params["DELAY"] != "5ms" || list[0].FinishedAt == nil || list[0].Name != "test" {
 		t.Fatalf("list %+v", list)
 	}
 	after, ok := get(m2, run.ID)
@@ -129,7 +129,7 @@ func TestStaleRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := Run{ID: "01KSTALE", Path: "workflows/a.workflow.yaml", Kind: "workflow", Workflow: "a", Status: StatusRunning, Started: time.Now().Add(-time.Hour)}
+	r := Run{ID: "01KSTALE", Path: "workflows/a.workflow.yaml", Kind: "workflow", Name: "a", Status: StatusRunning, StartedAt: time.Now().Add(-time.Hour)}
 	rec := newHistoryWriter(store, nil)
 	rec.send(recOp{kind: recRun, run: r})
 	rec.send(recOp{kind: recNode, run: Run{ID: r.ID}, index: 0, node: ActionState{ID: "wait", Type: "core.wait", Status: StatusRunning, Runs: 1}})
@@ -147,7 +147,7 @@ func TestStaleRun(t *testing.T) {
 
 	m, _, _ := withHistory(t, dir)
 	d, ok := get(m, r.ID)
-	if !ok || d.Status != workflow.Failed || d.Error != history.StaleError || d.Finished == nil || len(d.Actions) != 1 || d.Actions[0].Status != workflow.Failed {
+	if !ok || d.Status != workflow.Failed || d.Error != history.StaleError || d.FinishedAt == nil || len(d.Actions) != 1 || d.Actions[0].Status != workflow.Failed {
 		t.Errorf("%v %+v %+v", ok, d.Run, d.Actions)
 	}
 }

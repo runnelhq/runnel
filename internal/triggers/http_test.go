@@ -26,7 +26,7 @@ const apiTarget = `kind: Workflow
 apiVersion: runnel/v1
 name: api
 parameters:
-  - { name: ID, type: integer, required: true }
+  - { name: ID, type: int, required: true }
   - { name: NAME }
   - { name: DATA, type: json }
   - { name: MODE, enum: [fast, slow], default: slow }
@@ -117,7 +117,7 @@ func TestHTTPTrigger(t *testing.T) {
 		{call{method: "DELETE", path: "/api/items/1"}, 405, "method DELETE is not allowed for /api/items/1 (allowed: POST)"},
 		{call{method: "POST", path: "/api/items/1"}, 401, "missing or wrong token"},
 		{call{method: "POST", path: "/api/items/1", token: "wrong"}, 401, "missing or wrong token"},
-		{call{method: "POST", path: "/api/items/x", token: "s3cret"}, 400, "parameter ID (integer)"},
+		{call{method: "POST", path: "/api/items/x", token: "s3cret"}, 400, "parameter ID (int)"},
 		{call{method: "POST", path: "/api/items/1", token: "s3cret", contentType: "application/json", body: `{"DATA": "{x"}`}, 400, "parameter DATA (json)"},
 		{call{method: "POST", path: "/api/items/1", token: "s3cret", contentType: "application/json", body: `[1, 2]`}, 400, "the body must be a JSON object"},
 		{call{method: "POST", path: "/api/items/1", token: "s3cret", contentType: "text/csv", body: "a;b"}, 415, `unsupported content type \"text/csv\"`},

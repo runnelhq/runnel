@@ -12,7 +12,7 @@ apiVersion: runnel/v1
 name: parallel
 parameters:
   - name: ROWS
-    type: integer
+    type: int
     default: "100000"
 settings:
   batchSize: 1000

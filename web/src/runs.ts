@@ -15,7 +15,8 @@ export interface RunInfo {
   id: string;
   path: string;
   kind: "workflow" | "pipeline";
-  workflow: string;
+  /** Name of the workflow or pipeline. */
+  name: string;
   /** cron:<name>, http:<name>, cli, error …; missing for runs started in the editor. */
   trigger?: string;
   /** The run this one belongs to: for the error workflow (trigger error), the failed run it reports (ADR 0027). */
@@ -24,8 +25,8 @@ export interface RunInfo {
   environment?: string;
   params?: Record<string, string>;
   status: RunStatus;
-  started: string;
-  finished?: string;
+  startedAt: string;
+  finishedAt?: string;
   durationMs: number;
   error?: string;
   /** Pipelines: records per link (index in links). */

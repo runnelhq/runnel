@@ -13,8 +13,8 @@ const childPipeline = `kind: Pipeline
 apiVersion: runnel/v1
 name: numbers
 parameters:
-  - { name: ROWS, type: integer, required: true }
-  - { name: MIN, type: integer, default: "0" }
+  - { name: ROWS, type: int, required: true }
+  - { name: MIN, type: int, default: "0" }
 transforms:
   - { id: gen, type: core.generate-rows, with: { count: "${ROWS}", numberField: n } }
   - { id: check, type: core.filter, with: { condition: "{{ record.n > params.MIN }}" } }
@@ -31,8 +31,8 @@ name: parent
 parameters:
   - { name: TARGET, default: pipelines/numbers.pipeline.yaml }
 outputs:
-  - { name: KEPT, type: integer, value: "{{ results.load.output.transforms.check.written }}" }
-  - { name: ERRORS, type: integer, value: "{{ results.load.output.errors }}" }
+  - { name: KEPT, type: int, value: "{{ results.load.output.transforms.check.written }}" }
+  - { name: ERRORS, type: int, value: "{{ results.load.output.errors }}" }
 actions:
   - { id: start, type: core.start }
   - id: load
@@ -142,7 +142,7 @@ links:
 	}
 	for _, want := range []string{
 		`action "a": missing required parameter ROWS of pipeline pipelines/numbers.pipeline.yaml`,
-		`action "a": parameter MIN (integer): `,
+		`action "a": parameter MIN (int): `,
 		`action "a": parameter ROWZ is not declared by pipeline pipelines/numbers.pipeline.yaml (declared: ROWS, MIN)`,
 		`action "b": pipeline file pipelines/missing.pipeline.yaml not found`,
 		`action "c": pipeline file pipelines/bad.pipeline.yaml has errors; check it with "runnel validate"`,
@@ -175,7 +175,7 @@ links:
 apiVersion: runnel/v1
 name: parent
 outputs:
-  - { name: COUNT, type: integer, value: "{{ len(results.load.output.records) }}" }
+  - { name: COUNT, type: int, value: "{{ len(results.load.output.records) }}" }
   - { name: FIRST, value: "{{ results.load.output.records[0].name }}" }
 actions:
   - { id: start, type: core.start }

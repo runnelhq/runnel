@@ -151,10 +151,10 @@ func TestValidateProject(t *testing.T) {
 
 	var all strings.Builder
 	for _, args := range [][]string{
-		{"validate", okProject},                                                 // all environments
-		{"validate", "--env", "dev", okProject},                                 // only dev: API_URL is defined
-		{"validate", "--env", "dev", "--param", "UNDEFINED_USER=me", okProject}, // parameter defines the variable
-		{"validate", "internal/model/testdata/project/invalid"},                 // errors in project and environments
+		{"validate", okProject},                                                         // all environments
+		{"validate", "--environment", "dev", okProject},                                 // only dev: API_URL is defined
+		{"validate", "--environment", "dev", "--param", "UNDEFINED_USER=me", okProject}, // parameter defines the variable
+		{"validate", "internal/model/testdata/project/invalid"},                         // errors in project and environments
 	} {
 		code, out, errOut := run(t, args...)
 		all.WriteString("$ runnel " + strings.Join(args, " ") + "\n" + out + errOut)
@@ -213,8 +213,9 @@ func TestValidateFlagErrors(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"validate", "--env", "qa", "examples/hello"}, `environment "qa" not found in project "hello" (available: dev, prod)`},
-		{[]string{"validate", "--env", "dev", "examples/broken/graph.workflow.yaml"}, "no project (project.yaml) found"},
+		{[]string{"validate", "--environment", "qa", "examples/hello"}, `environment "qa" not found in project "hello" (available: dev, prod)`},
+		{[]string{"validate", "--environment", "dev", "examples/broken/graph.workflow.yaml"}, "no project (project.yaml) found"},
+		{[]string{"validate", "--env", "dev", "examples/hello"}, "unknown flag: --env"},
 		{[]string{"validate", "--param", "no-equals", "examples/hello"}, `invalid --param "no-equals"`},
 		{[]string{"validate", "--param", "1X=y", "examples/hello"}, `invalid --param "1X=y"`},
 	} {

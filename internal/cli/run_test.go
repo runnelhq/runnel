@@ -32,7 +32,7 @@ func TestRunHello(t *testing.T) {
 	t.Setenv("COMPUTERNAME", "TESTPC")
 	t.Setenv("TEMP", `C:\Temp`)
 
-	code, out, errOut := run(t, "run", "--env", "prod", "--param", "GREETING=Moin", "examples/hello/workflows/hello.workflow.yaml")
+	code, out, errOut := run(t, "run", "--environment", "prod", "--param", "GREETING=Moin", "examples/hello/workflows/hello.workflow.yaml")
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit code %d, stderr %q, stdout:\n%s", code, errOut, out)
 	}
@@ -645,12 +645,15 @@ actions:
 			`parameter GREETING (string): "Servus" is not one of the allowed values Hello, Hi, Moin`},
 		{"parameter of wrong type", []string{"run", "--param", "N=many", writeWorkflow(t, `
 parameters:
-  - { name: N, type: integer }
+  - { name: N, type: int }
 actions:
   - { id: start, type: core.start }
-`)}, `parameter N (integer): "many" is not an integer`},
-		{"unknown environment", []string{"run", "--env", "qa", "examples/hello/workflows/hello.workflow.yaml"}, `environment "qa" not found`},
-		{"env without project", []string{"run", "--env", "dev", writeWorkflow(t, "actions:\n  - { id: start, type: core.start }\n")}, "no project (project.yaml) found"},
+`)}, `parameter N (int): "many" is not a whole number`},
+		{"unknown environment", []string{"run", "--environment", "qa", "examples/hello/workflows/hello.workflow.yaml"}, `environment "qa" not found`},
+		{"env without project", []string{"run", "--environment", "dev", writeWorkflow(t, "actions:\n  - { id: start, type: core.start }\n")}, "no project (project.yaml) found"},
+		{"old flag --env", []string{"run", "--env", "prod", "examples/hello/workflows/hello.workflow.yaml"}, "unknown flag: --env"},
+		{"old parameter type", []string{"run", writeWorkflow(t, "parameters:\n  - { name: N, type: integer }\nactions:\n  - { id: start, type: core.start }\n")},
+			`invalid type "integer" (expected string, int, decimal, float, bool, date, datetime, json)`},
 		{"directory instead of file", []string{"run", "examples/hello"}, "examples/hello is a directory; pass a workflow file"},
 		{"missing file", []string{"run", "does-not-exist.workflow.yaml"}, "does-not-exist.workflow.yaml"},
 	}

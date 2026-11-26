@@ -23,7 +23,7 @@ const triggerTarget = `kind: Workflow
 apiVersion: runnel/v1
 name: target
 parameters:
-  - { name: DAYS, type: integer, required: true }
+  - { name: DAYS, type: int, required: true }
   - { name: MODE, enum: [full, delta], default: delta }
 actions:
   - { id: start, type: core.start }
@@ -55,7 +55,7 @@ func TestCheckTrigger(t *testing.T) {
 		{"target: workflows/missing.workflow.yaml\n", "target workflows/missing.workflow.yaml not found in the project"},
 		{"target: workflows/broken.workflow.yaml\n", `workflow workflows/broken.workflow.yaml has errors; check it with "runnel validate"`},
 		{"target: workflows/target.workflow.yaml\n", "missing required parameter DAYS of workflow workflows/target.workflow.yaml"},
-		{"target: workflows/target.workflow.yaml\nparams: { DAYS: x }\n", `parameter DAYS (integer)`},
+		{"target: workflows/target.workflow.yaml\nparams: { DAYS: x }\n", `parameter DAYS (int)`},
 		{"target: workflows/target.workflow.yaml\nparams: { DAYS: 1, MODE: half }\n", `parameter MODE (string)`},
 		{"target: workflows/target.workflow.yaml\nparams: { DAYS: 1, WEEKS: 2 }\n", "parameter WEEKS is not declared by workflow workflows/target.workflow.yaml (declared: DAYS, MODE)"},
 		{"target: workflows/target.workflow.yaml\nenvironment: prod\nparams: { DAYS: 1 }\n", `environment "prod" not found (environments: dev)`},

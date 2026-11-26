@@ -7,7 +7,7 @@ parameters:
   - name: FILE
     required: true
   - name: MIN_SALES
-    type: number
+    type: decimal
     default: "0"
 transforms:
   - id: read

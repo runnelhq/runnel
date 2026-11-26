@@ -10,17 +10,17 @@ apiVersion: runnel/v1
 name: import
 parameters:
   - name: BATCH
-    type: integer
+    type: int
     default: "7"
   - name: OUT_DIR
     description: Folder for the files of the pipeline
     default: out
 outputs:
   - name: EXPORTED
-    type: integer
+    type: int
     value: "{{ results.prepare.output.transforms.write.written }}"
   - name: REJECTED
-    type: integer
+    type: int
     value: "{{ results.prepare.output.errors }}"
 actions:
   - id: start

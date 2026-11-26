@@ -79,7 +79,7 @@ func waitRun(t *testing.T, s *Server, id string, cond func(runs.Detail) bool) ru
 func TestRunLifecycle(t *testing.T) {
 	_, s := newRunProject(t)
 	run := startRun(t, s, `{"path": "workflows/wait.workflow.yaml", "environment": "dev"}`)
-	if run.Status != runs.StatusRunning || run.Environment != "dev" || run.Workflow != "wait" {
+	if run.Status != runs.StatusRunning || run.Environment != "dev" || run.Name != "wait" {
 		t.Errorf("run %+v", run)
 	}
 	d := waitRun(t, s, run.ID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
@@ -87,6 +87,16 @@ func TestRunLifecycle(t *testing.T) {
 		t.Errorf("run %+v, log %+v", d.Run, d.Log)
 	}
 	expect(t, do(t, s, "GET", "/api/v1/runs", ""), http.StatusOK, run.ID)
+	// The names of the fields (R5c), also for each action.
+	body := do(t, s, "GET", "/api/v1/runs/"+run.ID, "").Body.String()
+	for _, key := range []string{`"name":`, `"startedAt":`, `"finishedAt":`} {
+		if strings.Count(body, key) < map[bool]int{true: 1, false: 4}[key == `"name":`] {
+			t.Errorf("%s missing (for the run and each action): %s", key, body)
+		}
+	}
+	if strings.Contains(body, `"started":`) || strings.Contains(body, `"finished":`) || strings.Contains(body, `"workflow":`) {
+		t.Errorf("old field names: %s", body)
+	}
 	expect(t, do(t, s, "POST", "/api/v1/runs/"+run.ID+"/cancel", ""), http.StatusConflict, "already finished")
 	expect(t, do(t, s, "GET", "/api/v1/runs/nope", ""), http.StatusNotFound, "run not found")
 	expect(t, do(t, s, "POST", "/api/v1/runs/nope/cancel", ""), http.StatusNotFound, "run not found")
@@ -336,7 +346,7 @@ func TestHTTPTriggerResponse(t *testing.T) {
 apiVersion: runnel/v1
 name: item
 parameters:
-  - { name: ID, type: integer, required: true }
+  - { name: ID, type: int, required: true }
 actions:
   - { id: start, type: core.start }
   - id: reply
@@ -354,7 +364,7 @@ links:
 apiVersion: runnel/v1
 name: outer
 parameters:
-  - { name: ID, type: integer, required: true }
+  - { name: ID, type: int, required: true }
 actions:
   - { id: start, type: core.start }
   - { id: call, type: core.run-workflow, with: { workflow: workflows/item.workflow.yaml, params: { ID: "${ID}" } } }
@@ -365,9 +375,9 @@ links:
 apiVersion: runnel/v1
 name: sum
 parameters:
-  - { name: A, type: integer, required: true }
+  - { name: A, type: int, required: true }
 outputs:
-  - { name: TWICE, type: integer, value: "{{ params.A * 2 }}" }
+  - { name: TWICE, type: int, value: "{{ params.A * 2 }}" }
 actions:
   - { id: start, type: core.start }
 `,
@@ -427,7 +437,7 @@ func TestHTTPTriggerPipeline(t *testing.T) {
 apiVersion: runnel/v1
 name: big
 parameters:
-  - { name: MIN, type: integer, default: "10" }
+  - { name: MIN, type: int, default: "10" }
 transforms:
   - { id: in, type: core.from-result }
   - { id: big, type: core.filter, with: { condition: "{{ record.amount >= params.MIN }}" } }

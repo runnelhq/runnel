@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -419,7 +420,7 @@ func TestRunOutputs(t *testing.T) {
 	w := parse(t, `
 outputs:
   - { name: GREETING, value: "Hello ${TARGET}" }
-  - { name: COUNT, type: integer, value: "${N}" }
+  - { name: COUNT, type: int, value: "${N}" }
   - { name: DATA, type: json, value: '{"ok": true}' }
 actions:
   - { id: start, type: core.start }
@@ -447,8 +448,42 @@ actions:
 	scope = vars.NewScope(vars.Layer{Name: "test", Values: map[string]string{"TARGET": "World", "N": "many"}})
 	r, _ = Prepare(w, Options{Registry: testRegistry(t), Scope: scope})
 	if res := r.Run(context.Background()); res.Status != Failed || res.Outputs != nil ||
-		!strings.Contains(res.Err.Error(), `output "COUNT": "many" is not an integer`) {
+		!strings.Contains(res.Err.Error(), `output "COUNT": "many" is not a whole number`) {
 		t.Errorf("type mismatch: %+v", res)
+	}
+}
+
+// Parameters and outputs have the types of records (ADR 0007, Nachtrag R5c): decimals
+// compute exactly, a date works with the date functions, a datetime keeps its zone.
+func TestRunTypedParameters(t *testing.T) {
+	w := parse(t, `
+parameters:
+  - { name: AMOUNT, type: decimal }
+  - { name: SINCE, type: date }
+  - { name: AT, type: datetime }
+  - { name: ON, type: bool }
+outputs:
+  - { name: TOTAL, type: decimal, value: "{{ params.AMOUNT * 3 }}" }
+  - { name: DAY, value: "{{ formatDate(addDays(params.SINCE, 1), 'dd.MM.yyyy') }}" }
+  - { name: LATER, type: bool, value: "{{ params.SINCE < params.AT }}" }
+  - { name: SINCE, type: date, value: "${SINCE}" }
+  - { name: ON, type: bool, value: "{{ params.ON }}" }
+actions:
+  - { id: start, type: core.start }
+`)
+	scope := vars.NewScope(vars.Layer{Name: "test", Values: map[string]string{
+		"AMOUNT": "0.10", "SINCE": "2026-11-20", "AT": "2026-11-21T08:00:00Z", "ON": "yes"}})
+	r, err := Prepare(w, Options{Registry: testRegistry(t), Scope: scope})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := r.Run(context.Background())
+	if res.Status != Succeeded {
+		t.Fatalf("run: %+v", res)
+	}
+	got, _ := json.Marshal(res.Outputs)
+	if want := `{"DAY":"21.11.2026","LATER":true,"ON":true,"SINCE":"2026-11-20","TOTAL":"0.3"}`; string(got) != want {
+		t.Errorf("outputs = %s, want %s", got, want)
 	}
 }
 
@@ -471,10 +506,10 @@ links:
 func TestExpressions(t *testing.T) {
 	w := parse(t, `
 parameters:
-  - { name: LIMIT, type: integer, default: "{{ 1 + 1 }}" }
+  - { name: LIMIT, type: int, default: "{{ 1 + 1 }}" }
   - { name: DAY, default: "{{ formatDate(addDays(parseDate('2026-11-19', 'yyyy-MM-dd'), 1), 'dd.MM.yyyy') }}" }
 outputs:
-  - { name: FILES, type: integer, value: "{{ len(results.list.output) }}" }
+  - { name: FILES, type: int, value: "{{ len(results.list.output) }}" }
   - { name: SUMMARY, value: "{{ results.list.status }}: {{ results.list.output }}" }
 actions:
   - { id: start, type: core.start }
@@ -549,7 +584,7 @@ actions:
 `, `parameter "D": default value: expression {{ parseDate('x', 'yyyy') }}`},
 		{"error in output", `
 outputs:
-  - { name: N, type: integer, value: "{{ 'x' }}" }
+  - { name: N, type: int, value: "{{ 'x' }}" }
 actions:
   - { id: start, type: core.start }
 `, `output "N"`},

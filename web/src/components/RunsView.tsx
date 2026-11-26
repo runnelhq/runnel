@@ -21,7 +21,7 @@ import {
  * The list of runs of the project (mockup S26d, states "list", "filter" and "empty"): runs of
  * the editor, of triggers and of runnel run from the run history, newest first and grouped by
  * day, with filters for status, file and trigger. Running runs and new ones appear without
- * reloading (tick changes on run.started and run.finished). The panel on the right shows the
+ * reloading (tick changes on run.started and run.finished events). The panel on the right shows the
  * selected run.
  */
 export function RunsView(props: {
@@ -177,7 +177,7 @@ export function RunsView(props: {
               <span role="columnheader">Env.</span>
             </div>
             {(runs ?? []).map((r, i) => (
-              <RunRow key={r.id} run={r} day={i === 0 || dayLabel(runs![i - 1].started) !== dayLabel(r.started)} selected={r.id === selected} onSelect={() => setSelected(r.id)} />
+              <RunRow key={r.id} run={r} day={i === 0 || dayLabel(runs![i - 1].startedAt) !== dayLabel(r.startedAt)} selected={r.id === selected} onSelect={() => setSelected(r.id)} />
             ))}
             {runs && (
               <div className="flex h-10 items-center gap-3 px-4 text-muted-foreground">
@@ -264,7 +264,7 @@ function RunRow(props: { run: RunInfo; day: boolean; selected: boolean; onSelect
     <>
       {props.day && (
         <div role="row" className="flex h-6 items-center border-b border-border px-4 text-2xs font-semibold text-muted-foreground">
-          <span role="cell">{dayLabel(r.started)}</span>
+          <span role="cell">{dayLabel(r.startedAt)}</span>
         </div>
       )}
       <div
@@ -279,7 +279,7 @@ function RunRow(props: { run: RunInfo; day: boolean; selected: boolean; onSelect
           <RunStatusLabel status={r.status} />
         </span>
         <span role="cell" className="font-mono text-2xs">
-          {timeOf(r.started)}
+          {timeOf(r.startedAt)}
         </span>
         <span role="cell" className="text-right font-mono text-2xs">
           {r.status === "running" ? "…" : formatDuration(r.durationMs)}
@@ -395,8 +395,8 @@ function Details(props: { run: RunDetail; triggers: TriggerInfo[]; onOpenFile: (
         </div>
         <h3 className="mt-1.5 mb-0.5 font-mono text-sm font-semibold break-all">{r.path.slice(r.path.lastIndexOf("/") + 1)}</h3>
         <div className="text-2xs text-muted-foreground">
-          {dayLabel(r.started).split(" · ")[0]} {timeOf(r.started)}
-          {r.finished && ` – ${timeOf(r.finished)}`}
+          {dayLabel(r.startedAt).split(" · ")[0]} {timeOf(r.startedAt)}
+          {r.finishedAt && ` – ${timeOf(r.finishedAt)}`}
           {r.status !== "running" && ` · ${formatDuration(r.durationMs)}`}
         </div>
         {related && (

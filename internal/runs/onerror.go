@@ -73,8 +73,8 @@ func FailureOf(d Detail, target string) Failure {
 		if a.Status != workflow.Failed {
 			continue
 		}
-		if f.Action == "" || (a.Finished != nil && (first == nil || a.Finished.Before(*first))) {
-			f.Action, first = a.ID, a.Finished
+		if f.Action == "" || (a.FinishedAt != nil && (first == nil || a.FinishedAt.Before(*first))) {
+			f.Action, first = a.ID, a.FinishedAt
 		}
 	}
 	return f
@@ -88,19 +88,19 @@ func StartFailure(projectDir, path string, data []byte, trigger, env string, noO
 	if err == nil || errors.Is(err, ErrShutdown) || errors.As(err, new(*LimitError)) {
 		return Failure{}, false
 	}
-	run := Run{Path: path, Trigger: trigger, Environment: env, Status: workflow.Failed, Error: err.Error(), Started: time.Now()}
-	finished := run.Started
-	run.Finished = &finished
+	run := Run{Path: path, Trigger: trigger, Environment: env, Status: workflow.Failed, Error: err.Error(), StartedAt: time.Now()}
+	finished := run.StartedAt
+	run.FinishedAt = &finished
 	var own string
 	if strings.HasSuffix(path, ".pipeline.yaml") {
 		run.Kind = "pipeline"
 		if p, _ := model.ReadPipeline(path, data); p != nil {
-			run.Workflow, own = p.Name, p.Settings.OnError
+			run.Name, own = p.Name, p.Settings.OnError
 		}
 	} else {
 		run.Kind = "workflow"
 		if w, _ := model.ReadWorkflow(path, data); w != nil {
-			run.Workflow, own = w.Name, w.Settings.OnError
+			run.Name, own = w.Name, w.Settings.OnError
 		}
 	}
 	var project *model.Project
@@ -114,9 +114,9 @@ func StartFailure(projectDir, path string, data []byte, trigger, env string, noO
 // Params returns the values of the FAILED_… parameters the error workflow declares.
 func (f Failure) Params(declared []model.Parameter) map[string]string {
 	values := map[string]string{
-		ParamFailedRun: f.Run.ID, ParamFailedPath: f.Run.Path, ParamFailedName: f.Run.Workflow, ParamFailedAction: f.Action,
-		ParamFailedError: f.Run.Error, ParamFailedTrigger: f.Run.Trigger, ParamFailedStarted: rfc3339(&f.Run.Started),
-		ParamFailedFinished: rfc3339(f.Run.Finished),
+		ParamFailedRun: f.Run.ID, ParamFailedPath: f.Run.Path, ParamFailedName: f.Run.Name, ParamFailedAction: f.Action,
+		ParamFailedError: f.Run.Error, ParamFailedTrigger: f.Run.Trigger, ParamFailedStarted: rfc3339(&f.Run.StartedAt),
+		ParamFailedFinished: rfc3339(f.Run.FinishedAt),
 	}
 	out := map[string]string{}
 	for _, p := range declared {

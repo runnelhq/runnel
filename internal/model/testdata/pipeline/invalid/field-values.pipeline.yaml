@@ -4,7 +4,7 @@ name: broken
 parameters:
   - name: 1FILE
   - name: LIMIT
-    type: integer
+    type: int
     default: many
 transforms:
   - id: 2read
