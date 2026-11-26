@@ -15,6 +15,7 @@ import (
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
 	"github.com/runnelhq/runnel/internal/transforms"
+	"github.com/runnelhq/runnel/internal/triggers"
 )
 
 const waitWorkflow = `kind: Workflow
@@ -469,6 +470,38 @@ links:
 		}
 		if time.Now().After(deadline) {
 			t.Fatal("the run that succeeded is kept (history: errors)")
+		}
+	}
+}
+
+// The default answer of an http trigger with response: run waits on the started run
+// itself: with history errors or none, a run that has already ended and left memory
+// when the wait begins is no longer found by its id, and the caller got a 504.
+func TestTriggerWaitAfterRunDropped(t *testing.T) {
+	_, s := newRunProject(t)
+	tr, err := model.ParseTrigger("triggers/api.yaml", []byte("kind: Trigger\napiVersion: runnel/v1\nname: api\ntype: http\n"+
+		"target: workflows/wait.workflow.yaml\nenvironment: dev\nwith: { method: POST, path: /api, auth: none, response: run }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, history := range []string{runs.HistoryErrors, runs.HistoryNone} {
+		started, err := s.startTrigger(tr, triggers.StartRequest{Params: map[string]string{"DELAY": "0s"}, History: history})
+		if err != nil || started.Wait == nil {
+			t.Fatalf("%s: %v", history, err)
+		}
+		for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+			if _, ok, _ := s.runs.Get(context.Background(), started.ID); !ok {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("%s: the run that succeeded is kept", history)
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		out, ok := started.Wait(ctx)
+		cancel()
+		if !ok || out.Status != "succeeded" {
+			t.Errorf("%s: %v %+v", history, ok, out)
 		}
 	}
 }

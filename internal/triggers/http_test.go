@@ -285,20 +285,20 @@ func TestHTTPResponseRun(t *testing.T) {
 	s.Reload()
 	var behave func(id string, r StartRequest) // what the simulated run does
 	outcomes := map[string]Outcome{}
-	s.opts.Start = func(tr *model.Trigger, r StartRequest) (string, error) {
-		id, err := f.start(tr, r)
-		go behave(id, r)
-		return id, err
-	}
-	s.opts.Wait = func(ctx context.Context, id string) (Outcome, bool) {
-		f.mu.Lock()
-		out, ok := outcomes[id]
-		f.mu.Unlock()
-		if !ok {
-			<-ctx.Done()
-			return Outcome{Status: "running"}, true
+	s.opts.Start = func(tr *model.Trigger, r StartRequest) (Started, error) {
+		run, err := f.start(tr, r)
+		go behave(run.ID, r)
+		run.Wait = func(ctx context.Context) (Outcome, bool) {
+			f.mu.Lock()
+			out, ok := outcomes[run.ID]
+			f.mu.Unlock()
+			if !ok {
+				<-ctx.Done()
+				return Outcome{Status: "running"}, true
+			}
+			return out, true
 		}
-		return out, true
+		return run, err
 	}
 	post := func(body string) *httptest.ResponseRecorder {
 		return call{method: "POST", path: "/svc/7?q=1", token: "s3cret", contentType: "application/json", body: body}.do(s)
@@ -369,13 +369,13 @@ func TestHTTPPipeline(t *testing.T) {
 		t.Fatal(p)
 	}
 	var behave func(r StartRequest)
-	s.opts.Start = func(tr *model.Trigger, r StartRequest) (string, error) {
-		id, err := f.start(tr, r)
+	s.opts.Start = func(tr *model.Trigger, r StartRequest) (Started, error) {
+		run, err := f.start(tr, r)
 		behave(r)
-		return id, err
-	}
-	s.opts.Wait = func(context.Context, string) (Outcome, bool) {
-		return Outcome{Status: "succeeded", Body: map[string]any{"transforms": map[string]any{}}}, true
+		run.Wait = func(context.Context) (Outcome, bool) {
+			return Outcome{Status: "succeeded", Body: map[string]any{"transforms": map[string]any{}}}, true
+		}
+		return run, err
 	}
 	post := func(body string) *httptest.ResponseRecorder {
 		return call{method: "POST", path: "/load?MODE=full", contentType: "application/json", body: body}.do(s)

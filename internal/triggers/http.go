@@ -158,11 +158,12 @@ func (h *httpTriggers) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.answer(w, r, e, start)
 		return
 	}
-	id, herr := h.start(e, start)
+	run, herr := h.start(e, start)
 	if herr != nil {
 		herr.write(w)
 		return
 	}
+	id := run.ID
 	w.Header().Set("Location", "/api/v1/runs/"+id)
 	reply(w, http.StatusAccepted, acceptedBody{RunID: id, Status: "/api/v1/runs/" + id})
 }
@@ -384,7 +385,7 @@ func (h *httpTriggers) params(t *model.Trigger, inputs map[string]string) (map[s
 
 // start starts the run of a request unless maxConcurrent or a limit of the project is
 // reached.
-func (h *httpTriggers) start(e *entry, start StartRequest) (string, *httpError) {
+func (h *httpTriggers) start(e *entry, start StartRequest) (Started, *httpError) {
 	s, t := h.s, e.t
 	if t.With.MaxConcurrent > 0 {
 		// Counting the running runs and starting one must not interleave; without a
@@ -401,26 +402,27 @@ func (h *httpTriggers) start(e *entry, start StartRequest) (string, *httpError) 
 		if running == 1 {
 			runsText = "1 run"
 		}
-		return "", errorf(http.StatusTooManyRequests, "trigger %q is already running %s (maxConcurrent: %d); try again later", t.Name, runsText, limit)
+		return Started{}, errorf(http.StatusTooManyRequests, "trigger %q is already running %s (maxConcurrent: %d); try again later", t.Name, runsText, limit)
 	}
 	now := s.opts.Now()
-	id, err := s.opts.Start(t, start)
+	run, err := s.opts.Start(t, start)
+	id := run.ID
 	switch {
 	case errors.As(err, new(*runs.LimitError)):
-		return "", errorf(http.StatusTooManyRequests, "%v", err)
+		return Started{}, errorf(http.StatusTooManyRequests, "%v", err)
 	case errors.Is(err, runs.ErrShutdown):
-		return "", errorf(http.StatusServiceUnavailable, "%v", err)
+		return Started{}, errorf(http.StatusServiceUnavailable, "%v", err)
 	case err != nil:
 		s.opts.Warn(fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, t.Target, err))
 		s.mu.Lock()
 		e.last = &Fired{Time: now, Error: err.Error()}
 		s.mu.Unlock()
-		return "", errorf(http.StatusInternalServerError, "the run could not be started; see the server log")
+		return Started{}, errorf(http.StatusInternalServerError, "the run could not be started; see the server log")
 	}
 	s.mu.Lock()
 	e.active = append(e.active, id)
 	e.last = &Fired{Time: now, RunID: id}
 	s.mu.Unlock()
 	s.opts.Log(fmt.Sprintf("trigger %q: started %s for %s, run %s", t.Name, t.Target, start.Client, id))
-	return id, nil
+	return run, nil
 }

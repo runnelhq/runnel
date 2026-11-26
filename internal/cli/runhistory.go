@@ -128,7 +128,9 @@ func (r *cliRun) launch(ctx context.Context, errOut io.Writer) error {
 	}
 	stop := context.AfterFunc(ctx, func() { r.m.Cancel(run.ID) })
 	defer stop()
-	d, _ := r.m.Wait(context.Background(), run.ID)
+	// Not Wait by id: a run whose history drops it (errors, none) may already have
+	// ended and left memory, and would be reported as failed.
+	d, _ := r.m.WaitLaunched(context.Background(), r.pend)
 	switch d.Status {
 	case workflow.Succeeded:
 		return nil

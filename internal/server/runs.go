@@ -78,7 +78,7 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	run, err := s.startFile(name, data, opts)
+	run, _, err := s.startFile(name, data, opts)
 	var diags model.Errors
 	switch {
 	case errors.As(err, &diags):
@@ -237,11 +237,11 @@ func (s *Server) savedTrigger(path string) (*model.Trigger, error) {
 // startTrigger starts a run of a trigger's target (the saved file), with its
 // environment and parameters (S37); extra are set by the trigger itself, e.g. the
 // path of a new file (S38).
-func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (string, error) {
+func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (triggers.Started, error) {
 	name := t.Target
 	data, err := s.readFile(name)
 	if err != nil {
-		return "", err
+		return triggers.Started{}, err
 	}
 	params := triggers.TriggerParams(t)
 	if len(r.Params) > 0 && params == nil {
@@ -250,16 +250,19 @@ func (s *Server) startTrigger(t *model.Trigger, r triggers.StartRequest) (string
 	maps.Copy(params, r.Params)
 	rows, err := runs.Records(r.Rows)
 	if err != nil {
-		return "", err
+		return triggers.Started{}, err
 	}
 	trigger := t.Type + ":" + t.Name
-	run, err := s.startFile(name, data, startOptions{env: t.Environment, params: params, trigger: trigger,
+	run, pend, err := s.startFile(name, data, startOptions{env: t.Environment, params: params, trigger: trigger,
 		client: r.Client, request: r.Request, respond: r.Respond, history: r.History, rows: rows})
 	// A run that fails before it starts (e.g. a missing secret) is reported too (ADR 0027).
 	if f, ok := runs.StartFailure(s.dir, name, data, trigger, t.Environment, false, err); ok {
 		s.onError.Add(f)
 	}
-	return run.ID, err
+	if err != nil {
+		return triggers.Started{}, err
+	}
+	return triggers.Started{ID: run.ID, Wait: func(ctx context.Context) (triggers.Outcome, bool) { return s.waitRun(ctx, pend) }}, nil
 }
 
 // runOnError runs the error workflow of a failed run and waits until it has ended (ADR
@@ -293,25 +296,36 @@ type startOptions struct {
 	respond   action.Responder
 }
 
-// startFile starts a run of the saved workflow or pipeline name of the project.
-func (s *Server) startFile(name string, data []byte, o startOptions) (runs.Run, error) {
+// startFile starts a run of the saved workflow or pipeline name of the project. The
+// pending run is the handle to wait for it (runs.Manager.WaitLaunched).
+func (s *Server) startFile(name string, data []byte, o startOptions) (runs.Run, *runs.Pending, error) {
+	var pend *runs.Pending
+	var err error
 	if fileKind(name) == "pipeline" {
-		run, _, err := s.runs.StartPipeline(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
+		pend, _, err = s.runs.PreparePipelineRun(name, runs.PipelineSpec{Name: name, Data: data, ProjectDir: s.dir,
 			Env: o.env, Params: o.params, Registry: s.transforms, Trigger: o.trigger, Client: o.client,
 			Rows: o.rows, Respond: o.respond, History: o.history, NoOnError: o.noOnError})
-		return run, err
+	} else {
+		pend, _, err = s.runs.PrepareRun(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
+			ProjectDir: s.dir, Env: o.env, Params: o.params, Registry: s.registry, Transforms: s.transforms, Trigger: o.trigger,
+			Client: o.client, Request: o.request, Respond: o.respond, History: o.history, NoOnError: o.noOnError})
 	}
-	run, _, err := s.runs.Start(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
-		ProjectDir: s.dir, Env: o.env, Params: o.params, Registry: s.registry, Transforms: s.transforms, Trigger: o.trigger,
-		Client: o.client, Request: o.request, Respond: o.respond, History: o.history, NoOnError: o.noOnError})
-	return run, err
+	if err != nil {
+		return runs.Run{}, nil, err
+	}
+	run, err := s.runs.Launch(pend)
+	if err != nil {
+		return runs.Run{}, nil, err
+	}
+	return run, pend, nil
 }
 
-// waitRun waits until a run has ended (or ctx is done) for the default answer of an
-// http trigger with response: run (S38b1): the outputs of a workflow, the counts of the
-// transforms of a pipeline.
-func (s *Server) waitRun(ctx context.Context, id string) (triggers.Outcome, bool) {
-	d, ok := s.runs.Wait(ctx, id)
+// waitRun waits until the run of pend has ended (or ctx is done) for the default answer
+// of an http trigger with response: run (S38b1): the outputs of a workflow, the counts of
+// the transforms of a pipeline. It waits on the launched run, not on its id: with
+// history errors or none, a run that ends at once is no longer found by its id.
+func (s *Server) waitRun(ctx context.Context, pend *runs.Pending) (triggers.Outcome, bool) {
+	d, ok := s.runs.WaitLaunched(ctx, pend)
 	if !ok {
 		return triggers.Outcome{}, false
 	}

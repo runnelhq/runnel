@@ -26,12 +26,12 @@ type fake struct {
 	fail     error
 }
 
-func (f *fake) start(t *model.Trigger, r StartRequest) (string, error) {
+func (f *fake) start(t *model.Trigger, r StartRequest) (Started, error) {
 	params, client := r.Params, r.Client
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.fail != nil {
-		return "", f.fail
+		return Started{}, f.fail
 	}
 	id := fmt.Sprintf("run-%d", len(f.started)+1)
 	f.started = append(f.started, t.Name)
@@ -39,7 +39,7 @@ func (f *fake) start(t *model.Trigger, r StartRequest) (string, error) {
 	f.clients = append(f.clients, client)
 	f.requests = append(f.requests, r)
 	f.running[id] = true
-	return id, nil
+	return Started{ID: id}, nil
 }
 
 func (f *fake) isRunning(id string) bool {

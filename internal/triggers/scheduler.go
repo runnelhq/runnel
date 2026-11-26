@@ -28,11 +28,9 @@ var PollInterval = 5 * time.Second
 type Options struct {
 	// Dir is the project directory.
 	Dir string
-	// Start starts a run of the trigger's target and returns its id.
-	Start func(t *model.Trigger, r StartRequest) (string, error)
-	// Wait waits until a run has ended or ctx is done and returns its outcome, for the
-	// default answer of http triggers with response: run; false if the run is unknown.
-	Wait func(ctx context.Context, runID string) (Outcome, bool)
+	// Start starts a run of the trigger's target and returns its id and how to wait
+	// for it.
+	Start func(t *model.Trigger, r StartRequest) (Started, error)
 	// Running reports whether a run is still running (for overlap: skip).
 	Running func(runID string) bool
 	// Log receives messages for the server log, e.g. started and skipped runs.
@@ -89,6 +87,17 @@ type StartRequest struct {
 	History string
 	// Respond answers the waiting caller (http with response: run; http.response).
 	Respond action.Responder
+}
+
+// Started is a run that Start has started.
+type Started struct {
+	// ID is the id of the run.
+	ID string
+	// Wait waits until the run has ended or ctx is done and returns its outcome, for the
+	// default answer of http triggers with response: run; nil: no default answer. It
+	// must find the run even when it has already ended and its history (errors, none)
+	// dropped it, so it waits on the run itself, not on its id.
+	Wait func(ctx context.Context) (Outcome, bool)
 }
 
 // Outcome is the state of a run when it has ended.
@@ -336,12 +345,12 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 	if busy {
 		f.Skipped = true
 		msg = fmt.Sprintf("trigger %q: skipped, the previous run %s is still running (overlap: skip)", t.Name, running)
-	} else if id, err := s.opts.Start(t, StartRequest{Params: params, History: t.HistoryMode()}); err != nil {
+	} else if run, err := s.opts.Start(t, StartRequest{Params: params, History: t.HistoryMode()}); err != nil {
 		f.Error = err.Error()
 		msg = fmt.Sprintf("trigger %q: %s was not started: %v", t.Name, what, err)
 	} else {
-		f.RunID = id
-		msg = fmt.Sprintf("trigger %q: started %s, run %s", t.Name, what, id)
+		f.RunID = run.ID
+		msg = fmt.Sprintf("trigger %q: started %s, run %s", t.Name, what, run.ID)
 	}
 
 	s.mu.Lock()

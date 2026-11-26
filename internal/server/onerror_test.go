@@ -88,10 +88,11 @@ func TestOnError(t *testing.T) {
 	waitRun(t, s, run.ID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
 
 	// A trigger run fails.
-	id, err := s.startTrigger(trigger("params: { WHO: you }\n"), triggers.StartRequest{})
+	started, err := s.startTrigger(trigger("params: { WHO: you }\n"), triggers.StartRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	id := started.ID
 	e := errorRuns(t, s, 1)[0]
 	d := waitRun(t, s, e.ID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })
 	if d.Status != "succeeded" || d.Parent != id || d.Trigger != "error" || d.Environment != "dev" || d.Path != "workflows/report.workflow.yaml" {

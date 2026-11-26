@@ -134,7 +134,7 @@ func New(opts Options) (*Server, error) {
 	}
 	s.onError = runs.NewErrorQueue(s.runOnError, s.warn)
 	s.runs.OnFailed(s.onError.Add)
-	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Wait: s.waitRun, Running: s.running, Log: opts.Log, Warn: opts.Warn,
+	s.triggers = triggers.New(triggers.Options{Dir: opts.Dir, Start: s.startTrigger, Running: s.running, Log: opts.Log, Warn: opts.Warn,
 		Listen: opts.TriggerListen, TLS: opts.TriggerTLS})
 	return s, nil
 }

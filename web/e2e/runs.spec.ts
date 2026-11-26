@@ -93,10 +93,21 @@ test("shows new runs without reloading and counts running ones in the header", a
 
   const res = await request.post("/api/v1/runs", { data: { path, params: { WAIT: "3s" } } });
   expect(res.status()).toBe(201);
+  const id = ((await res.json()) as { id: string }).id;
   // The run appears while running, the header counts it, and it ends without reloading.
   await expect(rows).toHaveCount(before + 1);
   await expect(rows.nth(0)).toContainText("Running");
-  await expect(page.getByRole("button", { name: /^Runs/ })).toContainText("1");
+  // The header counts all running runs of the project, also those that other tests start
+  // on this server at the same time: it shows as many as the API, this run among them.
+  const count = page.getByRole("button", { name: /^Runs/ }).getByTitle(/ running$/);
+  await expect
+    .poll(async () => {
+      const list = await request.get("/api/v1/runs?status=running");
+      const running = ((await list.json()) as { runs?: { id: string }[] }).runs ?? [];
+      const shown = Number((await count.allTextContents())[0] ?? "0");
+      return running.some((r) => r.id === id) && shown === running.length;
+    })
+    .toBe(true);
   await expect(rows.nth(0)).toContainText("Succeeded", { timeout: 10_000 });
 });
 

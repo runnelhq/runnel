@@ -267,3 +267,40 @@ func TestHistoryManyRuns(t *testing.T) {
 		t.Errorf("%d of %d runs started", len(all), n)
 	}
 }
+
+// The history is written in the background and may still say "running" for a run that
+// has just ended in memory: a filter by status follows the state in memory, so that the
+// run is neither counted as running (the count in the header of the editor) nor missing.
+func TestFindPrefersMemoryOverLaggingHistory(t *testing.T) {
+	m, store, _ := withHistory(t, t.TempDir())
+	s := spec(waitBody)
+	s.Params = map[string]string{"DELAY": "0s"}
+	run, _, err := m.Start("workflows/test.workflow.yaml", s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := m.Wait(context.Background(), run.ID); d.Status != workflow.Succeeded {
+		t.Fatalf("run %+v", d.Run)
+	}
+	// Wait until the writer has stored the end, then put the run back as running: what
+	// a reader sees while the writer is behind.
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		if h, ok, _ := store.Get(context.Background(), run.ID); ok && h.Run.Status == string(workflow.Succeeded) {
+			stale := h.Run
+			stale.Status, stale.Finished = string(StatusRunning), nil
+			if err := store.PutRun(context.Background(), stale); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the end of the run was not written")
+		}
+	}
+	if got, err := m.Find(context.Background(), history.Filter{Status: string(StatusRunning)}); err != nil || len(got) != 0 {
+		t.Errorf("running: %v %+v", err, got)
+	}
+	if got, err := m.Find(context.Background(), history.Filter{Status: string(workflow.Succeeded)}); err != nil || len(got) != 1 || got[0].ID != run.ID {
+		t.Errorf("succeeded: %v %+v", err, got)
+	}
+}
