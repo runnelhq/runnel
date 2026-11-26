@@ -24,6 +24,7 @@ func TestCatalog(t *testing.T) {
 		{"catalog-start.golden", []string{"catalog", "core.start"}},
 		{"catalog.golden.json", []string{"catalog", "--json"}},
 		{"catalog-sftp.golden", []string{"catalog", "sftp"}},
+		{"catalog-read.golden", []string{"catalog", "file.read"}}, // output, errors and limits (E15b)
 		{"catalog-expressions.golden", []string{"catalog", "--expressions"}},
 		{"catalog-expressions.golden.json", []string{"catalog", "--expressions", "--json"}},
 	}

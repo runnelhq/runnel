@@ -17,6 +17,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -33,6 +34,11 @@ var outputDefinition = transform.Definition{
 	Example:      "path: out/orders.xlsx\nsheet: Orders\nfields:\n  - { name: Nr }\n  - { name: Amount, format: \"#.##0,00\" }\n  - { name: Date, format: dd.MM.yyyy }\n  - { name: Share, excelFormat: 0.0% }\n",
 	Config:       output{},
 	New:          newOutput,
+	Reference: action.Reference{
+		Records: "Passes every written record on unchanged to all data links.",
+		Errors:  "A record with a value Excel cannot hold (more than 32,767 characters in a cell, a date before 1900, NaN) goes to the error link and is not written; without one, the pipeline stops. More than 1,048,576 rows, more than 16,384 columns and an existing workbook with ifExists: fail stop the pipeline. With replace, the workbook is written to a temporary file first.",
+		Limits:  []string{"The rows go through temporary files; the finished workbook is packed in memory at the end."},
+	},
 }
 
 type output struct {

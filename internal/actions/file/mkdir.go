@@ -21,6 +21,10 @@ var mkdirDefinition = action.Definition{
 	Example:     "path: \"archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n",
 	Config:      mkdir{},
 	New:         newMkdir,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "string", Description: "Path of the folder, relative paths with the project folder in front"}},
+		Errors:  "Fails when a file of that name exists or the folder cannot be created; an existing folder is no error.",
+	},
 }
 
 type mkdir struct {

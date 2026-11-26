@@ -21,6 +21,11 @@ var mkdirDefinition = action.Definition{
 	Example:     "connection: partner-sftp\npath: \"/outgoing/archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n",
 	Config:      mkdirAction{},
 	New:         newMkdir,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "string", Description: "Path of the folder on the server"}},
+		Errors:  "Fails when a file of that name exists, the folder cannot be created, or the connection fails (host key, certificate or sign-in refused, no answer within timeout); an existing folder is no error.",
+		Limits:  []string{"timeout limits creating the folder (default 10m)."},
+	},
 }
 
 type mkdirAction struct {

@@ -124,6 +124,28 @@ Regeln:
 - **Beschreibung** (`Description`): ein kurzer englischer Satz ohne Punkt; erscheint in der Palette des Editors.
 - Kommentar über der Definition: was die Action tut, Besonderheiten.
 
+### Ergebnis, Fehler und Grenzen (`Reference`, seit E15b)
+
+Jede Action beschreibt im Feld `Reference` der Definition, was sie liefert, wann sie scheitert und welche Grenzen
+gelten. `runnel catalog <typ>` zeigt es, `runnel catalog --json` (und `/api/v1/catalog`) enthält es als `outputs`,
+`errors` und `limits`; daraus entstehen die Referenz auf der Website und die Hilfe im Editor (E15d).
+
+```go
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the copied files in the target, without skipped ones"}},
+		Errors:  "Fails when nothing matches the source, and with ifExists: fail (the default) when a file exists in the target, checked before anything is copied.",
+	},
+```
+
+| Feld | Inhalt |
+|---|---|
+| `Outputs` | Teile von `result.output` mit ihrem Pfad als Name (`output` für den ganzen Wert, `output.status`, `output[].path` für die Einträge einer Liste), Typ und Beschreibung (eine Wendung ohne Punkt, wie `doc`). Typen: `string`, `integer`, `number`, `boolean`, `datetime`, `list`, `object`, `any`. **Pflicht** für jede Action mit `output`; Actions ohne stehen in `withoutOutput` im Vertragstest |
+| `Errors` | Wann die Action scheitert (Fehler-Links, Retry), mit dem Verhalten von `ifExists`/`ifMissing`; „Never fails.“, wenn sie nie scheitert. **Pflicht** |
+| `Limits` | Grenzen für Größe, Anzahl und Zeit mit ihren Standardwerten, z. B. `maxSize`, `timeout`; leer, wenn es keine gibt |
+
+Texte englisch, als Sätze mit Punkt; Felder der Konfiguration mit ihrem Namen (`maxSize`), Zahlen mit Tausender-Komma
+(`100,000`). Jede Angabe am Code prüfen – Standardwerte stehen in den Konstanten und `schema`-Tags, nicht im Gedächtnis.
+
 ## 5. Ausführen (`Execute`)
 
 ```go
@@ -184,7 +206,9 @@ Pflicht:
 - **Abbruch** für Actions, die länger laufen können (`context.WithCancel` / `WithTimeout`).
 - **Vertragstest** (`internal/actions/actions_test.go`) läuft automatisch für jede Action: Kategorie, Bezeichnung,
   Beschreibungen aller Felder, Beispielkonfiguration aus dem Schema (Beispiele, Standardwerte, erlaubte Werte) wird von
-  `New` angenommen, Abbruch mit dieser Konfiguration. Pflichtfelder brauchen dafür ein realistisches `example`.
+  `New` angenommen, Abbruch mit dieser Konfiguration. Pflichtfelder brauchen dafür ein realistisches `example`. Dazu
+  `Reference` (seit E15b): `Errors` immer, `Outputs` außer für Actions in `withoutOutput`, bekannte Typen, Namen unter
+  `output` (`actiontest.CheckReference`).
 - **Golden-Dateien** `internal/cli/testdata/catalog*.golden*` mit `go test ./internal/cli -update` neu erzeugen und den
   Diff prüfen – er zeigt, wie die Action im Editor erscheint.
 - Nur `t.TempDir()` und lokale Testserver (`httptest`), keine Abhängigkeit von Netz oder Rechnernamen.
@@ -207,6 +231,7 @@ Pflicht:
 - [ ] `Category`, `Label`, `Description`, `Config` gesetzt; jedes Feld mit `doc`, Pflichtfelder mit `required` und `example`
 - [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name)
 - [ ] `Example` (die `with:`-Werte in YAML) für den Abschnitt „Help“ im Editor; der Vertragstest prüft es
+- [ ] `Reference`: `Outputs` (Teile von `result.output`), `Errors`, `Limits` – am Code geprüft
 - [ ] Konfiguration über `DecodeConfig`; `New` prüft nur Struktur, Werte werden in `Execute` geprüft
 - [ ] `ctx` wird beachtet (Abbruch, Timeout); keine Panics; keine Secrets im Log
 - [ ] Verständliche englische Fehlermeldungen

@@ -9,6 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -26,6 +27,15 @@ var groupByDefinition = transform.Definition{
 	Config:       groupBy{},
 	New:          newGroupBy,
 	RecordErrors: true,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "<groupBy>", Type: "any", Description: "The values of the group, with their type"},
+			{Name: "<aggregates[].name>", Type: "any", Description: "The aggregate: int for count and countDistinct, text for concat, decimal for avg of int, else the type of the field"},
+		},
+		Records: "Passes on one record per group, with only the group fields and the aggregates, in the order the groups first appeared, once its input has ended; without groupBy exactly one record, also for no input.",
+		Errors:  "A record with a value that does not fit its function (e.g. text in sum) goes to the error link and counts in no group; without one, the pipeline stops.",
+		Limits:  []string{"Holds one entry per group in memory; it grows with the number of groups, not of records."},
+	},
 }
 
 type groupBy struct {

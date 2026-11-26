@@ -275,6 +275,9 @@ type Definition struct {
 	// Schema is the schema of the configuration where there is no Config, as for the
 	// transforms of plugins (ADR 0019, S50a).
 	Schema *schema.Schema
+	// Reference documents the fields it sets, the records it passes on, the errors and
+	// the limits of the transform (E15b).
+	action.Reference
 	// New creates a transform from its "with" configuration (variables resolved).
 	New func(with map[string]any) (Transform, error)
 	// RecordErrors is set for transforms that pass records they cannot process to an
@@ -317,6 +320,7 @@ type Descriptor struct {
 	InfoInput bool `json:"infoInput,omitempty"`
 	// Plugin: see Definition.Plugin.
 	Plugin string `json:"plugin,omitempty"`
+	action.Reference
 }
 
 // Registry holds the available transform types.
@@ -353,7 +357,7 @@ func (r *Registry) Register(d Definition) {
 	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, Example: d.Example, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
-		DetectFields: d.DetectFields != nil, InfoInput: d.InfoInput, Plugin: d.Plugin}
+		DetectFields: d.DetectFields != nil, InfoInput: d.InfoInput, Plugin: d.Plugin, Reference: d.Reference}
 }
 
 // With returns a copy of the registry with more transform types (those of the plugins

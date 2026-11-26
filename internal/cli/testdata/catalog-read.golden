@@ -1,0 +1,28 @@
+action file.read – Read File (category files)
+Reads a small text file into the workflow, as text, lines or JSON; output: content, value or lines, size and modified
+
+Fields (with:):
+  path       File to read, relative to the project folder or absolute
+             string, required, e.g. config/settings.json
+  format     How the content is read: text, lines (a list without line ends) or json (a value, e.g. {{ results.read.output.value.customers }})
+             string, one of text|lines|json, default text
+  encoding   Encoding of the file; auto recognizes UTF-8 with or without byte order mark and UTF-16
+             string, one of auto|utf-8|windows-1252|utf-16, default auto
+  ifMissing  If the file does not exist: fail, or go on with empty content (output missing: true)
+             string, one of fail|empty, default fail
+  maxSize    Largest file to read, e.g. 500KB or 10MB; the content goes into the result of the run
+             string, default 10MB
+
+Output (result.output):
+  output.content   string    The text of the file
+  output.lines     list      With format: lines, the lines without line ends
+  output.value     any       With format: json, the value
+  output.size      integer   Size of the file in bytes
+  output.modified  datetime  Time of the last change; missing for a missing file
+  output.missing   boolean   true if the file does not exist (ifMissing: empty); else not set
+
+Errors:
+  Fails when the file is missing (unless ifMissing: empty), is a folder, is larger than maxSize, cannot be decoded or, with format: json, is not exactly one valid JSON value.
+
+Limits:
+  - maxSize limits the file (default 10MB); its content becomes part of the result of the run.

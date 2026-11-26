@@ -31,6 +31,18 @@ var readDefinition = action.Definition{
 	Example:     "path: config/customers.json\nformat: json\n",
 	Config:      readFile{},
 	New:         newReadFile,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.content", Type: "string", Description: "The text of the file"},
+			{Name: "output.lines", Type: "list", Description: "With format: lines, the lines without line ends"},
+			{Name: "output.value", Type: "any", Description: "With format: json, the value"},
+			{Name: "output.size", Type: "integer", Description: "Size of the file in bytes"},
+			{Name: "output.modified", Type: "datetime", Description: "Time of the last change; missing for a missing file"},
+			{Name: "output.missing", Type: "boolean", Description: "true if the file does not exist (ifMissing: empty); else not set"},
+		},
+		Errors: "Fails when the file is missing (unless ifMissing: empty), is a folder, is larger than maxSize, cannot be decoded or, with format: json, is not exactly one valid JSON value.",
+		Limits: []string{"maxSize limits the file (default 10MB); its content becomes part of the result of the run."},
+	},
 }
 
 type readFile struct {

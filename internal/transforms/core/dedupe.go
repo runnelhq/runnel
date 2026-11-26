@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -23,6 +24,11 @@ var dedupeDefinition = transform.Definition{
 	Example:     "fields: [email]\nignoreCase: true\n",
 	Config:      dedupe{},
 	New:         newDedupe,
+	Reference: action.Reference{
+		Records: "Passes on the first record of each combination of values at once and drops the repeated ones; the log counts them.",
+		Errors:  "Never fails while the pipeline runs.",
+		Limits:  []string{"Holds the combinations seen in memory; it grows with the number of different records."},
+	},
 }
 
 type dedupe struct {

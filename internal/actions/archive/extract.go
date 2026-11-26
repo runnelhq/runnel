@@ -37,6 +37,14 @@ var extractDefinition = action.Definition{
 	Example:     "source: inbox/delivery.zip\ntarget: inbox/delivery\npattern: \"*.csv\"\n",
 	Config:      extract{},
 	New:         newExtract,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the unpacked files"}},
+		Errors:  "Fails before anything is written when an entry would leave the folder (.., absolute paths, drive letters, reserved names on Windows), the limits are exceeded or, with ifExists: fail (the default), a file exists. Also fails when the archive cannot be read or unpacks to more than maxSize while writing. Links and special files are left out with a warning.",
+		Limits: []string{
+			"maxSize limits the total size of the unpacked files (default 1GB); it is counted again while writing, as an archive may state less than it holds.",
+			"maxFiles limits the number of entries in the archive (default 10,000).",
+		},
+	},
 }
 
 type extract struct {

@@ -28,6 +28,19 @@ var queryDefinition = action.Definition{
 	Example:     "connection: app-db\nsql: SELECT COUNT(*) AS open FROM orders WHERE status = @status\nparams:\n  status: open\n",
 	Config:      queryAction{},
 	New:         newQuery,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.rows", Type: "list", Description: "The rows, each an object with the columns by name"},
+			{Name: "output.count", Type: "integer", Description: "Number of rows"},
+			{Name: "output.first", Type: "object", Description: "The first row; null without rows"},
+			{Name: "output.value", Type: "any", Description: "The first column of the first row, e.g. of SELECT COUNT(*); null without rows"},
+		},
+		Errors: "Fails when the connection cannot be opened, a parameter @name has no value, the database rejects the query, a column name appears twice, the query returns more than maxRows rows, or it takes longer than timeout.",
+		Limits: []string{
+			"maxRows limits the rows (default 1000); they are held in memory and in the result of the run, so larger results belong into a pipeline with db.table-input.",
+			"timeout limits the query (default 1m).",
+		},
+	},
 }
 
 // defaultMaxRows limits the rows a query may return (held in memory and in the result).

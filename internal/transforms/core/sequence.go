@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -22,6 +23,12 @@ var sequenceDefinition = transform.Definition{
 	Example:     "name: position\nstart: 10\nstep: 10\ngroupBy: [Nr]\n",
 	Config:      sequence{},
 	New:         newSequence,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<name>", Type: "int", Description: "The number of the record, from start in steps of step"}},
+		Records: "Passes every record on with the number, in the order they arrive.",
+		Errors:  "Stops the pipeline when start or step is not a whole number.",
+		Limits:  []string{"With groupBy, one counter per group is kept in memory."},
+	},
 }
 
 type sequence struct {

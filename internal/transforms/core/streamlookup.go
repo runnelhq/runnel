@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -26,6 +27,12 @@ var streamLookupDefinition = transform.Definition{
 	New:          newStreamLookup,
 	RecordErrors: true,
 	InfoInput:    true,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<return[].as>", Type: "any", Description: "The value of the lookup field, or its default; without as, under the name of the lookup field"}},
+		Records: "Reads the info link to the end first, then passes every record of the data links on with the returned fields; with notFound: drop, records without a match are dropped.",
+		Errors:  "With notFound: error or multiple: error, such a record goes to the error link; without one, the pipeline stops. More lookup records than maxRecords and a missing info link stop the pipeline.",
+		Limits:  []string{"maxRecords limits the lookup records held in memory (default 100,000)."},
+	},
 }
 
 // defaultMaxLookupRecords is the default of maxRecords (mockup S23b).

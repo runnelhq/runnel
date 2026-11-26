@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -28,6 +29,10 @@ var outputDefinition = transform.Definition{
 	Example:      "path: out/orders.csv\nfields:\n  - { name: Datum, format: dd.MM.yyyy }\n  - { name: Betrag, format: \"#.##0,00\" }\n",
 	Config:       output{},
 	New:          newOutput,
+	Reference: action.Reference{
+		Records: "Passes every written record on unchanged to all data links.",
+		Errors:  "A record with a value that cannot be written in its format or encoding goes to the error link and is not written; without one, the pipeline stops. With ifExists: fail, an existing file stops the pipeline before anything is written. Except with ifExists: append, the file is written to a temporary file first and replaces an existing one only once all records are written, so a failure leaves the old file.",
+	},
 }
 
 type output struct {

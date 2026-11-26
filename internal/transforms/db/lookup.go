@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/sqldb"
@@ -28,6 +29,12 @@ var lookupDefinition = transform.Definition{
 	New:          newLookup,
 	RecordErrors: true,
 	Parallel:     true,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<return[].as>", Type: "any", Description: "The value of the column, or its default; without as, under the name of the column"}},
+		Records: "Passes every record on with the returned columns; with notFound: drop, records without a matching row are dropped.",
+		Errors:  "With notFound: error or multiple: error, such a record goes to the error link; without one, the pipeline stops. A failing query or one longer than timeout stops the pipeline.",
+		Limits:  []string{"cache keeps the results of the last keys in memory (default 1000); timeout limits each query (default 30s)."},
+	},
 }
 
 type lookup struct {

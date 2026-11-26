@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -23,6 +24,14 @@ var splitFieldDefinition = transform.Definition{
 	Example:     "field: name\nseparator: \", \"\ninto: [lastName, firstName]\n",
 	Config:      splitField{},
 	New:         newSplitField,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "<into>", Type: "string", Description: "The parts in order; more parts stay together in the last field, missing ones are empty"},
+			{Name: "<indexField>", Type: "int", Description: "With rows, the position of the part, starting at 1"},
+		},
+		Records: "With into, passes every record on with the parts; with rows, one record per part with field set to the part, and a record without a value once.",
+		Errors:  "Never fails while the pipeline runs.",
+	},
 }
 
 type splitField struct {

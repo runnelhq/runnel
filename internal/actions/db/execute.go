@@ -23,6 +23,11 @@ var executeDefinition = action.Definition{
 	Example:     "connection: app-db\nsql: DELETE FROM orders WHERE created < @before\nparams:\n  before: ${CUTOFF_DATE}\n",
 	Config:      executeAction{},
 	New:         newExecute,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output.rowsAffected", Type: "integer", Description: "Rows changed by the statement; -1 if the database does not tell"}},
+		Errors:  "Fails when the connection cannot be opened, a parameter @name has no value, the database rejects the statement, or it takes longer than timeout.",
+		Limits:  []string{"timeout limits the statement (default 5m)."},
+	},
 }
 
 type executeAction struct {

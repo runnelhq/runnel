@@ -30,6 +30,11 @@ var uploadDefinition = action.Definition{
 	Example:     "connection: partner-sftp\nsource: outbox/*.csv\ntarget: /incoming/\n",
 	Config:      uploadAction{},
 	New:         newUpload,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the uploaded files on the server, without skipped ones"}},
+		Errors:  "Fails when nothing matches the source, the connection fails (host key, certificate or sign-in refused, no answer within timeout), and with ifExists: fail (the default) when a file exists on the server, checked before anything is uploaded. Each file is written to a temporary name and renamed when complete.",
+		Limits:  []string{"timeout limits each file (default 10m); the timeout of the action limits all together."},
+	},
 }
 
 type uploadAction struct {

@@ -24,6 +24,20 @@ var listDefinition = action.Definition{
 	Example:     "connection: partner-sftp\nfolder: /outgoing\npattern: \"*.csv\"\n",
 	Config:      listAction{},
 	New:         newList,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output[].path", Type: "string", Description: "Path of the entry on the server; the list is sorted by path"},
+			{Name: "output[].name", Type: "string", Description: "Name of the file or folder"},
+			{Name: "output[].size", Type: "integer", Description: "Size in bytes"},
+			{Name: "output[].modified", Type: "datetime", Description: "Time of the last change, to the second"},
+			{Name: "output[].folder", Type: "boolean", Description: "true for a folder"},
+		},
+		Errors: "Fails when the folder does not exist on the server, the connection fails (host key, certificate or sign-in refused, no answer within timeout), or there are more entries than the limit.",
+		Limits: []string{
+			"At most 10,000 entries, as they are held in the result of the run; narrow the list with pattern or without recursive.",
+			"timeout limits the listing (default 10m).",
+		},
+	},
 }
 
 type listAction struct {

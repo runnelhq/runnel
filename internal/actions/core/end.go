@@ -25,6 +25,9 @@ var (
 			}
 			return &end{kind: action.EndSuccess, message: c.Message}, nil
 		},
+		Reference: action.Reference{
+			Errors: "Never fails. Ends the workflow as successful at once: its links are not followed and actions still running are cancelled.",
+		},
 	}
 	abortDefinition = action.Definition{
 		Type:        "core.abort",
@@ -39,6 +42,9 @@ var (
 				return nil, err
 			}
 			return &end{kind: action.EndFailure, message: c.Message}, nil
+		},
+		Reference: action.Reference{
+			Errors: "Ends the workflow as failed at once, with the message: failure links are not followed and actions still running are cancelled.",
 		},
 	}
 )

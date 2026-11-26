@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
 
 	"github.com/runnelhq/runnel/internal/record"
@@ -26,6 +27,10 @@ var filterDefinition = transform.Definition{
 	Example:      "condition: \"{{ record.umsatz > 0 && record.ort != '' }}\"\nelse: rejected\n",
 	Config:       filter{},
 	New:          newFilter,
+	Reference: action.Reference{
+		Records: "Passes the records for which the condition is true to the data links; the others go to the transform named in else, or are dropped and counted in the log.",
+		Errors:  "A record whose condition cannot be evaluated goes to the error link; without one, the pipeline stops.",
+	},
 }
 
 type filter struct {

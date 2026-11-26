@@ -32,6 +32,21 @@ var powershellDefinition = action.Definition{
 	Example:     "script: |\n  param([string]$Folder)\n  Get-ChildItem $Folder | Select-Object Name, Length | ConvertTo-Json\nparams:\n  Folder: data\njson: true\n",
 	Config:      powershellAction{},
 	New:         newPowershell,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.exitCode", Type: "integer", Description: "Exit code of PowerShell"},
+			{Name: "output.stdout", Type: "string", Description: "Standard output; values of env are hidden"},
+			{Name: "output.stderr", Type: "string", Description: "Error output; values of env are hidden"},
+			{Name: "output.truncated", Type: "boolean", Description: "true if stdout or stderr was longer than maxOutput"},
+			{Name: "output.duration", Type: "string", Description: "Running time, e.g. 1.25s"},
+			{Name: "output.json", Type: "any", Description: "With json, the last JSON value of stdout, e.g. of ConvertTo-Json"},
+		},
+		Errors: "Fails when the edition is not installed, the script file is missing, the script ends with an exit code other than 0 (an uncaught error included), it runs longer than timeout (it is ended with all processes it started), or with json stdout holds no JSON.",
+		Limits: []string{
+			"timeout limits the script (default 10m).",
+			"maxOutput limits stdout and stderr each (default 1MB, at most 1GB); more is dropped.",
+		},
+	},
 }
 
 //go:embed runner.ps1

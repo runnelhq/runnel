@@ -19,6 +19,10 @@ var copyDefinition = action.Definition{
 	Example:     "source: inbox/*.csv\ntarget: archive/\nifExists: replace\n",
 	Config:      transfer{},
 	New:         newCopy,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the copied files in the target, without skipped ones"}},
+		Errors:  "Fails when nothing matches the source, and with ifExists: fail (the default) when a file exists in the target, checked before anything is copied; a file and a folder of the same name always conflict. A cancelled run stops between two blocks.",
+	},
 }
 
 type copyAction struct{ transfer }

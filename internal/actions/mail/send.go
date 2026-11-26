@@ -26,6 +26,18 @@ var sendDefinition = action.Definition{
 	Example:     "connection: mail\nto: ${ADMIN_MAIL}\nsubject: \"Import failed: {{ run.id }}\"\nbody: \"{{ run.lastError }}\"\n",
 	Config:      sendAction{},
 	New:         newSend,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "output.messageId", Type: "string", Description: "Message-ID of the mail"},
+			{Name: "output.recipients", Type: "integer", Description: "Number of recipients in to, cc and bcc"},
+			{Name: "output.size", Type: "integer", Description: "Size of the mail in bytes"},
+		},
+		Errors: "Fails when the mail has no sender or recipient, an address or attachment is invalid, the attachments are too large, the server cannot be reached within the timeout of the connection, refuses the sign-in or a recipient, or accepts no mail of this size.",
+		Limits: []string{
+			"Attachments may be at most 25 MB together.",
+			"The timeout of the connection limits connecting and sending (default 1m).",
+		},
+	},
 }
 
 type sendAction struct {

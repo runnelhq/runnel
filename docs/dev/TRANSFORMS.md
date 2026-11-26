@@ -35,6 +35,18 @@ internal/transforms/<namensraum>/
   Konfiguration bekommt ein **`Example`** (die `with:`-Werte in YAML) für die Hilfe im Panel; der Vertragstest prüft,
   dass `New` es annimmt.
 
+- **Ergebnis, Fehler und Grenzen** (`Reference`, seit E15b) wie bei Actions ([ACTIONS.md](ACTIONS.md#ergebnis-fehler-und-grenzen-reference-seit-e15b)),
+  mit diesen Unterschieden:
+
+  | Feld | Inhalt bei Transforms |
+  |---|---|
+  | `Outputs` | Felder, die der Transform hinzufügt oder ändert, mit einem Typ nach ADR 0007 (`string`, `int`, `decimal`, `float`, `bool`, `date`, `datetime`, `binary`, `json`) oder `any`, wenn er den Werten folgt. Steht der Name in der Konfiguration, wird deren Feld in spitzen Klammern genannt (`<name>`, `<fields[].name>`); der Vertragstest prüft, dass es das Feld gibt. Leer, wenn der Transform keine Felder setzt |
+  | `Records` | **Pflicht:** welche Datensätze der Transform weitergibt und über welche Links (alle Daten-Links, Ziele wie `else` und `default`, eigene Eingaben ohne eingehende Links) |
+  | `Errors` | **Pflicht:** was auf den Fehler-Link geht (die Felder `_error`, `_errorField` und `_errorTransform` nicht wiederholen) und was die Pipeline anhält, z. B. „A record whose condition cannot be evaluated goes to the error link; without one, the pipeline stops.“ |
+  | `Limits` | Grenzen, auch was im Speicher gehalten wird (`core.sort`: alle Datensätze), mit Standardwerten |
+
+  `Reference` ist ein eingebettetes Feld der Definition (`Reference: action.Reference{…}`), am Ende der Definition.
+
 ## 2. Verarbeiten (`Process`)
 
 ```go
@@ -116,6 +128,7 @@ func TestUpper(t *testing.T) {
 - [ ] Eine Datei je Transform, Eintrag in `register.go`, Kategorie, Label, Beschreibung, `doc` für jedes Feld
 - [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name)
 - [ ] Feldnamen mit `format=runnel-field`, Link-Ziele mit `format=runnel-target`; ein `Example`
+- [ ] `Reference`: `Outputs` (gesetzte Felder), `Records`, `Errors`, `Limits` – am Code geprüft
 - [ ] Werte mit Variablen werden in `Process` geprüft; `Emit`-Fehler werden zurückgegeben
 - [ ] `Init` meldet das Ausgabeschema und alle gelesenen Felder (`ic.Use`), mit Tests
 - [ ] Tests mit `transformtest`, Vertragstest grün, Katalog-Goldens geprüft

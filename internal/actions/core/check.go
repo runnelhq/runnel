@@ -20,6 +20,10 @@ var checkDefinition = action.Definition{
 	Example:     "condition: \"{{ len(results.list.output) > 0 }}\"\nmessage: No order files in the inbox\n",
 	Config:      checkAction{},
 	New:         newCheck,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "boolean", Description: "true if the condition is true"}},
+		Errors:  "Fails with the message (or \"the condition is false\") when the condition is false, and when it is neither true nor false; the failure link can report it.",
+	},
 }
 
 type checkAction struct {

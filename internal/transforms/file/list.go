@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions/file"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -26,6 +27,18 @@ var listDefinition = transform.Definition{
 	Example:     "folder: inbox\npattern: \"*.csv\"\nrecursive: true\n",
 	Config:      list{},
 	New:         newList,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{
+			{Name: "path", Type: "string", Description: "Path of the entry"},
+			{Name: "name", Type: "string", Description: "Name of the file or folder"},
+			{Name: "extension", Type: "string", Description: "Ending of the name with the dot, e.g. .csv; empty for folders"},
+			{Name: "size", Type: "int", Description: "Size in bytes"},
+			{Name: "modified", Type: "datetime", Description: "Time of the last change, to the second"},
+			{Name: "folder", Type: "bool", Description: "true for a folder"},
+		},
+		Records: "Creates one record per entry of the folder, in the order of their paths; it has no incoming links.",
+		Errors:  "Stops the pipeline when the folder does not exist or cannot be read.",
+	},
 }
 
 type list struct {

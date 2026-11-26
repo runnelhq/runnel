@@ -298,6 +298,7 @@ func describe(ctx context.Context, projectDir string, p *model.Plugin, store plu
 func definition(plugin string, d action.Descriptor) action.Definition {
 	return action.Definition{
 		Type: d.Type, Category: d.Category, Plugin: plugin, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
+		Reference: d.Reference,
 		New: func(with map[string]any) (action.Action, error) {
 			if err := schema.CheckConfig(d.Schema, with); err != nil {
 				return nil, err
@@ -362,7 +363,7 @@ func transformDefinition(projectDir string, p *model.Plugin, store plugintrust.S
 	d := tt.Descriptor
 	def := transform.Definition{
 		Type: d.Type, Category: d.Category, Plugin: p.Name, Label: d.Label, Description: d.Description, Example: d.Example, Schema: d.Schema,
-		RecordErrors: d.RecordErrors, Parallel: d.Parallel,
+		RecordErrors: d.RecordErrors, Parallel: d.Parallel, Reference: d.Reference,
 		New: func(with map[string]any) (transform.Transform, error) {
 			if err := schema.CheckConfig(d.Schema, with); err != nil {
 				return nil, err

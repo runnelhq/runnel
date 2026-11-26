@@ -23,6 +23,10 @@ var moveDefinition = action.Definition{
 	Example:     "source: inbox/orders.csv\ntarget: done/\n",
 	Config:      transfer{},
 	New:         newMove,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "New paths of the moved files and folders, without skipped ones"}},
+		Errors:  "Fails when nothing matches the source, and with ifExists: fail (the default) when a file exists in the target, checked before anything is moved; also when a copied source across drives cannot be deleted.",
+	},
 }
 
 type moveAction struct{ transfer }

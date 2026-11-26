@@ -25,6 +25,14 @@ var moveDefinition = action.Definition{
 	Example:     "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: /outgoing/archive/\n",
 	Config:      moveAction{},
 	New:         newMove,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "New paths on the server, without skipped ones"}},
+		Errors:  "Fails when nothing matches the source, the connection fails (host key, certificate or sign-in refused, no answer within timeout), the server cannot rename (e.g. to another file system), and with ifExists: fail (the default) when a file exists in the target, checked before anything is moved.",
+		Limits: []string{
+			"A path with wildcards may match at most 10,000 entries.",
+			"timeout limits each file or folder (default 10m).",
+		},
+	},
 }
 
 type moveAction struct {

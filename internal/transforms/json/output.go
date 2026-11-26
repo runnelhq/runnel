@@ -17,6 +17,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -35,6 +36,10 @@ var outputDefinition = transform.Definition{
 	Example:      "path: out/orders.json\nfields:\n  - { name: id }\n  - { name: day, format: dd.MM.yyyy }\n",
 	Config:       output{},
 	New:          newOutput,
+	Reference: action.Reference{
+		Records: "Passes every written record on unchanged to all data links.",
+		Errors:  "A record with a value that cannot be written (e.g. in its format) goes to the error link and is not written; without one, the pipeline stops. With ifExists: fail, an existing file stops the pipeline. The file is written to a temporary file first and replaces an existing one only once all records are written, so a failure leaves the old file.",
+	},
 }
 
 type output struct {

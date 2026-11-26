@@ -23,6 +23,11 @@ var waitDefinition = action.Definition{
 	Example:     "path: inbox/*.csv\nmaxWait: 30m\nstableFor: 10s\n",
 	Config:      wait{},
 	New:         newWait,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the matching files, sorted"}},
+		Errors:  "Fails when no file matches after maxWait, or the files still change in size after maxWait (stableFor), and when the folder cannot be read.",
+		Limits:  []string{"Looks every interval (default 5s, at least 10ms); without maxWait it waits until the timeout of the action or the end of the run."},
+	},
 }
 
 type wait struct {

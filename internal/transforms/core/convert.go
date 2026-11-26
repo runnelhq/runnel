@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -21,6 +22,11 @@ var convertDefinition = transform.Definition{
 	Example:      "fields:\n  - { name: kdnr, type: int }\n  - { name: umsatz, type: decimal, format: \"#.##0,00\" }\n",
 	Config:       convert{},
 	New:          newConvert,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "The value converted to the type of the field"}},
+		Records: "Passes every record on with the fields converted; a field missing in a record stays missing.",
+		Errors:  "A record with a value that cannot be converted goes unchanged to the error link; without one, the pipeline stops with record and field. Numbers are not rounded: 1.5 is no int.",
+	},
 }
 
 type convert struct {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/format"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -26,6 +27,12 @@ var inputDefinition = transform.Definition{
 	Config:       input{},
 	New:          newInput,
 	DetectFields: detectFields,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "The value at from with the type of the field; without fields, attributes as @name, child elements as text, objects or lists, own text as #text"}},
+		Records: "Creates one record per element that matches records and passes it to all data links; it has no incoming links.",
+		Errors:  "A record with a value that does not fit its type goes to the error link with its line; without one, the pipeline stops. Broken XML stops the pipeline with the line.",
+		Limits:  []string{"The file is read as a stream; a record may be at most 16 MiB and nested at most 256 levels deep. External entities are not resolved."},
+	},
 }
 
 type input struct {

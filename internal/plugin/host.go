@@ -271,6 +271,7 @@ func (pr *Process) Describe(ctx context.Context) (Description, error) {
 		}
 		seen[d.Type] = true
 		d.Kind = "action"
+		d.Records = "" // records are passed on by transforms only
 		if d.Label == "" {
 			d.Label = d.Type
 		}

@@ -33,6 +33,11 @@ var responseDefinition = transform.Definition{
 	Example:     "status: 200\nsingle: true\n",
 	Config:      response{},
 	New:         newResponse,
+	Reference: action.Reference{
+		Records: "Passes all records on unchanged to all data links. Once its input has ended, it answers the waiting caller with them as a JSON list (with single, the first record), if it received any; with whenEmpty also without, as a fallback.",
+		Errors:  "Stops the pipeline when there are more records than maxRecords or the status is invalid. Without a waiting caller, or when the caller has been answered already, it sends nothing.",
+		Limits:  []string{"maxRecords limits the records held in memory for the answer (default 10,000)."},
+	},
 }
 
 // DefaultMaxRows limits the records held in memory for an answer.

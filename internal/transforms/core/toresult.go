@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -22,6 +23,11 @@ var toResultDefinition = transform.Definition{
 	Example:     "maxRecords: 1000\n",
 	Config:      toResult{},
 	New:         newToResult,
+	Reference: action.Reference{
+		Records: "Passes all records on unchanged and adds them to the result of the pipeline: core.run-pipeline returns them as output.rows.",
+		Errors:  "Stops the pipeline when there are more records than maxRecords, or maxRecords is not a whole number of 1 or more.",
+		Limits:  []string{"maxRecords limits the records held in memory for the result (default 100,000)."},
+	},
 }
 
 // DefaultMaxResultRows limits the result records held in memory (ADR 0008).

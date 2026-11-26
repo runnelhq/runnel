@@ -133,7 +133,7 @@ Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
 | Methode | Antwort | Regeln |
 |---|---|---|
 | `initialize` | `protocolVersion` (1), `encoding` (`json`), `name` (wie in `plugin.yaml`), `version`, optional `concurrency` | Zeitgrenze 10 s; andere Version oder anderer Name: Plugin wird nicht genutzt |
-| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, optional `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example`); optional `transforms` (siehe [Transforms](#transforms)) und `connectionTypes` (siehe [Connection-Typen](#connection-typen)) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
+| `describe` | `actions`: Descriptoren wie die eingebauten (`type`, optional `category`, `label`, `description`, `schema` als JSON Schema der Konfiguration, optional `example` sowie `outputs`, `errors` und `limits` wie bei eingebauten, bei Transforms auch `records`); optional `transforms` (siehe [Transforms](#transforms)) und `connectionTypes` (siehe [Connection-Typen](#connection-typen)) | Zeitgrenze 10 s; Typen nur im eigenen Namensraum, jeder einmal, mit `schema` |
 | `action.execute` | `{"output": …}` (Text, Zahl, Liste, Objekt; im Workflow `result.output`) | `config` ist geprüft und aufgelöst (Variablen, Ausdrücke); ein Fehler ist eine Fehlerantwort, ihre `message` die Meldung der Action |
 | `connection.test` | `{"ok": true, "message": "…", "version": "…"}` | nur für Typen mit `"test": true`; `ok: false` mit `message` ist ein gescheiterter Test |
 | `shutdown` | `null` | danach schließt der Host stdin; nach 5 s beendet er den Prozess mit allen Kindprozessen |

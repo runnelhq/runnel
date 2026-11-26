@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/expr"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -23,6 +24,11 @@ var mapValuesDefinition = transform.Definition{
 	Example:     "field: status\nas: statusText\nvalues:\n  - { from: A, to: Active }\n  - { from: I, to: Inactive }\ndefault: Unknown\n",
 	Config:      mapValues{},
 	New:         newMapValues,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<as>", Type: "any", Description: "The new value; without as, it replaces the value of field"}},
+		Records: "Passes every record on with the value replaced by the table, the default, or unchanged.",
+		Errors:  "Never fails while the pipeline runs.",
+	},
 }
 
 type mapValues struct {

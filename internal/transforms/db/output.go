@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/sqldb"
@@ -28,6 +29,11 @@ var tableOutputDefinition = transform.Definition{
 	Config:       tableOutput{},
 	New:          newTableOutput,
 	RecordErrors: true,
+	Reference: action.Reference{
+		Records: "Passes every written record on unchanged to all data links, once its transaction is committed.",
+		Errors:  "When a transaction fails, its rows are written again one by one with an error link, so that only the failing records go there; without one, the pipeline stops and the transactions committed before stay.",
+		Limits:  []string{"commitSize rows per transaction (default 1000); timeout limits each transaction (default 5m)."},
+	},
 }
 
 var upsertDefinition = transform.Definition{
@@ -39,6 +45,11 @@ var upsertDefinition = transform.Definition{
 	Config:       upsert{},
 	New:          newUpsert,
 	RecordErrors: true,
+	Reference: action.Reference{
+		Records: "Passes every written record on unchanged to all data links, once its transaction is committed.",
+		Errors:  "When a transaction fails, its rows are written again one by one with an error link, so that only the failing records go there; without one, the pipeline stops and the transactions committed before stay.",
+		Limits:  []string{"commitSize rows per transaction (default 1000); timeout limits each transaction (default 5m)."},
+	},
 }
 
 type tableOutput struct {

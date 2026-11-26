@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/paths"
 	"github.com/runnelhq/runnel/internal/record"
@@ -29,6 +30,12 @@ var inputDefinition = transform.Definition{
 	Config:       input{},
 	New:          newInput,
 	DetectFields: detectFields,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "The column with the type of the field; without fields, every column as text, named by the header or field1, field2 …"}},
+		Records: "Creates one record per row (without the header) and passes it to all data links; it has no incoming links.",
+		Errors:  "A row with another number of values than the first, or with a value that does not fit its type, goes with its values as text to the error link, the message with file, line and column; without one, the pipeline stops. A missing file, a column missing in the header and other errors in the CSV (e.g. a stray quote) stop the pipeline.",
+		Limits:  []string{"The file is read as a stream, so it may be larger than the memory."},
+	},
 }
 
 type input struct {

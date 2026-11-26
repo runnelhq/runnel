@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
 )
@@ -25,6 +26,11 @@ var mergeJoinDefinition = transform.Definition{
 	Config:      mergeJoin{},
 	New:         newMergeJoin,
 	NamedInputs: true,
+	Reference: action.Reference{
+		Records: "Passes on one record per pair of left and right records with the same keys (n × m for repeated keys): the left fields, then the right fields the left records do not have. With join: left also left records without a partner, with full also right ones; their missing fields are empty.",
+		Errors:  "Stops the pipeline when an input is not sorted by the keys in ascending order, or when keys cannot be compared (e.g. text with a number).",
+		Limits:  []string{"Holds only the records of one key of each input in memory, so the inputs may be of any size."},
+	},
 }
 
 type mergeJoin struct {

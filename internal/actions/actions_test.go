@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/actions/actiontest"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/schema"
 )
@@ -51,7 +52,24 @@ func TestContract(t *testing.T) {
 				t.Errorf("configuration built from the schema was rejected (Config and New must use the same struct): %v", err)
 			}
 			checkExample(t, def, desc.Schema)
+			checkReference(t, def, desc.Schema)
 		})
+	}
+}
+
+// withoutOutput lists the actions that set no result.output; every other action
+// documents its output in Reference.Outputs (roadmap E15b).
+var withoutOutput = []string{"core.start", "core.success", "core.abort", "core.log", "core.wait", "core.dummy"}
+
+// checkReference checks the output, the errors and the limits of an action (E15b).
+func checkReference(t *testing.T, def action.Definition, s *schema.Schema) {
+	t.Helper()
+	actiontest.CheckReference(t, "action", def.Reference, s, action.OutputTypes)
+	switch none, has := slices.Contains(withoutOutput, def.Type), len(def.Outputs) > 0; {
+	case none && has:
+		t.Error("documents Outputs, but is listed in withoutOutput")
+	case !none && !has:
+		t.Error("missing Outputs: document result.output, or list the action in withoutOutput")
 	}
 }
 

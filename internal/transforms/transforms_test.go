@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/runnelhq/runnel/internal/actions/actiontest"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/schema"
@@ -52,9 +53,20 @@ func TestContract(t *testing.T) {
 				t.Errorf("configuration built from the schema was rejected (Config and New must use the same struct): %v", err)
 			}
 			checkExample(t, def, desc.Schema)
+			actiontest.CheckReference(t, "transform", def.Reference, desc.Schema, outputTypes)
 		})
 	}
 }
+
+// outputTypes are the types of fields a transform sets: those of records, or any if the
+// type follows the values.
+var outputTypes = func() []string {
+	types := []string{"any"}
+	for _, typ := range record.Types {
+		types = append(types, string(typ))
+	}
+	return types
+}()
 
 func checkSchema(t *testing.T, s *schema.Schema, path string) {
 	t.Helper()

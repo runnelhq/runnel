@@ -7,6 +7,9 @@ Fields (with:):
   level    Log level of the message
            string, one of debug|info|warn|error, default info
 
+Errors:
+  Fails only for an invalid level.
+
 transform core.log – Log (category output)
 Writes records to the run log and passes them on
 
@@ -17,3 +20,9 @@ Fields (with:):
           integer, default 1
   fields  Fields to write, in this order; empty: all fields
           list of string
+
+Records:
+  Passes all records on unchanged to all data links; writes every n-th of them (every) to the run log.
+
+Errors:
+  Stops the pipeline only for an invalid level.

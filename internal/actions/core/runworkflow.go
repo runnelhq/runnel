@@ -22,6 +22,10 @@ var runWorkflowDefinition = action.Definition{
 	Example:     "workflow: workflows/import-region.workflow.yaml\nparams:\n  REGION: north\n",
 	Config:      runWorkflow{},
 	New:         newRunWorkflow,
+	Reference: action.Reference{
+		Outputs: []action.OutputField{{Name: "output", Type: "object", Description: "The outputs of the called workflow by name, e.g. output.ROWS"}},
+		Errors:  "Fails when the workflow fails, cannot be started (file outside the project folder or missing, parameter not declared or invalid, calls itself) or is not in allowedTargets; cancelling the run cancels the called workflow.",
+	},
 }
 
 type runWorkflow struct {

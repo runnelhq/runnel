@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/transform"
@@ -24,6 +25,10 @@ var switchDefinition = transform.Definition{
 	Config:       switchRecords{},
 	New:          newSwitch,
 	RecordErrors: true,
+	Reference: action.Reference{
+		Records: "Passes each record to the transform of the first case whose condition is true, else to default; without default, the others are dropped and counted in the log.",
+		Errors:  "A record whose condition cannot be evaluated goes to the error link; without one, the pipeline stops.",
+	},
 }
 
 type switchRecords struct {
