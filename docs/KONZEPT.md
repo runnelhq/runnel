@@ -127,7 +127,7 @@ my-project/
   - Normaler **Daten-Link**
   - **Fehler-Link**: fehlerhafte Records werden mit Fehlerinfos (`_error`, `_errorField`, `_errorTransform`) umgeleitet statt die Pipeline abzubrechen
   - **Info-Link**: Nebeneingang (z. B. Lookup-Daten für „Stream Lookup“, seit S23b1), wird vor den Daten-Links vollständig gelesen
-- Verteilungsmodus bei mehreren Ausgängen: `copy` (jeder Ausgang bekommt jeden Record) oder `distribute` (Round-Robin), wie in Apache Hop.
+- Verteilungsmodus bei mehreren Ausgängen: `copy` (jeder Ausgang bekommt jeden Record) oder `roundRobin` (reihum; bis R5b `distribute`), wie in Apache Hop.
 - Transforms können mit **mehreren Kopien** (Parallelität) laufen, z. B. für teure HTTP-Lookups.
 
 ### 2.4 Link
@@ -565,7 +565,7 @@ Regeln des Pipeline-Formats (umgesetzt in `internal/model`, Stand S12; das Beisp
 - Graph: mindestens ein Transform, eindeutige IDs, Links nur zwischen vorhandenen Transforms, keine Links auf sich
   selbst und **keine Zyklen** (Datensätze fließen nur vorwärts). Warnungen: doppelte Links, Transforms ohne Verbindung.
 - Je Transform `copies: n` (1–64 parallele Instanzen, die sich die eingehenden Datensätze teilen; nur für Transforms,
-  die jeden Datensatz für sich verarbeiten – nicht für Ein- und Ausgaben) und `distribution: copy | distribute` (seit
+  die jeden Datensatz für sich verarbeiten – nicht für Ein- und Ausgaben) und `distribution: copy | roundRobin` (seit
   S17c). `settings:` der Pipeline: `batchSize` (Standard 500), `bufferSize` (Datensätze je Link, Standard 10.000,
   mindestens `batchSize`) und `strict` (ADR 0007). `layout` (Koordinaten je Transform-ID für den Editor) gibt es
   seit S25a1a; `disabled` ist noch ein unbekanntes Feld.
@@ -655,7 +655,7 @@ with:
   auth: { token: ${env:IMPORT_TOKEN} }   # oder: auth: none
   response: accepted         # sofort 202 mit der Lauf-ID; run: Antwort aus dem Lauf (seit S38b1)
   timeout: 30s               # nur bei run: so lange wartet der Aufrufer höchstens (Standard 30s)
-  maxConcurrent: 5           # laufende Runs dieses Triggers, darüber 429; Standard 4 (seit R5a), 0: kein eigenes Limit
+  maxConcurrentRuns: 5       # laufende Runs dieses Triggers, darüber 429; Standard 4 (seit R5a), 0: kein eigenes Limit; bis R5b maxConcurrent
   history: all               # all | errors | none – welche Läufe behalten werden (seit S38b2)
 ```
 
@@ -721,7 +721,7 @@ with:
   Felder des Formulars) und `.client`; ohne HTTP-Aufrufer ist `request` leer (`nil`), z. B.
   `{{ request?.body?.name ?? 'none' }}`. Der Header `Authorization` steht nicht darin. Aufgerufene Workflows sehen
   denselben `request`.
-  `maxConcurrent` oder `settings.maxConcurrentRuns` erreicht: `429`; Server wird beendet: `503`. Der Lauf trägt
+  `maxConcurrentRuns` des Triggers oder `settings.maxConcurrentRuns` des Projekts erreicht: `429`; Server wird beendet: `503`. Der Lauf trägt
   `trigger = http:<name>` und die Adresse des Aufrufers (`client`).
 
 ---
@@ -812,7 +812,7 @@ type Transform interface {
 
 - **Mehrere Eingänge** eines Transforms werden zu einem Strom gemischt (Reihenfolge zwischen den Zweigen nicht
   festgelegt); **mehrere Ausgänge** bekommen jeden Record (`copy`), ab dem zweiten als Kopie, damit Zweige sich nicht
-  gegenseitig verändern. Mit `distribution: distribute` bekommen die Daten-Links die Records reihum (Fehler-Links
+  gegenseitig verändern. Mit `distribution: roundRobin` (bis R5b `distribute`) bekommen die Daten-Links die Records reihum (Fehler-Links
   und `EmitTo` bleiben davon unberührt).
 - **Kopien** (`copies: n`): n Goroutinen mit je einer eigenen Instanz des Transforms lesen aus demselben Eingang und
   schreiben in dieselben Links; die Reihenfolge der Records ist danach nicht mehr festgelegt. Zähler und Ereignisse
@@ -911,7 +911,8 @@ Regeln: [ADR 0028](adr/0028-javascript-core-script.md).
   oder eine Überschreitung von `maxRecordTime` (Standard 1 s) schickt den Datensatz unverändert auf den Fehler-Link
   (`record 3: script, line 2: …`), ohne Fehler-Link endet die Pipeline. `init` läuft einmal vor dem ersten Datensatz
   auf oberster Ebene (seine Variablen und Funktionen sehen `script` und `end`), `end` nach dem letzten und darf weitere
-  Datensätze zurückgeben (z. B. Summen). `fields: [{ name, type }]` wandelt die Werte in die Typen um (wie
+  Datensätze zurückgeben (z. B. Summen); beide begrenzt `timeout` (Standard 1 min je Teil, seit R5b), darüber endet
+  die Pipeline. `fields: [{ name, type }]` wandelt die Werte in die Typen um (wie
   `core.convert`) und ergibt ein geschlossenes Schema; nicht aufgeführte Eigenschaften entfallen mit einer Warnung.
   Ohne `fields` folgen die Typen den Werten (ganze Zahl → `int`, `Date` → `datetime`, `Uint8Array` → `binary`, Objekt
   oder Liste → `json`), das Schema ist offen. `copies` ist erlaubt, je Kopie eine eigene Laufzeit (globale Variablen
@@ -922,8 +923,8 @@ Regeln: [ADR 0028](adr/0028-javascript-core-script.md).
 - Werte: Text, Zahlen, Boolean, Listen und Objekte wie in JSON; `decimal` und `date` kommen als Text (`"12.50"`),
   ganze Zahlen über ±2^53 als `BigInt`, Zeitpunkte als `Date`. Ganze Zahlen kommen als `int` zurück, andere als `float`.
 - Sandbox: kein Zugriff auf Dateisystem, Netzwerk, Prozesse und Umgebungsvariablen; `http`/`fs` im Skript gibt es in
-  dieser Fassung nicht (ADR 0028). Zeitlimit über `timeout` der Action, Abbruch des Laufs unterbricht das Skript
-  sofort; höchstens 1.000 Zeilen `console.*` je Ausführung der Action bzw. je Lauf des Transforms (je Zeile 8 KB),
+  dieser Fassung nicht (ADR 0028). Zeitlimit der Action über ihr Feld `timeout` (Standard 1 min, seit R5b) und das
+  `timeout` der Action im Workflow, Abbruch des Laufs unterbricht das Skript sofort; höchstens 1.000 Zeilen `console.*` je Ausführung der Action bzw. je Lauf des Transforms (je Zeile 8 KB),
   Rückgabewert höchstens 16 MiB als JSON.
   Speicher lässt sich nicht hart begrenzen.
 - Wiederverwendbare Skripte in `scripts/` werden über `require('./scripts/utils.js')` geladen: nur `.js`-Dateien in
@@ -933,7 +934,8 @@ Regeln: [ADR 0028](adr/0028-javascript-core-script.md).
 ### 7.2 Stufe 2: PowerShell / Shell
 
 - Regeln für beide (ohne Shell, Timeout mit Prozessbaum, Grenzen, Secrets nur in `env`): [ADR 0023](adr/0023-programme-powershell.md); `shell.run` startet Programme mit einer Argumentliste (seit S60).
-- `shell.powershell` (seit S61) mit Übergabe von Werten als benannte Parameter (`params`, mit Typen) und Rückgabe von JSON (`ConvertTo-Json`) als Action-Ergebnis; das Skript selbst enthält keine `${…}`/`{{ … }}`.
+- `shell.powershell` (seit S61) mit Übergabe von Werten als benannte Parameter (`params`, mit Typen) und Rückgabe von JSON (`ConvertTo-Json`) als Action-Ergebnis (`format: json` → `output.value`, seit R5b; vorher `json: true` → `output.json`); das Skript selbst enthält keine `${…}`/`{{ … }}`.
+- Output beider: `exitCode`, `stdout`, `stderr`, `truncated` und `durationMs` (Laufzeit in Millisekunden, seit R5b; vorher `duration` als Text).
 - Bevorzugt `pwsh.exe` (PowerShell 7), Fallback `powershell.exe` (5.1); wählbar mit `edition`.
 - In Pipelines: Transform `shell.powershell` – Records als NDJSON über stdin/stdout.
 
@@ -1030,7 +1032,7 @@ genau einem Anbieter – Runnel selbst, einem Plugin oder einer MCP-Connection (
 | Mehrere Browser | Ein Server, beliebig viele Editoren; Konfliktschutz per ETag, Live-Hinweis bei Änderungen anderswo, Zusammenarbeit über Git |
 | Secrets | Über Secret-Quellen ([ADR 0022](adr/0022-connections-secrets.md)): lokaler Store je Projekt außerhalb des Projektordners, verschlüsselt mit AES-256-GCM, Schlüssel per **Windows DPAPI** (Benutzer- bzw. Dienstkonto), sonst `RUNNEL_MASTER_KEY` oder Master-Passwort; dazu Umgebungsvariablen und später Tresore. `${secret:…}` nur in Connections, Secret-Quellen und `secret`-Feldern; Pflege mit `runnel secret`, im Editor nur setzen, nie anzeigen |
 | Secrets im Log | Automatische Maskierung aller aufgelösten Secret-Werte in Logs, Fehlermeldungen, Vorschauen und Ergebnissen (exakter Wert, ab 4 Zeichen) |
-| HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal; im Netz nur mit TLS – eigenes oder selbst erzeugtes Zertifikat – oder ausdrücklich `--triggers-insecure`, seit S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrent` ([ADR 0018](adr/0018-http-trigger.md)) |
+| HTTP-Trigger | Eigener Listener, getrennt vom Editor (Standard nur lokal; im Netz nur mit TLS – eigenes oder selbst erzeugtes Zertifikat – oder ausdrücklich `--triggers-insecure`, seit S40a); je Trigger ein Token (`Authorization: Bearer`) oder ausdrücklich `auth: none`, HMAC später; Body-Limit, `maxConcurrentRuns` ([ADR 0018](adr/0018-http-trigger.md)) |
 | Plugins | Start erst nach Freigabe je Projekt auf dem Rechner (`runnel plugins trust`, SHA-256 über den Plugin-Ordner, gespeichert außerhalb des Projekts; jede Änderung macht sie ungültig). Ohne Freigabe kein Code, auch nicht beim Prüfen oder Öffnen ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag) |
 | Datenbanken | Werte nur als Parameter (`@name`), Ausdrücke im SQL-Text sind ein Fehler; Bezeichner nur über geprüfte Felder; TLS mit Zertifikatsprüfung, Abschalten nur ausdrücklich mit Warnung ([ADR 0022](adr/0022-connections-secrets.md)) |
 | Connections | Zugangsdaten einer HTTP-Connection nur an deren Host; SFTP nur mit bekanntem Hostschlüssel; FTPS nur mit vertrauenswürdigem Zertifikat oder dessen Fingerprint, TLS ab 1.2; FTP ohne TLS nur mit `insecure: true` und Warnung; „Test connection“ nur für gespeicherte Connections, 15 s |
@@ -1190,8 +1192,11 @@ seit S54 die Archiv-Actions (siehe unten).
 - **Ergebnis (`result.output`):** die gefundenen bzw. geschriebenen Pfade als Liste, bei `file.mkdir` der Pfad, bei
   `file.list` je Eintrag `path`, `name`, `size`, `modified` und `folder` – z. B.
   `{{ sum(map(results.list.output, .size)) }}`.
-- **Warten:** `file.wait` prüft alle `interval` (Standard 5 s), gibt nach `maxWait` auf und wartet mit `stableFor`,
-  bis sich die Größe nicht mehr ändert (Datei fertig geschrieben).
+- **Warten:** `file.wait` prüft alle `interval` (Standard 5 s), gibt nach `maxWait` auf (Standard 1 h seit R5b, `0`:
+  bis zum `timeout` der Action oder zum Ende des Laufs) und wartet mit `stableFor`, bis sich die Größe nicht mehr
+  ändert (Datei fertig geschrieben).
+- **Art der Einträge:** `file.exists` zählt mit `include: all` (Standard), `files` oder `folders` dieselben Einträge
+  wie `file.list` (bis R5b `kind: any|file|folder`).
 
 **HTTP-Request und Bedingung prüfen (umgesetzt mit S10):**
 
@@ -1217,7 +1222,8 @@ ohne neue Typnamen hinzukommen können ([ADR 0013](adr/0013-typnamen-namensraeum
 - **Packen:** `source` wie bei den Datei-Actions (mit Platzhaltern); ein Ordner wird mit seinem Inhalt unter eigenem
   Namen gepackt, leere Ordner bleiben erhalten, Verknüpfungen und Geräte nicht (Warnung im Log). Geschrieben wird über
   eine temporäre Datei; ein vorhandenes Archiv wird erst ersetzt, wenn das neue fertig ist (`ifExists: replace`,
-  Standard) oder der Lauf schlägt fehl (`fail`). Ergebnis: `path`, `files` und `size`.
+  Standard) oder der Lauf schlägt fehl (`fail`). Ergebnis: `path`, `count` (Zahl der Einträge; bis R5b `files`) und
+  `size`.
 - **Entpacken:** in den Ordner `target`, mit `pattern` nur passende Dateien (z. B. `*.csv`). Vorhandene Dateien:
   `ifExists: fail` (Standard, geprüft bevor etwas geschrieben wird), `replace` oder `skip`. Ergebnis: die entpackten
   Pfade als Liste. Änderungszeitpunkte bleiben erhalten. Dateinamen in ZIP-Archiven ohne UTF-8-Kennzeichen werden
@@ -1269,7 +1275,7 @@ Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, L
   `output.errors` (alle Datensätze auf Fehler-Links), z. B. `{{ results.prepare.output.transforms.write.written }}` oder
   ein Link mit `when: "{{ results.prepare.output.errors > 0 }}"`.
 - Datensätze auf Fehler-Links lassen die Action nicht scheitern; eine Pipeline, die abbricht, schon.
-- **Datensätze hinein und heraus (S24a, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** `rows: "{{ … }}"`
+- **Datensätze hinein und heraus (S24a, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** `records: "{{ … }}"` (bis R5b `rows`)
   gibt der Pipeline eine Liste mit (z. B. die Dateiliste von `file.list`), die `core.from-result` als Datensätze
   weitergibt; was `core.to-result` erreicht, kommt als `output.rows` zurück (höchstens `maxRecords`, Standard 100.000).
 
@@ -1329,8 +1335,9 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   entfernten Duplikate.
 
 - **`core.switch`** gibt jeden Datensatz an genau einen Daten-Link weiter: `cases: [{ when: "{{ … }}", to: <id> }]` in
-  Reihenfolge, der erste wahre Fall entscheidet, sonst `default`; ohne `default` werden die übrigen verworfen und im Log
-  gezählt (`key-accounts 1, standard 1, dropped 1`). `runnel validate` prüft, dass zu jedem `to` und zum `default` ein
+  Reihenfolge, der erste wahre Fall entscheidet, sonst `else` (wie bei `core.filter`; bis R5b `default`); ohne `else`
+  werden die übrigen verworfen und im Log gezählt (`key-accounts 1, standard 1, dropped 1`). `runnel validate` prüft,
+  dass zu jedem `to` und zu `else` ein
   Daten-Link führt (mit Vorschlag), und warnt bei Links, zu denen kein Fall führt. Lässt sich eine Bedingung nicht
   auswerten, geht der Datensatz auf den Fehler-Link.
 
@@ -1391,8 +1398,8 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
   und Kleinschreibung; ein leeres `from` trifft leere Werte, ein fehlendes `to` leert. Werte, die nicht in der Tabelle
   stehen, bekommen `default` oder bleiben, wie sie sind.
 - **`core.split-field`** teilt den Text eines Feldes an `separator`: mit `into: [a, b]` in Felder desselben Datensatzes
-  (mehr Teile als Felder bleiben im letzten zusammen, fehlende sind leer), mit `rows: true` in einen Datensatz je Teil
-  (wahlweise mit `indexField` für die Position; leere Teile nur mit `keepEmpty`; ein Datensatz ohne Wert geht einmal
+  (mehr Teile als Felder bleiben im letzten zusammen, fehlende sind leer), mit `asRecords: true` in einen Datensatz je Teil
+  (wahlweise mit `numberField` für die Position; bis R5b `rows` und `indexField`; leere Teile nur mit `keepEmpty`; ein Datensatz ohne Wert geht einmal
   weiter). `trim` entfernt Leerzeichen um die Teile. Beides zugleich ist ein Fehler; nacheinander mit zwei Transforms.
 - **`core.convert`** wandelt Felder in einen anderen Typ um: Text mit Format (`"1.234,56"` → `decimal`, `"20.11.2026"` →
   `date`), in Text mit Format (`decimal` → `"1.234,56"`), Zahlen ineinander und `date` ↔ `datetime`. Was nicht passt,

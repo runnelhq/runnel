@@ -187,7 +187,7 @@ func TestEditFileEnvironmentAndProject(t *testing.T) {
 		{FileField{Field: "name", Value: "shop"}, "name: shop\n"},
 		{FileField{Field: "defaultEnvironment", Value: "dev"}, "name: orders\ndefaultEnvironment: dev\nvariables:\n"},
 		{FileField{Field: "settings.maxConcurrentRuns", Value: 4}, "  BASE: C:\\data\nsettings:\n  maxConcurrentRuns: 4\n"},
-		{FileField{Field: "workflow.defaultJoin", Value: "first"}, "workflow:\n  defaultJoin: first\n"},
+		{FileField{Field: "settings.defaultJoin", Value: "first"}, "settings:\n  defaultJoin: first\n"},
 		// The run history as a mapping from the form, numbers from JSON (S26e1).
 		{FileField{Field: "settings.history", Map: []KeyValue{{Key: "cli", Value: "errors"}, {Key: "keepDays", Value: float64(7)}}},
 			"settings:\n  history:\n    cli: errors\n    keepDays: 7\n"},

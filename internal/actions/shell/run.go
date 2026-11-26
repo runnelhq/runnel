@@ -15,7 +15,8 @@ import (
 
 // shell.run starts a program with a list of arguments, without a shell in between (ADR
 // 0023): values reach it only as single arguments or environment variables. Output:
-// exitCode, stdout, stderr, truncated, duration and, with json, the stdout read as JSON.
+// exitCode, stdout, stderr, truncated, durationMs and, with format: json, the stdout read
+// as JSON.
 var runDefinition = action.Definition{
 	Type:        "shell.run",
 	Category:    action.CategoryExecution,
@@ -30,10 +31,10 @@ var runDefinition = action.Definition{
 			{Name: "output.stdout", Type: "string", Description: "Standard output, decoded; values of env are hidden"},
 			{Name: "output.stderr", Type: "string", Description: "Error output, decoded; values of env are hidden"},
 			{Name: "output.truncated", Type: "boolean", Description: "true if stdout or stderr was longer than maxOutput"},
-			{Name: "output.duration", Type: "string", Description: "Running time, e.g. 1.25s"},
-			{Name: "output.json", Type: "any", Description: "With json, the last JSON value of stdout"},
+			{Name: "output.durationMs", Type: "integer", Description: "Running time in milliseconds"},
+			{Name: "output.value", Type: "any", Description: "With format: json, the last JSON value of stdout"},
 		},
-		Errors: "Fails when the program is not found, its exit code is not in okCodes (default 0; the message shows the last lines of stderr), it runs longer than timeout (it is ended with all processes it started), or with json stdout holds no JSON. Arguments of .bat and .cmd files with characters that cmd.exe interprets are refused.",
+		Errors: "Fails when the program is not found, its exit code is not in okCodes (default 0; the message shows the last lines of stderr), it runs longer than timeout (it is ended with all processes it started), or with format: json stdout holds no JSON. Arguments of .bat and .cmd files with characters that cmd.exe interprets are refused.",
 		Limits: []string{
 			"timeout limits the program (default 10m).",
 			"maxOutput limits stdout and stderr each (default 1MB, at most 1GB); more is dropped.",
@@ -49,14 +50,14 @@ type runAction struct {
 	Env       map[string]string `json:"env" doc:"Further environment variables; the only place for secrets (${secret:…}), as arguments are visible to other users" schema:"format=runnel-secret"`
 	Input     *string           `json:"input" doc:"Text for stdin; missing: stdin is empty, so that a program waiting for input does not hang"`
 	Encoding  string            `json:"encoding" doc:"Encoding of stdout and stderr; auto: UTF-8, else the OEM code page of Windows" schema:"enum=auto|utf-8|oem|windows-1252,default=auto"`
-	JSON      bool              `json:"json" doc:"Read the last JSON value of stdout into output.json" schema:"default=false"`
+	Format    string            `json:"format" doc:"text, or json to read the last JSON value of stdout into output.value" schema:"enum=text|json,default=text"`
 	MaxOutput string            `json:"maxOutput" doc:"Largest size of stdout and of stderr kept, e.g. 500KB or 10MB; more is dropped (truncated)" schema:"default=1MB"`
 	Timeout   string            `json:"timeout" doc:"Longest time the program may run; then it ends with all processes it started" schema:"format=runnel-duration,default=10m"`
 }
 
 func newRun(with map[string]any) (action.Action, error) {
 	a := &runAction{}
-	if err := action.DecodeConfig(with, a); err != nil {
+	if err := decode(with, a, &a.Format); err != nil {
 		return nil, err
 	}
 	if !proc.Valid(a.Encoding) {
@@ -107,5 +108,5 @@ func (a *runAction) Execute(ctx context.Context, ec *action.ExecContext) (action
 	}
 	name := filepath.Base(program)
 	ec.Log(slog.LevelDebug, fmt.Sprintf("starting %s with %d %s", name, len(a.Args), plural(len(a.Args), "argument")))
-	return execute(ctx, ec, name, cmd, a.Env, ok, a.JSON)
+	return execute(ctx, ec, name, cmd, a.Env, ok, a.Format == "json")
 }

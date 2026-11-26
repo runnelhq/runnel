@@ -18,7 +18,7 @@ Palette jedes Wort für sich in Typ, Name und Beschreibung; „set field value�
 | Fehlerbehandlung eines Transforms (Error handling) | Fehler-Link (`type: error`) mit den Feldern `_error` und `_errorField` |
 | Info-Stream (z. B. bei Stream lookup) | Info-Link (`type: info`) |
 | Change number of copies | `copies: n` |
-| Rows distribution / Copy rows | `distribution: distribute` bzw. `copy` |
+| Rows distribution / Copy rows | `distribution: roundRobin` bzw. `copy` |
 | Variablen `${NAME}` | `${NAME}` wie in Hop; dazu `${env:…}` und `${secret:…}`, Ausdrücke in `{{ … }}` ([ADR 0006](adr/0006-ausdruckssprache.md)) |
 | Parameter von Workflow und Pipeline | `parameters` mit Typ, Standardwert und Pflicht |
 | Metadaten: Relational Database Connection | Connection (`connections/<name>.yaml`, [ADR 0022](adr/0022-connections.md)) |

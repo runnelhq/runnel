@@ -15,10 +15,10 @@ name: lookup
 transforms:
   - id: customers
     type: core.generate-rows
-    with: { rows: 3, rowNumberField: id, fields: [ { name: name, value: Ada } ] }
+    with: { count: 3, numberField: id, fields: [ { name: name, value: Ada } ] }
   - id: orders
     type: core.generate-rows
-    with: { rows: 4, rowNumberField: customerId }
+    with: { count: 4, numberField: customerId }
   - id: lookup
     type: core.stream-lookup
     with:
@@ -123,8 +123,8 @@ test("offers the incoming transforms as left and right of a merge join", async (
 apiVersion: runnel/v1
 name: lookup
 transforms:
-  - { id: orders, type: core.generate-rows, with: { rows: 2, rowNumberField: id } }
-  - { id: customers, type: core.generate-rows, with: { rows: 2, rowNumberField: id } }
+  - { id: orders, type: core.generate-rows, with: { count: 2, numberField: id } }
+  - { id: customers, type: core.generate-rows, with: { count: 2, numberField: id } }
   - id: join
     type: core.merge-join
     with:

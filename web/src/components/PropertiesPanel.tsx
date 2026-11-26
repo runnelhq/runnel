@@ -1165,7 +1165,7 @@ function TransformExecution(props: {
   const { action, parallel, outgoing, at, set } = props;
   const copies = action.copies || 1;
   const distribution = action.distribution || "copy";
-  const canDistribute = outgoing > 1 || distribution === "distribute";
+  const canDistribute = outgoing > 1 || distribution === "roundRobin";
   return (
     <>
       <Field
@@ -1195,7 +1195,7 @@ function TransformExecution(props: {
         help={
           !canDistribute
             ? "Only with more than one outgoing data link"
-            : distribution === "distribute"
+            : distribution === "roundRobin"
               ? "Records go to the data links in turn"
               : "Every outgoing data link gets every record"
         }
@@ -1206,9 +1206,9 @@ function TransformExecution(props: {
             value={distribution}
             options={[
               ["copy", "Copy to all"],
-              ["distribute", "Distribute"],
+              ["roundRobin", "Distribute"],
             ]}
-            disabledOptions={canDistribute ? [] : ["distribute"]}
+            disabledOptions={canDistribute ? [] : ["roundRobin"]}
             onChange={(v) => set("distribution")(v === "copy" ? null : v)}
           />
         )}

@@ -215,7 +215,7 @@ func TestRunPipelineExample(t *testing.T) {
 	}
 	// A value that is not a whole number is reported when the transform runs.
 	code, out, _ = run(t, "run", "--param", "ROWS=-5", "examples/pipelines/pipelines/numbers.pipeline.yaml")
-	if code != 1 || !strings.Contains(out, `[numbers] failed after`) || !strings.Contains(out, `rows: "-5" is not a whole number of 0 or more`) {
+	if code != 1 || !strings.Contains(out, `[numbers] failed after`) || !strings.Contains(out, `count: "-5" is not a whole number of 0 or more`) {
 		t.Errorf("exit code %d:\n%s", code, out)
 	}
 }

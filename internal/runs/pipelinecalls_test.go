@@ -16,7 +16,7 @@ parameters:
   - { name: ROWS, type: integer, required: true }
   - { name: MIN, type: integer, default: "0" }
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: "${ROWS}", rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: "${ROWS}", numberField: n } }
   - { id: check, type: core.filter, with: { condition: "{{ record.n > params.MIN }}" } }
   - { id: show, type: core.log, with: { every: 1000 } }
 links:
@@ -183,7 +183,7 @@ actions:
     type: core.run-pipeline
     with:
       pipeline: pipelines/double.pipeline.yaml
-      rows: "{{ [{'name': 'a.csv', 'size': 5}, {'name': 'b.csv', 'size': 50}, {'size': 99, 'name': 'c.csv'}] }}"
+      records: "{{ [{'name': 'a.csv', 'size': 5}, {'name': 'b.csv', 'size': 50}, {'size': 99, 'name': 'c.csv'}] }}"
 links:
   - { from: start, to: load }
 `,
@@ -202,10 +202,10 @@ func TestRunPipelineCallWithInvalidRows(t *testing.T) {
 		"pipelines/numbers.pipeline.yaml": childPipeline,
 		"workflows/parent.workflow.yaml": pipelineParent(`      pipeline: pipelines/numbers.pipeline.yaml
       params: { ROWS: 1 }
-      rows: "{{ 'not a list' }}"`),
+      records: "{{ 'not a list' }}"`),
 	})
 	res, _, _ := start(t, dir, nil)
-	if res.Err == nil || !strings.Contains(res.Err.Error(), "rows must be a list, e.g. {{ results.files.output }}, not not a list") {
+	if res.Err == nil || !strings.Contains(res.Err.Error(), "records must be a list, e.g. {{ results.files.output }}, not not a list") {
 		t.Errorf("%v", res.Err)
 	}
 	// A list of plain values becomes records with the field value.

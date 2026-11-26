@@ -59,7 +59,6 @@ type settingsForm struct {
 	SecretStore        string         `json:"secretStore,omitempty" yaml:"secretStore"`
 	Secrets            map[string]any `json:"-" yaml:"secrets"`
 	SecretNames        []string       `json:"secrets" yaml:"-"`
-	Workflow           map[string]any `json:"workflow,omitempty" yaml:"workflow"`
 	Settings           map[string]any `json:"settings,omitempty" yaml:"settings"`
 }
 

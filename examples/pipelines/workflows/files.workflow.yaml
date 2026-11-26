@@ -1,7 +1,7 @@
 # Passes a file list to a pipeline and uses the records it returns (roadmap S24a). Relative paths refer to the project folder (output in out/); for example:
 #   runnel run -v examples/pipelines/workflows/files.workflow.yaml
 # - "list" lists the CSV files of data/.
-# - "check" gives the list to pipelines/files.pipeline.yaml (rows); the pipeline reads
+# - "check" gives the list to pipelines/files.pipeline.yaml (records); the pipeline reads
 #   it with core.from-result and returns the large files with core.to-result.
 # - "report" uses the returned records: results.check.output.rows.
 kind: Workflow
@@ -27,7 +27,7 @@ actions:
     type: core.run-pipeline
     with:
       pipeline: pipelines/files.pipeline.yaml
-      rows: "{{ results.list.output }}"
+      records: "{{ results.list.output }}"
       params:
         MIN_SIZE: ${MIN_SIZE}
   - id: report

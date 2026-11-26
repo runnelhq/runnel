@@ -149,7 +149,7 @@ Die Nachträge E14a, E14b und S58 sind mit E15b nach Themen zusammengefasst ([Re
   Karte statt als Tabellenzelle zeigt (Mockup E14).
 - **Formate für den Editor:** `runnel-field` kennzeichnet den Namen eines Felds der eingehenden Datensätze (der Editor
   bietet die bekannten Felder an), `runnel-target` die Id eines Transforms, zu dem ein Daten-Link führt (`to` und
-  `default` von `core.switch`). An einer Liste von Texten (`[]string`, z. B. `groupBy`) gilt das Format für jeden Text
+  `else` von `core.switch`, bis R5b `default`). An einer Liste von Texten (`[]string`, z. B. `groupBy`) gilt das Format für jeden Text
   (`items.format`). Seit S23b2 kennzeichnet `runnel-info-field` den Namen eines Felds der Nachschlagedaten auf dem
   Info-Link (`lookupField` von `core.stream-lookup`); der Editor bietet die Felder des Info-Links an. Im Descriptor
   sagt `infoInput`, dass ein Transform Nachschlagedaten über einen Info-Link annimmt. Seit S23c kennzeichnet

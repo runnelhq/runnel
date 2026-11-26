@@ -80,13 +80,25 @@ func TestRun(t *testing.T) {
 	if out, _, err := run(t, dir, "echo", map[string]any{"env": map[string]any{"EXIT": "3"}, "okCodes": []any{0, 3}}); err != nil || out["exitCode"] != int64(3) {
 		t.Errorf("okCodes: %v %v", out, err)
 	}
-	// json reads stdout.
-	out, _, err = run(t, dir, "json", map[string]any{"json": true})
-	if err != nil || out["json"].(map[string]any)["files"] != float64(3) {
+	// format: json reads stdout into output.value; the running time is durationMs (R5b).
+	out, _, err = run(t, dir, "json", map[string]any{"format": "json"})
+	if err != nil || out["value"].(map[string]any)["files"] != float64(3) {
 		t.Errorf("json: %#v %v", out, err)
 	}
-	if _, _, err := run(t, dir, "echo", map[string]any{"json": true}); err == nil || !strings.Contains(err.Error(), "is not JSON") {
+	if ms, ok := out["durationMs"].(int64); !ok || ms < 0 {
+		t.Errorf("durationMs: %#v", out["durationMs"])
+	}
+	if _, _, err := run(t, dir, "echo", map[string]any{"format": "json"}); err == nil || !strings.Contains(err.Error(), "is not JSON") {
 		t.Errorf("not json: %v", err)
+	}
+	// The old field json and other formats are errors.
+	for want, with := range map[string]map[string]any{
+		`field "json" was renamed before 1.0: use format: json`: {"program": "x", "json": true},
+		`invalid format "xml" (expected text or json)`:          {"program": "x", "format": "xml"},
+	} {
+		if _, err := newRun(with); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%v: %v, want %q", with, err, want)
+		}
 	}
 }
 

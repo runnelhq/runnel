@@ -43,7 +43,6 @@ export interface SettingsData {
   variables: Record<string, unknown>;
   secretStore?: string;
   secrets: string[];
-  workflow?: Record<string, unknown>;
   settings?: Record<string, unknown>;
 }
 

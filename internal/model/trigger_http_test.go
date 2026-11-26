@@ -17,7 +17,7 @@ with:
   method: post
   path: /api/customers/{id}/orders
   auth: { token: "${env:RUNNEL_TEST_TOKEN}" }
-  maxConcurrent: 3
+  maxConcurrentRuns: 3
 `
 
 func TestParseHTTPTrigger(t *testing.T) {
@@ -65,12 +65,12 @@ func TestParseHTTPTrigger(t *testing.T) {
 		{`{ token: "${env:RUNNEL_TEST_TOKEN}" }`, `{ token: "abc123" }`, "the token must not be written into the file"},
 		{`{ token: "${env:RUNNEL_TEST_TOKEN}" }`, "open", `invalid auth "open"`},
 		{`  auth: { token: "${env:RUNNEL_TEST_TOKEN}" }` + "\n", "", `missing required field "auth"`},
-		{"maxConcurrent: 3", "maxConcurrent: 3\n  response: wait", `invalid response "wait" (expected accepted or run)`},
-		{"maxConcurrent: 3", "maxConcurrent: 3\n  timeout: 30s", "timeout belongs to response: run"},
-		{"maxConcurrent: 3", "maxConcurrent: 3\n  response: run\n  timeout: 0s", "timeout must be at least 1s"},
-		{"maxConcurrent: 3", "maxConcurrent: 3\n  history: some", `invalid history "some" (expected all, errors or none)`},
-		{"maxConcurrent: 3", "maxConcurrent: -1", "maxConcurrent must not be negative"},
-		{"maxConcurrent: 3", "maxConcurrent: 3\n  overlap: allow", "overlap is not used by http triggers"},
+		{"maxConcurrentRuns: 3", "maxConcurrentRuns: 3\n  response: wait", `invalid response "wait" (expected accepted or run)`},
+		{"maxConcurrentRuns: 3", "maxConcurrentRuns: 3\n  timeout: 30s", "timeout belongs to response: run"},
+		{"maxConcurrentRuns: 3", "maxConcurrentRuns: 3\n  response: run\n  timeout: 0s", "timeout must be at least 1s"},
+		{"maxConcurrentRuns: 3", "maxConcurrentRuns: 3\n  history: some", `invalid history "some" (expected all, errors or none)`},
+		{"maxConcurrentRuns: 3", "maxConcurrentRuns: -1", "maxConcurrentRuns must not be negative"},
+		{"maxConcurrentRuns: 3", "maxConcurrentRuns: 3\n  overlap: allow", "overlap is not used by http triggers"},
 	} {
 		src := strings.Replace(httpSource, c.old, c.new, 1)
 		if _, err := ParseTrigger("triggers/t.yaml", []byte(src)); err == nil || !strings.Contains(err.Error(), c.want) {

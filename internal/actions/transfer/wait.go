@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
+	"github.com/runnelhq/runnel/internal/actions/file"
 )
 
 // transfer.wait waits until files exist on the server of a connection and, optionally,
@@ -28,7 +29,7 @@ var waitDefinition = action.Definition{
 		Outputs: []action.OutputField{{Name: "output", Type: "list", Description: "Paths of the matching files on the server, sorted"}},
 		Errors:  "Fails when no file matches after maxWait, or the files still change in size after maxWait (stableFor), and when the first connection fails or a host key, certificate or sign-in is refused. A dropped connection or a look longer than timeout is retried at the next look.",
 		Limits: []string{
-			"Looks every interval (default 5s, at least 10ms); without maxWait it waits until the timeout of the action or the end of the run.",
+			"Looks every interval (default 5s, at least 10ms); maxWait limits the wait (default 1h; 0: until the timeout of the action or the end of the run).",
 			"timeout limits each look (default 1m).",
 			"A path with wildcards may match at most 10,000 entries.",
 		},
@@ -39,7 +40,7 @@ type waitAction struct {
 	Connection string `json:"connection" doc:"Connection of the server (a file in connections/)" schema:"required,connection=sftp|ftps|ftp,example=partner-sftp"`
 	Path       string `json:"path" doc:"File to wait for on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively" schema:"required,example=/outgoing/*.csv"`
 	Interval   string `json:"interval" doc:"How often to look, e.g. 5s or 1m" schema:"format=runnel-duration,default=5s"`
-	MaxWait    string `json:"maxWait" doc:"Give up and fail after this time; empty: wait until the action's timeout or the end of the run" schema:"format=runnel-duration,example=2h"`
+	MaxWait    string `json:"maxWait" doc:"Give up and fail after this time; 0: wait until the action's timeout or the end of the run" schema:"format=runnel-duration,default=1h"`
 	StableFor  string `json:"stableFor" doc:"The size of the files must not change for this time, e.g. 30s; empty: do not check" schema:"format=runnel-duration,example=30s"`
 	Timeout    string `json:"timeout" doc:"Longest time for one look on the server, e.g. 30s; after it Runnel connects again" schema:"format=runnel-duration,default=1m"`
 }
@@ -63,7 +64,7 @@ func (a *waitAction) Execute(ctx context.Context, ec *action.ExecContext) (actio
 	if interval < 10*time.Millisecond {
 		return action.Result{}, fmt.Errorf("interval %s is too short (at least 10ms)", interval)
 	}
-	maxWait, err := durationOf("maxWait", a.MaxWait, 0)
+	maxWait, err := file.MaxWait(a.MaxWait)
 	if err != nil {
 		return action.Result{}, err
 	}

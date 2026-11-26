@@ -21,19 +21,19 @@ import (
 // archive.create packs files and folders into a ZIP, TAR or TAR.GZ archive. A folder is
 // packed with its subfolders, under its own name. The archive is written via a temporary
 // file and replaces an existing one only once it is complete.
-// Output: path, number of files and size of the archive.
+// Output: path, number of entries (count, until R5b: files) and size of the archive.
 var createDefinition = action.Definition{
 	Type:        "archive.create",
 	Category:    action.CategoryFiles,
 	Label:       "Create Archive",
-	Description: "Packs files and folders into a ZIP, TAR or TAR.GZ archive; output: path, files and size",
+	Description: "Packs files and folders into a ZIP, TAR or TAR.GZ archive; output: path, count and size",
 	Example:     "source: out/export\ntarget: archive/export.zip\n",
 	Config:      create{},
 	New:         newCreate,
 	Reference: action.Reference{
 		Outputs: []action.OutputField{
 			{Name: "output.path", Type: "string", Description: "Path of the archive"},
-			{Name: "output.files", Type: "integer", Description: "Number of entries packed: files and empty folders"},
+			{Name: "output.count", Type: "integer", Description: "Number of entries packed: files and empty folders"},
 			{Name: "output.size", Type: "integer", Description: "Size of the archive in bytes"},
 		},
 		Errors: "Fails when nothing matches the source, the format is not known from the ending, a file cannot be read, or the archive exists with ifExists: fail. The archive is written to a temporary file first, so a failure leaves an existing archive as it was. Links and special files are left out with a warning.",
@@ -129,7 +129,7 @@ func (a *create) Execute(ctx context.Context, ec *action.ExecContext) (action.Re
 		return action.Result{}, fmt.Errorf("cannot read %q: %w", a.Target, plain(err))
 	}
 	ec.Logf(slog.LevelInfo, "packed %d %s into %s (%d bytes)", len(entries), plural(len(entries), "file"), a.Target, info.Size())
-	return action.Result{Output: map[string]any{"path": target, "files": int64(len(entries)), "size": info.Size()}}, nil
+	return action.Result{Output: map[string]any{"path": target, "count": int64(len(entries)), "size": info.Size()}}, nil
 }
 
 // collect lists the files to pack: a file under its name, a folder with its content

@@ -437,7 +437,7 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   Office 365 bieten oft kein `PLAIN`) ist in Runnel umgesetzt.
 - **Felder der Connection:** `host`, `port` (leer: 587 bei `starttls`, 465 bei `tls`, 25 bei `none`), `tls`
   (`starttls` Standard, `tls` von Anfang an, `none`), `auth` (`password`, `none`; leer: `password`, wenn `user`
-  gesetzt ist), `user`, `password` (Secret), `from` (Absender, wenn die Action keinen nennt), `timeout` (Standard 1m für
+  gesetzt ist; seit R5b `basic` statt `password`, Nachtrag), `user`, `password` (Secret), `from` (Absender, wenn die Action keinen nennt), `timeout` (Standard 1m für
   Verbinden und Senden einer Mail).
 - **Sicherheit:** Das Zertifikat des Servers wird immer geprüft (Zertifikate des Systems); einen Schalter zum Abschalten
   gibt es nicht. Bietet der Server bei `starttls` kein `STARTTLS`, bricht Runnel ab, statt unverschlüsselt zu senden.
@@ -556,7 +556,7 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   bleibt in beide Richtungen erhalten.
 - **Grenzen:** `timeout` je Datei (bzw. für die ganze Liste und für das Prüfen der Ziele), Standard 10 Minuten; danach
   schließt Runnel die Verbindung, die Action schlägt fehl. Das `timeout` der Action begrenzt alles zusammen. `maxSize`
-  beim Download ist optional (leer: ohne Grenze) und wird vor und während der Übertragung geprüft. `transfer.list`
+  beim Download ist optional (leer: ohne Grenze; seit R5b Standard 1 GB, Nachtrag) und wird vor und während der Übertragung geprüft. `transfer.list`
   liefert höchstens 10000 Einträge, mehr ist ein Fehler (die Liste liegt im Ergebnis des Laufs).
 - **Sicherheit:** Namen vom Server, die lokal kein einfacher Dateiname sind (`..`, `/`, `\`, unter Windows Laufwerke
   und reservierte Namen wie `NUL`), sind beim Herunterladen ein Fehler; so kann ein Server nichts außerhalb des
@@ -571,7 +571,7 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
 
 - **Optionen wie `file.*` (ADR 0025):** `transfer.delete` (`path`, `recursive`, `ifMissing` mit Standard `skip`),
   `transfer.move` (`source`, `target`, `ifExists` mit Standard `fail`), `transfer.mkdir` (`path`), `transfer.exists`
-  (`path`, `kind`) und `transfer.wait` (`path`, `interval`, `maxWait`, `stableFor`) haben Namen, Standardwerte, Output
+  (`path`, `kind`; seit R5b `include`, Nachtrag) und `transfer.wait` (`path`, `interval`, `maxWait`, `stableFor`) haben Namen, Standardwerte, Output
   und Meldungen der gleichnamigen `file.*`-Actions; dazu `timeout`. Pfade auf dem Server wie in S57a.
 - **`transfer.move` nur auf dem Server:** Quelle und Ziel liegen auf demselben Server; Runnel lässt den Server
   umbenennen (`posix-rename@openssh.com`, wo vorhanden, sonst bei `ifExists: replace` Löschen und `rename` wie in S57a)
@@ -642,3 +642,19 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
 die Standardquelle ohne `secretStore:` (Nachtrag S39a), lässt sich aber erst mit S39d setzen: `secretStore: local`
 meldet bis dahin „the local secret store is not available yet“. Das Schema nennt nur `env` und `inline` und keinen
 Standardwert; S39d fügt `local` wieder hinzu (additiv). So sagt 1.0 keine Bedeutung eines nie gebauten Werts zu.
+
+## Nachtrag 2026-11-26 (R5b): einheitliche Namen und Standards
+
+- **`timeout` in `postgres` und `sqlserver`:** Die Zeit für den Verbindungsaufbau heißt `timeout` wie bei `sftp`,
+  `ftps`, `ftp` und `smtp` (Standard bleibt 30 s); die Beschreibung sagt, dass er nur den Aufbau begrenzt (Abfragen haben
+  ihr eigenes `timeout` in Action bzw. Transform). `connectTimeout` ist ein Fehler mit dem neuen Namen; die Prüfung
+  kennt dafür je Connection-Typ eine Liste umbenannter Felder (`connection.Definition.Renamed`).
+- **`auth: basic` bei `smtp`:** Anmeldung mit `user` und `password` heißt wie bei der Connection `http` `basic`;
+  `oauth2` und `none` stimmen schon überein. Leer bleibt `basic`, wenn `user` gesetzt ist. `auth: password` ist ein
+  Fehler mit dem neuen Namen, andere unbekannte Werte jetzt ebenfalls (vorher als Passwort-Anmeldung behandelt).
+- **`transfer.exists`:** `include: all|files|folders` (Standard `all`) wie `transfer.list` statt `kind: any|file|folder`.
+- **`transfer.wait`:** `maxWait` hat den Standard 1 h (wie `file.wait`); `0` wartet bis zum `timeout` der Action oder
+  zum Ende des Laufs.
+- **`transfer.download`:** `maxSize` hat den Standard 1 GB wie `http.request` mit `saveTo`; eine Datei ohne Grenze gibt
+  es nicht mehr, größere Werte (z. B. `20GB`) sind möglich.
+- Alte Namen und Werte sind Fehler mit dem neuen Namen, ohne Übergangszeit (bewusster Bruch vor 1.0, ADR 0029).

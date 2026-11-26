@@ -175,7 +175,7 @@ test("repeats an action for each entry and gives parameters to a sub-workflow", 
 test("pipelines have parameters, but no outputs", async ({ page, request }) => {
   await request.put("/api/v1/files/pipelines/params.pipeline.yaml", {
     headers: { "If-Match": "*" },
-    data: "kind: Pipeline\napiVersion: runnel/v1\nname: p\ntransforms:\n  - id: gen\n    type: core.generate-rows\n    with:\n      rows: 3\n",
+    data: "kind: Pipeline\napiVersion: runnel/v1\nname: p\ntransforms:\n  - id: gen\n    type: core.generate-rows\n    with:\n      count: 3\n",
   });
   await open(page, "params.pipeline.yaml", "node-gen");
   await expect(panel(page).getByRole("button", { name: /^Outputs/ })).toHaveCount(0);

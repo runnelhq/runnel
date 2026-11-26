@@ -66,7 +66,7 @@ test("tells where the preview stopped", async ({ page, request }) => {
 
 test("a run ends the preview and shows its own counts", async ({ page, request }) => {
   const rowsPath = "pipelines/rows.pipeline.yaml";
-  const rows = "kind: Pipeline\napiVersion: runnel/v1\nname: rows\ntransforms:\n  - { id: gen, type: core.generate-rows, with: { rows: 250 } }\n  - { id: pass, type: core.dummy }\nlinks:\n  - { from: gen, to: pass }\n";
+  const rows = "kind: Pipeline\napiVersion: runnel/v1\nname: rows\ntransforms:\n  - { id: gen, type: core.generate-rows, with: { count: 250 } }\n  - { id: pass, type: core.dummy }\nlinks:\n  - { from: gen, to: pass }\n";
   await request.put(`/api/v1/files/${rowsPath}`, { headers: { "If-Match": "*" }, data: rows });
   await page.goto("/");
   await page.getByRole("tree").getByText("rows.pipeline.yaml", { exact: true }).click();

@@ -35,6 +35,9 @@ type Definition struct {
 	Schema *schema.Schema
 	// Plugin names the plugin that provides the type; empty for built-in types.
 	Plugin string
+	// Renamed holds fields renamed before 1.0 by old name, with what to write instead
+	// (R5b): a clean break with a clear message instead of "unknown field".
+	Renamed map[string]string
 }
 
 // Descriptor is the description of a connection type for checks and the editor.
@@ -158,6 +161,11 @@ func (r *Registry) Check(typ string, with map[string]any) error {
 	}
 	if with == nil {
 		with = map[string]any{}
+	}
+	for _, old := range slices.Sorted(maps.Keys(d.Renamed)) {
+		if _, ok := with[old]; ok {
+			return fmt.Errorf("field %q was renamed before 1.0: use %s", old, d.Renamed[old])
+		}
 	}
 	if d.Config == nil {
 		return schema.CheckConfig(r.desc[typ].Schema, with) // a type of a plugin: it checks the values itself

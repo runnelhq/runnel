@@ -221,8 +221,8 @@ transforms:
   - id: gen
     type: core.generate-rows
     with:
-      rows: 200000
-      rowNumberField: id
+      count: 200000
+      numberField: id
       fields:
         - { name: name, value: customer }
         - { name: amount, value: 1234.5 }

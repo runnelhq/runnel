@@ -170,7 +170,7 @@ links:
 	}
 }
 
-// With the target fields of the types (from their schemas), default of core.switch and
+// With the target fields of the types (from their schemas), else of core.switch and
 // else of core.filter follow renamed ids too; a field that is not a target stays.
 func TestPastePipelineTargets(t *testing.T) {
 	target := "kind: Pipeline\napiVersion: runnel/v1\nname: p\ntransforms:\n  - id: rest\n    type: core.dummy\n"
@@ -180,7 +180,7 @@ func TestPastePipelineTargets(t *testing.T) {
     with:
       cases:
         - { when: "{{ record.n > 1 }}", to: rest }
-      default: rest
+      else: rest
   - { id: check, type: core.filter, with: { condition: "{{ true }}", else: rest } }
   - { id: names, type: core.map-values, with: { field: x, default: rest } }
   - id: rest
@@ -189,7 +189,7 @@ func TestPastePipelineTargets(t *testing.T) {
 	targets := func(typ string) [][]string {
 		switch typ {
 		case "core.switch":
-			return [][]string{{"cases", "*", "to"}, {"default"}}
+			return [][]string{{"cases", "*", "to"}, {"else"}}
 		case "core.filter":
 			return [][]string{{"else"}}
 		}
@@ -199,7 +199,7 @@ func TestPastePipelineTargets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range []string{"to: rest-2 }", "      default: rest-2\n", "else: rest-2 }", "with: { field: x, default: rest }", "  - id: rest-2\n"} {
+	for _, s := range []string{"to: rest-2 }", "      else: rest-2\n", "else: rest-2 }", "with: { field: x, default: rest }", "  - id: rest-2\n"} {
 		if !strings.Contains(string(out), s) {
 			t.Errorf("missing %q in:\n%s", s, out)
 		}

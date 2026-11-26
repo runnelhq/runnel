@@ -15,7 +15,7 @@ const pipelineText = `kind: Pipeline
 apiVersion: runnel/v1
 name: insert
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 1 } }
+  - { id: gen, type: core.generate-rows, with: { count: 1 } }
   - { id: out, type: core.dummy }
   - { id: rejected, type: core.dummy }
 links:

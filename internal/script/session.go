@@ -74,14 +74,29 @@ func (s *Session) interrupt(timeout bool) {
 	s.r.vm.Interrupt(ErrTimeLimit)
 }
 
-// Run runs code at the top level of the runtime, without limit: its variables and
-// functions are global, seen by the functions called later (e.g. init of core.script).
+// SetLimit changes the longest time of a limited call, e.g. for end of core.script after
+// the records; 0: none. Not during a call.
+func (s *Session) SetLimit(limit time.Duration) {
+	s.limit = limit
+	if limit > 0 && s.timer == nil {
+		s.timer = time.AfterFunc(limit, func() { s.interrupt(true) })
+		s.timer.Stop()
+	}
+	if limit <= 0 && s.timer != nil {
+		s.timer.Stop()
+		s.timer = nil
+	}
+}
+
+// Run runs code at the top level of the runtime, with the limit of the session: its
+// variables and functions are global, seen by the functions called later (e.g. init of
+// core.script).
 func (s *Session) Run(name, code string) error {
 	prg, err := goja.Compile(name, code, false)
 	if err != nil {
 		return syntaxError(name, err)
 	}
-	_, err = s.run(name, false, func() (goja.Value, error) { return s.r.vm.RunProgram(prg) })
+	_, err = s.run(name, true, func() (goja.Value, error) { return s.r.vm.RunProgram(prg) })
 	return err
 }
 

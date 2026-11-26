@@ -179,7 +179,7 @@ Technisch: `POST /api/v1/runs` mit `startAt: "<action-id>"` bzw. `only: "<action
 
 Abstimmung mit dem Maintainer zur Umsetzung von 3c:
 
-- **Übergabe ausdrücklich:** Eine Pipeline erhält Datensätze über das Feld `rows` von `core.run-pipeline`, eine Liste
+- **Übergabe ausdrücklich:** Eine Pipeline erhält Datensätze über das Feld `rows` (seit R5b `records`, ADR 0025) von `core.run-pipeline`, eine Liste
   aus einem Ausdruck (z. B. `rows: "{{ results.list.output }}"`); `core.from-result` gibt sie weiter. Ein implizites
   Lesen des Ergebnisses der vorherigen Action (wie „Get rows from result“ in Hop) gibt es nicht – es hinge davon ab,
   über welchen Link die Action erreicht wurde. Objekte werden zu Datensätzen (Felder nach Namen sortiert, da Objekte

@@ -62,12 +62,11 @@ test("edits project.yaml", async ({ page }) => {
   const limit = form.locator('[data-field="settings.maxConcurrentRuns"]').getByRole("textbox");
   await limit.fill("3");
   await limit.press("Tab");
-  await form.locator('[data-field="workflow.defaultJoin"]').getByRole("combobox").selectOption("first");
+  await form.locator('[data-field="settings.defaultJoin"]').getByRole("combobox").selectOption("first");
   await expect.poll(() => yaml(page)).toContain("defaultEnvironment: prod\n");
   const text = await yaml(page);
   expect(text).toContain("# Example project. Check it with:");
-  expect(text).toContain("settings:\n  maxConcurrentRuns: 3\n");
-  expect(text).toContain("workflow:\n  defaultJoin: first\n");
+  expect(text).toContain("settings:\n  maxConcurrentRuns: 3\n  defaultJoin: first\n");
 });
 
 test("sets how long the run history keeps runs in project.yaml", async ({ page }) => {

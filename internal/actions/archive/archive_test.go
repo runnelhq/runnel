@@ -93,7 +93,7 @@ func TestRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			o := out.(map[string]any)
-			if o["path"] != target || o["files"] != int64(4) || o["size"].(int64) <= 0 {
+			if o["path"] != target || o["count"] != int64(4) || o["size"].(int64) <= 0 {
 				t.Errorf("output %v", o)
 			}
 			if len(logs) != 1 || !strings.HasPrefix(logs[0].Msg, "packed 4 files into ") {
@@ -130,7 +130,7 @@ func TestCreateWithWildcardsAndOptions(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 	out, _, err := run(t, createDefinition, map[string]any{"source": filepath.Join(dir, "out", "*.csv"), "target": target, "format": "zip"})
-	if err != nil || out.(map[string]any)["files"] != int64(2) {
+	if err != nil || out.(map[string]any)["count"] != int64(2) {
 		t.Fatalf("%v, %v", out, err)
 	}
 	if _, _, err := run(t, createDefinition, map[string]any{"source": filepath.Join(dir, "out", "*.csv"), "target": target, "format": "zip", "ifExists": "fail"}); err == nil ||
@@ -138,7 +138,7 @@ func TestCreateWithWildcardsAndOptions(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 	out, _, err = run(t, createDefinition, map[string]any{"source": filepath.Join(dir, "out", "*"), "target": target, "format": "zip"})
-	if err != nil || out.(map[string]any)["files"] != int64(3) {
+	if err != nil || out.(map[string]any)["count"] != int64(3) {
 		t.Fatalf("archive packed itself: %v, %v", out, err)
 	}
 	// By content: a ZIP without ending.

@@ -16,8 +16,8 @@ transforms:
   - id: numbers
     type: core.generate-rows
     with:
-      rows: ${ROWS}
-      rowNumberField: n
+      count: ${ROWS}
+      numberField: n
       fields:
         - { name: status, value: new }
         - { name: amount, value: 9.95 }

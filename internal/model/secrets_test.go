@@ -169,8 +169,8 @@ func TestTriggerTokenSecret(t *testing.T) {
 	}
 
 	for text, want := range map[string]string{
-		strings.Replace(httpSource, `"${env:RUNNEL_TEST_TOKEN}"`, `"Bearer ${secret:tok}"`, 1):              "the token must not be written into the file; write token: ${secret:NAME}",
-		strings.Replace(httpSource, "maxConcurrent: 3", "maxConcurrent: 3\nparams:\n  PW: ${secret:pw}", 1): "${secret:pw} is not allowed here",
+		strings.Replace(httpSource, `"${env:RUNNEL_TEST_TOKEN}"`, `"Bearer ${secret:tok}"`, 1):                      "the token must not be written into the file; write token: ${secret:NAME}",
+		strings.Replace(httpSource, "maxConcurrentRuns: 3", "maxConcurrentRuns: 3\nparams:\n  PW: ${secret:pw}", 1): "${secret:pw} is not allowed here",
 	} {
 		if _, err := ParseTrigger("triggers/x.yaml", []byte(text)); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v\nwant %q", err, want)

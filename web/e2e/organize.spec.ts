@@ -10,7 +10,7 @@ test.describe.configure({ mode: "serial" });
 
 const dir = "zz-organize";
 const files: Record<string, string> = {
-  [`${dir}/count.pipeline.yaml`]: "kind: Pipeline\napiVersion: runnel/v1\nname: count\ntransforms:\n  - { id: rows, type: core.generate-rows, with: { rows: 3 } }\n",
+  [`${dir}/count.pipeline.yaml`]: "kind: Pipeline\napiVersion: runnel/v1\nname: count\ntransforms:\n  - { id: rows, type: core.generate-rows, with: { count: 3 } }\n",
   [`${dir}/main.workflow.yaml`]: `kind: Workflow\napiVersion: runnel/v1\nname: main\nactions:\n  - { id: start, type: core.start }\n  - { id: count, type: core.run-pipeline, with: { pipeline: ${dir}/count.pipeline.yaml } }\nlinks:\n  - { from: start, to: count }\n`,
   [`${dir}/organize-notes.csv`]: "a;b\n",
   [`triggers/${dir}/main.yaml`]: `kind: Trigger\napiVersion: runnel/v1\nname: organize-main\ntype: interval\ntarget: ${dir}/main.workflow.yaml\nenabled: false\nwith:\n  every: 1h\n`,

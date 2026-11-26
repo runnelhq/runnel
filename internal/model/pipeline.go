@@ -57,8 +57,9 @@ const (
 const (
 	// DistributeCopy passes every record to every data link (the default).
 	DistributeCopy = "copy"
-	// DistributeRoundRobin passes each record to one data link, in turn.
-	DistributeRoundRobin = "distribute"
+	// DistributeRoundRobin passes each record to one data link, in turn (until R5b:
+	// distribute).
+	DistributeRoundRobin = "roundRobin"
 )
 
 // Transform is a step of a pipeline.
@@ -70,7 +71,7 @@ type Transform struct {
 	// Copies is the number of instances that run in parallel, sharing the incoming
 	// records; 0: 1.
 	Copies int `yaml:"copies,omitempty" json:"copies,omitempty"`
-	// Distribution is copy (default) or distribute: how records are passed to several
+	// Distribution is copy (default) or roundRobin: how records are passed to several
 	// outgoing data links.
 	Distribution string `yaml:"distribution,omitempty" json:"distribution,omitempty"`
 }
@@ -171,8 +172,10 @@ func (p *Pipeline) validate() error {
 		}
 		switch t.Distribution {
 		case "", DistributeCopy, DistributeRoundRobin:
+		case "distribute":
+			add(path+".distribution", "%s: distribution distribute was renamed before 1.0: use roundRobin", label)
 		default:
-			add(path+".distribution", "%s: invalid distribution %q (expected copy or distribute)", label, t.Distribution)
+			add(path+".distribution", "%s: invalid distribution %q (expected copy or roundRobin)", label, t.Distribution)
 		}
 	}
 	st := p.Settings

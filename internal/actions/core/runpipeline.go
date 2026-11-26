@@ -15,7 +15,7 @@ import (
 // plus the variables of the project and environment. The output are the counts of its
 // transforms, e.g. {{ results.load.output.transforms.write.written }}, and the number
 // of records that went to error links ({{ results.load.output.errors }}). Records can
-// be passed in (rows, read by core.from-result) and come back (output.rows, written by
+// be passed in (records, read by core.from-result) and come back (output.rows, written by
 // core.to-result). A failed pipeline fails the action.
 var runPipelineDefinition = action.Definition{
 	Type:        "core.run-pipeline",
@@ -31,7 +31,7 @@ var runPipelineDefinition = action.Definition{
 			{Name: "output.errors", Type: "integer", Description: "Records that went to error links, in all transforms"},
 			{Name: "output.rows", Type: "list", Description: "The records that reached core.to-result, each as an object"},
 		},
-		Errors: "Fails when the pipeline stops with an error or cannot be started (file outside the project folder or missing, parameter not declared or invalid), when the pipeline is not in allowedTargets and when rows is not a list. Records on error links do not fail the action.",
+		Errors: "Fails when the pipeline stops with an error or cannot be started (file outside the project folder or missing, parameter not declared or invalid), when the pipeline is not in allowedTargets and when records is not a list. Records on error links do not fail the action.",
 		Limits: []string{"output.rows holds at most maxRecords of core.to-result (default 100,000)."},
 	},
 }
@@ -41,12 +41,16 @@ type runPipeline struct {
 	Params   map[string]any `json:"params" doc:"Values for the parameters of the pipeline, by name"`
 	// AllowedTargets restricts a pipeline given by ${…} or {{ … }} (ADR 0008, Nachtrag S25b).
 	AllowedTargets []string `json:"allowedTargets" doc:"Pipeline files this action may call, with wildcards and relative to the project folder, e.g. pipelines/import-*.pipeline.yaml; for a pipeline given by a variable or expression"`
-	// Rows is a list, usually from an expression; checked when the action runs.
-	Rows any `json:"rows" doc:"Records for core.from-result in the pipeline: a list, e.g. {{ results.files.output }}; items that are not objects become a record with the field value"`
+	// Records is a list, usually from an expression; checked when the action runs. It was
+	// rows until R5b.
+	Records any `json:"records" doc:"Records for core.from-result in the pipeline: a list, e.g. {{ results.files.output }}; items that are not objects become a record with the field value"`
 }
 
 func newRunPipeline(with map[string]any) (action.Action, error) {
 	a := &runPipeline{}
+	if err := action.Renamed(with, "rows", "records (the records for core.from-result)"); err != nil {
+		return nil, err
+	}
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
@@ -74,7 +78,7 @@ func (a *runPipeline) Execute(ctx context.Context, ec *action.ExecContext) (acti
 	for name, v := range a.Params {
 		params[name] = expr.Format(v)
 	}
-	rows, err := toRows(a.Rows)
+	rows, err := toRows(a.Records)
 	if err != nil {
 		return action.Result{}, err
 	}
@@ -89,8 +93,8 @@ func (a *runPipeline) Execute(ctx context.Context, ec *action.ExecContext) (acti
 	return action.Result{Output: out}, nil
 }
 
-// toRows turns the value of rows into records: objects as they are, other items as
-// {value: item}. Without rows, nil.
+// toRows turns the value of records into records: objects as they are, other items as
+// {value: item}. Without records, nil.
 func toRows(v any) ([]map[string]any, error) {
 	switch v := v.(type) {
 	case nil:
@@ -108,5 +112,5 @@ func toRows(v any) ([]map[string]any, error) {
 	case []map[string]any:
 		return v, nil
 	}
-	return nil, fmt.Errorf("rows must be a list, e.g. {{ results.files.output }}, not %s", expr.Format(v))
+	return nil, fmt.Errorf("records must be a list, e.g. {{ results.files.output }}, not %s", expr.Format(v))
 }

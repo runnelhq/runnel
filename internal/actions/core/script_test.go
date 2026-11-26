@@ -21,7 +21,7 @@ func TestScriptConfig(t *testing.T) {
 	actiontest.ConfigError(t, scriptDefinition, nil, "give the code in script or its file in file")
 	actiontest.ConfigError(t, scriptDefinition, map[string]any{"script": "return 1", "file": "scripts/a.js"}, "either script or file")
 	actiontest.ConfigError(t, scriptDefinition, map[string]any{"file": "scripts/a.ps1"}, "expected a .js file")
-	actiontest.ConfigError(t, scriptDefinition, map[string]any{"script": "return 1", "timeout": "1s"}, "timeout")
+	actiontest.ConfigError(t, scriptDefinition, map[string]any{"script": "return 1", "timeout": "soon"}, `invalid timeout "soon"`)
 	// Syntax errors are found when checking, with the line in the script.
 	actiontest.ConfigError(t, scriptDefinition, map[string]any{"script": "const a = 1;\nlet x = ;"}, "script, line 2: syntax error:")
 }
@@ -118,6 +118,11 @@ func TestScriptCancelled(t *testing.T) {
 	time.AfterFunc(20*time.Millisecond, cancel)
 	if _, _, err := actiontest.Execute(ctx, a); !errors.Is(err, context.Canceled) {
 		t.Errorf("cancel: %v", err)
+	}
+	// timeout of its own (default 1m, R5b).
+	a = actiontest.New(t, scriptDefinition, map[string]any{"script": "while (true) {}", "timeout": "50ms"})
+	if _, _, err := actiontest.Execute(context.Background(), a); err == nil || err.Error() != "script took longer than timeout (50ms)" {
+		t.Errorf("own timeout: %v", err)
 	}
 }
 

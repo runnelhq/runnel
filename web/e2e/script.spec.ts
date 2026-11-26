@@ -46,7 +46,7 @@ transforms:
   - id: rows
     type: core.generate-rows
     with:
-      rows: 2
+      count: 2
       fields:
         - { name: amount, value: 9.95 }
         - { name: unit price, value: 2 }

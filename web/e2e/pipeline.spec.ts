@@ -266,7 +266,7 @@ const checks = `kind: Pipeline
 apiVersion: runnel/v1
 name: checks
 transforms:
-  - { id: gen, type: core.generate-rows, with: { rows: 5, rowNumberField: n } }
+  - { id: gen, type: core.generate-rows, with: { count: 5, numberField: n } }
   - id: check
     type: core.filter
     with:

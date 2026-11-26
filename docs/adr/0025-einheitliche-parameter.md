@@ -146,3 +146,28 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
   1, sodass `${…}` möglich ist; eine Zahl ohne Variable wird schon beim Prüfen geprüft.
 - Der Datei-Trigger nennt den überwachten Ordner `with.folder` (wie `file.list`), nicht mehr `with.path`; `path` bei
   `type: file` ist ein Fehler mit dem Hinweis auf `folder`. `with.path` bleibt der Pfad der Adresse eines HTTP-Triggers.
+
+## Nachtrag 2026-11-26 (R5b)
+
+Weitere Regeln aus der Durchsicht der Namen vor 1.0 (Roadmap R5), mit den Bausteinen, die sie seitdem befolgen:
+
+| Regel | Name | Bausteine (vorher) |
+|---|---|---|
+| Welche Einträge eines Ordners zählen | `include: all\|files\|folders` | `file.list`, `transfer.list`; neu `file.exists`, `transfer.exists` mit Standard `all` (`kind: any\|file\|folder`) |
+| Anzahl als Ergebnis oder Vorgabe | `count` | `db.query`, `http.request`; neu `archive.create` (`output.files`), `core.generate-rows` (`rows`) |
+| Feld mit der laufenden Nummer ab 1 | `numberField` | `core.generate-rows` (`rowNumberField`), `core.split-field` (`indexField`) |
+| Datensätze als Liste in einen Baustein | `records` | `core.run-pipeline` (`rows`); `core.split-field` teilt in Datensätze mit `asRecords: true` (`rows: true`) |
+| Ziel für Datensätze, die nicht passen | `else` | `core.filter`; neu `core.switch` (`default`) – `default` ist sonst ein **Wert** (`core.map-values`, `return[].default`, Parameter) |
+| Lesart der Ausgabe eines Programms | `format: text\|json` → `output.value` | `shell.run`, `shell.powershell` (`json: true` → `output.json`), wie `file.read` |
+| Dauer als Ergebnis | `…Ms` als Zahl in Millisekunden | `shell.*` `output.durationMs` (`duration` als Text), wie `durationMs` der Läufe |
+| Gleichzeitige Läufe | `maxConcurrentRuns` | HTTP-Trigger (`maxConcurrent`), wie `settings.maxConcurrentRuns` |
+| Verteilung auf Daten-Links | `distribution: copy\|roundRobin` | Pipeline-Transforms (`distribute`) |
+
+- **Übergang:** Alte Namen sind ein Fehler mit Position und neuem Namen, z. B.
+  `field "kind" was renamed before 1.0: use include: all, files or folders (as in file.list)`. Die Bausteine prüfen das
+  in `New` mit `action.Renamed` (Dateiformate über eine Liste in `internal/model/unknown.go`), wie R5a bei `stopOnError`
+  und `utf-16le`; die Abkündigung mit `Deprecated` (ADR 0029) bleibt für die Zeit nach 1.0. Einen Alias gibt es nicht.
+- **Standardwerte statt „ohne Grenze“:** `maxWait` von `file.wait`/`transfer.wait` 1 h (`0`: bis zum Timeout der
+  Action), `timeout` von `core.script` 1 min (Action; im Transform für `init` und `end`), `maxSize` von
+  `transfer.download` 1 GB. Ein vergessener Wert hält so keinen Lauf unbegrenzt fest.
+- **Zahlen mit `${…}`** in allen Zahlenfeldern (Befund D2) folgen getrennt in R5b2.

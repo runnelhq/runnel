@@ -22,7 +22,8 @@ import (
 // record and params: an object it returns is the new record, a list several, null none.
 // init runs before the first record at the top level (its variables are global), end
 // after the last one and may return further records. An exception or a record that
-// takes longer than maxRecordTime goes to the error link.
+// takes longer than maxRecordTime goes to the error link; init and end longer than
+// timeout stop the pipeline (R5b).
 var scriptDefinition = transform.Definition{
 	Parallel:     true,
 	Type:         "core.script",
@@ -36,9 +37,9 @@ var scriptDefinition = transform.Definition{
 	Reference: action.Reference{
 		Outputs: []action.OutputField{{Name: "<fields[].name>", Type: "any", Description: "A declared field, converted to its type; without fields the types follow the values"}},
 		Records: "Passes on what the script returns for each record: an object as one record, a list as several, null as none; end may return further records after the last one.",
-		Errors:  "A record whose script throws an exception, returns a value that cannot be converted or takes longer than maxRecordTime goes to the error link; without one, the pipeline stops. A syntax error, a missing script file and errors in init or end stop the pipeline.",
+		Errors:  "A record whose script throws an exception, returns a value that cannot be converted or takes longer than maxRecordTime goes to the error link; without one, the pipeline stops. A syntax error, a missing script file and errors in init or end (also taking longer than timeout) stop the pipeline.",
 		Limits: []string{
-			"maxRecordTime limits the time per record (default 1s); init and end have no limit of their own.",
+			"maxRecordTime limits the time per record (default 1s), timeout that of init and of end (default 1m each).",
 			"The console keeps at most 1,000 lines per copy, each cut at 8 KiB; a script file or module may be at most 4 MiB.",
 			"No access to files, network, processes or environment variables; require loads modules from scripts/ of the project only.",
 		},
@@ -53,6 +54,7 @@ type scriptTransform struct {
 	Params        map[string]any `json:"params" doc:"Values for the script as params.NAME; may use ${…}, a value of its own may be ${secret:…}" schema:"format=runnel-params"`
 	Fields        []scriptField  `json:"fields" doc:"Fields of the returned records with their type, in this order: each value is converted to the type, other properties are dropped; without fields the types follow the values"`
 	MaxRecordTime string         `json:"maxRecordTime" doc:"Longest time the script may take for one record; a record that takes longer goes to the error link" schema:"format=runnel-duration,default=1s"`
+	Timeout       string         `json:"timeout" doc:"Longest time init and end may take, each; longer stops the pipeline" schema:"format=runnel-duration,default=1m"`
 
 	// convert converts the values of the fields; declared tells the names of the fields.
 	convert  []func(any) (any, error)
@@ -65,8 +67,11 @@ type scriptField struct {
 	Type string `json:"type" doc:"Type of the field; a returned value is converted to it" schema:"required,enum=string|int|decimal|float|bool|date|datetime|binary|json"`
 }
 
-// defaultRecordTime is the default of maxRecordTime (ADR 0028).
-const defaultRecordTime = time.Second
+// Defaults of maxRecordTime (ADR 0028) and of timeout (init and end, R5b).
+const (
+	defaultRecordTime = time.Second
+	defaultInitTime   = time.Minute
+)
 
 func newScript(with map[string]any) (transform.Transform, error) {
 	t := &scriptTransform{}
@@ -93,7 +98,12 @@ func newScript(with map[string]any) (transform.Transform, error) {
 		return nil, err
 	}
 	if !strings.Contains(t.MaxRecordTime, "${") {
-		if _, err := recordTime(t.MaxRecordTime); err != nil {
+		if _, err := recordTime("maxRecordTime", t.MaxRecordTime, defaultRecordTime); err != nil {
+			return nil, err
+		}
+	}
+	if !strings.Contains(t.Timeout, "${") {
+		if _, err := recordTime("timeout", t.Timeout, defaultInitTime); err != nil {
 			return nil, err
 		}
 	}
@@ -144,14 +154,22 @@ func fieldConverter(typ record.Type) (func(any) (any, error), error) {
 	return c.Convert, nil
 }
 
-// recordTime reads maxRecordTime.
-func recordTime(s string) (time.Duration, error) {
+// phaseError names timeout in the error of init or end that took too long.
+func phaseError(err error, limit time.Duration) error {
+	if errors.Is(err, script.ErrTimeLimit) {
+		return fmt.Errorf("%w (timeout %s)", err, limit)
+	}
+	return err
+}
+
+// recordTime reads maxRecordTime or timeout.
+func recordTime(field, s string, fallback time.Duration) (time.Duration, error) {
 	if s == "" {
-		return defaultRecordTime, nil
+		return fallback, nil
 	}
 	d, err := time.ParseDuration(s)
 	if err != nil || d <= 0 {
-		return 0, fmt.Errorf("invalid maxRecordTime %q (examples: 500ms, 5s)", s)
+		return 0, fmt.Errorf("invalid %s %q (examples: 500ms, 5s)", field, s)
 	}
 	return d, nil
 }
@@ -173,7 +191,11 @@ func (t *scriptTransform) Process(ctx context.Context, in <-chan transform.Batch
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	limit, err := recordTime(t.MaxRecordTime)
+	limit, err := recordTime("maxRecordTime", t.MaxRecordTime, defaultRecordTime)
+	if err != nil {
+		return err
+	}
+	initLimit, err := recordTime("timeout", t.Timeout, defaultInitTime)
 	if err != nil {
 		return err
 	}
@@ -195,14 +217,15 @@ func (t *scriptTransform) Process(ctx context.Context, in <-chan transform.Batch
 			return err
 		}
 	}
-	s := rt.Start(ctx, limit)
+	s := rt.Start(ctx, initLimit)
 	defer s.Close()
 	s.Set("params", t.params)
 	if t.InitCode != "" {
 		if err := s.Run("init", t.InitCode); err != nil {
-			return err
+			return phaseError(err, initLimit)
 		}
 	}
+	s.SetLimit(limit)
 	warned := map[string]bool{}
 	var n, failed int64
 	for b := range in {
@@ -237,7 +260,11 @@ func (t *scriptTransform) Process(ctx context.Context, in <-chan transform.Batch
 		return err
 	}
 	if end != nil {
-		recs, err := s.Records(end, false)
+		s.SetLimit(initLimit)
+		recs, err := s.Records(end, true)
+		if err != nil {
+			return phaseError(err, initLimit)
+		}
 		for i := 0; err == nil && i < len(recs); i++ {
 			recs[i], _, err = t.typed(recs[i], out, warned)
 		}

@@ -18,7 +18,7 @@ import (
 
 // execute runs a prepared command for an action of the namespace (ADR 0023): env is added
 // to the environment and its values are hidden in the output; the output has exitCode,
-// stdout, stderr, truncated, duration and, with readJSON, json.
+// stdout, stderr, truncated, durationMs and, with readJSON, value.
 func execute(ctx context.Context, ec *action.ExecContext, name string, cmd proc.Command, env map[string]string, okCodes []int, readJSON bool) (action.Result, error) {
 	var secrets []string
 	if len(env) > 0 {
@@ -41,7 +41,7 @@ func execute(ctx context.Context, ec *action.ExecContext, name string, cmd proc.
 		ec.Log(slog.LevelWarn, fmt.Sprintf("the output of %s was longer than %d bytes; the rest was dropped", name, maxOutput(cmd.MaxOutput)))
 	}
 	out := map[string]any{"exitCode": int64(res.ExitCode), "stdout": res.Stdout, "stderr": res.Stderr,
-		"truncated": res.Truncated, "duration": res.Duration.Round(time.Millisecond).String()}
+		"truncated": res.Truncated, "durationMs": res.Duration.Milliseconds()}
 	if !slices.Contains(okCodes, res.ExitCode) {
 		return action.Result{Output: out}, fmt.Errorf("%s ended with exit code %d%s", name, res.ExitCode, lastLines(res.Stderr, 5))
 	}
@@ -50,10 +50,27 @@ func execute(ctx context.Context, ec *action.ExecContext, name string, cmd proc.
 		if err != nil {
 			return action.Result{Output: out}, fmt.Errorf("the output of %s is not JSON: %w", name, err)
 		}
-		out["json"] = v
+		out["value"] = v
 	}
 	ec.Log(slog.LevelInfo, fmt.Sprintf("%s ended with exit code %d in %s", name, res.ExitCode, res.Duration.Round(time.Millisecond)))
 	return action.Result{Output: out}, nil
+}
+
+// decode decodes the configuration of an action of the namespace and checks format:
+// with json, stdout is read as JSON into output.value, like file.read with format: json.
+// Until R5b this was json: true with output.json.
+func decode(with map[string]any, v any, format *string) error {
+	if err := action.Renamed(with, "json", "format: json (the value is then output.value, as in file.read)"); err != nil {
+		return err
+	}
+	if err := action.DecodeConfig(with, v); err != nil {
+		return err
+	}
+	switch *format {
+	case "", "text", "json":
+		return nil
+	}
+	return fmt.Errorf("invalid format %q (expected text or json)", *format)
 }
 
 // checkEnvName reports a name that cannot be an environment variable.

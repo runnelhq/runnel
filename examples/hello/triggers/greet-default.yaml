@@ -11,4 +11,4 @@ with:
   method: POST
   path: /greet
   auth: none
-  maxConcurrent: 2          # more running runs of this trigger: 429
+  maxConcurrentRuns: 2      # more running runs of this trigger: 429

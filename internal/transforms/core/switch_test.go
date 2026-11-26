@@ -34,7 +34,7 @@ var switchCases = []any{
 }
 
 func TestSwitch(t *testing.T) {
-	tr := transformtest.New(t, switchDefinition, map[string]any{"cases": switchCases, "default": "others"})
+	tr := transformtest.New(t, switchDefinition, map[string]any{"cases": switchCases, "else": "others"})
 	out, logs, err := transformtest.RunRouted(context.Background(), tr, countries("DE", "AT", "US", "DE", nil, "FR")...)
 	if err != nil {
 		t.Fatal(err)
@@ -49,11 +49,11 @@ func TestSwitch(t *testing.T) {
 		t.Errorf("log %v", logs)
 	}
 
-	// Without a default, records that match no case are dropped.
+	// Without else, records that match no case are dropped.
 	tr = transformtest.New(t, switchDefinition, map[string]any{"cases": switchCases})
 	out, logs, err = transformtest.RunRouted(context.Background(), tr, countries("DE", "US", "IT")...)
 	if err != nil || ids(out["germany"]) != "1" || len(out["eu"]) != 0 || len(out[""]) != 0 {
-		t.Errorf("without default: %v %v", out, err)
+		t.Errorf("without else: %v %v", out, err)
 	}
 	if len(logs) != 1 || logs[0].Msg != "germany 1, eu 0, dropped 2" {
 		t.Errorf("log %v", logs)
@@ -87,7 +87,7 @@ func TestSwitchErrors(t *testing.T) {
 }
 
 func TestSwitchInit(t *testing.T) {
-	tr := transformtest.New(t, switchDefinition, map[string]any{"default": "othrs", "cases": []any{
+	tr := transformtest.New(t, switchDefinition, map[string]any{"else": "othrs", "cases": []any{
 		map[string]any{"when": "{{ record.contry == 'DE' }}", "to": "germany"},
 	}})
 	ic := transform.NewInitContext(record.Schema{}.With("country", record.String))
@@ -106,11 +106,18 @@ func TestSwitchInit(t *testing.T) {
 	}
 	want := []string{
 		`error cases[0].when: field "contry" does not exist in the incoming records (did you mean "country"?) (fields: country)`,
-		`error default: no data link leads to "othrs" (did you mean "others"?) (links to: germany, eu, others)`,
-		`warning : the link to "eu" gets no records: no case and not the default leads there`,
-		`warning : the link to "others" gets no records: no case and not the default leads there`,
+		`error else: no data link leads to "othrs" (did you mean "others"?) (links to: germany, eu, others)`,
+		`warning : the link to "eu" gets no records: no case and not else leads there`,
+		`warning : the link to "others" gets no records: no case and not else leads there`,
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("problems:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// default of core.switch is else since R5b, as in core.filter.
+func TestSwitchOldDefault(t *testing.T) {
+	if _, err := newSwitch(map[string]any{"cases": switchCases, "default": "others"}); err == nil || !strings.Contains(err.Error(), `field "default" was renamed before 1.0: use else`) {
+		t.Errorf("%v", err)
 	}
 }

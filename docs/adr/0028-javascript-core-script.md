@@ -115,7 +115,8 @@ Betrachtete Varianten:
 - **`require('./scripts/utils.js')`** lädt nur `.js`-Dateien aus dem Ordner `scripts/` des Projekts (relativ zum
   Projekt, kein `..`, keine npm-Module). Jedes Modul wird je Laufzeit einmal geladen.
 - **Zeit:**
-  - Action: `timeout` der Action (Standard wie bei anderen Actions); danach bricht `Interrupt` das Skript ab.
+  - Action: `timeout` der Action (Standard wie bei anderen Actions); danach bricht `Interrupt` das Skript ab. Seit
+    R5b zusätzlich eine eigene Grenze mit Standard 1 min (Nachtrag).
   - Transform: **`maxRecordTime`** je Datensatz, Standard **1 s**, einstellbar (z. B. `5s`). Eine Überschreitung ist
     ein Fehler des Datensatzes.
   - Ein Abbruch des Laufs bricht laufende Skripte sofort ab.
@@ -201,7 +202,7 @@ Typen, `fields`, `init`/`end`, Fehler-Link, Benchmark; **S73c** Editor (Hervorhe
   `record 3: field "amount": …`, bei Zeitüberschreitung `record 3: script: the script took longer than maxRecordTime
   (1s)`. Am Ende ein Info-Log „2 of 100 records with errors“.
 - **Zeit:** `maxRecordTime` gilt je Aufruf des Skripts für einen Datensatz, nicht für `init` und `end`; sie begrenzt
-  nur ein Abbruch des Laufs. Ein Timer je Kopie wird je Datensatz neu gestellt (keine Goroutine und kein Kontext je
+  nur ein Abbruch des Laufs (seit R5b auch `timeout`, Nachtrag). Ein Timer je Kopie wird je Datensatz neu gestellt (keine Goroutine und kein Kontext je
   Datensatz). Nach einer Unterbrechung ist die Laufzeit für den nächsten Datensatz wieder nutzbar. Eine Exception in
   `init` oder `end` beendet die Pipeline mit dem Fehler.
 - **`console`:** höchstens 1.000 Zeilen je Lauf einer Kopie (über alle Datensätze, `init` und `end`).
@@ -232,3 +233,14 @@ Typen, `fields`, `init`/`end`, Fehler-Link, Benchmark; **S73c** Editor (Hervorhe
 - **Syntaxfehler:** Die Action prüft die Syntax von `script` jetzt schon beim Prüfen (wie der Transform seit S73b), damit
   der Editor und `runnel validate` den Fehler vor dem Lauf zeigen. Die Meldung (`script, line 3: syntax error: …`)
   steht am Feld, die Zeile wird markiert.
+
+## Nachtrag 2026-11-26 (R5b): Standard-Zeitlimits
+
+- **Action:** `with.timeout` begrenzt das Skript, Standard **1 min** (wie `shell.*` mit 10 min eine eigene Grenze).
+  `while (true) {}` hält damit keinen Lauf mehr unbegrenzt fest. Das `timeout` der Action im Workflow gilt zusätzlich;
+  die kürzere Grenze gewinnt. Meldung: `script took longer than timeout (1m0s)`.
+- **Transform:** `timeout` begrenzt `init` und `end`, je Teil, Standard **1 min**; eine Überschreitung beendet die
+  Pipeline (`init: the script took longer than allowed (timeout 1m0s)`). `maxRecordTime` gilt weiter je Datensatz. Die
+  Sitzung stellt dazu ihre Grenze um (`Session.SetLimit`); `init` läuft jetzt als begrenzter Aufruf.
+- Größere Werte sind möglich (z. B. `timeout: 30m`); ohne Grenze gibt es nicht, damit ein vergessener Wert keinen Lauf
+  und über `maxConcurrentRuns` keine weiteren Läufe blockiert.

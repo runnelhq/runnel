@@ -78,3 +78,16 @@ func TestWaitConfig(t *testing.T) {
 		}
 	}
 }
+
+// Without maxWait the wait ends after an hour (R5b); 0 waits until the timeout of the
+// action or the end of the run.
+func TestMaxWaitDefault(t *testing.T) {
+	for text, want := range map[string]time.Duration{"": time.Hour, " ": time.Hour, "0": 0, "0s": 0, "30m": 30 * time.Minute} {
+		if got, err := MaxWait(text); err != nil || got != want {
+			t.Errorf("%q: %v %v, want %v", text, got, err, want)
+		}
+	}
+	if _, err := MaxWait("soon"); err == nil || !strings.Contains(err.Error(), `maxWait: invalid duration "soon"`) {
+		t.Errorf("soon: %v", err)
+	}
+}

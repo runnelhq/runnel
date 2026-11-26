@@ -27,7 +27,7 @@ func TestSource(t *testing.T) {
 	}{
 		{conn(connections.TypeSQLServer, map[string]any{"host": "db01", "port": 1433, "database": "ERP", "user": "runnel", "password": "p@ss:/?"}),
 			"sqlserver", []string{"sqlserver://runnel:p%40ss%3A%2F%3F@db01:1433?", "database=ERP", "encrypt=true", "TrustServerCertificate=false", "connection+timeout=30", "app+name=Runnel"}},
-		{conn(connections.TypeSQLServer, map[string]any{"host": "db01", "instance": "SQLEXPRESS", "database": "ERP", "user": "u", "encrypt": "strict", "trustServerCertificate": true, "connectTimeout": "5s"}),
+		{conn(connections.TypeSQLServer, map[string]any{"host": "db01", "instance": "SQLEXPRESS", "database": "ERP", "user": "u", "encrypt": "strict", "trustServerCertificate": true, "timeout": "5s"}),
 			"sqlserver", []string{"sqlserver://u:@db01/SQLEXPRESS?", "encrypt=strict", "TrustServerCertificate=true", "connection+timeout=5"}},
 		{conn(connections.TypePostgres, map[string]any{"host": "pg", "database": "shop", "user": "runnel", "password": "s3cret"}),
 			"pgx", []string{"postgres://runnel:s3cret@pg:5432/shop?", "sslmode=verify-full", "connect_timeout=30", "application_name=Runnel"}},
@@ -48,8 +48,10 @@ func TestSource(t *testing.T) {
 	for c, want := range map[*connection.Resolved]string{
 		new(conn(connections.TypeSQLServer, map[string]any{"host": "h", "port": "1433", "instance": "X", "database": "d", "user": "u"})): "give either port or instance, not both",
 		new(conn(connections.TypePostgres, map[string]any{"host": "h", "port": "99999", "database": "d", "user": "u"})):                  `invalid port "99999"`,
-		new(conn(connections.TypePostgres, map[string]any{"host": "h", "database": "d", "user": "u", "connectTimeout": "10ms"})):         "connectTimeout: invalid duration",
+		new(conn(connections.TypePostgres, map[string]any{"host": "h", "database": "d", "user": "u", "timeout": "10ms"})):                "timeout: invalid duration",
 		new(conn(connections.TypePostgres, map[string]any{"host": "h", "database": "d"})):                                                `missing required field "user"`,
+		// connectTimeout is timeout since R5b.
+		new(conn(connections.TypeSQLServer, map[string]any{"host": "h", "database": "d", "connectTimeout": "5s"})): `field "connectTimeout" was renamed before 1.0: use timeout`,
 	} {
 		if _, _, err := source(context.Background(), reg, *c); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v: %v, want %q", c.With, err, want)

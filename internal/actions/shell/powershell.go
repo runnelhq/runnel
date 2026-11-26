@@ -23,13 +23,13 @@ import (
 // shell.powershell runs a PowerShell script (ADR 0023): inline or from a file, without
 // variables in the script; values come only as params, passed as JSON to a start script
 // that splats them as named parameters, so that their types stay. Output like shell.run;
-// with json, the last JSON value of stdout (e.g. of ConvertTo-Json).
+// with format: json, the last JSON value of stdout (e.g. of ConvertTo-Json).
 var powershellDefinition = action.Definition{
 	Type:        "shell.powershell",
 	Category:    action.CategoryExecution,
 	Label:       "PowerShell",
 	Description: "Runs a PowerShell script with named parameters; output: exitCode, stdout, stderr and optionally JSON",
-	Example:     "script: |\n  param([string]$Folder)\n  Get-ChildItem $Folder | Select-Object Name, Length | ConvertTo-Json\nparams:\n  Folder: data\njson: true\n",
+	Example:     "script: |\n  param([string]$Folder)\n  Get-ChildItem $Folder | Select-Object Name, Length | ConvertTo-Json\nparams:\n  Folder: data\nformat: json\n",
 	Config:      powershellAction{},
 	New:         newPowershell,
 	Reference: action.Reference{
@@ -38,10 +38,10 @@ var powershellDefinition = action.Definition{
 			{Name: "output.stdout", Type: "string", Description: "Standard output; values of env are hidden"},
 			{Name: "output.stderr", Type: "string", Description: "Error output; values of env are hidden"},
 			{Name: "output.truncated", Type: "boolean", Description: "true if stdout or stderr was longer than maxOutput"},
-			{Name: "output.duration", Type: "string", Description: "Running time, e.g. 1.25s"},
-			{Name: "output.json", Type: "any", Description: "With json, the last JSON value of stdout, e.g. of ConvertTo-Json"},
+			{Name: "output.durationMs", Type: "integer", Description: "Running time in milliseconds"},
+			{Name: "output.value", Type: "any", Description: "With format: json, the last JSON value of stdout, e.g. of ConvertTo-Json"},
 		},
-		Errors: "Fails when the edition is not installed, the script file is missing, the script ends with an exit code other than 0 (an uncaught error included), it runs longer than timeout (it is ended with all processes it started), or with json stdout holds no JSON.",
+		Errors: "Fails when the edition is not installed, the script file is missing, the script ends with an exit code other than 0 (an uncaught error included), it runs longer than timeout (it is ended with all processes it started), or with format: json stdout holds no JSON.",
 		Limits: []string{
 			"timeout limits the script (default 10m).",
 			"maxOutput limits stdout and stderr each (default 1MB, at most 1GB); more is dropped.",
@@ -63,7 +63,7 @@ type powershellAction struct {
 	Script    string            `json:"script" doc:"The script; no ${…} or {{ … }} – values come as params" schema:"format=runnel-script"`
 	File      string            `json:"file" doc:"A script file instead of script, relative to the project folder, e.g. scripts/cleanup.ps1" schema:"format=runnel-script"`
 	Params    map[string]any    `json:"params" doc:"Named parameters of the script (param(...)); numbers, true/false, lists and objects keep their type; may use ${…} and {{ … }}"`
-	JSON      bool              `json:"json" doc:"Read the last JSON value of stdout (e.g. of ConvertTo-Json) into output.json" schema:"default=false"`
+	Format    string            `json:"format" doc:"text, or json to read the last JSON value of stdout (e.g. of ConvertTo-Json) into output.value" schema:"enum=text|json,default=text"`
 	Edition   string            `json:"edition" doc:"auto: PowerShell 7 (pwsh) if installed, else Windows PowerShell 5.1; pwsh or windows to choose one" schema:"enum=auto|pwsh|windows,default=auto"`
 	Workdir   string            `json:"workdir" doc:"Working folder, relative to the project folder; empty: the project folder"`
 	Env       map[string]string `json:"env" doc:"Further environment variables, e.g. secrets ($env:NAME in the script)" schema:"format=runnel-secret"`
@@ -73,7 +73,7 @@ type powershellAction struct {
 
 func newPowershell(with map[string]any) (action.Action, error) {
 	a := &powershellAction{}
-	if err := action.DecodeConfig(with, a); err != nil {
+	if err := decode(with, a, &a.Format); err != nil {
 		return nil, err
 	}
 	switch {
@@ -187,7 +187,7 @@ func (a *powershellAction) Execute(ctx context.Context, ec *action.ExecContext) 
 		name = filepath.Base(a.File)
 	}
 	ec.Log(slog.LevelDebug, fmt.Sprintf("starting %s with %s and %d %s", name, filepath.Base(program), len(params), plural(len(params), "parameter")))
-	return execute(ctx, ec, name, cmd, a.Env, []int{0}, a.JSON)
+	return execute(ctx, ec, name, cmd, a.Env, []int{0}, a.Format == "json")
 }
 
 // parseTimeout reads a timeout; empty: 10 minutes (ADR 0023).

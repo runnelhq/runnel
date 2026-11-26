@@ -43,7 +43,7 @@ func httpSetup(t *testing.T) (*fake, *Scheduler) {
 	t.Setenv("RUNNEL_TEST_TOKEN", "s3cret")
 	dir, f, s, _ := setup(t, map[string]string{
 		"items.yaml": httpTrigger("items", "POST", "/api/items/{ID}", "params: { MODE: fast }\n") + "  auth: { token: \"${env:RUNNEL_TEST_TOKEN}\" }\n",
-		"open.yaml":  httpTrigger("open", "GET", "/open", "") + "  auth: none\n  maxConcurrent: 1\n",
+		"open.yaml":  httpTrigger("open", "GET", "/open", "") + "  auth: none\n  maxConcurrentRuns: 1\n",
 		"off.yaml":   httpTrigger("off", "GET", "/off", "enabled: false\n") + "  auth: none\n",
 	})
 	write(t, dir, "workflows/api.workflow.yaml", apiTarget)
@@ -136,10 +136,10 @@ func TestHTTPTrigger(t *testing.T) {
 	}
 }
 
-// A missing required parameter is reported before a run starts; maxConcurrent and the
+// A missing required parameter is reported before a run starts; maxConcurrentRuns and the
 // limits of the project answer 429, a server shutting down 503.
 func TestHTTPTriggerLimits(t *testing.T) {
-	dir, f, s, _ := setup(t, map[string]string{"open.yaml": httpTrigger("open", "GET", "/open", "") + "  auth: none\n  maxConcurrent: 1\n"})
+	dir, f, s, _ := setup(t, map[string]string{"open.yaml": httpTrigger("open", "GET", "/open", "") + "  auth: none\n  maxConcurrentRuns: 1\n"})
 	write(t, dir, "workflows/api.workflow.yaml", apiTarget)
 	s.Reload()
 	open := call{method: "GET", path: "/open"}
@@ -150,7 +150,7 @@ func TestHTTPTriggerLimits(t *testing.T) {
 	if w := open.do(s); w.Code != 202 {
 		t.Fatalf("first: %d %s", w.Code, w.Body)
 	}
-	if w := open.do(s); w.Code != 429 || !strings.Contains(w.Body.String(), `trigger \"open\" is already running 1 run (maxConcurrent: 1)`) {
+	if w := open.do(s); w.Code != 429 || !strings.Contains(w.Body.String(), `trigger \"open\" is already running 1 run (maxConcurrentRuns: 1)`) {
 		t.Errorf("second: %d %s", w.Code, w.Body)
 	}
 	f.running = map[string]bool{}
@@ -172,12 +172,12 @@ func TestHTTPTriggerLimits(t *testing.T) {
 	}
 }
 
-// Without maxConcurrent an http trigger runs at most 4 runs at the same time (R5a): the
-// 5th request is refused with 429. maxConcurrent: 0, set explicitly, has no own limit.
+// Without maxConcurrentRuns an http trigger runs at most 4 runs at the same time (R5a): the
+// 5th request is refused with 429. maxConcurrentRuns: 0, set explicitly, has no own limit.
 func TestHTTPTriggerDefaultLimit(t *testing.T) {
 	dir, f, s, _ := setup(t, map[string]string{
 		"open.yaml":      httpTrigger("open", "GET", "/open", "") + "  auth: none\n",
-		"unlimited.yaml": httpTrigger("unlimited", "GET", "/unlimited", "") + "  auth: none\n  maxConcurrent: 0\n",
+		"unlimited.yaml": httpTrigger("unlimited", "GET", "/unlimited", "") + "  auth: none\n  maxConcurrentRuns: 0\n",
 	})
 	write(t, dir, "workflows/api.workflow.yaml", apiTarget)
 	s.Reload()
@@ -187,7 +187,7 @@ func TestHTTPTriggerDefaultLimit(t *testing.T) {
 			t.Fatalf("request %d: %d %s", i+1, w.Code, w.Body)
 		}
 	}
-	if w := open.do(s); w.Code != 429 || !strings.Contains(w.Body.String(), `trigger \"open\" is already running 4 runs (maxConcurrent: 4)`) {
+	if w := open.do(s); w.Code != 429 || !strings.Contains(w.Body.String(), `trigger \"open\" is already running 4 runs (maxConcurrentRuns: 4)`) {
 		t.Errorf("5th: %d %s", w.Code, w.Body)
 	}
 	unlimited := call{method: "GET", path: "/unlimited?ID=1"}
@@ -308,7 +308,7 @@ func TestHTTPOnNetwork(t *testing.T) {
 func TestHTTPResponseRun(t *testing.T) {
 	t.Setenv("RUNNEL_TEST_TOKEN", "s3cret")
 	dir, f, s, _ := setup(t, map[string]string{
-		"svc.yaml": httpTrigger("svc", "POST", "/svc/{ID}", "") + "  auth: { token: \"${env:RUNNEL_TEST_TOKEN}\" }\n  response: run\n  timeout: 1s\n  maxConcurrent: 0\n",
+		"svc.yaml": httpTrigger("svc", "POST", "/svc/{ID}", "") + "  auth: { token: \"${env:RUNNEL_TEST_TOKEN}\" }\n  response: run\n  timeout: 1s\n  maxConcurrentRuns: 0\n",
 	})
 	write(t, dir, "workflows/api.workflow.yaml", apiTarget)
 	s.Reload()

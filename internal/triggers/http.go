@@ -385,7 +385,7 @@ func (h *httpTriggers) params(t *model.Trigger, inputs map[string]string) (map[s
 	return params, nil
 }
 
-// start starts the run of a request unless maxConcurrent or a limit of the project is
+// start starts the run of a request unless maxConcurrentRuns or a limit of the project is
 // reached.
 func (h *httpTriggers) start(e *entry, start StartRequest) (Started, *httpError) {
 	s, t := h.s, e.t
@@ -405,7 +405,7 @@ func (h *httpTriggers) start(e *entry, start StartRequest) (Started, *httpError)
 		if running == 1 {
 			runsText = "1 run"
 		}
-		return Started{}, errorf(http.StatusTooManyRequests, "trigger %q is already running %s (maxConcurrent: %d); try again later", t.Name, runsText, limit)
+		return Started{}, errorf(http.StatusTooManyRequests, "trigger %q is already running %s (maxConcurrentRuns: %d); try again later", t.Name, runsText, limit)
 	}
 	now := s.opts.Now()
 	run, err := s.opts.Start(t, start)

@@ -2,7 +2,7 @@ testdata/project/invalid/environments/dev.yaml:3:7: environment name "developmen
 testdata/project/invalid/environments/dev.yaml:5:7: invalid variable name "1X" (letters, digits and _, not starting with a digit)
 testdata/project/invalid/environments/test.yaml:4:12: sequence was used where mapping is expected
 testdata/project/invalid/project.yaml:4:21: default environment "staging" not found (expected testdata/project/invalid/environments/staging.yaml)
-testdata/project/invalid/project.yaml:6:16: invalid defaultJoin "any" (expected all, first or each)
-testdata/project/invalid/project.yaml:9:13: invalid variable name "bad-name" (letters, digits and _, not starting with a digit)
-testdata/project/invalid/project.yaml:10:11: unclosed "${" at position 1
-testdata/project/invalid/project.yaml:13:10: invalid history "always" (expected all, errors or none)
+testdata/project/invalid/project.yaml:7:13: invalid variable name "bad-name" (letters, digits and _, not starting with a digit)
+testdata/project/invalid/project.yaml:8:11: unclosed "${" at position 1
+testdata/project/invalid/project.yaml:10:16: invalid defaultJoin "any" (expected all, first or each)
+testdata/project/invalid/project.yaml:12:10: invalid history "always" (expected all, errors or none)
