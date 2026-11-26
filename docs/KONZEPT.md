@@ -360,8 +360,8 @@ im PR geprüft und in den `THIRD_PARTY_NOTICES` geführt (ADR 0004, ADR 0022).
 | ODBC (optional, Access, Legacy; auch MySQL/MariaDB bis auf Weiteres) | `alexbrainman/odbc` |
 | Excel | Lesen mit eigenem Reader (`internal/xlsx`: `archive/zip`, `encoding/xml`, seit S67a), Schreiben mit `xuri/excelize/v2` (seit S67b) – [ADR 0024](adr/0024-excel-lesen-schreiben.md) |
 | CSV | `encoding/csv`, Kodierungen mit `golang.org/x/text` (Windows-1252, UTF-16) |
-| SFTP | `pkg/sftp` + `x/crypto/ssh` |
-| FTP/FTPS | offen; Auswahl mit S57 (Lizenz MIT-kompatibel) |
+| SFTP (seit S57a) | `pkg/sftp` v1.13.12 (BSD-2-Clause, mit `kr/fs`, BSD-3-Clause) + `golang.org/x/crypto/ssh` (BSD-3-Clause) |
+| FTP/FTPS | offen; Auswahl mit S57c (Lizenz MIT-kompatibel) |
 | Mail | Go-Standardbibliothek (`net/smtp`, `mime`, seit S62a); OAuth2 (Client Credentials, `XOAUTH2`) für Office 365 seit S62b ohne Bibliothek (`internal/oauth`) |
 | Logging | `log/slog` (strukturiert, JSON) |
 | WebView2-Fenster | `jchv/go-webview2` oder Wails v2 |
@@ -1149,7 +1149,7 @@ in beiden Listen (z. B. `http.request`, `core.log`) sind beabsichtigt.
 | Allgemein | Start, Erfolg, Abbruch, Warten, Dummy (`core.dummy` – Sammelpunkt für Zweige), Variablen setzen, Bedingung prüfen (`core.check`, seit S10), Log schreiben, Schleife (ForEach über Liste/Dateien) |
 | Ausführung | Pipeline ausführen, Workflow ausführen (jeweils mit `forEach`, seit S24b), JavaScript (`core.script`, seit S73a, [ADR 0028](adr/0028-javascript-core-script.md)), PowerShell (`shell.powershell`, seit S61), Programm starten (`shell.run`, seit S60, [ADR 0023](adr/0023-programme-powershell.md)) |
 | Dateien | Existiert, Warten auf Datei, Kopieren, Verschieben, Löschen, Umbenennen, Ordner anlegen, Archiv packen/entpacken (ZIP, TAR, TAR.GZ), Dateiliste |
-| Netzwerk | HTTP-Request (`http.request`, seit S10; mit `http`-Connection für Basis-Adresse und Anmeldung seit S63a, `Retry-After` seit S63b, Paginierung mit `paginate` seit S63c, Download als Datei mit `saveTo` seit S63d), HTTP-Antwort (`http.response`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`: upload, download, list, delete, move, mkdir, exists, wait; Protokoll in der Connection, S57), Mail senden (`mail.send`, seit S62a: über eine `smtp`-Connection, Text und HTML, Anhänge), Mail abrufen (IMAP) |
+| Netzwerk | HTTP-Request (`http.request`, seit S10; mit `http`-Connection für Basis-Adresse und Anmeldung seit S63a, `Retry-After` seit S63b, Paginierung mit `paginate` seit S63c, Download als Datei mit `saveTo` seit S63d), HTTP-Antwort (`http.response`, seit S38b1), Dateitransfer SFTP/FTPS/FTP (`transfer.*`, Protokoll in der Connection: `transfer.upload`, `transfer.download` und `transfer.list` über eine `sftp`-Connection seit S57a; delete, move, mkdir, exists, wait mit S57b, `ftps`/`ftp` mit S57c), Mail senden (`mail.send`, seit S62a: über eine `smtp`-Connection, Text und HTML, Anhänge), Mail abrufen (IMAP) |
 | Datenbank | SQL ausführen (`db.execute`, seit S20a: über eine Connection, Werte nur als `@name`), Abfrage in den Workflow (`db.query`, seit S59: Zeilen, Anzahl, erster Wert – deckt auch „Tabelle existiert“ und „Zeilen zählen“ ab) |
 
 **Datei-Actions (umgesetzt mit S09):** `file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`,

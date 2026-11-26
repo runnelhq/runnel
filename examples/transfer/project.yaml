@@ -1,0 +1,17 @@
+# Example for file transfer with SFTP (S57a). It needs an SFTP server, e.g. OpenSSH on
+# Windows or Linux: set SFTP_HOST and SFTP_USER below, the password in the environment
+# variable SFTP_PASSWORD, and the fingerprint of the server in SFTP_HOST_KEY. Without the
+# fingerprint "Test connection" in the editor (or a first run) names the one of the server;
+# check it with the administrator of the server, e.g. on the server itself with
+#   ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub
+# Then run:
+#   runnel run -v examples/transfer/workflows/fetch.workflow.yaml
+#   runnel run -v examples/transfer/workflows/send.workflow.yaml
+kind: Project
+apiVersion: runnel/v1
+name: transfer
+description: Fetches and sends CSV files through an sftp connection
+variables:
+  SFTP_HOST: sftp.example.com
+  SFTP_USER: runnel
+  SFTP_HOST_KEY: SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg

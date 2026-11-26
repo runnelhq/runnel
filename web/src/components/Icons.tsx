@@ -440,6 +440,10 @@ const actionIcons: Record<string, ReactNode> = {
   "shell.powershell": <path d="M7 5h14l-4 14H3zM8.5 9.5l3 2.5-3 2.5M12.5 15h3" />,
   // JavaScript (S73a): braces around a dot.
   "core.script": <path d="M8 4c-2 0-2.5 1-2.5 3v2c0 1.5-.8 3-2.5 3 1.7 0 2.5 1.5 2.5 3v2c0 2 .5 3 2.5 3M16 4c2 0 2.5 1 2.5 3v2c0 1.5.8 3 2.5 3-1.7 0-2.5 1.5-2.5 3v2c0 2-.5 3-2.5 3M12 12h.01" />,
+  // File transfer (S57a): a server with an arrow up (upload), down (download) or lines (list).
+  "transfer.upload": <path d="M4 3h16v7H4zM7.5 6.5h.01M12 21v-8M8.5 16.5L12 13l3.5 3.5" />,
+  "transfer.download": <path d="M4 3h16v7H4zM7.5 6.5h.01M12 13v8M8.5 17.5L12 21l3.5-3.5" />,
+  "transfer.list": <path d="M4 3h16v7H4zM7.5 6.5h.01M6 14h12M6 17.5h12M6 21h8" />,
   "mail.send": (
     <>
       <rect x="3" y="5" width="14" height="11" rx="1.5" />
@@ -583,7 +587,7 @@ export function KindIcon({ kind, ...p }: P & { kind: string | undefined }) {
   }
 }
 
-/** The sign of a connection type (mockup S39b): cylinder for databases, a page for SQLite, globe for http, envelope for smtp. */
+/** The sign of a connection type (mockup S39b): cylinder for databases, a page for SQLite, globe for http, envelope for smtp, two servers for sftp. */
 export function ConnectionIcon({ type, ...p }: P & { type: string }) {
   switch (type) {
     case "sqlite":
@@ -599,6 +603,12 @@ export function ConnectionIcon({ type, ...p }: P & { type: string }) {
         <Icon {...p}>
           <circle cx="12" cy="12" r="9" />
           <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+        </Icon>
+      );
+    case "sftp":
+      return (
+        <Icon {...p}>
+          <path d="M4 4h16v6H4zM4 14h16v6H4zM7.5 7h.01M7.5 17h.01M12 10v4" />
         </Icon>
       );
     case "smtp":

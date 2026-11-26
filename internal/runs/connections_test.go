@@ -80,7 +80,7 @@ func TestRunConnectionProblems(t *testing.T) {
 func TestCheckConnection(t *testing.T) {
 	for conn, want := range map[string]string{
 		appConnection: "",
-		strings.Replace(appConnection, "type: sqlite", "type: mysql", 1):            `connections/app.yaml:4:7: unknown connection type "mysql" (available: http, postgres, smtp, sqlite, sqlserver)`,
+		strings.Replace(appConnection, "type: sqlite", "type: mysql", 1):            `connections/app.yaml:4:7: unknown connection type "mysql" (available: http, postgres, sftp, smtp, sqlite, sqlserver)`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "file: x.db", 1):         `connections/app.yaml:6:9: sqlite connection: unknown field "file"`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "path: ${secret:pw}", 1): `connections/app.yaml:6:9: ${secret:pw} is not allowed here`,
 		strings.Replace(appConnection, "path: ${DB_FILE}", "path: ${NOT_SET}", 1):   `warning: variable "NOT_SET" is not defined`,

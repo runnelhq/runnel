@@ -1,7 +1,8 @@
 // Package conntest tests a connection for the editor (ADR 0022, section 8; S39c1): it
 // opens the connection like a run would and does the least that shows it works –
 // databases answer a ping and their version, an http API answers the base address with
-// the sign-in, a mail server accepts the sign-in. Nothing is written or sent.
+// the sign-in, a mail server accepts the sign-in, an SFTP server lists the folder after
+// the sign-in (with a known host key). Nothing is written or sent.
 package conntest
 
 import (
@@ -14,6 +15,7 @@ import (
 
 	"github.com/runnelhq/runnel/internal/actions/http"
 	"github.com/runnelhq/runnel/internal/actions/mail"
+	"github.com/runnelhq/runnel/internal/actions/transfer"
 	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/paths"
@@ -30,6 +32,8 @@ func Run(ctx context.Context, c connection.Resolved) (string, error) {
 		return http.Check(ctx, c)
 	case connections.TypeSMTP:
 		return mail.Check(ctx, c)
+	case connections.TypeSFTP:
+		return transfer.Check(ctx, c)
 	}
 	return "", fmt.Errorf("connections of type %s cannot be tested yet", c.Type)
 }

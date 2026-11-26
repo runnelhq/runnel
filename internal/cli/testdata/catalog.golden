@@ -25,9 +25,12 @@ actions / files
   file.wait        Wait for File    Waits until files exist; output: the matching paths
   file.write       Write File       Writes a text or a value as JSON to a file, replacing it or appending; output: path and size
 actions / network
-  http.request   HTTP Request   Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer
-  http.response  HTTP Response  Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
-  mail.send      Send Mail      Sends a mail through a mail server, with text or HTML and attachments
+  http.request       HTTP Request          Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer
+  http.response      HTTP Response         Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
+  mail.send          Send Mail             Sends a mail through a mail server, with text or HTML and attachments
+  transfer.download  Download Files        Downloads files or folders from a server (SFTP); output: the downloaded files
+  transfer.list      List Files on Server  Lists the files of a folder on a server (SFTP); output: path, name, size, modified and folder of each entry
+  transfer.upload    Upload Files          Uploads files or folders to a server (SFTP); output: the uploaded files
 actions / database
   db.execute  Execute SQL  Runs an SQL statement on a database, e.g. to insert, update or delete rows
   db.query    Query SQL    Reads the rows of an SQL query into the workflow; output: rows, count, first and value

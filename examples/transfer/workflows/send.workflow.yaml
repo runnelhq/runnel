@@ -1,0 +1,24 @@
+# Uploads the CSV files of outbox/ into /incoming on the server, replacing files of the
+# same name. Each file is written to a temporary name first and renamed when complete, so
+# the partner never reads a half file.
+#   runnel run -v examples/transfer/workflows/send.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: send
+actions:
+  - id: start
+    type: core.start
+  - id: upload
+    type: transfer.upload
+    with:
+      connection: partner-sftp
+      source: outbox/*.csv
+      target: /incoming/
+      ifExists: replace
+  - id: done
+    type: core.log
+    with:
+      message: "Uploaded {{ len(result.output) }} files"
+links:
+  - { from: start, to: upload }
+  - { from: upload, to: done }
