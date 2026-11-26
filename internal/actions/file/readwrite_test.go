@@ -130,9 +130,10 @@ func TestWriteFile(t *testing.T) {
 	if _, err := output(t, writeDefinition, map[string]any{"path": path, "content": "€ ✓", "encoding": "windows-1252"}); err == nil || !strings.Contains(err.Error(), "cannot hold") {
 		t.Errorf("windows-1252 refused: %v", err)
 	}
-	if _, err := output(t, writeDefinition, map[string]any{"path": path, "content": "ä", "encoding": "utf-16le"}); err != nil || read() != "\xFF\xFE\xE4\x00" {
-		t.Errorf("utf-16le: %q %v", read(), err)
+	if _, err := output(t, writeDefinition, map[string]any{"path": path, "content": "ä", "encoding": "utf-16"}); err != nil || read() != "\xFF\xFE\xE4\x00" {
+		t.Errorf("utf-16: %q %v", read(), err)
 	}
 	actiontest.ConfigError(t, writeDefinition, map[string]any{"path": "a", "ifExists": "keep"}, `invalid ifExists "keep"`)
 	actiontest.ConfigError(t, writeDefinition, map[string]any{"path": "a", "encoding": "ascii"}, `invalid encoding "ascii"`)
+	actiontest.ConfigError(t, writeDefinition, map[string]any{"path": "a", "encoding": "utf-16le"}, `invalid encoding "utf-16le": it is called utf-16 now`)
 }

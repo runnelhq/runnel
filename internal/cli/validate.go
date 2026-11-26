@@ -44,31 +44,38 @@ func newValidateCommand() *cobra.Command {
 			"The project (project.yaml in the workflow's directory or above) and its environments\n" +
 			"are checked as well. Variables are checked against every environment of the project,\n" +
 			"or only against the one given with --env.\n\n" +
-			"Exit code 1 if an error was found (or a warning, with --strict).",
+			"Exit codes: 0 no errors, 1 an error was found (or a warning, with --strict),\n" +
+			"2 nothing checked (invalid arguments, a path that does not exist, no files found).",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				args = []string{"."}
-			}
-			params, err := parseParams(opts.params)
-			if err != nil {
-				return err
-			}
-			files, err := findFiles(args)
-			if err != nil {
-				return err
-			}
-			if len(files) == 0 {
-				return fmt.Errorf("no workflow, pipeline or trigger files (*%s, *%s, %s/**/*.yaml) found in %s", workflowSuffix, pipelineSuffix, model.TriggersDir, strings.Join(args, ", "))
-			}
-			v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
-				registry: actions.Builtin(), transforms: transforms.Builtin()}
-			return v.run(files)
+			return notChecked(validate(cmd, args, opts))
 		},
 	}
 	cmd.Flags().BoolVar(&opts.strict, "strict", false, "treat warnings as errors")
 	cmd.Flags().StringVar(&opts.env, "env", "", "check variables only against this environment of the project")
 	cmd.Flags().StringArrayVar(&opts.params, "param", nil, "parameter `KEY=VALUE` passed at start (repeatable)")
 	return cmd
+}
+
+// validate checks the files of args. Problems in files are reported and end with
+// errExitCode(1); other errors mean nothing could be checked.
+func validate(cmd *cobra.Command, args []string, opts validateOptions) error {
+	if len(args) == 0 {
+		args = []string{"."}
+	}
+	params, err := parseParams(opts.params)
+	if err != nil {
+		return err
+	}
+	files, err := findFiles(args)
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("no workflow, pipeline or trigger files (*%s, *%s, %s/**/*.yaml) found in %s", workflowSuffix, pipelineSuffix, model.TriggersDir, strings.Join(args, ", "))
+	}
+	v := &validator{out: cmd.OutOrStdout(), opts: opts, params: params, projects: map[string]*model.Project{},
+		registry: actions.Builtin(), transforms: transforms.Builtin()}
+	return v.run(files)
 }
 
 type validateOptions struct {

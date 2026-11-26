@@ -44,7 +44,7 @@ with:
   auth: { token: ${env:CUSTOMER_API_TOKEN} }   # oder: auth: none
   response: run                            # accepted (Standard) | run
   timeout: 30s                             # nur bei run: ohne Antwort bis dahin 504
-  maxConcurrent: 10                        # gleichzeitige Läufe dieses Triggers, darüber 429
+  maxConcurrent: 10                        # gleichzeitige Läufe dieses Triggers, darüber 429 (Standard 4 seit R5a)
   history: errors                          # all | errors | none (Standard: all bei accepted, errors bei run)
 ```
 
@@ -65,7 +65,7 @@ with:
 
 | `response` | Verhalten |
 |---|---|
-| `accepted` (Webhook) | Sofort **`202`** mit `{ "runId": …, "status": "/api/v1/runs/…" }`; der Lauf arbeitet im Hintergrund |
+| `accepted` (Webhook) | Sofort **`202`** mit `{ "runId": … }` (bis R5a zusätzlich `status`, siehe Nachtrag 2026-11-26); der Lauf arbeitet im Hintergrund |
 | `run` (Dienst) | Die Anfrage wartet, bis der Lauf antwortet, höchstens `timeout` (dann **`504`**) |
 
 Bei `response: run` antwortet der Lauf auf zwei Wegen – **beide** sind vorgesehen:
@@ -168,3 +168,16 @@ Abgestimmt mit dem Maintainer. Die Action heißt wie der Transform `http.respons
 HTTP-Triggers, und ADR 0013 erlaubt denselben Namen für Action und Transform (wie `core.log`, `http.request`). Einen
 Alias für `http.respond` gibt es nicht, da noch kein Release erschienen ist; Workflows mit `http.respond` meldet
 `validate` als unbekannten Typ.
+
+## Nachtrag 2026-11-26 (R5a): Grenze und Antwort `202`
+
+- **`maxConcurrent` hat den Standard 4:** Ohne Angabe nimmt ein HTTP-Trigger höchstens 4 Läufe gleichzeitig an, die
+  nächste Anfrage bekommt `429` (AGENTS.md „Sicherheit“: Grenze für gleichzeitige Läufe). `maxConcurrent: 0` gilt nur
+  ausdrücklich gesetzt als „keine eigene Grenze“; dann greifen nur `settings.maxConcurrentRuns` von Projekt und
+  Workflow. Im Modell ist das Feld ein Zeiger, damit `0` und „nicht gesetzt“ unterscheidbar sind.
+  `settings.maxConcurrentRuns` behält den Standard `0` (keine Grenze): Es gilt auch für Läufe aus Editor, Zeitplan und
+  Ordner-Überwachung, und die Anfragen von außen begrenzt schon der Trigger.
+- **Antwort `202`** bei `response: accepted`: `{"runId": "…"}`. Das Feld `status` mit dem Pfad
+  `/api/v1/runs/<id>` entfällt: `status` ist sonst überall ein Zustand, und der Pfad zeigt auf die API des Servers auf
+  `127.0.0.1`, die ein Aufrufer im Netz nicht erreicht. Der Header `Location` bleibt wie bisher. Bewusster Bruch vor 1.0
+  (ADR 0029).

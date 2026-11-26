@@ -1112,12 +1112,12 @@
           },
           "encoding": {
             "type": "string",
-            "description": "Encoding of the file; utf-8-bom lets Excel and older Windows programs recognize umlauts",
+            "description": "Encoding of the file; utf-8-bom lets Excel and older Windows programs recognize umlauts, utf-16 is little endian with byte order mark (as in csv.output)",
             "enum": [
               "utf-8",
               "utf-8-bom",
               "windows-1252",
-              "utf-16le"
+              "utf-16"
             ],
             "default": "utf-8"
           },
@@ -3476,9 +3476,9 @@
             "default": "first"
           },
           "maxRecords": {
-            "type": "integer",
+            "type": "string",
             "description": "Most records of the lookup data held in memory; more stop the pipeline (for larger tables use db.lookup)",
-            "default": 100000
+            "default": "100000"
           }
         },
         "required": [

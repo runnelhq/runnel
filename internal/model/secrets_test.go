@@ -36,8 +36,8 @@ func TestSecretStores(t *testing.T) {
 	for _, tt := range []struct{ store, name, want string }{
 		{"", "RUNNEL_TEST_UNSET", `secret "RUNNEL_TEST_UNSET": environment variable RUNNEL_TEST_UNSET is not set (secret store env)`},
 		{"local", "pw", `secret "pw": the local secret store is not available yet; set secretStore: env`},
-		{"shared", "pw", "the shared secret store is not available yet"},
-		{"vault", "pw", `unknown secret store "vault" (available: local, shared, env, inline)`},
+		{"shared", "pw", `unknown secret store "shared" (available: env, inline)`},
+		{"vault", "pw", `unknown secret store "vault" (available: env, inline)`},
 	} {
 		if _, err := lookup(tt.store, tt.name); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("lookup(%q, %q): %v, want %q", tt.store, tt.name, err, tt.want)
@@ -66,11 +66,21 @@ func TestSecretStores(t *testing.T) {
 func TestSecretsInProjectFiles(t *testing.T) {
 	_, err := ReadProject("project.yaml", []byte("kind: Project\napiVersion: runnel/v1\nname: p\nsecretStore: vault\nvariables:\n  PW: ${secret:pw}\n"), nil)
 	for _, want := range []string{
-		`project.yaml:4:14: unknown secret store "vault" (expected local, shared, env, inline)`,
+		`project.yaml:4:14: unknown secret store "vault" (expected env, inline)`,
 		`project.yaml:6:7: ${secret:pw} is not allowed here: secrets may only be used in fields for secrets`,
 	} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("project: %v\nwant %s", err, want)
+		}
+	}
+	// Until S39d, local cannot be set; shared (S39e) is no store (R5a).
+	for store, want := range map[string]string{
+		"local":  `environments/prod.yaml:4:14: the local secret store is not available yet (expected env or inline; without secretStore it will be the default)`,
+		"shared": `environments/prod.yaml:4:14: unknown secret store "shared" (expected env, inline)`,
+	} {
+		_, err := ReadEnvironment("environments/prod.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: "+store+"\n"))
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: %v\nwant %s", store, err, want)
 		}
 	}
 	env, err := ReadEnvironment("environments/prod.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: env\n"))

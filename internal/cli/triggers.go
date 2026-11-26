@@ -18,7 +18,8 @@ func newTriggersCommand() *cobra.Command {
 		Long: "Lists the triggers of the project in project-dir (or the current directory) – the files in\n" +
 			model.TriggersDir + "/ – with their schedule, target and the next time they start a run.\n" +
 			"Triggers start runs only while \"runnel serve\" runs. Problems of trigger files are\n" +
-			"reported like by \"runnel validate\"; exit code 1 if there are any.",
+			"reported like by \"runnel validate\"; exit code 1 if there are any, 2 if no project was found\n" +
+			"or the command line is invalid.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
@@ -27,7 +28,7 @@ func newTriggersCommand() *cobra.Command {
 			}
 			root, err := findProject(dir)
 			if err != nil {
-				return err
+				return notChecked(err)
 			}
 			list, problems := triggers.Load(displayPath(root))
 			out := cmd.OutOrStdout()

@@ -137,3 +137,12 @@ gibt. Damit bestehende Dateien leicht anzupassen sind:
   erst mit Version 1.0: `Definition.Renamed` in `action` und `transform` und die Einträge der Bausteine entfallen.
 - Ein altes Feld wie `overwrite` oder `maxRows` ist weiterhin ein Fehler mit Position, jetzt wie jedes unbekannte
   Feld (`unknown field "maxRows"`). Die neuen Namen stehen in der Tabelle in Abschnitt 1 und in der Roadmap (S70a–c).
+
+## Nachtrag 2026-11-26 (R5a)
+
+- `file.write` nennt die Kodierung UTF-16 wie `csv.output` `utf-16` (Little Endian mit BOM, beim Anhängen ohne);
+  `utf-16le` ist ein Fehler mit dem neuen Namen.
+- `maxRecords` von `core.stream-lookup` ist wie bei `core.to-result` und `http.response` Text mit einer ganzen Zahl ab
+  1, sodass `${…}` möglich ist; eine Zahl ohne Variable wird schon beim Prüfen geprüft.
+- Der Datei-Trigger nennt den überwachten Ordner `with.folder` (wie `file.list`), nicht mehr `with.path`; `path` bei
+  `type: file` ist ein Fehler mit dem Hinweis auf `folder`. `with.path` bleibt der Pfad der Adresse eines HTTP-Triggers.

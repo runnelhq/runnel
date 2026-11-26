@@ -45,7 +45,7 @@ type writeFile struct {
 	Path     string `json:"path" doc:"File to write, relative to the project folder or absolute; missing folders are created" schema:"required,example=out/status.txt"`
 	Content  any    `json:"content" doc:"What to write: a text, or with format: json any value, e.g. {{ results.query.output.rows }}"`
 	Format   string `json:"format" doc:"text writes the content as text (other values as JSON), json writes the value as formatted JSON" schema:"enum=text|json,default=text"`
-	Encoding string `json:"encoding" doc:"Encoding of the file; utf-8-bom lets Excel and older Windows programs recognize umlauts" schema:"enum=utf-8|utf-8-bom|windows-1252|utf-16le,default=utf-8"`
+	Encoding string `json:"encoding" doc:"Encoding of the file; utf-8-bom lets Excel and older Windows programs recognize umlauts, utf-16 is little endian with byte order mark (as in csv.output)" schema:"enum=utf-8|utf-8-bom|windows-1252|utf-16,default=utf-8"`
 	LineEnds string `json:"lineEnds" doc:"Line ends: as in the content, crlf (Windows) or lf" schema:"enum=keep|crlf|lf,default=keep"`
 	IfExists string `json:"ifExists" doc:"If the file exists: replace it once the content is written, append to it, or fail" schema:"enum=replace|append|fail,default=replace"`
 }
@@ -55,8 +55,12 @@ func newWriteFile(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
+	if a.Encoding == "utf-16le" {
+		// Until R5a; one name for the same encoding in reading and writing (ADR 0025).
+		return nil, errors.New(`invalid encoding "utf-16le": it is called utf-16 now (little endian with byte order mark, as in csv.output)`)
+	}
 	for _, c := range []struct{ field, value, allowed string }{
-		{"format", a.Format, "text|json"}, {"encoding", a.Encoding, "utf-8|utf-8-bom|windows-1252|utf-16le"},
+		{"format", a.Format, "text|json"}, {"encoding", a.Encoding, "utf-8|utf-8-bom|windows-1252|utf-16"},
 		{"lineEnds", a.LineEnds, "keep|crlf|lf"}, {"ifExists", a.IfExists, "replace|append|fail"},
 	} {
 		if c.value != "" && !strings.Contains("|"+c.allowed+"|", "|"+c.value+"|") {
@@ -141,7 +145,7 @@ func (a *writeFile) text() (string, error) {
 }
 
 // encode converts the text into the bytes of the encoding; bom writes a byte order mark
-// where the encoding has one (utf-8-bom, utf-16le).
+// where the encoding has one (utf-8-bom, utf-16).
 func encode(text, enc string, bom bool) ([]byte, error) {
 	switch enc {
 	case "", "utf-8":
@@ -157,7 +161,7 @@ func encode(text, enc string, bom bool) ([]byte, error) {
 			return nil, errors.New("the content has characters that windows-1252 cannot hold; use encoding: utf-8-bom")
 		}
 		return []byte(out), nil
-	case "utf-16le":
+	case "utf-16":
 		policy := unicode.IgnoreBOM
 		if bom {
 			policy = unicode.UseBOM

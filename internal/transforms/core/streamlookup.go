@@ -39,11 +39,12 @@ var streamLookupDefinition = transform.Definition{
 const defaultMaxLookupRecords = 100000
 
 type streamLookup struct {
-	Keys       []streamLookupKey    `json:"keys" doc:"Fields of the record and the fields of the lookup data they must be equal to, compared as text" schema:"required"`
-	Return     []streamLookupReturn `json:"return" doc:"Fields of the matching lookup record added to the record" schema:"required"`
-	NotFound   string               `json:"notFound" doc:"Records without a matching lookup record: keep them with the defaults, drop them, or treat them as errors (error link)" schema:"enum=keep|drop|error,default=keep"`
-	Multiple   string               `json:"multiple" doc:"Several matching lookup records: take the first in the order they arrived, or treat the record as an error" schema:"enum=first|error,default=first"`
-	MaxRecords *int                 `json:"maxRecords" doc:"Most records of the lookup data held in memory; more stop the pipeline (for larger tables use db.lookup)" schema:"default=100000"`
+	Keys     []streamLookupKey    `json:"keys" doc:"Fields of the record and the fields of the lookup data they must be equal to, compared as text" schema:"required"`
+	Return   []streamLookupReturn `json:"return" doc:"Fields of the matching lookup record added to the record" schema:"required"`
+	NotFound string               `json:"notFound" doc:"Records without a matching lookup record: keep them with the defaults, drop them, or treat them as errors (error link)" schema:"enum=keep|drop|error,default=keep"`
+	Multiple string               `json:"multiple" doc:"Several matching lookup records: take the first in the order they arrived, or treat the record as an error" schema:"enum=first|error,default=first"`
+	// MaxRecords is text, so that it can be a variable, like in core.to-result (R5a).
+	MaxRecords string `json:"maxRecords" doc:"Most records of the lookup data held in memory; more stop the pipeline (for larger tables use db.lookup)" schema:"default=100000"`
 }
 
 type streamLookupKey struct {
@@ -100,8 +101,11 @@ func newStreamLookup(with map[string]any) (transform.Transform, error) {
 	default:
 		return nil, fmt.Errorf("invalid multiple %q (expected first or error)", t.Multiple)
 	}
-	if t.MaxRecords != nil && *t.MaxRecords < 1 {
-		return nil, errors.New("maxRecords must be at least 1")
+	if !strings.Contains(t.MaxRecords, "${") {
+		// A variable is checked once it is resolved, before the pipeline runs.
+		if _, err := maxRecords(t.MaxRecords, defaultMaxLookupRecords); err != nil {
+			return nil, err
+		}
 	}
 	return t, nil
 }
@@ -200,15 +204,15 @@ func (t *streamLookup) Process(ctx context.Context, in <-chan transform.Batch, o
 // load reads the lookup data into a table by key.
 func (t *streamLookup) load(ctx context.Context, info <-chan transform.Batch, from string, out *transform.Output) (map[string]*lookupEntry, int, error) {
 	out.Logf(slog.LevelDebug, "waiting for the lookup data from %s (info link)", from)
-	most := defaultMaxLookupRecords
-	if t.MaxRecords != nil {
-		most = *t.MaxRecords
+	most, err := maxRecords(t.MaxRecords, defaultMaxLookupRecords)
+	if err != nil {
+		return nil, 0, err
 	}
 	table := map[string]*lookupEntry{}
 	n := 0
 	for b := range info {
 		for _, r := range b {
-			if n++; n > most {
+			if n++; int64(n) > most {
 				return nil, n, fmt.Errorf("the lookup data from %s has more than %d records (maxRecords); for larger tables use db.lookup", from, most)
 			}
 			id, ok := t.key(r, func(k streamLookupKey) string { return k.LookupField })

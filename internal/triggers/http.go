@@ -114,9 +114,11 @@ func (s *Scheduler) HTTPAddress() string {
 	return h.addr
 }
 
+// acceptedBody is the answer 202 of response: accepted: the id of the run. Until R5a it
+// also had "status" with the path of the run in the API of the server, which a caller in
+// the network cannot reach and which is no state.
 type acceptedBody struct {
-	RunID  string `json:"runId"`
-	Status string `json:"status"`
+	RunID string `json:"runId"`
 }
 
 func reply(w http.ResponseWriter, status int, v any) { httpx.WriteJSON(w, status, v, false) }
@@ -165,7 +167,7 @@ func (h *httpTriggers) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	id := run.ID
 	w.Header().Set("Location", "/api/v1/runs/"+id)
-	reply(w, http.StatusAccepted, acceptedBody{RunID: id, Status: "/api/v1/runs/" + id})
+	reply(w, http.StatusAccepted, acceptedBody{RunID: id})
 }
 
 // request checks a request and works out the start of its run.
@@ -387,7 +389,8 @@ func (h *httpTriggers) params(t *model.Trigger, inputs map[string]string) (map[s
 // reached.
 func (h *httpTriggers) start(e *entry, start StartRequest) (Started, *httpError) {
 	s, t := h.s, e.t
-	if t.With.MaxConcurrent > 0 {
+	limit := t.HTTPMaxConcurrent()
+	if limit > 0 {
 		// Counting the running runs and starting one must not interleave; without a
 		// limit, requests start their runs at the same time.
 		e.startMu.Lock()
@@ -397,7 +400,7 @@ func (h *httpTriggers) start(e *entry, start StartRequest) (Started, *httpError)
 	s.mu.Lock()
 	running := len(e.active)
 	s.mu.Unlock()
-	if limit := t.With.MaxConcurrent; limit > 0 && running >= limit {
+	if limit > 0 && running >= limit {
 		runsText := fmt.Sprintf("%d runs", running)
 		if running == 1 {
 			runsText = "1 run"

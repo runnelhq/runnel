@@ -46,14 +46,24 @@ func newToResult(with map[string]any) (transform.Transform, error) {
 	return t, nil
 }
 
+// maxRecords reads a setting maxRecords: text, so that it can be a variable ${…} (ADR
+// 0025), with a whole number of 1 or more; def if it is empty.
+func maxRecords(text string, def int64) (int64, error) {
+	s := strings.TrimSpace(text)
+	if s == "" {
+		return def, nil
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || n < 1 {
+		return 0, fmt.Errorf("maxRecords: %q is not a whole number of 1 or more", text)
+	}
+	return n, nil
+}
+
 func (t *toResult) Process(_ context.Context, in <-chan transform.Batch, out *transform.Output) error {
-	limit := int64(DefaultMaxResultRows)
-	if s := strings.TrimSpace(t.MaxRecords); s != "" {
-		n, err := strconv.ParseInt(s, 10, 64)
-		if err != nil || n < 1 {
-			return fmt.Errorf("maxRecords: %q is not a whole number of 1 or more", t.MaxRecords)
-		}
-		limit = n
+	limit, err := maxRecords(t.MaxRecords, DefaultMaxResultRows)
+	if err != nil {
+		return err
 	}
 	var n int64
 	for b := range in {

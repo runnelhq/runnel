@@ -3,7 +3,7 @@
 # - "list" lists the order files of the inbox.
 # - "totals" runs pipelines/total.pipeline.yaml once per file (forEach); row is the
 #   current entry of the list, here a file with path and name. Two files run at a time
-#   (parallel: 2). stopOnError: false lets the other files run if one fails; the action
+#   (parallel: 2). continueOnEntryError: true lets the other files run if one fails; the action
 #   still fails at the end then.
 # - Its output lists the files in order: items[i].row, .success, .output (the result of
 #   the pipeline) and .error, plus succeeded and failed.
@@ -29,7 +29,7 @@ actions:
     type: core.run-pipeline
     forEach: "{{ results.list.output }}"
     parallel: 2
-    stopOnError: false
+    continueOnEntryError: true
     with:
       pipeline: pipelines/total.pipeline.yaml
       params:

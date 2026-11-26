@@ -51,7 +51,8 @@ versehentlich in Logs, Feldwerten oder Vorschauen landen.
 ### Funktionsbibliothek
 
 Zusätzlich zu den eingebauten Operatoren und Funktionen von `expr` (`upper`, `lower`, `trim`, `split`, `replace`,
-`len`, `int`, `float`, `string`, `toJSON`, `fromJSON`, `??`, `in`, `matches`, `map`/`filter`/`any`/`all` für Listen …):
+`len`, `int`, `float`, `string`, `toJSON`, `fromJSON`, `??`, `in`, `matches`, `map`/`filter`/`any`/`all` für Listen …;
+seit R5a nur die dokumentierten, siehe Nachtrag 2026-11-26):
 
 | Bereich | Funktionen |
 |---|---|
@@ -198,3 +199,28 @@ when:      "{{ result.rows > 0 }}"
 - Die Funktionsbibliothek muss für `expr` und goja doppelt registriert und gemeinsam getestet werden.
 - Ein späterer Import von Hop-Workflows muss Hop-Ausdrücke (z. B. aus „Formula“/JavaScript-Transforms) übersetzen
   oder in den Transform `core.script` übernehmen.
+
+## Nachtrag 2026-11-26 (R5a): Nur dokumentierte Funktionen
+
+- **Whitelist:** Ausdrücke rufen nur die Funktionen auf, die die Referenz nennt (`Functions` in
+  `internal/expr/docs.go`, ausgegeben von `runnel catalog --expressions` und in der Reference des Editors). Jeder andere
+  Aufruf ist beim Prüfen (`validate`, Editor) und vor dem Lauf ein Fehler mit ähnlichen Funktionen, z. B.
+  `unknown function "date" (similar: parseDate, formatDate, …)`. Die übrigen Built-ins von expr-lang sind abgeschaltet
+  (`DisableAllBuiltins`, dann `EnableBuiltin` für die dokumentierten); ein Test stellt sicher, dass jedes Built-in der
+  gepinnten Version entweder dokumentiert oder abgelehnt ist. So ändert ein Update von expr-lang den Funktionsumfang nicht
+  unbemerkt (ADR 0029).
+- **Dokumentierte Built-ins** neben der Funktionsbibliothek: `now`, `upper`, `lower`, `trim`, `replace`, `split`,
+  `join`, `len`, `round`, `sum` sowie neu `int`, `float`, `string`, `toJSON`, `fromJSON`, `abs`, `ceil`, `floor`,
+  `min`, `max`, `hasPrefix`, `hasSuffix`, `first`, `last`, `keys`.
+- **Nicht aufgenommen** sind u. a. `date`, `duration` und `timezone`: `date('2026-01-01')` rechnet in UTC, `today()` und
+  `parseDate` in lokaler Zeit; die Datumsfunktionen der Bibliothek decken den Bedarf. Ebenso `type`, `repeat`,
+  `indexOf`, `trimPrefix`/`trimSuffix`, `toBase64`/`fromBase64`, `get`, `take`, `values`, `toPairs`/`fromPairs`,
+  `reverse`, `uniq`, `flatten`, `sort`, `mean`, `median` und die Bit-Funktionen; hinzufügen ist später additiv.
+  `concat` ist die Funktion der Bibliothek (Trenner vorne), nicht die von expr-lang.
+- **Listen mit Bedingung** (`all`, `any`, `none`, `one`, `filter`, `map`, `count`, `sum`, `find`, `findIndex`,
+  `findLast`, `findLastIndex`, `groupBy`, `sortBy`, `reduce`) sind Sprachmittel von expr-lang: Der Parser behandelt sie
+  gesondert (`#`, `.feld`, `#acc`), sie lassen sich nicht abschalten. Sie bleiben, stehen in der Referenz (Gruppe
+  „Lists with a condition“) und gelten als zugesagt wie die übrigen Funktionen.
+- **Operatoren** bleiben vollständig: Arithmetik, Vergleiche, `&&`/`||`/`!` (auch `and`, `or`, `not`), `??`, `?:`,
+  `in`, `matches`, `contains`, `startsWith`, `endsWith`, `..`, `|` (Pipe), `?.`, Indizes und Ausschnitte, `let`. Sie
+  sind Teil der Sprache, nicht der Funktionsliste.

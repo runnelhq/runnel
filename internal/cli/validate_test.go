@@ -99,12 +99,12 @@ links:
 
 func TestValidateNoFiles(t *testing.T) {
 	code, _, errOut := run(t, "validate", t.TempDir())
-	if code != 1 || !strings.Contains(errOut, "no workflow, pipeline or trigger files (*.workflow.yaml, *.pipeline.yaml, triggers/**/*.yaml)") {
+	if code != exitUsage || !strings.Contains(errOut, "no workflow, pipeline or trigger files (*.workflow.yaml, *.pipeline.yaml, triggers/**/*.yaml)") {
 		t.Errorf("exit code %d, stderr %q", code, errOut)
 	}
 
 	code, _, errOut = run(t, "validate", filepath.Join(t.TempDir(), "missing.workflow.yaml"))
-	if code != 1 || !strings.Contains(errOut, "Error:") {
+	if code != exitUsage || !strings.Contains(errOut, "Error:") {
 		t.Errorf("missing file: exit code %d, stderr %q", code, errOut)
 	}
 }
@@ -219,7 +219,7 @@ func TestValidateFlagErrors(t *testing.T) {
 		{[]string{"validate", "--param", "1X=y", "examples/hello"}, `invalid --param "1X=y"`},
 	} {
 		code, _, errOut := run(t, tt.args...)
-		if code != 1 || !strings.Contains(errOut, tt.want) {
+		if code != exitUsage || !strings.Contains(errOut, tt.want) {
 			t.Errorf("%v: exit code %d, stderr %q, want containing %q", tt.args, code, errOut, tt.want)
 		}
 	}

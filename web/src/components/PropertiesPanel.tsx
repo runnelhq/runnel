@@ -1877,7 +1877,7 @@ function ForEachSection(props: {
 }) {
   const { action, at, set } = props;
   const parallel = action.parallel || 1;
-  const problems = [...at("forEach"), ...at("parallel"), ...at("stopOnError")];
+  const problems = [...at("forEach"), ...at("parallel"), ...at("continueOnEntryError"), ...at("stopOnError")];
   return (
     <Section
       title="For each entry"
@@ -1903,12 +1903,12 @@ function ForEachSection(props: {
         </Field>
         <div className="pt-[22px]">
           <Check
-            fieldKey="stopOnError"
-            checked={action.stopOnError ?? true}
+            fieldKey="continueOnEntryError"
+            checked={!action.continueOnEntryError}
             label="Stop at the first error"
-            help="stopOnError"
-            problems={at("stopOnError")}
-            onChange={(on) => set("stopOnError")(on ? null : false)}
+            help="Off: continueOnEntryError"
+            problems={[...at("continueOnEntryError"), ...at("stopOnError")]}
+            onChange={(on) => set("continueOnEntryError")(on ? null : true)}
           />
         </div>
       </div>

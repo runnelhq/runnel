@@ -198,7 +198,7 @@ func intervalTrigger(name, every, extra string) string {
 }
 
 func fileTrigger(name, extra string) string {
-	return fmt.Sprintf("kind: Trigger\napiVersion: runnel/v1\nname: %s\ntype: file\ntarget: workflows/job.workflow.yaml\nwith:\n  path: inbox\n  pattern: \"*.csv\"\n  param: FILE\n%s", name, extra)
+	return fmt.Sprintf("kind: Trigger\napiVersion: runnel/v1\nname: %s\ntype: file\ntarget: workflows/job.workflow.yaml\nwith:\n  folder: inbox\n  pattern: \"*.csv\"\n  param: FILE\n%s", name, extra)
 }
 
 // An interval trigger runs first one interval after the start, then at each interval;

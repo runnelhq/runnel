@@ -100,11 +100,19 @@
           ],
           "x-runnel-group": "When"
         },
-        "path": {
+        "folder": {
           "type": "string",
-          "description": "file: folder to watch, relative to the project folder or absolute (also UNC); http: path of the address with placeholders, e.g. /api/customers/{id}",
+          "description": "file: folder to watch, relative to the project folder or absolute (also UNC)",
           "examples": [
             "inbox"
+          ],
+          "x-runnel-group": "When"
+        },
+        "path": {
+          "type": "string",
+          "description": "http: path of the address with placeholders, e.g. /api/customers/{id}",
+          "examples": [
+            "/api/customers/{id}"
           ],
           "x-runnel-group": "When"
         },
@@ -177,8 +185,8 @@
         },
         "maxConcurrent": {
           "type": "integer",
-          "description": "http: most runs of this trigger at the same time; 0: no own limit",
-          "default": 0,
+          "description": "http: most runs of this trigger at the same time; a request beyond it gets 429. 0: no own limit (only the limits of the project)",
+          "default": 4,
           "x-runnel-group": "Answer"
         },
         "timeout": {

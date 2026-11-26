@@ -24,7 +24,10 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
   `transfer.*`, `archive.create`/`archive.extract`, `file.read`/`file.write`, `file.list` als Transform,
   `json.input`/`json.output`, `excel.input`/`excel.output` (ADR 0024), `xml.input`/`xml.output`, `core.calculate`,
   `core.dedupe`, `core.sequence`, `core.map-values`, `core.split-field`, `core.stream-lookup`, `core.merge-join`;
-  Funktionen `concat()`, `basename()`, `dirname()`, `ext()`, `replaceRegex()`.
+  Funktionen `concat()`, `basename()`, `dirname()`, `ext()`, `replaceRegex()`; in der Referenz der Ausdrücke neu
+  `int()`, `float()`, `string()`, `toJSON()`, `fromJSON()`, `abs()`, `ceil()`, `floor()`, `min()`, `max()`,
+  `hasPrefix()`, `hasSuffix()`, `first()`, `last()`, `keys()` und die Listen mit Bedingung (`all`, `any`, `count`,
+  `find`, `groupBy`, `sortBy`, `reduce` …).
 - **Einheitliche Parameter** der Bausteine (ADR 0025): `ifExists`, `ifMissing`, `format`, `maxRecords` u. a.
 - **Schemas der Dateiarten:** `runnel schema <art>` und `GET /api/v1/schemas/{kind}`.
 - **Referenz je Version:** `runnel catalog --json` mit Connection-Typen, `runnel catalog --expressions`,
@@ -50,6 +53,30 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 - Exakte Zahlen und Datumswerte in Body, Params und Rows; `transform.init` schickt leere Listen als `[]`.
 - Mehrere Fehler im Editor: Umbenennen und Einfügen von Transforms ändern alle Ziele, `core.filter` mit `else`,
   Binärdateien werden nicht geöffnet, Tab-Leiste mit vielen Dateien, Lesbarkeit im dunklen Farbschema.
+- `runnel run` endet bei einem falschen Aufruf (unbekanntes Flag, fehlende Datei als Argument, `--param` ohne Wert)
+  mit Exit-Code 2 („nicht gestartet“) wie in der Hilfe beschrieben, nicht mit 1 („fehlgeschlagen“).
+- `core.stream-lookup` nimmt bei `maxRecords` eine Variable `${…}` an wie `core.to-result`.
+
+### Bruch
+
+Bewusste Änderungen aus der Durchsicht der Namen und Standardwerte vor 1.0 (R5a, ADR 0029):
+
+- **Exit-Codes:** Ein falscher Aufruf endet bei allen Befehlen mit 2 statt 1, bei `runnel health` mit 3.
+  `runnel validate` und `runnel triggers` enden mit 2, wenn nichts geprüft werden konnte (Pfad fehlt, kein Projekt,
+  ungültiges `--param`/`--env`); 1 heißt nur noch „Fehler gefunden“.
+- **Ausdrücke:** Nur die Funktionen der Referenz (`runnel catalog --expressions`) sind aufrufbar; andere Built-ins von
+  expr-lang wie `date()`, `duration()`, `type()` oder `repeat()` sind ein Fehler mit ähnlichen Funktionen
+  (ADR 0006, Nachtrag R5a).
+- **HTTP-Trigger:** `with.maxConcurrent` hat den Standard 4 statt „keine Grenze“; `maxConcurrent: 0` hebt die eigene
+  Grenze ausdrücklich auf. Die Antwort `202` enthält nur noch `runId`, das Feld `status` mit dem Pfad des Laufs
+  entfällt (ADR 0018, Nachtrag R5a).
+- **Datei-Trigger:** Der überwachte Ordner heißt `with.folder` (wie bei `file.list`) statt `with.path`.
+- **forEach:** `stopOnError` heißt `continueOnEntryError` mit umgekehrter Bedeutung (Standard `false`):
+  `stopOnError: false` wird zu `continueOnEntryError: true` (ADR 0008, Nachtrag R5a).
+- **`file.write`:** Die Kodierung `utf-16le` heißt `utf-16` wie in `csv.output` und `file.read`.
+- **`core.stream-lookup`:** `maxRecords` ist Text (wie bei `core.to-result`); im Katalog Typ `string`.
+- **Secret-Quellen:** `secretStore` nimmt nur noch `env` und `inline` an; `shared` entfällt, `local` kommt mit dem
+  lokalen Secret-Store (S39d) zurück (ADR 0022, Nachtrag R5a).
 
 ## Frühere Versionen
 

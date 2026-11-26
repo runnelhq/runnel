@@ -57,7 +57,8 @@ var Roots = []Doc{
 }
 
 // Functions describes the functions of expressions: the library of Runnel (ADR 0006)
-// and the most useful built-in functions of expr-lang.
+// and the built-in functions of expr-lang that expressions may use. A function that is
+// not listed here cannot be called (allow.go, R5a).
 var Functions = []Doc{
 	{Group: "Date", Name: "today", Signature: "today()", Type: "date", Description: "Today, 00:00 local time", Example: "{{ today() }}"},
 	{Group: "Date", Name: "now", Signature: "now()", Type: "date", Description: "The current date and time", Example: "{{ now() }}"},
@@ -76,6 +77,8 @@ var Functions = []Doc{
 	{Group: "Text", Name: "trim", Signature: "trim(text)", Type: "string", Description: "Removes spaces at the start and end", Example: "{{ trim(' a ') }}"},
 	{Group: "Text", Name: "replace", Signature: "replace(text, old, new)", Type: "string", Description: "Replaces all occurrences", Example: "{{ replace('a-b', '-', '_') }}"},
 	{Group: "Text", Name: "replaceRegex", Signature: "replaceRegex(text, pattern, new)", Type: "string", Description: "Replaces every match of a regular expression (write patterns with \\ in backticks, e.g. `\\d+`); new may use groups as $1 or ${name}, $$ for a $", Example: "{{ replaceRegex('0221 / 123-45', '[^0-9]', '') }}"},
+	{Group: "Text", Name: "hasPrefix", Signature: "hasPrefix(text, prefix)", Type: "bool", Description: "Whether a text starts with another (also the operator startsWith)", Example: "{{ hasPrefix('INV-4711', 'INV-') }}"},
+	{Group: "Text", Name: "hasSuffix", Signature: "hasSuffix(text, suffix)", Type: "bool", Description: "Whether a text ends with another (also the operator endsWith)", Example: "{{ hasSuffix('orders.csv', '.csv') }}"},
 	{Group: "Text", Name: "split", Signature: "split(text, separator)", Type: "list", Description: "Splits text into a list", Example: "{{ split('a;b', ';') }}"},
 	{Group: "Text", Name: "padLeft", Signature: "padLeft(text, length, fill)", Type: "string", Description: "Fills on the left up to a length, e.g. 007; fill defaults to a space", Example: "{{ padLeft('7', 3, '0') }}"},
 	{Group: "Text", Name: "padRight", Signature: "padRight(text, length, fill)", Type: "string", Description: "Fills on the right up to a length", Example: "{{ padRight('ab', 4) }}"},
@@ -91,12 +94,41 @@ var Functions = []Doc{
 	{Group: "Paths", Name: "dirname", Signature: "dirname(path)", Type: "string", Description: "The path without its last part, e.g. the folder of a file; empty without a folder", Example: "{{ dirname('Exports/2026/orders.zip') }}"},
 	{Group: "Paths", Name: "ext", Signature: "ext(path)", Type: "string", Description: "Ending of the file name with its dot, e.g. .zip; empty without one", Example: "{{ ext('Exports/2026/orders.zip') }}"},
 
+	{Group: "Conversion", Name: "int", Signature: "int(value)", Type: "integer", Description: "Whole number from a number (cut off) or a text like '42'", Example: "{{ int('42') + 1 }}"},
+	{Group: "Conversion", Name: "float", Signature: "float(value)", Type: "number", Description: "Number from a whole number or a text like '1.5' (with a decimal point)", Example: "{{ float('1.5') * 2 }}"},
+	{Group: "Conversion", Name: "string", Signature: "string(value)", Type: "string", Description: "Any value as text, e.g. a number to join with text", Example: "{{ string(42) + ' orders' }}"},
+	{Group: "Conversion", Name: "toJSON", Signature: "toJSON(value)", Type: "string", Description: "A value as JSON text, indented", Example: "{{ toJSON({'id': 7}) }}"},
+	{Group: "Conversion", Name: "fromJSON", Signature: "fromJSON(text)", Type: "any", Description: "The value of a JSON text: map, list, number, text or bool", Example: "{{ fromJSON('{\"id\": 7}').id }}"},
+
 	{Group: "Numbers and lists", Name: "len", Signature: "len(value)", Type: "integer", Description: "Number of characters, entries of a list or keys of a map", Example: "{{ len(['a', 'b']) }}"},
 	{Group: "Numbers and lists", Name: "round", Signature: "round(number)", Type: "number", Description: "Rounds to a whole number", Example: "{{ round(2.5) }}"},
-	{Group: "Numbers and lists", Name: "sum", Signature: "sum(list)", Type: "number", Description: "Sum of a list of numbers", Example: "{{ sum([1, 2, 3]) }}"},
-	{Group: "Numbers and lists", Name: "map", Signature: "map(list, .field)", Type: "list", Description: "Takes a field of each entry, e.g. the sizes of files", Example: "{{ map([{'size': 1}], .size) }}"},
-	{Group: "Numbers and lists", Name: "filter", Signature: "filter(list, condition)", Type: "list", Description: "Keeps the entries for which the condition is true", Example: "{{ filter([1, 5, 9], # > 3) }}"},
+	{Group: "Numbers and lists", Name: "ceil", Signature: "ceil(number)", Type: "number", Description: "Rounds up to a whole number", Example: "{{ ceil(2.1) }}"},
+	{Group: "Numbers and lists", Name: "floor", Signature: "floor(number)", Type: "number", Description: "Rounds down to a whole number", Example: "{{ floor(2.9) }}"},
+	{Group: "Numbers and lists", Name: "abs", Signature: "abs(number)", Type: "number", Description: "The number without its sign", Example: "{{ abs(-3) }}"},
+	{Group: "Numbers and lists", Name: "min", Signature: "min(a, b, …)", Type: "number", Description: "The smallest of the numbers or of a list", Example: "{{ min(3, 1, 2) }}"},
+	{Group: "Numbers and lists", Name: "max", Signature: "max(a, b, …)", Type: "number", Description: "The largest of the numbers or of a list", Example: "{{ max([3, 1, 2]) }}"},
+	{Group: "Numbers and lists", Name: "sum", Signature: "sum(list, value)", Type: "number", Description: "Sum of a list of numbers; with value, of a value of each entry", Example: "{{ sum([{'size': 1}, {'size': 2}], .size) }}"},
 	{Group: "Numbers and lists", Name: "join", Signature: "join(list, separator)", Type: "string", Description: "Joins a list of texts", Example: "{{ join(['a', 'b'], ', ') }}"},
+	{Group: "Numbers and lists", Name: "first", Signature: "first(list)", Type: "any", Description: "The first entry; nil for an empty list", Example: "{{ first(['a', 'b']) }}"},
+	{Group: "Numbers and lists", Name: "last", Signature: "last(list)", Type: "any", Description: "The last entry; nil for an empty list", Example: "{{ last(['a', 'b']) }}"},
+	{Group: "Numbers and lists", Name: "keys", Signature: "keys(map)", Type: "list", Description: "The keys of a map", Example: "{{ keys({'a': 1}) }}"},
+
+	// The list functions with a condition are part of the language of expr-lang: in the
+	// condition, # is the entry and .field a field of it.
+	{Group: "Lists with a condition", Name: "map", Signature: "map(list, value)", Type: "list", Description: "A value of each entry, e.g. the sizes of files", Example: "{{ map([{'size': 1}], .size) }}"},
+	{Group: "Lists with a condition", Name: "filter", Signature: "filter(list, condition)", Type: "list", Description: "Keeps the entries for which the condition is true; # is the entry", Example: "{{ filter([1, 5, 9], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "all", Signature: "all(list, condition)", Type: "bool", Description: "Whether the condition is true for every entry", Example: "{{ all([1, 5], # > 0) }}"},
+	{Group: "Lists with a condition", Name: "any", Signature: "any(list, condition)", Type: "bool", Description: "Whether the condition is true for at least one entry", Example: "{{ any([1, 5], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "none", Signature: "none(list, condition)", Type: "bool", Description: "Whether the condition is true for no entry", Example: "{{ none([1, 5], # > 9) }}"},
+	{Group: "Lists with a condition", Name: "one", Signature: "one(list, condition)", Type: "bool", Description: "Whether the condition is true for exactly one entry", Example: "{{ one([1, 5], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "count", Signature: "count(list, condition)", Type: "integer", Description: "Number of entries for which the condition is true", Example: "{{ count([1, 5, 9], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "find", Signature: "find(list, condition)", Type: "any", Description: "The first entry for which the condition is true; nil if none", Example: "{{ find([1, 5, 9], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "findIndex", Signature: "findIndex(list, condition)", Type: "integer", Description: "Position (from 0) of the first entry for which the condition is true; -1 if none", Example: "{{ findIndex([1, 5, 9], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "findLast", Signature: "findLast(list, condition)", Type: "any", Description: "The last entry for which the condition is true; nil if none", Example: "{{ findLast([1, 5, 9], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "findLastIndex", Signature: "findLastIndex(list, condition)", Type: "integer", Description: "Position (from 0) of the last entry for which the condition is true; -1 if none", Example: "{{ findLastIndex([1, 5, 9], # > 3) }}"},
+	{Group: "Lists with a condition", Name: "groupBy", Signature: "groupBy(list, value)", Type: "map", Description: "The entries in lists by a value of each, e.g. orders by customer", Example: "{{ groupBy([{'c': 'a'}, {'c': 'b'}], .c) }}"},
+	{Group: "Lists with a condition", Name: "sortBy", Signature: "sortBy(list, value, order)", Type: "list", Description: "The entries sorted by a value of each; order 'asc' (default) or 'desc'", Example: "{{ sortBy([{'n': 2}, {'n': 1}], .n, 'desc') }}"},
+	{Group: "Lists with a condition", Name: "reduce", Signature: "reduce(list, value, initial)", Type: "any", Description: "Combines the entries to one value: #acc is the value so far (initial, else the first entry), # the entry", Example: "{{ reduce([1, 2, 3], #acc + #, 0) }}"},
 
 	{Group: "Empty values", Name: "coalesce", Signature: "coalesce(a, b, …)", Type: "any", Description: "The first value that is not empty", Example: "{{ coalesce(run.environment, 'none') }}"},
 	{Group: "Empty values", Name: "isEmpty", Signature: "isEmpty(value)", Type: "bool", Description: "Whether a value is empty: nothing, empty text, list or map", Example: "{{ isEmpty(run.lastError) }}"},

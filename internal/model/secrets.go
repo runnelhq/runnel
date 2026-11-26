@@ -12,18 +12,18 @@ import (
 
 // Secret stores (ADR 0022): ${secret:NAME} reads from the default store of the
 // environment (secretStore: in the environment, else in project.yaml, else local);
-// ${secret:STORE/NAME} names the store. Built in are local and shared (the local secret
-// store of the computer, roadmap S39d/S39e), env (environment variables) and inline
-// (secrets: in the environment or project.yaml, plain text; Nachtrag S39a2).
+// ${secret:STORE/NAME} names the store. Built in are env (environment variables) and
+// inline (secrets: in the environment or project.yaml, plain text; Nachtrag S39a2).
+// local, the local secret store of the computer, is the default but follows with S39d;
+// until then it cannot be set (R5a). A shared store (S39e) is not planned for 1.0.
 const (
 	SecretStoreLocal  = "local"
-	SecretStoreShared = "shared"
 	SecretStoreEnv    = "env"
 	SecretStoreInline = "inline"
 )
 
-// SecretStores are the names of the built-in secret stores.
-var SecretStores = []string{SecretStoreLocal, SecretStoreShared, SecretStoreEnv, SecretStoreInline}
+// SecretStores are the names of the secret stores secretStore can be set to.
+var SecretStores = []string{SecretStoreEnv, SecretStoreInline}
 
 // DefaultSecretStore returns the store ${secret:NAME} reads from in an environment:
 // secretStore of the environment, else of the project, else local. p and env may be nil.
@@ -146,7 +146,7 @@ func secretStoreAvailable(store string) error {
 	switch store {
 	case SecretStoreEnv, SecretStoreInline:
 		return nil
-	case SecretStoreLocal, SecretStoreShared:
+	case SecretStoreLocal:
 		return fmt.Errorf("the %s secret store is not available yet; set secretStore: env in the environment or project.yaml, or write ${secret:env/NAME}", store)
 	}
 	return fmt.Errorf("unknown secret store %q (available: %s)", store, strings.Join(SecretStores, ", "))
@@ -155,6 +155,9 @@ func secretStoreAvailable(store string) error {
 func checkSecretStore(s *source, store string) Errors {
 	if store == "" || slices.Contains(SecretStores, store) {
 		return nil
+	}
+	if store == SecretStoreLocal {
+		return Errors{s.errorf("$.secretStore", "the local secret store is not available yet (expected %s; without secretStore it will be the default)", strings.Join(SecretStores, " or "))}
 	}
 	return Errors{s.errorf("$.secretStore", "unknown secret store %q (expected %s)", store, strings.Join(SecretStores, ", "))}
 }

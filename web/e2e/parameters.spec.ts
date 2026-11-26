@@ -165,7 +165,7 @@ test("repeats an action for each entry and gives parameters to a sub-workflow", 
   await params.getByTestId("map-value-0").getByRole("textbox").fill("Moin");
   await params.getByTestId("map-value-0").getByRole("textbox").blur();
   await expect.poll(() => yaml(page)).toContain(
-    '      workflow: workflows/hello.workflow.yaml\n      params:\n        GREETING: Moin\n    forEach: "{{ [1, 2, 3] }}"\n    parallel: 2\n    stopOnError: false\n',
+    '      workflow: workflows/hello.workflow.yaml\n      params:\n        GREETING: Moin\n    forEach: "{{ [1, 2, 3] }}"\n    parallel: 2\n    continueOnEntryError: true\n',
   );
   await page.getByTestId("node-greet").click();
   await params.getByRole("button", { name: "Remove GREETING" }).click();

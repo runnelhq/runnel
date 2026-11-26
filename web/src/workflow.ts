@@ -17,8 +17,8 @@ export interface Action {
   forEach?: string;
   /** Entries of forEach run at the same time; 0 or missing: 1. */
   parallel?: number;
-  /** Stops forEach at the first failed entry; missing: true. */
-  stopOnError?: boolean;
+  /** Lets all entries of forEach run when one fails; missing: false, the first failed entry stops the others. */
+  continueOnEntryError?: boolean;
   /** Pipelines: instances that share the incoming records (0 or missing: 1). */
   copies?: number;
   /** Pipelines: copy (default) or distribute, for several outgoing data links. */

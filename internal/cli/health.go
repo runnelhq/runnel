@@ -39,6 +39,8 @@ func newHealthCommand() *cobra.Command {
 			"--service reads the port from the installed Windows service, else --addr is used.\n\n" +
 			"Exit code: 0 ok, 1 degraded, 2 fail, 3 not reachable or unknown (as monitoring tools expect).",
 		Args: cobra.NoArgs,
+		// An invalid command line leaves the health unknown.
+		Annotations: map[string]string{annotationUsageExit: strconv.Itoa(healthExitUnreachable)},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if service != "" {
 				port, err := servicePort(service)
@@ -73,7 +75,6 @@ func newHealthCommand() *cobra.Command {
 	cmd.Flags().StringVar(&service, "service", "", "name of an installed Windows service (e.g. runnel): use its port")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print the answer of the server as JSON")
 	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Second, "how long to wait for the answer")
-	cmd.SetFlagErrorFunc(healthUnknown)
 	return cmd
 }
 

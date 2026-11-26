@@ -23,6 +23,8 @@ functions / Text
   trim(text)                        string  Removes spaces at the start and end
   replace(text, old, new)           string  Replaces all occurrences
   replaceRegex(text, pattern, new)  string  Replaces every match of a regular expression (write patterns with \ in backticks, e.g. `\d+`); new may use groups as $1 or ${name}, $$ for a $
+  hasPrefix(text, prefix)           bool    Whether a text starts with another (also the operator startsWith)
+  hasSuffix(text, suffix)           bool    Whether a text ends with another (also the operator endsWith)
   split(text, separator)            list    Splits text into a list
   padLeft(text, length, fill)       string  Fills on the left up to a length, e.g. 007; fill defaults to a space
   padRight(text, length, fill)      string  Fills on the right up to a length
@@ -35,13 +37,40 @@ functions / Paths
   basename(path)  string  Last part of a path or address, e.g. the file name; / and \ both separate
   dirname(path)   string  The path without its last part, e.g. the folder of a file; empty without a folder
   ext(path)       string  Ending of the file name with its dot, e.g. .zip; empty without one
+functions / Conversion
+  int(value)      integer  Whole number from a number (cut off) or a text like '42'
+  float(value)    number   Number from a whole number or a text like '1.5' (with a decimal point)
+  string(value)   string   Any value as text, e.g. a number to join with text
+  toJSON(value)   string   A value as JSON text, indented
+  fromJSON(text)  any      The value of a JSON text: map, list, number, text or bool
 functions / Numbers and lists
-  len(value)               integer  Number of characters, entries of a list or keys of a map
-  round(number)            number   Rounds to a whole number
-  sum(list)                number   Sum of a list of numbers
-  map(list, .field)        list     Takes a field of each entry, e.g. the sizes of files
-  filter(list, condition)  list     Keeps the entries for which the condition is true
-  join(list, separator)    string   Joins a list of texts
+  len(value)             integer  Number of characters, entries of a list or keys of a map
+  round(number)          number   Rounds to a whole number
+  ceil(number)           number   Rounds up to a whole number
+  floor(number)          number   Rounds down to a whole number
+  abs(number)            number   The number without its sign
+  min(a, b, …)           number   The smallest of the numbers or of a list
+  max(a, b, …)           number   The largest of the numbers or of a list
+  sum(list, value)       number   Sum of a list of numbers; with value, of a value of each entry
+  join(list, separator)  string   Joins a list of texts
+  first(list)            any      The first entry; nil for an empty list
+  last(list)             any      The last entry; nil for an empty list
+  keys(map)              list     The keys of a map
+functions / Lists with a condition
+  map(list, value)                list     A value of each entry, e.g. the sizes of files
+  filter(list, condition)         list     Keeps the entries for which the condition is true; # is the entry
+  all(list, condition)            bool     Whether the condition is true for every entry
+  any(list, condition)            bool     Whether the condition is true for at least one entry
+  none(list, condition)           bool     Whether the condition is true for no entry
+  one(list, condition)            bool     Whether the condition is true for exactly one entry
+  count(list, condition)          integer  Number of entries for which the condition is true
+  find(list, condition)           any      The first entry for which the condition is true; nil if none
+  findIndex(list, condition)      integer  Position (from 0) of the first entry for which the condition is true; -1 if none
+  findLast(list, condition)       any      The last entry for which the condition is true; nil if none
+  findLastIndex(list, condition)  integer  Position (from 0) of the last entry for which the condition is true; -1 if none
+  groupBy(list, value)            map      The entries in lists by a value of each, e.g. orders by customer
+  sortBy(list, value, order)      list     The entries sorted by a value of each; order 'asc' (default) or 'desc'
+  reduce(list, value, initial)    any      Combines the entries to one value: #acc is the value so far (initial, else the first entry), # the entry
 functions / Empty values
   coalesce(a, b, …)  any   The first value that is not empty
   isEmpty(value)     bool  Whether a value is empty: nothing, empty text, list or map
