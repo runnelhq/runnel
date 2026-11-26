@@ -1,0 +1,572 @@
+<!doctype html>
+<!--
+  Mockup E15c – Help per building block: the whole reference of an action or transform in the
+  editor (label, type, category, badges, description, fields with types, defaults and allowed
+  values including nested lists, output or fields set, records, errors, limits, example). It
+  comes from the descriptors of the catalog (E15b) and opens from the palette ("?" on a tile,
+  F1) and from the properties panel ("?" next to the type, "Open help" instead of the old Help
+  section). It is shown as a wide panel in place of the properties panel.
+  Builds on the approved mockups E4 (shell), E6b (palette), E7 (properties), E13 (icons),
+  E14 (help section), S25a (pipelines) and S52 (plugins). Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                  (default light)
+    state = open | action | transform | plugin            (default open)
+    controls = 0                                    hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>help – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5; color: var(--foreground);
+         background: var(--background); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  code, .mono { font-family: var(--rn-font-mono); }
+  a { color: var(--primary); text-underline-offset: 2px; }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; position: relative; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 248px 1fr 320px; min-height: 0; }
+  .body.wide { grid-template-columns: 248px 1fr 600px; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 3px 8px;
+                      border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); cursor: pointer; white-space: nowrap; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); color: var(--sidebar-foreground);
+          border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; height: 36px; padding: 0 16px; flex: none; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; flex: none; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .k { color: var(--muted-foreground); display: inline-flex; }
+  .row.selected .k { color: var(--accent-foreground); }
+  .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); font-weight: 400; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); flex: none; }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); white-space: nowrap; }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; white-space: nowrap; }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); white-space: nowrap; }
+  .badge.outline { background: transparent; border: 1px solid var(--border); color: var(--muted-foreground); font-weight: 500; }
+  .badge.plugin { background: var(--accent); color: var(--accent-foreground); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; white-space: nowrap; }
+  .btn.small { height: 24px; padding: 0 8px; font-size: var(--rn-text-2xs); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--muted-foreground); }
+  .btn svg.i { width: 13px; height: 13px; }
+  .btn kbd, kbd { font: 10px var(--rn-font-mono); }
+  .btn kbd { opacity: .75; }
+  .icon-btn { display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: var(--rn-radius-md);
+              background: transparent; color: var(--muted-foreground); }
+  .icon-btn.hover { background: var(--accent); color: var(--accent-foreground); border-color: var(--border); }
+  .icon-btn.focus { outline: 2px solid var(--ring); outline-offset: 1px; color: var(--foreground); }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+
+  /* Palette (E6b) */
+  .palette { margin-top: 8px; border-top: 1px solid var(--sidebar-border); display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  .search { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid var(--input);
+            border-radius: var(--rn-radius-md); background: var(--background); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .search kbd { margin-left: auto; padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
+  .palette .search { margin: 0 12px 8px; }
+  .group { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 16px; font-weight: 600; font-size: var(--rn-text-xs); }
+  .group.closed { font-weight: 500; }
+  .items { list-style: none; margin: 0; padding: 0 8px; }
+  .item { position: relative; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 8px; border-radius: var(--rn-radius-md); }
+  .item.hover { background: var(--sidebar-accent); }
+  .item .tile { width: 22px; height: 22px; border-radius: var(--rn-radius-sm); }
+  .item .tile svg.i { width: 13px; height: 13px; }
+  .item .t { line-height: 1.2; min-width: 0; }
+  .item .t small { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .item .q { margin-left: auto; width: 22px; height: 22px; }
+  .tile { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-allgemein); color: var(--rn-tiefe-0); flex: none; }
+  .qmark { font: 600 12px/1 var(--rn-font-sans); }
+
+  /* Canvas (design/README.md, 6.1) */
+  .canvas { position: relative; flex: 1; overflow: hidden; background-color: var(--canvas);
+            background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1.2px); background-size: 16px 16px; }
+  svg.edges { position: absolute; left: 0; top: 0; overflow: visible; }
+  .edge { fill: none; stroke-width: 2; }
+  .edge.success { stroke: var(--link-success); }
+  .edge.always { stroke: var(--link-always); }
+  .edge-label { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+                border-radius: var(--rn-radius-full); background: var(--card); border: 1.5px solid currentColor; font-size: 11px; font-weight: 700; line-height: 1; }
+  .edge-label.success { color: var(--link-success); }
+  .node { position: absolute; width: 176px; height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 10px;
+          background: var(--node); border: 1px solid var(--node-border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-sm); }
+  .node.selected { outline: 2px solid var(--node-selected); outline-offset: 1px; }
+  .node .text { min-width: 0; line-height: 1.25; }
+  .node .id { font-weight: 600; white-space: nowrap; }
+  .node .type { font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .port { position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--node); border: 1.5px solid var(--node-border); }
+  .port.in { left: -5px; } .port.out { right: -5px; }
+  .controls-panel { position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column; background: var(--card);
+                    border: 1px solid var(--border); border-radius: var(--rn-radius-md); box-shadow: var(--rn-shadow-sm); overflow: hidden; }
+  .controls-panel span { display: grid; place-items: center; width: 30px; height: 30px; color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+  .controls-panel span:last-child { border-bottom: 0; }
+  .bottom { flex: none; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 2px; height: 32px; padding: 0 8px; }
+  .bottom .t2 { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+
+  /* Properties (E7) */
+  .side { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--background); position: relative; }
+  .side .panel-title { justify-content: space-between; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border); gap: 8px; }
+  .scroll { overflow: auto; flex: 1; min-height: 0; }
+  .ph { display: flex; gap: 10px; align-items: center; padding: 14px 16px 6px; }
+  .ph .tile { width: 32px; height: 32px; }
+  .ph h3 { margin: 0; font-size: var(--rn-text-base); font-weight: 600; line-height: 1.2; }
+  .ph .t { display: flex; align-items: center; gap: 4px; font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .ph .t .icon-btn { width: 20px; height: 20px; border-radius: 50%; border-color: var(--border); }
+  .ph-desc { margin: 0 16px 8px; color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .section { border-top: 1px solid var(--border); margin-top: 8px; }
+  .section > h4 { display: flex; align-items: center; gap: 6px; margin: 0; height: 34px; padding: 0 16px; font-size: var(--rn-text-xs); font-weight: 600; }
+  .section > h4 .sum { margin-left: auto; font-weight: 400; color: var(--muted-foreground); font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); }
+  .field { padding: 0 16px; margin-bottom: 12px; }
+  .field > label { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; font-size: var(--rn-text-xs); font-weight: 500; }
+  .field > label .req { color: var(--destructive); }
+  .field > label .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); font-weight: 400; }
+  .input { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 30px; padding: 0 8px; border: 1px solid var(--input);
+           border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); white-space: nowrap; overflow: hidden; }
+  .input.mono { font-family: var(--rn-font-mono); }
+  .input svg.i { width: 14px; height: 14px; color: var(--muted-foreground); }
+  .hint { margin-top: 4px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .helprow { display: flex; align-items: center; gap: 8px; margin: 0 16px 12px; padding: 8px 10px; border: 1px dashed var(--border);
+             border-radius: var(--rn-radius-md); font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .helprow .btn { margin-left: auto; }
+  .tooltip { position: absolute; z-index: 5; max-width: 300px; padding: 7px 10px; border-radius: var(--rn-radius-md); background: var(--popover);
+             color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); line-height: 1.4; }
+  .tooltip small { display: block; margin-top: 3px; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .tooltip kbd { padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
+
+  /* Help panel (new in E15c) */
+  .side.help .panel-title { gap: 6px; }
+  .side.help .panel-title .search { width: 220px; margin-left: auto; height: 26px; }
+  .hhead { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 16px 20px 8px; }
+  .hhead .tile { width: 40px; height: 40px; border-radius: var(--rn-radius-lg); }
+  .hhead .tile svg.i { width: 22px; height: 22px; }
+  .hhead h2 { margin: 0; font-size: var(--rn-text-lg); font-weight: 600; line-height: 1.2; }
+  .hhead .t { font: var(--rn-text-xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .hhead .segmented button { font-size: var(--rn-text-2xs); }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 10px; }
+  .hdesc { margin: 0 20px 12px; font-size: var(--rn-text-sm); }
+  .jump { position: sticky; top: 0; z-index: 2; display: flex; gap: 4px; padding: 6px 16px; background: var(--background); border-bottom: 1px solid var(--border); }
+  .jump a { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--rn-radius-sm);
+            font-size: var(--rn-text-xs); color: var(--muted-foreground); text-decoration: none; }
+  .jump a.on { background: var(--muted); color: var(--foreground); font-weight: 500; }
+  .jump a .n { font-size: 10px; color: var(--muted-foreground); }
+  .jump .compact { display: none; align-items: center; gap: 6px; margin-right: 8px; font-weight: 600; font-size: var(--rn-text-xs); }
+  .jump .compact .tile { width: 18px; height: 18px; border-radius: var(--rn-radius-sm); }
+  .jump .compact .tile svg.i { width: 11px; height: 11px; }
+  .jump.stuck .compact { display: inline-flex; }
+  .hs { padding: 14px 20px 4px; }
+  .hs h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: var(--rn-text-sm); font-weight: 600; }
+  .hs h3 small { font-weight: 400; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .hs h3 small .mono { font-size: var(--rn-text-2xs); }
+  .hs p { margin: 0 0 8px; font-size: var(--rn-text-xs); line-height: 1.55; }
+  .hs ul.limits { margin: 0 0 8px; padding-left: 18px; font-size: var(--rn-text-xs); line-height: 1.55; }
+  .hs ul.limits li { margin-bottom: 3px; }
+  .ref { width: 100%; border-collapse: collapse; font-size: var(--rn-text-xs); }
+  .ref th { text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground);
+            padding: 4px 8px 5px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .ref td { vertical-align: top; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--border); line-height: 1.45; }
+  .ref tr:last-child td { border-bottom: 0; }
+  .ref .n { font: 500 var(--rn-text-xs) var(--rn-font-mono); white-space: nowrap; }
+  .ref .n .req { color: var(--destructive); font-weight: 700; }
+  .ref .n small { display: block; font: 10px var(--rn-font-sans); color: var(--muted-foreground); margin-top: 1px; }
+  .ref .n .tree { display: inline-block; color: var(--muted-foreground); width: 14px; padding: 0; }
+  .ref tr.child td.n { padding-left: 4px; }
+  .ref tr.child .n .p { color: var(--muted-foreground); font-weight: 400; }
+  .ref .ty { font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); white-space: nowrap; }
+  .ref .df { font: var(--rn-text-2xs) var(--rn-font-mono); white-space: nowrap; }
+  .ref .df .none { color: var(--muted-foreground); font-family: var(--rn-font-sans); }
+  .ref .d .vals { margin-top: 4px; }
+  .ref .d .eg { margin-top: 2px; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .ref .d .eg .mono { font-size: var(--rn-text-2xs); color: var(--foreground); }
+  .ref .d .only { margin-top: 2px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .ref .d .only .mono { font-size: var(--rn-text-2xs); }
+  .chip { display: inline-block; font: 10px/16px var(--rn-font-mono); padding: 0 5px; margin: 0 3px 3px 0; border-radius: var(--rn-radius-sm);
+          background: var(--muted); border: 1px solid var(--border); }
+  .chip.def { border-color: var(--primary); }
+  .legend { margin: 6px 0 0; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .legend .req { color: var(--destructive); font-weight: 700; }
+  .ex { margin: 0 0 8px; padding: 10px 12px; border-radius: var(--rn-radius-md); background: var(--muted); font: var(--rn-text-xs)/1.6 var(--rn-font-mono); white-space: pre; }
+  .ex .k { font-weight: 500; }
+  .ex .s { color: var(--muted-foreground); }
+  .ex .x { color: var(--expression); background: var(--expression-soft); border-radius: 3px; }
+  .acts { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .acts small { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .acts small .mono { font-size: var(--rn-text-2xs); }
+  .missing { display: flex; gap: 10px; margin: 6px 20px 8px; padding: 10px 12px; border-radius: var(--rn-radius-md); background: var(--muted);
+             font-size: var(--rn-text-xs); color: var(--muted-foreground); line-height: 1.5; }
+  .missing .sym { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font-weight: 700; font-size: 11px; }
+  .missing b { color: var(--foreground); font-weight: 600; }
+  .jump .pairsw { margin-left: auto; }
+  .jump .pairsw button { font-size: var(--rn-text-2xs); padding: 2px 8px; }
+  .pair { font-size: var(--rn-text-2xs); color: var(--muted-foreground); text-align: right; margin-top: 3px; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px; font: 12px/1 var(--rn-font-mono);
+                   background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E15c</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="open" href="#">open</a> <a data-state="action" href="#">action</a>
+  <a data-state="transform" href="#">transform</a> <a data-state="plugin" href="#">plugin</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>orders</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\orders</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body" id="body">
+    <aside>
+      <div class="panel-title"><span class="label">Explorer</span></div>
+      <ul class="tree" id="tree"></ul>
+      <section class="palette" id="palette" aria-label="Palette"></section>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div class="canvas" id="canvas"></div>
+      <div class="bottom"><span class="t2">›&nbsp; Problems</span><span class="t2">›&nbsp; Log</span></div>
+    </main>
+    <section class="side" id="side"></section>
+  </div>
+  <footer><span class="ok">● Connected</span><span class="mono">127.0.0.1:7300</span><span id="foot"></span><span class="spacer"></span><span>Runnel v0.1.0</span></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "open";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const filePage = "M13 21H6V3h8l4 4v5M14 3v4h4";
+  const folderPath = "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z";
+  // Icons of the building blocks as in the editor (E13).
+  const T = {
+    "core.start": '<path d="M8 5l11 7-11 7z" fill="currentColor"/>',
+    "core.log": '<path d="M5 6h14M5 12h14M5 18h9"/>',
+    "http.request": '<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',
+    "http.response": '<path d="M9 7L4 12l5 5M4 12h9a7 7 0 0 1 7 7"/>',
+    "file.write": `<path d="${filePage}M14.5 21l.5-2.5 4.5-4.5 2 2-4.5 4.5zM18.5 15l2 2"/>`,
+    "file.read": `<path d="${filePage}M14 17.5h6.5M18 15l2.5 2.5L18 20"/>`,
+    "file.list": `<path d="${folderPath}M7.5 11h9M7.5 14.5h6"/>`,
+    "file.copy": '<rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V4H5v13h3"/>',
+    "csv.input": '<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6"/>',
+    "csv.output": '<path d="M6 3h8l4 4v14H6zM14 3v4h4M12 11v7M9 15l3 3 3-3"/>',
+    "core.filter": '<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',
+    "core.group-by": '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><path d="M7.5 11v4h9v-4M12 15v5"/>',
+    "core.sort": '<path d="M7 4v16M4 17l3 3 3-3M14 6h6M14 12h4M14 18h2"/>',
+    "core.constant": '<path d="M12 5v14M5 12h14"/>',
+    general: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/>',
+    plug: '<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0zM12 17v4"/>',
+  };
+  const K = {
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    pl: '<path d="M4 7h10M4 12h16M4 17h10"/><circle cx="18" cy="7" r="2"/><circle cx="18" cy="17" r="2"/>',
+    folder: `<path d="${folderPath}"/>`,
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+  };
+  const I = {
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    back: '<path d="M15 6l-6 6 6 6"/>',
+    search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    code: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+    play: '<path d="M8 5l11 7-11 7z"/>',
+    book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7"/>',
+  };
+  const cat = {
+    general: "var(--rn-kategorie-allgemein)", execution: "var(--rn-kategorie-ausfuehrung)", files: "var(--rn-kategorie-dateien)",
+    network: "var(--rn-kategorie-netzwerk)", database: "var(--rn-kategorie-datenbank)", input: "var(--rn-kategorie-eingabe)",
+    transform: "var(--rn-kategorie-transformation)", combine: "var(--rn-kategorie-transformation)", output: "var(--rn-kategorie-ausgabe)",
+  };
+  const tile = (type, category, size) => `<span class="tile" style="background:${cat[category]}">${icon(T[type] || T.general, size)}</span>`;
+  const qBtn = (cls = "", label = "Help") => `<button class="icon-btn ${cls}" aria-label="${label}" title="${label} (F1)"><span class="qmark">?</span></button>`;
+
+  const pipeline = state === "transform";
+  const helpOpen = state !== "open";
+
+  // ---------- Explorer ----------
+  const openFile = pipeline ? "daily.pipeline.yaml" : "fetch-orders.workflow.yaml";
+  const rows = [["folder", "pipelines", 0, "2"], ["pl", "daily.pipeline.yaml", 1], ["pl", "orders.pipeline.yaml", 1],
+    ["folder", "plugins", 0, "1"], ["folder", "workflows", 0, "2"], ["wf", "fetch-orders.workflow.yaml", 1], ["wf", "sync-users.workflow.yaml", 1],
+    ["proj", "project.yaml", 0]];
+  document.getElementById("tree").innerHTML = rows.map(([k, n, d, c]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === openFile ? "selected" : ""}">${k === "folder" ? (n === "plugins" ? chevRight : chev) : '<span style="width:12px"></span>'}` +
+    `<span class="k">${icon(K[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}</div></li>`).join("");
+
+  // ---------- Palette ----------
+  const item = (type, label, category, cls = "", extra = "") =>
+    `<li class="item ${cls}">${tile(type, category)}<span class="t">${label}<small>${type}</small></span>${extra}</li>`;
+  const group = (name, n, open) => `<div class="group ${open ? "" : "closed"}">${open ? chev : chevRight}${name}<span class="count">${n}</span></div>`;
+  let pal;
+  if (pipeline) {
+    pal = `${group("Input", 7, true)}<ul class="items">${item("csv.input", "CSV Input", "input")}${item("file.list", "List Files", "input")}</ul>
+      ${group("Transform", 12, true)}<ul class="items">${item("core.constant", "Add Constants", "transform")}${item("core.filter", "Filter", "transform")}${item("core.sort", "Sort", "transform")}</ul>
+      ${group("Combine", 5, true)}<ul class="items">${item("core.group-by", "Group By", "combine")}</ul>
+      ${group("Output", 8, false)}${group("Flow", 4, false)}`;
+  } else {
+    const hover = state === "open";
+    pal = `${group("General", 7, false)}${group("Execution", 4, false)}
+      ${group("Files", 9, true)}<ul class="items">${item("file.copy", "Copy File", "files")}
+        ${item("file.list", "List Files", "files", hover || state === "action" ? "hover" : "", hover || state === "action" ? `<span class="q">${qBtn(hover ? "hover" : "focus")}</span>` : "")}
+        ${item("file.read", "Read File", "files")}${item("file.write", "Write File", "files")}</ul>
+      ${group("Network", 4, true)}<ul class="items">${item("http.request", "HTTP Request", "network")}${item("http.response", "HTTP Response", "network")}</ul>
+      ${group("Database", 3, false)}${group("iban", 1, state === "plugin")}${state === "plugin"
+        ? `<ul class="items"><li class="item">${tile("plug", "general")}<span class="t">Check IBAN<small>iban.check</small></span></li></ul>` : ""}`;
+  }
+  document.getElementById("palette").innerHTML = `<div class="panel-title"><span class="label">Palette</span></div>
+    <div class="search">${icon(I.search, 14)}Search ${pipeline ? "transforms" : "actions"}<kbd>/</kbd></div>${pal}`;
+
+  // ---------- Tabs, file bar, canvas ----------
+  document.getElementById("tabs").innerHTML = `<div class="tab active">${icon(pipeline ? K.pl : K.wf)} ${openFile} ×</div>`;
+  document.getElementById("filebar").innerHTML = `<span class="crumbs">${pipeline ? "pipelines" : "workflows"} / <b>${openFile}</b></span>
+    <div class="spacer"></div><button class="btn">${icon(I.play, 13)}Run</button><button class="btn" style="opacity:.5">Save <kbd>Ctrl+S</kbd></button>
+    <div class="segmented"><button aria-pressed="true">${icon(pipeline ? K.pl : K.wf, 14)}Canvas</button><button>${icon(I.code, 14)}YAML</button></div>`;
+  document.getElementById("foot").textContent = pipeline ? "Pipeline · 5 transforms · 4 links" : "Workflow · 5 steps · 4 links";
+
+  const node = (x, y, id, type, category, sel) => `<div class="node ${sel ? "selected" : ""}" style="left:${x}px;top:${y}px"><span class="port in"></span>
+    ${tile(type, category)}<div class="text"><div class="id">${id}</div><div class="type">${type}</div></div><span class="port out"></span></div>`;
+  const edge = (x1, y1, x2, y2, cls) => { const m = (x1 + x2) / 2; return `<path class="edge ${cls}" d="M${x1} ${y1} C${m} ${y1} ${m} ${y2} ${x2} ${y2}"/>`; };
+  let nodes, edges;
+  if (pipeline) {
+    nodes = [[40, 60, "read", "csv.input", "input"], [40, 170, "valid", "core.filter", "transform"], [260, 170, "total", "core.group-by", "combine", true],
+      [260, 280, "sorted", "core.sort", "transform"], [260, 390, "write", "csv.output", "output"]];
+    edges = edge(128, 112, 128, 170, "always").replace(/C.*"/, 'L128 170"') + edge(216, 196, 260, 196, "always") +
+      edge(348, 222, 348, 280, "always").replace(/C.*"/, 'L348 280"') + edge(348, 332, 348, 390, "always").replace(/C.*"/, 'L348 390"');
+  } else {
+    const sel = state === "open";
+    nodes = [[40, 60, "start", "core.start", "general"], [40, 170, "fetch", "http.request", "network", sel], [260, 170, "save", "file.write", "files"],
+      [260, 280, "inbox", "file.list", "files"], [260, 390, "log", "core.log", "general"]];
+    edges = edge(128, 112, 128, 170, "success").replace(/C.*"/, 'L128 170"') + edge(216, 196, 260, 196, "success") +
+      edge(348, 222, 348, 280, "success").replace(/C.*"/, 'L348 280"') + edge(348, 332, 348, 390, "success").replace(/C.*"/, 'L348 390"');
+  }
+  document.getElementById("canvas").innerHTML = `<svg class="edges" width="1" height="1">${edges}</svg>` +
+    nodes.map(n => node(...n)).join("") +
+    (pipeline ? "" : `<span class="edge-label success" style="left:128px;top:141px">✔</span><span class="edge-label success" style="left:238px;top:196px">✔</span>
+      <span class="edge-label success" style="left:348px;top:251px">✔</span><span class="edge-label success" style="left:348px;top:361px">✔</span>`) +
+    `<div class="controls-panel"><span>+</span><span>−</span><span>⛶</span></div>`;
+
+  // ---------- Reference content from the catalog (runnel catalog --json, E15b) ----------
+  const B = {
+    "file.list": {
+      kind: "action", label: "List Files", category: "files", categoryLabel: "Files", pair: "transform",
+      description: "Lists the files of a folder; output: path, name, size, modified and folder of each entry",
+      fields: [
+        { n: "folder", req: true, ty: "string", d: "Folder to list, relative to the project folder or absolute", eg: "C:\\in" },
+        { n: "pattern", ty: "string", df: "*", d: "Names to include, with wildcards, e.g. *.csv" },
+        { n: "recursive", ty: "boolean", df: "false", d: "Also list the subfolders" },
+        { n: "include", ty: "string", df: "files", vals: ["files", "folders", "all"], d: "What to list" },
+      ],
+      outputs: [["output[].path", "string", "Path of the entry; the list is sorted by path"], ["output[].name", "string", "Name of the file or folder"],
+        ["output[].size", "integer", "Size in bytes"], ["output[].modified", "datetime", "Time of the last change, to the second"], ["output[].folder", "boolean", "true for a folder"]],
+      errors: "Fails when the folder does not exist or cannot be read; an empty folder gives an empty list.",
+      limits: ['All entries are held in memory as the output; for very many files use the transform <a href="#">file.list</a>.'],
+      example: [["folder", '"${INBOX}"'], ["pattern", '"*.csv"']],
+    },
+    "core.group-by": {
+      kind: "transform", label: "Group By", category: "combine", categoryLabel: "Combine", recordErrors: true,
+      description: "Combines records with the same values into one, with count, sum and other aggregates",
+      fields: [
+        { n: "groupBy", ty: "list of fields", d: "Fields whose values form a group; empty: one record for all" },
+        { n: "aggregates", ty: "list of objects", d: "Fields computed per group, after the group fields", children: [
+          { n: "name", req: true, ty: "string", d: "Name of the new field", eg: "total" },
+          { n: "function", req: true, ty: "string", vals: ["count", "countDistinct", "sum", "avg", "min", "max", "first", "last", "concat"],
+            d: "count: records (or values of field), countDistinct: different values, sum, avg, min, max, first, last, concat: values as text" },
+          { n: "field", ty: "field", d: "Field the function is applied to; empty for count: all records", eg: "amount" },
+          { n: "separator", ty: "string", d: "Text between the values of concat; empty: comma and space", eg: '" / "', only: "function: concat" },
+        ] },
+      ],
+      outputs: [["&lt;groupBy&gt;", "any", "The values of the group, with their type"],
+        ["&lt;aggregates[].name&gt;", "any", "The aggregate: int for count and countDistinct, text for concat, decimal for avg of int, else the type of the field"]],
+      records: "Passes on one record per group, with only the group fields and the aggregates, in the order the groups first appeared, once its input has ended; without groupBy exactly one record, also for no input.",
+      errors: "A record with a value that does not fit its function (e.g. text in sum) goes to the error link and counts in no group; without one, the pipeline stops.",
+      limits: ["Holds one entry per group in memory; it grows with the number of groups, not of records."],
+    },
+    "iban.check": {
+      kind: "action", label: "Check IBAN", category: "general", categoryLabel: "General", plugin: "iban 1.2.0", icon: "plug",
+      description: "Checks one IBAN and returns bank and BIC",
+      fields: [
+        { n: "iban", req: true, ty: "string", d: "The IBAN to check, with or without spaces" },
+        { n: "country", ty: "string", d: "Accept only IBANs of this country (two letters)", eg: "DE" },
+        { n: "connection", ty: "connection", d: "Registry account for current bank data; empty: the bank list in the plugin" },
+      ],
+    },
+  };
+
+  function fieldRows(fields, parent) {
+    return fields.map(f => {
+      const child = !!parent;
+      const name = child ? `<span class="tree" title="In each entry of ${parent}">└</span>${f.n}` : f.n;
+      const vals = f.vals ? `<div class="vals">${f.vals.map(v => `<span class="chip ${v === f.df ? "def" : ""}">${v}</span>`).join("")}</div>` : "";
+      const eg = f.eg ? `<div class="eg">e.g. <span class="mono">${esc(f.eg)}</span></div>` : "";
+      const only = f.only ? `<div class="only">Only with <span class="mono">${f.only}</span></div>` : "";
+      const row = `<tr class="${child ? "child" : ""}"><td class="n">${name}${f.req ? '<span class="req" title="Required">*</span>' : ""}${f.req ? "<small>required</small>" : ""}</td>
+        <td class="ty">${f.ty}</td><td class="df">${f.df ? esc(f.df) : '<span class="none">–</span>'}</td>
+        <td class="d">${f.d}${vals}${eg}${only}</td></tr>`;
+      return row + (f.children ? fieldRows(f.children, f.n) : "");
+    }).join("");
+  }
+
+  function helpPanel(type, opts) {
+    const b = B[type];
+    const kindLabel = b.kind === "action" ? "Action" : "Transform";
+    const nFields = b.fields.reduce((n, f) => n + 1 + (f.children ? f.children.length : 0), 0);
+    const outTitle = b.kind === "action" ? "Output" : "Fields set";
+    const sections = [["Fields", nFields]];
+    if (b.outputs) sections.push([outTitle, b.outputs.length]);
+    if (b.records) sections.push(["Records"]);
+    if (b.errors) sections.push(["Errors"]);
+    if (b.limits) sections.push(["Limits", b.limits.length]);
+    if (b.example || b.kind === "transform") sections.push(["Example"]);
+
+    // Action and transform of the same type (A+T): a switch at the end of the bar with the sections, so it stays in view.
+    const pair = b.pair
+      ? `<div class="segmented pairsw" role="group" aria-label="Same type as" title="Same type in workflows and pipelines"><button aria-pressed="true">Action</button><button>Transform</button></div>` : "";
+    const badges = [`<span class="badge">${kindLabel}</span>`, `<span class="badge outline">${b.categoryLabel}</span>`];
+    if (b.plugin) badges.push(`<span class="badge plugin">${icon(T.plug, 12)}Plugin ${b.plugin}</span>`);
+    else badges.push(`<span class="badge outline">Built-in · v0.1.0</span>`);
+    if (b.recordErrors) badges.push(`<span class="badge outline" title="Records that fail go to the error link">Error link for records</span>`);
+
+    let html = `<div class="hhead">${tile(b.icon || type, b.category, 22)}<div><h2>${b.label}</h2><div class="t">${type}</div></div><span></span></div>
+      <div class="badges">${badges.join("")}</div>
+      <p class="hdesc">${b.description}</p>
+      <nav class="jump ${opts.stuck ? "stuck" : ""}"><span class="compact">${tile(b.icon || type, b.category)}${b.label}</span>${sections.map(([s, n], i) =>
+        `<a href="#" class="${i === (opts.on || 0) ? "on" : ""}">${s}${n ? `<span class="n">${n}</span>` : ""}</a>`).join("")}${pair}</nav>`;
+
+    html += `<div class="hs"><h3>Fields <small>under <span class="mono">with:</span></small></h3>
+      <table class="ref"><thead><tr><th style="width:136px">Name</th><th style="width:116px">Type</th><th style="width:60px">Default</th><th>Description</th></tr></thead>
+      <tbody>${fieldRows(b.fields)}</tbody></table>
+      <p class="legend"><span class="req">*</span> required · <span class="chip def">value</span> default of the allowed values</p></div>`;
+
+    if (!b.outputs && !b.errors) {
+      html += `<div class="missing"><span class="sym">i</span><div><b>No more details from the plugin.</b> The plugin <span class="mono">iban</span> describes
+        its fields, but no output, errors, limits or example. Its documentation, or the Log of a run, shows what it returns.</div></div>`;
+      return html;
+    }
+    if (b.outputs) {
+      const sub = b.kind === "action" ? `in <span class="mono">result.output</span> of the step` : "on every record passed on";
+      html += `<div class="hs"><h3>${outTitle} <small>${sub}</small></h3><table class="ref"><thead><tr><th style="width:${b.kind === "action" ? 150 : 170}px">${b.kind === "action" ? "Path" : "Field"}</th><th style="width:96px">Type</th><th>Description</th></tr></thead>
+        <tbody>${b.outputs.map(([n, t, d]) => `<tr><td class="n">${n}</td><td class="ty">${t}</td><td class="d">${d}</td></tr>`).join("")}</tbody></table>
+        ${b.kind === "transform" ? '<p class="legend"><span class="mono">&lt;…&gt;</span> a name from the configuration</p>' : ""}</div>`;
+    }
+    if (b.records) html += `<div class="hs"><h3>Records</h3><p>${b.records}</p></div>`;
+    if (b.errors) html += `<div class="hs"><h3>Errors</h3><p>${b.errors}</p></div>`;
+    if (b.limits) html += `<div class="hs"><h3>Limits</h3><ul class="limits">${b.limits.map(l => `<li>${l}</li>`).join("")}</ul></div>`;
+    if (type === "file.list") {
+      html += `<div class="hs"><h3>Example</h3><div class="ex"><span class="k">- id:</span> list
+  <span class="k">type:</span> file.list
+  <span class="k">with:</span>
+    <span class="k">folder:</span> <span class="x">\${INBOX}</span>
+    <span class="k">pattern:</span> <span class="s">"*.csv"</span></div>
+        <div class="acts"><button class="btn small">${icon(I.copy, 12)}Copy example</button><small>Also in the terminal: <span class="mono">runnel catalog file.list</span></small></div></div>`;
+    }
+    return html;
+  }
+
+  // ---------- Right panel ----------
+  const side = document.getElementById("side");
+  const body = document.getElementById("body");
+  if (!helpOpen) {
+    // Properties of the selected step with "?" next to the type; the Help section becomes a link.
+    side.innerHTML = `<div class="panel-title"><span class="label">Properties</span><button class="icon-btn" aria-label="Hide properties">${icon(I.close, 14)}</button></div>
+      <div class="scroll">
+        <div class="ph">${tile("http.request", "network")}<div><h3>HTTP Request</h3><div class="t">http.request ${qBtn("hover", "Help for http.request")}</div></div></div>
+        <p class="ph-desc">Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer</p>
+        <div class="field"><label>ID<span class="key">id</span></label><div class="input mono">fetch</div></div>
+        <div class="section"><h4>${chev}Configuration</h4>
+          <div class="field"><label>Connection<span class="key">with.connection</span></label><div class="input mono">shop-api ${icon(I.down)}</div>
+            <div class="hint">Connection of the API (a file in connections/) with base address and sign-in; empty: url is a full address</div></div>
+          <div class="field"><label>URL<span class="key">with.url</span></label><div class="input mono">orders</div></div>
+          <div class="field"><label>Method<span class="key">with.method</span></label><div class="input">GET ${icon(I.down)}</div></div>
+          <div class="field"><label>Save to<span class="key">with.saveTo</span></label><div class="input mono" style="color:var(--muted-foreground)">inbox/export.zip</div></div>
+        </div>
+        <div class="section"><h4>${chevRight}Execution<span class="sum">defaults</span></h4></div>
+        <div class="section"><h4>${icon(I.book, 13)}Help</h4>
+          <div class="helprow">Fields, output, errors, limits and an example<button class="btn small">Open help <kbd>F1</kbd></button></div></div>
+      </div>
+      <div class="tooltip" style="left:176px;top:66px;white-space:nowrap">Open help <kbd>F1</kbd></div>`;
+    // Tooltip of the hovered palette tile: as today, plus how to open the help.
+    document.getElementById("app").insertAdjacentHTML("beforeend", `<div class="tooltip" style="left:240px;top:466px;max-width:256px">
+      <b>List Files</b> – Lists the files of a folder; output: path, name, size, modified and folder of each entry
+      <small>Drag to the canvas · <b>?</b> or <kbd>F1</kbd> for help</small></div>`);
+  } else {
+    body.classList.add("wide");
+    side.classList.add("help");
+    const type = state === "action" ? "file.list" : state === "transform" ? "core.group-by" : "iban.check";
+    const fromProps = state !== "action";
+    const yaml = state === "transform"
+      ? `<div class="hs"><h3>Example</h3><div class="ex"><span class="k">- id:</span> total
+  <span class="k">type:</span> core.group-by
+  <span class="k">with:</span>
+    <span class="k">groupBy:</span> [Datum]
+    <span class="k">aggregates:</span>
+      - { name: orders, function: count }
+      - { name: total, function: sum, field: Betrag }</div>
+        <div class="acts"><button class="btn small">${icon(I.copy, 12)}Copy example</button><button class="btn small">${icon(I.code, 12)}Show <b class="mono">total</b> in YAML</button></div></div>` : "";
+    side.innerHTML = `<div class="panel-title">${fromProps ? `<button class="btn small ghost">${icon(I.back, 12)}Properties</button>` : '<span class="label">Help</span>'}
+        <div class="search">${icon(I.search, 14)}Search building blocks<kbd>Ctrl+K</kbd></div>
+        <button class="icon-btn" aria-label="Close help">${icon(I.close, 14)}</button></div>
+      <div class="scroll" id="hscroll">${helpPanel(type, state === "action" ? { stuck: true, on: 4 } : {})}${yaml}<div style="height:16px"></div></div>`;
+    // Action: scrolled to the end (after "Example" in the bar); the bar with the sections stays at the top and names the block.
+    if (state === "action") {
+      const sc = document.getElementById("hscroll");
+      sc.scrollTop = sc.scrollHeight;
+    }
+  }
+</script>
+</body>
+</html>
