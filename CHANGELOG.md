@@ -33,6 +33,8 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 - **Editor:** Icons aller Bausteine, Listen im Panel, Kopieren und Einfügen, Markdown-Dokumente, Reference und
   Variables, Vervollständigung im YAML-Editor, Formulare für Trigger, Environments und `project.yaml`, viele offene
   Dateien, Link teilen, Hilfe je Baustein mit Suche (Strg+K).
+- **Abkündigen** (ADR 0029): umbenannte Felder gelten unter beiden Namen, `validate` warnt mit Ersatz; im Katalog
+  tragen sie `deprecated` und `x-runnel-replacement`. Abgekündigt ist noch nichts.
 - Relative Pfade beziehen sich auf den Projektordner (ADR 0020); dynamische Ziele mit `allowedTargets`.
 
 ### Behoben

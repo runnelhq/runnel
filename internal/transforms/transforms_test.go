@@ -98,6 +98,9 @@ func sampleOf(typ string, s *schema.Schema) map[string]any {
 func sample(s *schema.Schema) map[string]any {
 	with := map[string]any{}
 	for _, p := range s.Properties {
+		if p.Schema.Deprecated { // its new name is in the sample (ADR 0029)
+			continue
+		}
 		with[p.Name] = sampleValue(p.Schema)
 		// A required list of objects gets one sample entry (e.g. the fields of core.convert).
 		if p.Schema.Type == "array" && slices.Contains(s.Required, p.Name) && p.Schema.Items != nil && p.Schema.Items.Type == "object" {

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "Type of the file",
+      "enum": [
+        "Connection"
+      ]
+    },
+    "apiVersion": {
+      "type": "string",
+      "description": "Version of the file format",
+      "enum": [
+        "runnel/v1"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the connection; must match the file name, used as connection: \u003cname\u003e",
+      "examples": [
+        "erp-db"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What the connection is for, e.g. ERP database, read only"
+    },
+    "type": {
+      "type": "string",
+      "description": "Kind of connection, e.g. sqlite; it decides the fields under with:",
+      "examples": [
+        "sqlite"
+      ]
+    },
+    "with": {
+      "type": "object",
+      "description": "Settings of the connection type; differences between environments come from variables, e.g. ${DB_HOST}",
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "kind",
+    "apiVersion",
+    "name",
+    "type"
+  ],
+  "additionalProperties": false
+}

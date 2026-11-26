@@ -71,6 +71,7 @@ func PreparePipeline(spec PipelineSpec) (*PreparedPipeline, error) {
 	if diags.HasErrors() {
 		return p, diags
 	}
+	diags = append(diags, DeprecatedInPipeline(pl, spec.Registry)...)
 	p.Warnings = diags
 
 	if p.Project, p.Env, err = scope(spec.ProjectDir, spec.Env, spec.Name); err != nil {

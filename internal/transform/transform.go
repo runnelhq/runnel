@@ -280,6 +280,9 @@ type Definition struct {
 	action.Reference
 	// New creates a transform from its "with" configuration (variables resolved).
 	New func(with map[string]any) (Transform, error)
+	// Deprecated lists renamed and deprecated fields of the configuration, as in
+	// action.Definition (ADR 0029).
+	Deprecated []action.Deprecated
 	// RecordErrors is set for transforms that pass records they cannot process to an
 	// error link (Output.Fail); an error link from another transform is never used.
 	RecordErrors bool
@@ -355,9 +358,37 @@ func (r *Registry) Register(d Definition) {
 			panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
 		}
 	}
+	if len(d.Deprecated) > 0 {
+		deprecate(&d, s)
+	}
 	r.defs[d.Type] = d
 	r.descriptors[d.Type] = Descriptor{Type: d.Type, Kind: "transform", Category: d.Category, Label: d.Label, Description: d.Description, Schema: s, Example: d.Example, RecordErrors: d.RecordErrors, Parallel: d.Parallel,
 		DetectFields: d.DetectFields != nil, InfoInput: d.InfoInput, Plugin: d.Plugin, Reference: d.Reference}
+}
+
+// deprecate marks the deprecated fields of d in its schema s and maps them to their new
+// names before New and DetectFields (ADR 0029).
+func deprecate(d *Definition, s *schema.Schema) {
+	if err := action.DeprecateSchema(s, d.Deprecated); err != nil {
+		panic(fmt.Sprintf("transform type %s: %v", d.Type, err))
+	}
+	newFn, detect, deps := d.New, d.DetectFields, d.Deprecated
+	d.New = func(with map[string]any) (Transform, error) {
+		with, err := action.MapDeprecated(with, deps)
+		if err != nil {
+			return nil, err
+		}
+		return newFn(with)
+	}
+	if detect != nil {
+		d.DetectFields = func(ctx context.Context, with map[string]any, limit int) (*Detection, error) {
+			with, err := action.MapDeprecated(with, deps)
+			if err != nil {
+				return nil, err
+			}
+			return detect(ctx, with, limit)
+		}
+	}
 }
 
 // With returns a copy of the registry with more transform types (those of the plugins

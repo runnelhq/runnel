@@ -39,7 +39,7 @@ Beiträge stehen unter der [MIT-Lizenz](LICENSE) des Projekts (ADR 0004).
 | Neue Transforms | [docs/dev/TRANSFORMS.md](docs/dev/TRANSFORMS.md) |
 | Plugins | folgt mit Roadmap-Schritt S49–S51 |
 | Testen, bekannte Einschränkungen | [docs/TESTPLAN.md](docs/TESTPLAN.md) |
-| Release erstellen | [README – Releases](README.md#releases) |
+| Release erstellen | [README – Releases](README.md#releases), [docs/dev/RELEASE.md](docs/dev/RELEASE.md) (Changelog, Basis des Vertragstests) |
 
 ## Fehler melden
 

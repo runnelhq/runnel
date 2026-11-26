@@ -47,6 +47,13 @@ internal/transforms/<namensraum>/
 
   `Reference` ist ein eingebettetes Feld der Definition (`Reference: action.Reference{…}`), am Ende der Definition.
 
+### Felder umbenennen oder abkündigen
+
+Wie bei Actions ([ACTIONS.md](ACTIONS.md#felder-umbenennen-oder-abkündigen-deprecated-adr-0029)): `Deprecated` in
+`transform.Definition` mit Einträgen vom Typ `action.Deprecated`. `Register` bildet das alte Feld vor `New` und vor
+`DetectFields` auf das neue ab; `validate`, der Editor und `runnel run` warnen mit Position, beide Felder zusammen sind ein
+Fehler, das Schema trägt `deprecated`.
+
 ## 2. Verarbeiten (`Process`)
 
 ```go
@@ -126,7 +133,7 @@ func TestUpper(t *testing.T) {
 ## 5. Checkliste für den PR
 
 - [ ] Eine Datei je Transform, Eintrag in `register.go`, Kategorie, Label, Beschreibung, `doc` für jedes Feld
-- [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name)
+- [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name); umbenannte Felder über `Deprecated` (ADR 0029)
 - [ ] Feldnamen mit `format=runnel-field`, Link-Ziele mit `format=runnel-target`; ein `Example`
 - [ ] `Reference`: `Outputs` (gesetzte Felder), `Records`, `Errors`, `Limits` – am Code geprüft
 - [ ] Werte mit Variablen werden in `Process` geprüft; `Emit`-Fehler werden zurückgegeben

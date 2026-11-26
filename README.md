@@ -185,8 +185,8 @@ Fertige Builds gibt es unter [Releases](https://github.com/runnelhq/runnel/relea
 
 ### Release erstellen
 
-Vorher in [CHANGELOG.md](CHANGELOG.md) den Abschnitt „Unveröffentlicht“ in die neue Version umbenennen (mit Datum)
-und einen leeren „Unveröffentlicht“ darüber anlegen.
+Vorher den Changelog abschließen und die Basis des Vertragstests erneuern, siehe
+[docs/dev/RELEASE.md](docs/dev/RELEASE.md).
 
 **Über GitHub (ohne lokales Git):** *Actions → Release → Run workflow*, Branch `main` lassen, Version eintragen
 (z. B. `v0.1.0`) und starten. Der Workflow testet, baut, erzeugt das Tag und veröffentlicht das Release.
