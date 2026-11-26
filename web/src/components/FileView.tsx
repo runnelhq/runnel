@@ -800,17 +800,23 @@ export function FileView(props: {
   // Opened from the palette, there is only × (decision for mockup E15c).
   const onHelpRequest = useCallback((r: HelpRequest) => setHelp({ type: r.type, kind: r.kind, back: false }), []);
   useHelpRequests(active && isGraph, onHelpRequest);
+  // The handler reads the latest state through a ref: re-registering it after each render
+  // left a gap in which F1 right after selecting a step still saw the old selection.
+  const f1State = useRef({ graphKind, selection, graph, panel, view });
+  f1State.current = { graphKind, selection, graph, panel, view };
   useEffect(() => {
-    if (!active || !graphKind) return;
+    if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "F1" || e.defaultPrevented) return;
+      const s = f1State.current;
+      if (!s.graphKind) return;
       e.preventDefault(); // instead of the help of the browser
-      const one = selection.actions.length === 1 ? graph?.actions?.find((a) => a.id === selection.actions[0]) : undefined;
-      if (one) setHelp({ type: one.type, kind: graphKind, back: panel && view === "canvas", step: one.id });
+      const one = s.selection.actions.length === 1 ? s.graph?.actions?.find((a) => a.id === s.selection.actions[0]) : undefined;
+      if (one) setHelp({ type: one.type, kind: s.graphKind, back: s.panel && s.view === "canvas", step: one.id });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, graphKind, selection, graph, panel, view]);
+  }, [active]);
 
   useEffect(() => {
     if (!toast) return;
