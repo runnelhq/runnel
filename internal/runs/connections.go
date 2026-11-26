@@ -314,6 +314,11 @@ func ActionScriptField(reg *action.Registry) func(typ, field string) bool {
 	return formatField(workflowSteps(&model.Workflow{}, reg).schema, schema.FormatScript)
 }
 
+// TransformScriptField is ActionScriptField for transforms (core.script, ADR 0028).
+func TransformScriptField(reg *transform.Registry) func(typ, field string) bool {
+	return formatField(pipelineSteps(&model.Pipeline{}, reg).schema, schema.FormatScript)
+}
+
 // TransformSQLField is ActionSQLField for transforms.
 func TransformSQLField(reg *transform.Registry) func(typ, field string) bool {
 	return formatField(pipelineSteps(&model.Pipeline{}, reg).schema, schema.FormatSQL)

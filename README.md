@@ -27,7 +27,8 @@ Noch vor Version 1.0 (Stand: Phase 0.5 abgeschlossen, siehe [Roadmap](docs/ROADM
   (`file.exists`, `file.wait`, `file.copy`, `file.move`, `file.delete`, `file.mkdir`, `file.list`, `file.read`, `file.write`) der Antwort an
   HTTP-Aufrufer (`http.response`) und JavaScript (`core.script`); Ausdrücke `{{ … }}`, `forEach`, Retry und Timeouts.
 - **Pipelines** mit CSV (`csv.input`, `csv.output`), Filtern, Umwandeln, Verteilen, Sortieren und Gruppieren,
-  Datensätzen von und zu Workflows sowie der Antwort an HTTP-Aufrufer (`http.response`).
+  Datensätzen von und zu Workflows, JavaScript je Datensatz (`core.script`) sowie der Antwort an HTTP-Aufrufer
+  (`http.response`).
 - **Editor** im Browser für Workflows und Pipelines, **Trigger** (Zeitplan, Intervall, Ordner, HTTP) und der Betrieb
   als **Windows-Dienst**.
 

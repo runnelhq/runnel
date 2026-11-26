@@ -20,21 +20,24 @@ type scalar struct {
 
 var simpleKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// CodeFields are the fields of action types that hold code of a script language and are
-// passed as written (ADR 0028): ${…} and {{ … }} in them are part of the code, e.g. a
-// template literal of JavaScript, not references or expressions.
-var CodeFields = map[string]string{"core.script": "script"}
+// CodeFields are the fields of action and transform types that hold code of a script
+// language and are passed as written (ADR 0028): ${…} and {{ … }} in them are part of
+// the code, e.g. a template literal of JavaScript, not references or expressions.
+var CodeFields = map[string][]string{"core.script": {"script", "init", "end"}}
 
-// codePaths returns the paths of the fields with code in the actions of a document.
+// codePaths returns the paths of the fields with code in the actions and transforms of
+// a document.
 func codePaths(body ast.Node) map[string]bool {
 	out := map[string]bool{}
-	for i, item := range seqValues(unwrap(valueOf(entries(body), "actions"))) {
-		typ, ok := unwrap(valueOf(entries(unwrap(item)), "type")).(*ast.StringNode)
-		if !ok {
-			continue
-		}
-		if field, ok := CodeFields[typ.Value]; ok {
-			out[fmt.Sprintf("$.actions[%d].with.%s", i, field)] = true
+	for _, list := range []string{"actions", "transforms"} {
+		for i, item := range seqValues(unwrap(valueOf(entries(body), list))) {
+			typ, ok := unwrap(valueOf(entries(unwrap(item)), "type")).(*ast.StringNode)
+			if !ok {
+				continue
+			}
+			for _, field := range CodeFields[typ.Value] {
+				out[fmt.Sprintf("$.%s[%d].with.%s", list, i, field)] = true
+			}
 		}
 	}
 	return out

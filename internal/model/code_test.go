@@ -34,3 +34,29 @@ actions:
 		t.Errorf("variables %v", names)
 	}
 }
+
+// In a pipeline, script, init and end of the transform core.script are code too (S73b).
+func TestCodeFieldsPipeline(t *testing.T) {
+	src := `kind: Pipeline
+apiVersion: runnel/v1
+name: js
+transforms:
+  - id: js
+    type: core.script
+    with:
+      params: { a: "${A}" }
+      init: "let x = ` + "`${y}`" + `"
+      script: "return ` + "`${params.a}`" + ` + '{{ not valid( }}'"
+      end: "return { t: '${Z}' }"
+`
+	if _, err := ReadPipeline("p.pipeline.yaml", []byte(src)); err != nil {
+		t.Fatal(err)
+	}
+	uses, _, err := ScanVariables("p.pipeline.yaml", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uses) != 1 || uses[0].Name != "A" {
+		t.Errorf("variables %v", uses)
+	}
+}

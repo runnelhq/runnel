@@ -1,0 +1,78 @@
+# Calculates gross amounts with JavaScript (core.script, S73b, ADR 0028). For example:
+#   runnel run examples/pipelines/pipelines/script.pipeline.yaml
+# - "read" reads the orders in German format: Betrag is a decimal number, Datum a date.
+# - "calc" runs its script for every record: decimal numbers come as text ("1234.50"),
+#   dates as "2026-11-19". The script returns a new record; "fields" converts its values
+#   to the declared types. init runs once before the first record, end once after the
+#   last one and adds a record with the totals. An order with an unknown value in
+#   Bezahlt throws an exception: it goes over the error link to "rejected".
+#   ${…} in the script is a template literal of JavaScript, not a variable of Runnel.
+# - "write" writes the records to out/orders-gross.csv.
+kind: Pipeline
+apiVersion: runnel/v1
+name: script
+parameters:
+  - name: RATE
+    description: VAT rate
+    type: number
+    default: "0.19"
+transforms:
+  - id: read
+    type: csv.input
+    with:
+      path: data/orders.csv
+      delimiter: ";"
+      fields:
+        - { name: Nr, type: int }
+        - { name: Kunde }
+        - { name: Betrag, type: decimal, format: "#.##0,00" }
+        - { name: Datum, type: date, format: dd.MM.yyyy }
+        - { name: Bezahlt }
+  - id: calc
+    type: core.script
+    with:
+      params:
+        rate: ${RATE}
+      fields:
+        - { name: order, type: int }
+        - { name: customer, type: string }
+        - { name: day, type: date }
+        - { name: net, type: decimal }
+        - { name: gross, type: decimal }
+        - { name: paid, type: bool }
+      init: |
+        let totalNet = 0;
+        let totalGross = 0;
+        const cents = x => Math.round(x * 100) / 100;
+      script: |
+        if (!['ja', 'nein'].includes(record.Bezahlt)) {
+          throw new Error(`order ${record.Nr}: unknown value "${record.Bezahlt}" in Bezahlt`);
+        }
+        const net = Number(record.Betrag);
+        const gross = cents(net * (1 + Number(params.rate)));
+        totalNet += net;
+        totalGross += gross;
+        return {
+          order: record.Nr,
+          customer: record.Kunde.trim(),
+          day: record.Datum,
+          net: record.Betrag,
+          gross: gross.toFixed(2),
+          paid: record.Bezahlt === 'ja',
+        };
+      end: |
+        console.log(`net ${cents(totalNet)}, gross ${cents(totalGross)}`);
+        return { customer: 'Total', net: cents(totalNet).toFixed(2), gross: cents(totalGross).toFixed(2) };
+  - id: write
+    type: csv.output
+    with:
+      path: out/orders-gross.csv
+  - id: rejected
+    type: core.log
+    with:
+      level: warn
+      fields: [Nr, _error]
+links:
+  - { from: read, to: calc }
+  - { from: calc, to: write }
+  - { from: calc, to: rejected, type: error }

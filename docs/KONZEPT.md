@@ -894,7 +894,7 @@ Drei Stufen – von einfach bis mächtig:
 
 Regeln: [ADR 0028](adr/0028-javascript-core-script.md).
 
-- Action `core.script` (Workflow, seit S73a) und Transform `core.script` (Pipeline, S73b) führen JS in **goja** aus
+- Action `core.script` (Workflow, seit S73a) und Transform `core.script` (Pipeline, seit S73b) führen JS in **goja** aus
   (`internal/script`). JavaScript gibt es nur hier; `{{ … }}`-Ausdrücke nutzen `expr-lang`
   ([ADR 0006](adr/0006-ausdruckssprache.md)). Faustregel: Ausdrücke für Werte und Bedingungen, `core.script` für
   Logik über mehrere Schritte (Schleifen, Zwischenwerte, verschachteltes JSON umbauen).
@@ -903,11 +903,23 @@ Regeln: [ADR 0028](adr/0028-javascript-core-script.md).
   und wird in Log, Fehlern und Ergebnis maskiert), `return` liefert `result.output`, `console.log`/`warn`/`error`
   schreiben ins Log des Laufs, eine Exception lässt die Action fehlschlagen (Meldung mit Zeile im Skript).
   Im Code sind `${…}` und `{{ … }}` nur Text (z. B. Template-Literale) und werden weder ersetzt noch geprüft.
+- Transform: derselbe Code (`script` oder `file`) läuft **je Datensatz** mit `record` (Felder in ihrer Reihenfolge)
+  und `params` (nur `${…}`, ein eigener Wert darf `${secret:…}` sein). Rückgabe: ein Objekt ist der neue Datensatz
+  (Felder in der Reihenfolge des Objekts), eine Liste von Objekten mehrere, `null`/`undefined` keiner. Eine Exception
+  oder eine Überschreitung von `maxRecordTime` (Standard 1 s) schickt den Datensatz unverändert auf den Fehler-Link
+  (`record 3: script, line 2: …`), ohne Fehler-Link endet die Pipeline. `init` läuft einmal vor dem ersten Datensatz
+  auf oberster Ebene (seine Variablen und Funktionen sehen `script` und `end`), `end` nach dem letzten und darf weitere
+  Datensätze zurückgeben (z. B. Summen). `fields: [{ name, type }]` wandelt die Werte in die Typen um (wie
+  `core.convert`) und ergibt ein geschlossenes Schema; nicht aufgeführte Eigenschaften entfallen mit einer Warnung.
+  Ohne `fields` folgen die Typen den Werten (ganze Zahl → `int`, `Date` → `datetime`, `Uint8Array` → `binary`, Objekt
+  oder Liste → `json`), das Schema ist offen. `copies` ist erlaubt, je Kopie eine eigene Laufzeit (globale Variablen
+  gelten je Kopie). Beispiel `examples/pipelines/pipelines/script.pipeline.yaml`.
 - Werte: Text, Zahlen, Boolean, Listen und Objekte wie in JSON; `decimal` und `date` kommen als Text (`"12.50"`),
   ganze Zahlen über ±2^53 als `BigInt`, Zeitpunkte als `Date`. Ganze Zahlen kommen als `int` zurück, andere als `float`.
 - Sandbox: kein Zugriff auf Dateisystem, Netzwerk, Prozesse und Umgebungsvariablen; `http`/`fs` im Skript gibt es in
   dieser Fassung nicht (ADR 0028). Zeitlimit über `timeout` der Action, Abbruch des Laufs unterbricht das Skript
-  sofort; höchstens 1.000 Zeilen `console.*` je Ausführung (je Zeile 8 KB), Rückgabewert höchstens 16 MiB als JSON.
+  sofort; höchstens 1.000 Zeilen `console.*` je Ausführung der Action bzw. je Lauf des Transforms (je Zeile 8 KB),
+  Rückgabewert höchstens 16 MiB als JSON.
   Speicher lässt sich nicht hart begrenzen.
 - Wiederverwendbare Skripte in `scripts/` werden über `require('./scripts/utils.js')` geladen: nur `.js`-Dateien in
   `scripts/` des Projekts (Pfad relativ zum Projekt, kein `..`, keine Links aus `scripts/` heraus, keine npm-Module),
@@ -1270,7 +1282,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 | Kategorie | Transforms |
 |---|---|
 | Eingabe | CSV, Excel (`excel.input`, seit S67a), JSON/NDJSON, XML (`xml.input`, seit S68a), Fixed-Width, Tabelleneingabe (SQL, `db.table-input` seit S20b), REST-Eingabe (mit Paging), Zeilen generieren, Dateiliste (`file.list`, seit S55: wie die gleichnamige Action, je Eintrag ein Datensatz mit `path`, `name`, `extension`, `size`, `modified`, `folder`) |
-| Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript, Konstante hinzufügen, Sequenz |
+| Transformation | Felder auswählen/umbenennen, Filter, Berechnen (Ausdruck), Wertzuordnung, Feld teilen, Typ konvertieren, String-Funktionen, Datum-Funktionen, JavaScript (`core.script`, seit S73b, Kap. 7.1), Konstante hinzufügen, Sequenz |
 | Fluss | Switch/Case, Kopieren/Verteilen, Anhängen (Append), Dummy, Blockieren bis fertig |
 | Ausführung | Mapping (`core.run-pipeline`: Datensätze strömen durch eine andere Pipeline, S56), Pipeline Executor, Workflow Executor ([ADR 0021](adr/0021-unter-pipelines.md)), In Ergebnis kopieren (`core.to-result`), Aus Ergebnis lesen (`core.from-result`) |
 | Kombination | Stream-Lookup (`core.stream-lookup`, seit S23b1), DB-Lookup (`db.lookup`, seit S23a), HTTP-Lookup, Merge-Join (`core.merge-join`, inner/left/full, seit S23c), Sortieren, Gruppieren/Aggregieren, Duplikate entfernen, Pivot/Unpivot |

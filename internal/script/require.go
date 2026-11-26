@@ -122,3 +122,20 @@ func uncatchable(err error) bool {
 	_, overflow := errors.AsType[*goja.StackOverflowError](err)
 	return interrupted || overflow
 }
+
+// ReadFile reads the script file at path (name as written, for messages), without a
+// byte order mark; a file is at most as large as a module.
+func ReadFile(path, name string) (string, error) {
+	info, err := os.Stat(path)
+	switch {
+	case err != nil || info.IsDir():
+		return "", fmt.Errorf("script file %s not found", name)
+	case info.Size() > maxModuleBytes:
+		return "", fmt.Errorf("script file %s is larger than %d MiB", name, maxModuleBytes>>20)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("cannot read script file %s", name)
+	}
+	return strings.TrimPrefix(string(data), "\uFEFF"), nil
+}

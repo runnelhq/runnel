@@ -48,7 +48,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, HTTP-Trigger mit eigenem Listener in `http.go` und Antworten in `respond.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt in `check.go` |
 | `internal/winsvc/` | Windows-Dienst: Installieren, Steuern, Ausführen, Ereignisanzeige (`*_windows.go`; sonst `ErrNotSupported`) |
 | `internal/proc/` | Programme starten für `shell.*` (ADR 0023): ohne Shell, Timeout mit Prozessbaum (Job Object/Prozessgruppe), Grenzen der Ausgabe, Kodierung, Prüfung von Batch-Argumenten |
-| `internal/script/` | JavaScript für `core.script` (ADR 0028) mit goja: Laufzeit ohne Zugriff auf den Rechner, Werte Go ↔ JS, `console.*` mit Grenzen, `require` nur aus `scripts/` des Projekts, Abbruch über den Kontext |
+| `internal/script/` | JavaScript für `core.script` (ADR 0028) mit goja: Laufzeit ohne Zugriff auf den Rechner, Werte Go ↔ JS, `console.*` mit Grenzen, `require` nur aus `scripts/` des Projekts, Abbruch über den Kontext, Sitzung für den Transform (`session.go`: Zeitlimit je Aufruf, Rückgabe als Datensätze) |
 | `internal/xlsx/` | Excel-Arbeitsmappen (`.xlsx`) lesen für `excel.input` (S67a): Blätter, Zeilen als Strom mit Zelltypen und Datumsformaten, Grenzen für entpackte Teile (Schreiben: `excel.output` mit `excelize`, S67b) |
 | `internal/textenc/` | Kodierung von Eingabedateien (UTF-8 mit/ohne BOM, UTF-16, Windows-1252) für `csv.input` und `json.input` |
 | `internal/logfile/` | Log-Datei mit Rotation nach Größe und mehreren alten Dateien (Dienst), Handler für das Server-Log im Format `text` oder `json` (S71) |

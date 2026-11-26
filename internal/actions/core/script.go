@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -50,29 +49,17 @@ func newScript(with map[string]any) (action.Action, error) {
 	return a, nil
 }
 
-// maxScriptBytes limits the size of a script file.
-const maxScriptBytes = 4 << 20
-
 func (a *scriptAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
 	if err := ctx.Err(); err != nil {
 		return action.Result{}, err
 	}
 	name, code := "script", a.Script
 	if a.File != "" {
+		var err error
 		name = filepath.ToSlash(a.File)
-		file := paths.Resolve(ctx, a.File)
-		info, err := os.Stat(file)
-		switch {
-		case err != nil || info.IsDir():
-			return action.Result{}, fmt.Errorf("script file %s not found", a.File)
-		case info.Size() > maxScriptBytes:
-			return action.Result{}, fmt.Errorf("script file %s is larger than %d MiB", a.File, maxScriptBytes>>20)
+		if code, err = script.ReadFile(paths.Resolve(ctx, a.File), a.File); err != nil {
+			return action.Result{}, err
 		}
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return action.Result{}, fmt.Errorf("cannot read script file %s", a.File)
-		}
-		code = strings.TrimPrefix(string(data), "\uFEFF")
 	}
 	rt := script.New(script.Options{Dir: paths.Base(ctx), Log: ec.Log})
 	fn, err := rt.Compile(name, code, "params")

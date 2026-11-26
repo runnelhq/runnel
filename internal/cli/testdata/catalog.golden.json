@@ -1937,6 +1937,91 @@
       "example": "left: orders\nright: customers\nkeys:\n  - { left: customerId, right: id }\njoin: left\n"
     },
     {
+      "type": "core.script",
+      "kind": "transform",
+      "category": "transform",
+      "label": "Script",
+      "description": "Runs JavaScript for every record: return a new record, several or none",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "JavaScript run for every record, the body of a function: record holds its fields, params the values; return an object (the new record), a list of objects (several records) or null (none); ${…} and {{ … }} in it are plain text",
+            "format": "runnel-script"
+          },
+          "file": {
+            "type": "string",
+            "description": "A .js file instead of script, relative to the project folder, e.g. scripts/clean.js",
+            "format": "runnel-script"
+          },
+          "init": {
+            "type": "string",
+            "description": "JavaScript run once before the first record, e.g. let count = 0; its variables and functions are seen by script and end",
+            "format": "runnel-script"
+          },
+          "end": {
+            "type": "string",
+            "description": "JavaScript run once after the last record, the body of a function: return an object or a list of objects for further records, e.g. a total",
+            "format": "runnel-script"
+          },
+          "params": {
+            "type": "object",
+            "description": "Values for the script as params.NAME; may use ${…}, a value of its own may be ${secret:…}",
+            "format": "runnel-params",
+            "additionalProperties": {}
+          },
+          "fields": {
+            "type": "array",
+            "description": "Fields of the returned records with their type, in this order: each value is converted to the type, other properties are dropped; without fields the types follow the values",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the field",
+                  "examples": [
+                    "amount"
+                  ]
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type of the field; a returned value is converted to it",
+                  "enum": [
+                    "string",
+                    "int",
+                    "decimal",
+                    "float",
+                    "bool",
+                    "date",
+                    "datetime",
+                    "binary",
+                    "json"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "maxRecordTime": {
+            "type": "string",
+            "description": "Longest time the script may take for one record; a record that takes longer goes to the error link",
+            "format": "runnel-duration",
+            "default": "1s"
+          }
+        },
+        "additionalProperties": false
+      },
+      "example": "fields:\n  - { name: name, type: string }\n  - { name: amount, type: decimal }\nscript: |\n  if (!record.name) return null; // drop the record\n  return { name: record.name.trim(), amount: record.amount };\n",
+      "recordErrors": true,
+      "parallel": true
+    },
+    {
       "type": "core.select-fields",
       "kind": "transform",
       "category": "transform",

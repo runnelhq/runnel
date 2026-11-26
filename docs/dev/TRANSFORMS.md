@@ -107,6 +107,7 @@ func TestUpper(t *testing.T) {
 - **`transformtest.Run`** gibt Records in einen Transform und liefert die ausgegebenen Records, Log und Fehler.
 - **Vertragstest** (`internal/transforms/transforms_test.go`) läuft für jeden Transform: Kategorie, Texte, Beschreibungen
   aller Felder, unbekannte Felder werden abgelehnt, Beispielkonfiguration aus dem Schema wird angenommen, Abbruch.
+  Felder, die sich gegenseitig ausschließen (z. B. `script` und `file` von `core.script`), stehen in `leaveOut`.
 - Zusammenspiel mehrerer Transforms über die Engine: Tests in `internal/engine/pipeline`, Beispiele unter `examples/`.
 - Golden-Dateien des Katalogs mit `go test ./internal/cli -update` neu erzeugen und den Diff prüfen.
 
