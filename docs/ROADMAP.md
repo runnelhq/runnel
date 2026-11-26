@@ -187,11 +187,32 @@ ansprechbar, auch als kleiner Dienst mit Antwort aus Workflow oder Pipeline. Der
 | S73c ✅ | JavaScript: Editor | Code-Feld mit Hervorhebung (`@codemirror/lang-javascript` 6.2.5) und Vervollständigung für `record`, `params`, `console` und Felder (`components/ScriptInput.tsx`): `script` der Action, `script`, `init` und `end` des Transforms; nach `record.` die Felder des eingehenden Schemas, nach `params.` die Schlüssel aus `params`, `console.log`/`info`/`warn`/`error`, Dateien unter `scripts/` in `require('…')`; Zeilennummern, wächst bis zu einer Höchsthöhe; Tab rückt ein, Esc und Tab verlassen das Feld; Syntaxfehler (jetzt auch der Action) am Feld und an der Zeile | Playwright `web/e2e/script.spec.ts`; im Editor `examples/hello/workflows/script.workflow.yaml` öffnen, `total` wählen, `params.` tippen |
 | S53 | MCP-Server (vormals S11a) | `runnel mcp` (stdio): Workflows eines Projekts als MCP-Tools; Eingabe-Schema aus `parameters`, Ergebnis aus `outputs`, Log als Fortschrittsmeldungen ([ADR 0012](adr/0012-ki-faehigkeit.md)) | MCP Inspector; Claude Desktop/Claude Code ruft `examples/hello` auf |
 
+## Phase 1.0 – Stabilisierung
+
+Vor dem ersten stabilen Release: Zusagen nach [ADR 0029](adr/0029-stabilitaet-versionen.md) festlegen und prüfbar
+machen, letzte Durchsicht, Release Candidate. Die Schritte haben eine eigene Reihe `R1`, `R2` … (Release).
+
+| Nr. | Schritt | Inhalt | Prüfen |
+|---|---|---|---|
+| R1 ✅ | Stabilität und Versionen | [ADR 0029](adr/0029-stabilitaet-versionen.md) ([#266](https://github.com/runnelhq/runnel/pull/266)): SemVer ab `v1.0.0`, was zugesagt ist, was eine Minor-Version darf, Abkündigen, öffentliche und interne HTTP-API | ADR-PR |
+| R2 ✅ | Öffentliche und interne API | `docs/dev/API.md` kennzeichnet jeden Endpunkt als öffentlich oder intern (ADR 0029, Abschnitt 5) | Doku |
+| R3 ✅ | Changelog und PR-Vorlage | `CHANGELOG.md` mit „Neu“, „Behoben“, „Abgekündigt“, „Bruch“ und „Unveröffentlicht“; `.github/pull_request_template.md` mit den üblichen Abschnitten und „Stabilität (ADR 0029)“; Pflicht zum Eintrag in AGENTS.md und CONTRIBUTING.md | Doku |
+| R4 | Abkündigen und Vertragstest | Dauerhafter Mechanismus für umbenannte und abgekündigte Felder in den Definitionen von Actions und Transforms (wie `Renamed` aus ADR 0025): altes Feld weiter angenommen, Warnung mit Position und Ersatz, beide Felder zusammen ein Fehler; `deprecated` im Katalog und in `runnel catalog <typ>`. Basis der Golden-Dateien (Katalog, Ausdrücke, Schemas der Dateiarten) und Test, dass keine Pfade, Typen, Auswahlwerte oder Standardwerte verloren gehen | Go-Tests mit Test-Definitionen; `make test` |
+| R5 | Namen und Standardwerte durchsehen | Letzte Durchsicht aller Feldnamen, Werte und Standardwerte vor dem Release Candidate (Qualitäts-PR, ADR 0029 „Konsequenzen“) | Review |
+| S39d | Lokaler Secret-Store (aus dem Backlog) | Quelle `local` je Projekt außerhalb des Projektordners (AES-256-GCM, Schlüssel per DPAPI bzw. `RUNNEL_MASTER_KEY`), `runnel secret set/list/delete/missing` mit `--from-file`, `--service` ([ADR 0022](adr/0022-connections-secrets.md)) | Go-Tests; manuell unter Windows (DPAPI, Dienst) |
+| R6 | Instabile Tests beheben | Tests, die in der CI gelegentlich scheitern, zuverlässig machen | CI mehrfach grün |
+| R7 | Release Candidate `v0.1.0-rc.1` | Release Candidate mit CHANGELOG; manueller Test unter Windows nach [TESTPLAN](TESTPLAN.md): W9–W15, W17, W18, W20–W27, W68–W70 | Testplan, Eintrag im Verlauf des Testplans |
+
+> **Noch offen:** ob der MCP-Server (S53) zu 1.0 gehört, und das Signieren von `runnel.exe` (Code-Signing, TESTPLAN
+> K9). Beides entscheidet der Maintainer vor dem Release Candidate.
+
 ---
 
 ## Backlog
 
 Werden bei Bedarf als eigener Schritt (je ein PR) eingeplant. Reihenfolge ist offen.
+
+> S39d (lokaler Secret-Store) ist seit 2026-11-26 in [Phase 1.0](#phase-10--stabilisierung) eingeplant.
 
 ### Zurückgestellt (Tiefe vor Breite)
 
@@ -212,7 +233,6 @@ Nummer und ihren Inhalt; Abhängigkeiten sind angegeben.
 | S17 (Teil) | `maxErrors` | Schwelle für Fehler-Links: mehr als n fehlerhafte Datensätze brechen die Pipeline ab | S17a |
 | S39a ✅ | Secrets mit der Quelle `env` | `${secret:[quelle/]NAME}` nur in Feldern mit `format: runnel-secret` und als Token von HTTP-Triggern; Standardquelle `secretStore:` im Environment bzw. in `project.yaml`, sonst `local`; eingebaute Quelle `env` (Umgebungsvariablen), `local`/`shared` mit Meldung „not available yet“; fehlendes Secret verhindert den Start (Meldung ohne Wert); Maskierung (`***`) in Log, Fehlern, Ereignissen, Ergebnissen und Datenvorschau ([ADR 0022](adr/0022-connections-secrets.md), Nachtrag S39a) | Go-Tests; HTTP-Trigger mit `token: ${secret:env/NAME}`, `runnel validate` meldet `${secret:…}` in einem gewöhnlichen Feld |
 | S39a2 ✅ | Secrets im Klartext (`inline`) | Eingebaute Quelle `inline`: `secrets:` im Environment bzw. in `project.yaml`, gelesen wie jedes Secret (nur in Secret-Feldern, maskiert); `validate` und Editor warnen bei Klartext; für Entwicklung und einfache APIs ([ADR 0022](adr/0022-connections-secrets.md), Nachtrag S39a2) | Go-Tests; `secretStore: inline` mit `secrets:` in `environments/dev.yaml`, HTTP-Trigger mit `${secret:…}`; Beispiel `examples/http` (Trigger `release` mit Token) |
-| S39d | Lokaler Secret-Store | Quelle `local` je Projekt außerhalb des Projektordners (AES-256-GCM, Schlüssel per DPAPI bzw. `RUNNEL_MASTER_KEY`), `runnel secret set/list/delete/missing` mit `--from-file`, `--service` ([ADR 0022](adr/0022-connections-secrets.md)) | S39a |
 | S39e | Gemeinsamer Store und Pflege | Quelle `shared`, `runnel secret export/import`, Ablaufdatum (`--expires`), `move` für verschobene Projekte, Secret-Quellen als Datei (`kind: SecretStore`) | S39d |
 | S39f | Mockup: Secrets im Editor | Felder mit `format: runnel-secret` im Eigenschafts-Panel: zeigt nur die Referenz (`${secret:…}`), schlägt Namen vor, warnt vor Klartext; Übersicht der Secrets je Environment (genutzt, vorhanden in der Quelle des Environments, fehlend; wie `runnel secret missing`) neben den Variablen (E18); Secrets setzen und löschen (nie anzeigen), Hinweis auf bald ablaufende | S39d |
 | S39g | Secrets im Editor | Umsetzung nach freigegebenem Mockup S39f; API zum Setzen und Löschen (`PUT`/`DELETE /secrets/{name}`, `GET /secrets` nur mit Namen), im Netzbetrieb standardmäßig aus ([ADR 0022](adr/0022-connections-secrets.md)) | S39f |

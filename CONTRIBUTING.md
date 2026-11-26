@@ -19,8 +19,11 @@ Danke für dein Interesse! Diese Seite beschreibt, wie Beiträge ablaufen. **Die
 4. **Prüfen:** `make lint` (Linux- und Windows-Code) und `make test` (Race-Detector); bei Änderungen am Editor
    `npm run typecheck` und die betroffenen Playwright-Tests in `web/` (oder `make e2e`); bei Parsern `make fuzz`, bei
    Pfaden unter Last `make bench`.
-5. **Pull Request** nach `main`, Titel und Beschreibung deutsch: Zusammenfassung, Änderungen, Entscheidungen fürs Review,
-   „Prüfen“ (wie man das Ergebnis selbst ausprobiert).
+5. **Pull Request** nach `main`, Titel und Beschreibung deutsch nach der Vorlage
+   ([.github/pull_request_template.md](.github/pull_request_template.md)): Art, Inhalt, Golden-Dateien, Tests,
+   Leistung, Sicherheit, Stabilität (ADR 0029), „Prüfen“ (wie man das Ergebnis selbst ausprobiert), Abhängigkeiten,
+   Umfang. Für Anwender sichtbare Änderungen bekommen im selben PR einen Eintrag in [CHANGELOG.md](CHANGELOG.md)
+   unter „Unveröffentlicht“.
 6. Die CI prüft Lint (Linux und Windows), Schwachstellen, Tests unter Linux und Windows, den Editor (Typprüfung,
    Playwright) sowie Build und Packen. Gemergt wird, wenn die CI grün ist und das Review abgeschlossen ist.
 
