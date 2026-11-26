@@ -193,6 +193,13 @@ func (q *ErrorQueue) Add(f Failure) {
 	}
 }
 
+// Len returns the number of failures waiting for their error workflow.
+func (q *ErrorQueue) Len() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.waiting)
+}
+
 func (q *ErrorQueue) loop(f Failure) {
 	for {
 		q.run(f)

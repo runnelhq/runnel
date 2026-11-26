@@ -1,0 +1,32 @@
+$ runnel health  # ok
+Status:   ok
+Server:   runnel v1.2.3, up 2h3m4s (since 2026-11-26T08:00:00+01:00)
+Project:  flows (D:\flows)
+Checks:
+  ok        scheduler    running, 2 of 3 triggers active
+  ok        triggers     all trigger files loaded
+  ok        runs         0 running
+Last failed run: 01JD workflows/import.workflow.yaml (cron:nightly) at 2026-11-26T09:30:00+01:00
+  boom
+$ runnel health  # degraded
+Status:   degraded
+Server:   runnel v1.2.3, up 2h3m4s (since 2026-11-26T08:00:00+01:00)
+Project:  flows (D:\flows)
+Checks:
+  ok        scheduler    running, 2 of 3 triggers active
+  degraded  triggers     1 trigger file with errors, not loaded: triggers/bad.yaml
+  ok        runs         0 running
+  triggers/bad.yaml:4:9: error: target workflows/x.workflow.yaml does not exist
+Last failed run: 01JD workflows/import.workflow.yaml (cron:nightly) at 2026-11-26T09:30:00+01:00
+  boom
+$ runnel health  # fail
+Status:   fail
+Server:   runnel v1.2.3, up 2h3m4s (since 2026-11-26T08:00:00+01:00)
+Project:  flows (D:\flows)
+Checks:
+  fail      scheduler    the scheduler of the triggers is not running
+  degraded  triggers     1 trigger file with errors, not loaded: triggers/bad.yaml
+  ok        runs         0 running
+  triggers/bad.yaml:4:9: error: target workflows/x.workflow.yaml does not exist
+Last failed run: 01JD workflows/import.workflow.yaml (cron:nightly) at 2026-11-26T09:30:00+01:00
+  boom

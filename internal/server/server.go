@@ -85,6 +85,18 @@ type Server struct {
 	pruneOnce            sync.Once
 	// onError runs the error workflows of failed runs one at a time (ADR 0027).
 	onError *runs.ErrorQueue
+
+	// For GET /health (S43a): the start, the project name, the listener of http
+	// triggers, why the history could not be opened, the folder whose disk is watched.
+	started       time.Time
+	projectName   string
+	triggerListen string
+	triggerTLS    *tls.Config
+	historyErr    string
+	dataDir       string
+	// now and diskFree are replaced by tests.
+	now      func() time.Time
+	diskFree func(dir string) (free, total uint64, err error)
 }
 
 // New opens the project directory. Close releases it.
@@ -105,13 +117,18 @@ func New(opts Options) (*Server, error) {
 		warn = func(string) {}
 	}
 	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
-		stop: make(chan struct{}), warn: warn, info: opts.Log}
+		stop: make(chan struct{}), warn: warn, info: opts.Log,
+		started: time.Now(), triggerListen: opts.TriggerListen, triggerTLS: opts.TriggerTLS, now: time.Now, diskFree: diskFree}
+	if p, err := model.LoadProject(opts.Dir); err == nil {
+		s.projectName = p.Name
+	}
 	if s.info == nil {
 		s.info = func(string) {}
 	}
 	if opts.HistoryDir != "" {
 		s.openHistory(opts.HistoryDir, opts.Log)
 	}
+	s.dataDir = dataDir(opts.HistoryDir, opts.Dir)
 	if opts.Logger != nil {
 		s.runs.OnEnd(func(r runs.Run) { logRun(opts.Logger, r) })
 	}
@@ -172,6 +189,7 @@ func (s *Server) openHistory(base string, log func(string)) {
 		s.history, err = history.Open(context.Background(), dir)
 	}
 	if err != nil {
+		s.historyErr = err.Error()
 		s.warn(fmt.Sprintf("the run history is off, runs are kept in memory only: %v", err))
 		return
 	}
@@ -261,6 +279,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST "+APIPrefix+"/plugins/{name}/untrust", s.handleUntrustPlugin)
 	mux.HandleFunc("POST "+APIPrefix+"/plugins/{name}/reload", s.handleReloadPlugin)
 	mux.HandleFunc("GET "+APIPrefix+"/version", handleVersion)
+	mux.HandleFunc("GET "+APIPrefix+"/health", s.handleHealth)
 	mux.HandleFunc("/", s.handleUI)
 	mux.HandleFunc(APIPrefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown endpoint %s %s", r.Method, r.URL.Path))

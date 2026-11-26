@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -137,6 +138,10 @@ type Manager struct {
 	onEnd func(Run)
 	// onFailed receives each failed run with an error workflow (ADR 0027).
 	onFailed func(Failure)
+	// lastFailed is the last run that failed and byTrigger the status of the last ended
+	// run of each trigger, since the start (GET /health, S43a).
+	lastFailed *Run
+	byTrigger  map[string]workflow.Status
 }
 
 type entry struct {
@@ -513,6 +518,17 @@ const (
 // m.mu must be held.
 func (m *Manager) ended(e *entry) bool {
 	close(e.done)
+	if e.run.Trigger != "" {
+		if m.byTrigger == nil {
+			m.byTrigger = map[string]workflow.Status{}
+		}
+		m.byTrigger[e.run.Trigger] = e.run.Status
+	}
+	if e.run.Status == workflow.Failed {
+		r := e.run
+		r.Params, r.Outputs, r.LinkRows = nil, nil, nil
+		m.lastFailed = &r
+	}
 	drop := e.history == HistoryNone || (e.history == HistoryErrors && e.run.Status == workflow.Succeeded)
 	if m.recording(e) {
 		m.rec.send(recOp{kind: recEnd, run: snapshot(e), hash: e.hash, nodes: copyActions(e), del: drop})
@@ -795,6 +811,35 @@ func (m *Manager) Running() int {
 		}
 	}
 	return n
+}
+
+// Health summarizes the runs for GET /health (S43a), from memory only.
+type Health struct {
+	// Running is the number of running runs.
+	Running int
+	// LastFailed is the last run that failed since the start; nil: none.
+	LastFailed *Run
+	// Triggers is the status of the last ended run of each trigger ("cron:nightly").
+	Triggers map[string]workflow.Status
+	// HistoryError is the error of the last write to the run history; empty if it
+	// worked or there is no history.
+	HistoryError string
+}
+
+// Health returns the summary of the runs.
+func (m *Manager) Health() Health {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	h := Health{LastFailed: m.lastFailed, Triggers: maps.Clone(m.byTrigger)}
+	for _, e := range m.runs {
+		if e.run.Status == StatusRunning {
+			h.Running++
+		}
+	}
+	if m.rec != nil {
+		h.HistoryError = m.rec.lastError()
+	}
+	return h
 }
 
 // Drain stops starting runs (Start returns ErrShutdown) and waits until the running

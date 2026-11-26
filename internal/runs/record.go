@@ -25,7 +25,8 @@ type historyWriter struct {
 	done  chan struct{}
 
 	mu      sync.Mutex
-	dropped bool // the queue was full; reported once
+	dropped bool   // the queue was full; reported once
+	failing string // error of the last write; empty once a batch was written (GET /health)
 }
 
 // Size of the queue of the historyWriter; when it is full, entries are dropped (the run
@@ -165,6 +166,7 @@ func (r *historyWriter) write(ctx context.Context, st *writerState, batch []recO
 		}
 		return nil
 	})
+	r.setError(err)
 	if err != nil {
 		r.report(st, err)
 		for _, op := range batch {
@@ -236,6 +238,7 @@ func (r *historyWriter) report(st *writerState, err error) {
 	if err == nil {
 		return
 	}
+	r.setError(err)
 	now := time.Now()
 	if !st.lastWarn.IsZero() && now.Sub(st.lastWarn) < time.Minute {
 		st.suppressed++
@@ -247,6 +250,23 @@ func (r *historyWriter) report(st *writerState, err error) {
 	}
 	st.lastWarn, st.suppressed = now, 0
 	r.warn(msg)
+}
+
+// setError keeps the error of a write for lastError; nil clears it.
+func (r *historyWriter) setError(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.failing = ""
+	if err != nil {
+		r.failing = err.Error()
+	}
+}
+
+// lastError returns the error of the last write; empty if it worked.
+func (r *historyWriter) lastError() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.failing
 }
 
 func putRun(ctx context.Context, tx *history.Tx, op recOp) error {
