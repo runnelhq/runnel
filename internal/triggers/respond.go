@@ -73,20 +73,21 @@ func (h *httpTriggers) answer(w http.ResponseWriter, r *http.Request, e *entry, 
 	s := h.s
 	box := newAnswerBox()
 	start.Respond = box.respond
-	id, herr := h.start(e, start)
+	run, herr := h.start(e, start)
 	if herr != nil {
 		box.close()
 		herr.write(w)
 		return
 	}
+	id := run.ID
 	w.Header().Set("Runnel-Run-Id", id)
 	timeout := e.t.ResponseTimeout()
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	ended := make(chan Outcome, 1)
-	if s.opts.Wait != nil {
+	if run.Wait != nil {
 		go func() {
-			if out, ok := s.opts.Wait(ctx, id); ok && out.Status != "running" {
+			if out, ok := run.Wait(ctx); ok && out.Status != "running" {
 				ended <- out
 			}
 		}()

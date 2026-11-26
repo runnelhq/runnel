@@ -67,6 +67,43 @@ func TestHistory(t *testing.T) {
 	}
 }
 
+// WaitLaunched returns the state of a launched run even when it has already ended and
+// its history dropped it from memory, where Wait by id no longer finds it: runnel run
+// reported such a run as failed (exit code 1) when it ended before Wait was called.
+func TestWaitLaunchedAfterDrop(t *testing.T) {
+	m := NewManager()
+	defer func() { _ = m.Shutdown(context.Background()) }()
+	for _, history := range []string{HistoryErrors, HistoryNone} {
+		s := spec(waitBody)
+		s.Params = map[string]string{"DELAY": "0s"}
+		pend, _, err := m.PrepareRun("workflows/a.workflow.yaml", s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pend.History = history
+		if _, ok := m.WaitLaunched(context.Background(), pend); ok {
+			t.Errorf("%s: WaitLaunched before Launch", history)
+		}
+		if _, err := m.Launch(pend); err != nil {
+			t.Fatal(err)
+		}
+		for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+			if _, ok := get(m, pend.ID()); !ok {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("%s: a run that succeeded is kept", history)
+			}
+		}
+		if _, ok := m.Wait(context.Background(), pend.ID()); ok {
+			t.Errorf("%s: Wait by id found a dropped run", history)
+		}
+		if d, ok := m.WaitLaunched(context.Background(), pend); !ok || d.Status != "succeeded" || len(d.Log) == 0 {
+			t.Errorf("%s: WaitLaunched %v %+v", history, ok, d.Run)
+		}
+	}
+}
+
 // Runs of http triggers have their own limit, so that they do not push out others.
 func TestHTTPRunLimit(t *testing.T) {
 	m := NewManager()

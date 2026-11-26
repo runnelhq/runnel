@@ -38,6 +38,12 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 ### Behoben
 
 - Lauf-IDs sind monoton, auch in derselben Millisekunde.
+- `runnel run` meldet einen erfolgreichen Lauf mit `--history errors` oder `none` (bzw. `settings.history.cli`)
+  nicht mehr gelegentlich als fehlgeschlagen (Exit-Code 1, mit Start des Fehler-Workflows), wenn er sehr schnell endet.
+- HTTP-Trigger mit `response: run` und `history: errors` oder `none` antworten bei einem sehr schnell beendeten Lauf
+  ohne `http.response` nicht mehr gelegentlich erst nach dem Timeout mit 504, sondern mit der Antwort des Laufs.
+- `GET /api/v1/runs?status=…` und die Zahl laufender Läufe im Editor zählen einen gerade beendeten Lauf nicht mehr
+  als laufend, solange die Run-Historie noch nicht geschrieben ist.
 - Kodierung einer Datei bleibt beim Speichern im Editor erhalten; Standardwerte in Variablen.
 - Exakte Zahlen und Datumswerte in Body, Params und Rows; `transform.init` schickt leere Listen als `[]`.
 - Mehrere Fehler im Editor: Umbenennen und Einfügen von Transforms ändern alle Ziele, `core.filter` mit `else`,

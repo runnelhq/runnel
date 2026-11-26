@@ -260,6 +260,8 @@ type Pending struct {
 	hash    string
 	onError string
 	start   func(context.Context)
+	// e is the run's entry once Launch has registered it (WaitLaunched).
+	e *entry
 }
 
 // ID returns the id of the run.
@@ -389,6 +391,7 @@ func (m *Manager) add(p *Pending) (Run, error) {
 	}
 	m.runs[id] = e
 	m.order = append(m.order, id)
+	p.e = e
 	m.prune()
 	if m.recording(e) {
 		m.rec.send(recOp{kind: recRun, run: snapshot(e), hash: e.hash})
@@ -680,8 +683,13 @@ func (m *Manager) Find(ctx context.Context, f history.Filter) ([]Run, error) {
 	f.Limit = min(f.Limit, MaxList)
 	m.mu.Lock()
 	out := make([]Run, 0, len(m.order))
+	// The state in memory is the current one; the history may lag behind (it is written
+	// in the background), e.g. still "running" for a run that has just ended. So a run in
+	// memory is never taken from the history, whether or not it matches f.
+	inMemory := make(map[string]bool, len(m.order))
 	for _, id := range slices.Backward(m.order) {
 		r := m.runs[id].run
+		inMemory[id] = true
 		if matches(r, f) {
 			r.LinkRows = slices.Clone(r.LinkRows)
 			out = append(out, r)
@@ -701,6 +709,9 @@ func (m *Manager) Find(ctx context.Context, f history.Filter) ([]Run, error) {
 	}
 	runs := make([]Run, 0, len(stored))
 	for _, h := range stored {
+		if inMemory[h.ID] {
+			continue
+		}
 		r, err := fromHistory(h)
 		if err != nil {
 			return out, err
@@ -753,7 +764,8 @@ func detailOf(e *entry) Detail {
 
 // Wait waits until a run has ended or ctx is done and returns its state; false if
 // there is no such run. It also returns the state of a run that history drops when it
-// ends, if it was running when Wait was called.
+// ends, if it was running when Wait was called; a caller that started the run uses
+// WaitLaunched, which cannot miss it.
 func (m *Manager) Wait(ctx context.Context, id string) (Detail, bool) {
 	m.mu.Lock()
 	e := m.runs[id]
@@ -761,13 +773,32 @@ func (m *Manager) Wait(ctx context.Context, id string) (Detail, bool) {
 	if e == nil {
 		return Detail{}, false
 	}
+	return m.waitEntry(ctx, e), true
+}
+
+// WaitLaunched waits like Wait for the run that Launch started from p, and returns its
+// state even if the run has already ended and its history (errors, none) dropped it from
+// memory: unlike Wait by id, it cannot miss a run that ends before it is called. False
+// if p was not launched.
+func (m *Manager) WaitLaunched(ctx context.Context, p *Pending) (Detail, bool) {
+	m.mu.Lock()
+	e := p.e
+	m.mu.Unlock()
+	if e == nil {
+		return Detail{}, false
+	}
+	return m.waitEntry(ctx, e), true
+}
+
+// waitEntry waits until the run of e has ended or ctx is done and returns its state.
+func (m *Manager) waitEntry(ctx context.Context, e *entry) Detail {
 	select {
 	case <-e.done:
 	case <-ctx.Done():
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return detailOf(e), true
+	return detailOf(e)
 }
 
 // IsRunning reports whether a run is running, without copying its state like Get.

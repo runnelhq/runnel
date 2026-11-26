@@ -54,7 +54,11 @@ for (const enc of encodings) {
     await open(page);
     await expect(page.getByTestId("file-summary")).toContainText(enc.label);
     await typeAfterName(page, "-ä");
+    // Saved within the typing pause, before the tab shows "●": its absence alone does not
+    // mean the save is done, so wait for the answer to the save.
+    const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith(fileURL));
     await page.keyboard.press("Control+s");
+    expect((await saved).ok()).toBe(true);
     await expect(page.getByRole("tab", { name: /encoded\.workflow\.yaml/ })).not.toContainText("●");
     expectBytes(Buffer.from(await (await request.get(fileURL)).body()), enc.bytes(text("encoded-ä")), enc.label);
   });
