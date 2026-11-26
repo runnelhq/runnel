@@ -32,11 +32,21 @@ zwischen hellem und dunklem Modus und den Zuständen (sie gehört nicht zum Entw
 | [`s26d-runs.html`](s26d-runs.html) | S26d – Liste der Läufe im Editor | `list`, `filter`, `run`, `changed`, `empty` | freigegeben mit PR #213; `list`, `filter` und `empty` umgesetzt mit S26e1, `run` und `changed` mit S26e2 |
 | [`s52-plugins.html`](s52-plugins.html) | S52 – Plugins im Editor | `plugin`, `untrusted`, `trust`, `changed`, `error`, `canvas` | freigegeben mit PR #227; Server mit S52a, `plugin`, `untrusted`, `trust`, `changed` und `error` umgesetzt mit S52b1, `canvas` mit S52b2 |
 | [`e22-split-link.html`](e22-split-link.html) | E22 – Link teilen: Schritt zwischen zwei Schritte einfügen | `drag`, `menu`, `inserted`, `pipeline`, `blocked` | freigegeben mit PR #239, umgesetzt mit E22 |
+| [`e15-help.html`](e15-help.html) | E15c – Hilfe je Baustein im Editor | `open`, `action`, `transform`, `plugin` | zur Freigabe (Umsetzung mit E15d) |
 
 ## Entscheidungen
 
 | Mockup | Entscheidung |
 |---|---|
+| E15c | Zustände: `open` zeigt die Wege zur Hilfe (Palette: „?“ an der Kachel unter der Maus oder im Fokus, Tooltip wie bisher mit Hinweis „? or F1 for help“; Panel: „?“ neben dem Typ, der Abschnitt „Help“ wird zur Zeile „Open help“). `action` zeigt die Hilfe von `file.list` (Action, aus der Palette geöffnet) bis zum Ende gescrollt: Output, Errors, Limits mit Link zum Transform, Example mit „Copy example“. `transform` zeigt `core.group-by` (aus dem Panel geöffnet) von oben: Kopf, Badges, Felder mit der verschachtelten Liste `aggregates`, „Fields set“. `plugin` zeigt `iban.check` aus dem Plugin `iban` ohne die neuen Schlüssel |
+| E15c | **Anzeige als breites Panel rechts an Stelle des Eigenschaften-Panels** (600 px statt 320 px), nicht als Tab unten oder Dialog: Der untere Bereich ist für Tabellen mit Beschreibungen zu niedrig (Problems/Log, ca. 170 px); ein Dialog verdeckt den Canvas und den gewählten Schritt, die man beim Lesen oft braucht. Rechts ist der Ort, an dem man den Schritt konfiguriert; der Canvas bleibt sichtbar und bedienbar. Aus dem Panel geöffnet führt „‹ Properties“ zurück (auch Esc), × schließt die Hilfe; aus der Palette geöffnet gibt es nur × |
+| E15c | **Öffnen:** „?“ an der Kachel der Palette (erscheint bei Maus oder Tastaturfokus, wie die Knöpfe im Explorer), „?“ neben dem Typ im Kopf des Panels und F1 (für den gewählten Schritt oder die Kachel im Fokus). Der Abschnitt „Help“ aus E14 (Beispiel, „Show in YAML“, „Copy example“) wird zur Zeile „Open help“; Beispiel und Knöpfe stehen jetzt in der Hilfe. Kein eigenes Kontextmenü der Palette dafür |
+| E15c | **Inhalt** nur aus dem Descriptor (E15b), in fester Reihenfolge: Kopf (Kachel, Label, Typ), Badges (Action/Transform, Kategorie, „Built-in · Version“ oder „Plugin name version“, „Error link for records“ bei `recordErrors`), Beschreibung, Fields, Output (Action, Pfade in `result.output`) bzw. Fields set (Transform, `<…>` für Namen aus der Konfiguration), Records (nur Transforms), Errors, Limits, Example. Leere Abschnitte entfallen samt Eintrag in der Leiste |
+| E15c | **Felder als Tabelle** (Name, Type, Default, Description): Pflicht mit `*` und „required“ unter dem Namen, erlaubte Werte als Chips unter der Beschreibung (Standardwert umrandet), Beispiel „e.g. …“, Bedingungen aus `x-runnel-only` als „Only with function: concat“. Unterfelder von Listen und Objekten (`aggregates[]`, `paginate.*`) als eingerückte Zeilen mit └ direkt unter dem Elternfeld; Typen lesbar („list of objects“, „list of fields“, „field“, „connection“) statt JSON-Schema-Begriffen |
+| E15c | Eine Leiste mit den Abschnitten (mit Anzahl) springt zum Abschnitt und bleibt beim Scrollen oben stehen; sobald der Kopf verschwunden ist, zeigt sie links Kachel und Label. Gibt es denselben Typ als Action und als Transform (z. B. `file.list`, `http.response`, `core.log`), wechselt rechts in der Leiste „Action / Transform“ zur anderen Hilfe (A+T wie auf der Website) |
+| E15c | „Copy example“ immer; „Show <id> in YAML“ nur, wenn die Hilfe für den gewählten Schritt offen ist. Das Beispiel zeigt den ganzen Schritt (`id`, `type`, `with`) wie in E14; darunter der Hinweis auf `runnel catalog <typ>` |
+| E15c | Suche im Kopf der Hilfe („Search building blocks“, Strg+K): findet wie die Palette nach Typ, Label und Beschreibung, aber über Actions und Transforms (auch der Plugins) zugleich, und öffnet deren Hilfe; eine Zeile je Typ mit Kachel, Label, Typ und Art. Ohne eigenen Zustand im Mockup |
+| E15c | Plugins ohne `outputs`, `errors`, `limits` oder `example`: Kopf, Badges, Beschreibung und Felder wie bei eingebauten Bausteinen, danach ein neutraler Hinweis „No more details from the plugin“ (Symbol i, keine Warnfarbe – es ist kein Fehler). Kategorie fehlt → „General“ wie in der Palette |
 | E4 | `${…}`-Variablen in der Ausdrucksfarbe (Indigo), wie `{{ … }}`-Ausdrücke |
 | E4 | Mehrere geöffnete Dateien als Tabs schon in E4 |
 | E4 | Umschalter für das Farbschema in der Kopfzeile (Standard: System); ein Einstellungsmenü erst, wenn es mehrere Einstellungen gibt |
@@ -172,7 +182,8 @@ node design/mockups/screenshots.cjs e16-copy-paste copy,paste,refs,wrongkind
 node design/mockups/screenshots.cjs e17-markdown open,text,new,links
 node design/mockups/screenshots.cjs s16d-icons choice,canvas
 node design/mockups/screenshots.cjs s39-connections form,test,new,field,plaintext,secrets,set
+node design/mockups/screenshots.cjs e15-help open,action,transform,plugin 1440x900
 ```
 
-Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800, doppelte Auflösung). Voraussetzung: Playwright mit
+Erzeugt je Zustand `…-hell.png` und `…-dunkel.png` (1280 × 800 oder die Größe im dritten Argument, doppelte Auflösung). Voraussetzung: Playwright mit
 Chromium. Fehlen Inter oder JetBrains Mono auf dem Rechner, nutzen die Screenshots die Ersatzschriften aus den Tokens.
