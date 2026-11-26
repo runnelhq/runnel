@@ -122,6 +122,16 @@ LocalService, verzögerter Autostart, Neustart nach Fehlern, laufende Runs bekom
 steht in `%ProgramData%\runnel\logs\<name>.log`, Start, Stopp, Warnungen und Fehler zusätzlich in der Ereignisanzeige.
 
 ```bash
+runnel health
+```
+
+`runnel health` fragt den laufenden Server bzw. Dienst auf diesem Rechner nach seinem Zustand (`GET /api/v1/health`):
+Scheduler, Trigger-Dateien, fehlgeschlagene Läufe, Run-Historie, freier Platz und Listener der HTTP-Trigger. Exit-Code
+0 `ok`, 1 `degraded`, 2 `fail`, 3 nicht erreichbar – wie es Monitoring-Werkzeuge (PRTG, Zabbix, Checkmk) erwarten.
+`--addr` (Standard `127.0.0.1:7300`) bzw. `--service <name>` (Port aus dem installierten Dienst), `--json` für die
+Antwort des Servers.
+
+```bash
 runnel catalog core.wait
 ```
 

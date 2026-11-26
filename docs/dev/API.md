@@ -26,6 +26,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | Methode | Pfad | Ergebnis |
 |---|---|---|
 | GET | `/version` | `{"version", "commit", "date", "goVersion", "os", "arch"}` wie `runnel version --json` |
+| GET | `/health` | Zustand für Monitoring (S43a): `200` bei `ok` und `degraded`, `503` bei `fail`, siehe [Zustand](#zustand-health) |
 | GET | `/projects/current` | `{"name": "hello", "dir": "C:\\…\\hello", "environments": ["dev", "prod"], "defaultEnvironment": "dev", "history": {"keepDays": 30, "maxRuns": 10000}}`; `history` ist die Aufbewahrung der Run-Historie mit den Standardwerten (seit S26e1); `onError` der Fehler-Workflow aus `settings.onError` (fehlt, wenn keiner gesetzt ist; seit S72b) |
 | GET | `/projects/current/tree` | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `trigger` (seit E10), `connection`, `plugin` (`plugins/<name>/plugin.yaml`, seit S52b1), `binary` (Programme, Bibliotheken, Archive, Datenbanken, Office-Dateien, z. B. `.exe`, `.dll`, `.zip`, `.db`, `.xlsx`, `.pdf`; öffnet der Editor nicht), `document` (`*.md`), `image` (`*.png`, `*.jpg`, `*.jpeg`, `*.gif`, `*.webp`; beide seit E17), `other`; versteckte Einträge und symbolische Links fehlen |
 | GET | `/files/{path}` | Inhalt der Datei, Header `ETag`; `415` für Binärdateien (`kind: binary` oder Inhalt mit Nullbytes, außer UTF-16 mit BOM), `422` für Dateien über 10 MiB (sie werden nicht gelesen); Bilder (siehe `kind: image`) mit ihrem Typ (`image/png` …), damit Dokumente sie zeigen können. Dateien des Projekts sind Daten, keine Seiten des Editors: `X-Content-Type-Options: nosniff` und `Content-Security-Policy: default-src 'none'; …; sandbox` (seit E17), direkt im Browser geöffnet führt etwa eine SVG- oder HTML-Datei keine Skripte aus; SVG gilt deshalb nicht als Bild |
@@ -59,6 +60,63 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | POST | `/plugins/{name}/untrust` | Freigabe zurücknehmen, siehe unten |
 | POST | `/plugins/{name}/reload` | Plugin erneut prüfen und starten (`describe`), siehe unten |
 | GET | `/triggers` | Trigger des Projekts (S37, S38): `{"triggers": [{name, file, type, target, schedule, timezone, enabled, next, last} …], "problems": [Problem …]}`. `schedule` ist der Cron-Ausdruck, `every 15m` (`interval`), `new *.csv in inbox` (`file`) oder `POST /hooks/import` (`http`, seit S38a); `http` ist die Adresse des Listeners der HTTP-Trigger, sobald er offen ist; `timezone` nur bei `cron`. `next` ist der nächste Zeitpunkt, bei `file` die nächste Abfrage des Ordners (fehlt bei deaktivierten Triggern), `last` das Ergebnis des letzten fälligen Zeitpunkts seit dem Start des Servers (`{time, runId}`, `{time, skipped: true}` bei `overlap: skip` oder `{time, error}`, bei `file` zusätzlich `files` mit den absoluten Pfaden; ein nicht lesbarer Ordner steht als `error`); `problems` sind Fehler in Trigger-Dateien (Format wie `/validate`), solche Trigger sind nicht aktiv |
+
+## Zustand (`/health`)
+
+Für Monitoring-Werkzeuge auf demselben Rechner (PRTG, Zabbix, Checkmk) und `runnel health` (S43a). Es gelten dieselben
+Regeln wie für die übrige API: nur `127.0.0.1`, `Host` muss lokal sein, ein `Origin` muss passen. Ein Token gibt es
+nicht – die API hat keins –, deshalb genügt ein einfaches `curl -s http://127.0.0.1:7300/api/v1/health` (curl sendet
+`Host: 127.0.0.1:7300` und kein `Origin`). Über den Listener der HTTP-Trigger ist der Endpunkt nicht erreichbar.
+
+Die Antwort entsteht aus dem Speicher und wenigen Aufrufen des Dateisystems (Größe der Historie, freier Platz), ohne
+Abfragen an die Datenbank; `Cache-Control: no-store`. Statuscode `200` bei `ok` und `degraded`, `503` bei `fail`:
+
+```json
+{
+  "status": "degraded",
+  "version": "v0.2.0",
+  "uptime": 7384,
+  "startedAt": "2026-11-26T08:00:00+01:00",
+  "project": {"name": "hello", "dir": "D:\\flows\\hello"},
+  "checks": [
+    {"name": "scheduler", "status": "ok", "message": "running, 4 of 5 triggers active"},
+    {"name": "triggers", "status": "degraded", "message": "1 trigger file with errors, not loaded: triggers/bad.yaml"},
+    {"name": "runs", "status": "ok", "message": "0 running"},
+    {"name": "history", "status": "ok", "message": "writable, 3 MB"},
+    {"name": "disk", "status": "ok", "message": "51200 MB free of 102400 MB in C:\\ProgramData\\runnel\\history"},
+    {"name": "listener", "status": "ok", "message": "http triggers listening on 127.0.0.1:7301"},
+    {"name": "certificate", "status": "ok", "message": "valid until 2028-11-20"}
+  ],
+  "scheduler": {"running": true, "triggers": 5, "active": 4, "problems": [Problem …]},
+  "runs": {"running": 0, "onErrorQueue": 0,
+           "lastFailed": {"id": "01JD…", "time": "…", "file": "workflows/import.workflow.yaml", "trigger": "cron:nightly", "error": "…"}},
+  "history": {"enabled": true, "path": "C:\\ProgramData\\runnel\\history\\hello-1a2b3c4d\\runs.db", "writable": true, "sizeBytes": 3145728},
+  "disk": {"path": "C:\\ProgramData\\runnel\\history", "freeBytes": 53687091200, "totalBytes": 107374182400},
+  "listener": {"configured": "127.0.0.1:7301", "running": true, "address": "127.0.0.1:7301", "tls": true, "notAfter": "2028-11-20T10:00:00Z"}
+}
+```
+
+`status` ist der schlechteste Stand der `checks`; jede Prüfung nennt in `message` den Grund (englisch, für die Anzeige
+im Monitoring). Die Prüfungen:
+
+| Prüfung | `ok` | `degraded` | `fail` |
+|---|---|---|---|
+| `scheduler` | Scheduler der Trigger läuft | – | läuft nicht (z. B. beim Beenden) |
+| `triggers` | alle Trigger-Dateien geladen | eine Trigger-Datei hat Fehler und ist nicht aktiv (Datei und Meldung in `scheduler.problems`, Format wie `/validate`) | – |
+| `runs` | – | der letzte beendete Lauf eines aktiven Triggers ist fehlgeschlagen, oder sein letzter Start war nicht möglich | – |
+| `history` | Run-Historie schreibbar, oder ausgeschaltet (Läufe nur im Speicher) | – | sie ließ sich nicht öffnen, oder der letzte Schreibvorgang schlug fehl |
+| `disk` | genug Platz, oder unbekannt (`disk.error`) | im Datenordner ist weniger frei als 1 GiB bzw. 5 % des Laufwerks – der kleinere Wert gilt (kleine Laufwerke) | – |
+| `listener` (nur mit `--triggers`) | offen, oder kein HTTP-Trigger aktiv | ein HTTP-Trigger ist aktiv, der Listener aber nicht offen (Port belegt, siehe Server-Log) | – |
+| `certificate` (nur mit HTTPS) | gültig noch mindestens 14 Tage | läuft in weniger als 14 Tagen ab oder ist abgelaufen | – |
+
+Weitere Angaben: `uptime` in Sekunden seit `startedAt`; `scheduler.triggers` geladene, `active` davon eingeschaltete
+Trigger; `runs.running` laufende Läufe, `lastFailed` der letzte fehlgeschlagene Lauf seit dem Start (auch von Hand
+gestartete; sie ändern den Status nicht), `onErrorQueue` fehlgeschlagene Läufe, die auf ihren Fehler-Workflow warten
+(ADR 0027); `history.sizeBytes` mit dem Write-Ahead-Log; `disk.path` der Datenordner (Ordner der Run-Historien, ohne
+Historie der Projektordner); `listener.notAfter` das Ende des Zertifikats, bei eigenen Zertifikaten das zuletzt
+geladene. Der Stand der Läufe gilt seit dem Start des Servers (aus dem Speicher, nicht aus der Historie); „schreibbar“
+heißt: geöffnet, und der letzte Schreibvorgang gelang – ein Fehler zeigt sich also beim nächsten Lauf. Secrets und
+Stacktraces enthält die Antwort nicht; Pfade schon, wie die übrige API.
 
 ## Konfliktschutz (ETag)
 

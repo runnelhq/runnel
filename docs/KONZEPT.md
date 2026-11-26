@@ -313,6 +313,7 @@ flowchart LR
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments, Triggern, Connections und `plugin.yaml` (seit S58 bzw. S49a), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
 | Plugins | `runnel plugins [trust\|untrust] [projektordner] [--plugin <name>] [--yes] [--service]` (seit S49a) | Plugins anzeigen (freigegebene mit ihren Typen, seit S49b1) und für das Projekt auf diesem Rechner freigeben ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag; [docs/dev/PLUGINS.md](dev/PLUGINS.md)) |
+| Zustand | `runnel health [--addr 127.0.0.1:7300] [--service <name>] [--json]` (seit S43a) | Zustand des laufenden Servers bzw. Dienstes für Monitoring. Exit-Code: 0 `ok`, 1 `degraded`, 2 `fail`, 3 nicht erreichbar |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
@@ -1069,7 +1070,17 @@ Transaktionen; laufende Läufe bleiben. `history: all|errors|none` gilt an allen
 
 ### 9.3 Observability
 
-- `/metrics` im Prometheus-Format (optional), `/health` für Monitoring (z. B. PRTG, Checkmk).
+- **Zustand (seit S43a):** `GET /api/v1/health` am Server bzw. Dienst, wie die übrige API nur lokal (`127.0.0.1`,
+  ohne Token), nicht auf dem Listener der HTTP-Trigger. Antwort `ok`, `degraded` (`200`) oder `fail` (`503`) mit
+  Prüfungen und Grund je Prüfung: `fail`, wenn der Scheduler der Trigger nicht läuft oder die Run-Historie nicht
+  schreibbar ist; `degraded`, wenn eine Trigger-Datei Fehler hat, der letzte Lauf eines aktiven Triggers fehlschlug,
+  im Datenordner weniger als 1 GiB (auf kleinen Laufwerken 5 %) frei ist, der Listener der HTTP-Trigger nicht offen ist
+  oder sein Zertifikat in weniger als 14 Tagen abläuft. Dazu Version, Laufzeit, Projekt, laufende Läufe, letzter
+  fehlgeschlagener Lauf, Warteschlange der Fehler-Workflows, Größe der Historie, freier Platz. Die Antwort kommt aus
+  dem Speicher, ohne Abfragen an die Datenbank. `runnel health` fragt sie ab und endet mit 0 `ok`, 1 `degraded`,
+  2 `fail`, 3 nicht erreichbar – die Codes, die Monitoring-Plugins (Nagios, Checkmk, PRTG) erwarten
+  ([API](dev/API.md#zustand-health)).
+- `/metrics` im Prometheus-Format (optional, Backlog S43).
 - Benachrichtigungen bei Fehlschlag: global konfigurierbarer „Error-Workflow“ (wie n8n), der bei jedem fehlgeschlagenen Run mit dessen Kontext gestartet wird.
 
 ---
@@ -1089,6 +1100,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/schemas/{kind}` | JSON Schema einer Dateiart: `project`, `environment`, `trigger` (seit S58) |
 | GET | `/variables` | Genutzte und definierte Variablen mit Fundstellen und Werten je Ebene (seit E18a) |
 | GET | `/expressions` · `/version` | Wurzeln, Funktionen und Variablen für den Ausdruckseditor · Version des Servers |
+| GET | `/health` | Zustand für Monitoring: Scheduler, Trigger-Dateien, Läufe, Historie, Platz, Listener (seit S43a, `503` bei `fail`) |
 | POST | `/runs` | Run starten `{ path, environment, params }`; später `runConfig`, `startAt`, `only`, `reuseResultsFrom` |
 | GET | `/runs?status=&path=&trigger=&before=&limit=` | Läufe: laufende aus dem Speicher, beendete aus der Run-Historie (seit S26a), Filter und Seiten (seit S26b) |
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
@@ -1453,6 +1465,8 @@ Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dat
   - **Log:** vollständig in `%ProgramData%\runnel\logs\<name>.log` (der Ordner wird beim Installieren für das Konto
     beschreibbar gemacht), Start, Stopp, Warnungen und Fehler zusätzlich in der Ereignisanzeige.
   - Der Dienst startet die `runnel.exe`, mit der er installiert wurde; nach dem Verschieben neu installieren.
+  - **Überwachung:** `runnel health --service <name>` (Port aus der Befehlszeile des Dienstes) bzw. ein Monitoring-Agent
+    auf demselben Rechner mit `GET http://127.0.0.1:<port>/api/v1/health` (seit S43a, Kap. 9.3).
 - **Code-Signing** der exe (Authenticode) – wichtig, damit SmartScreen/Virenscanner nicht anschlagen.
 - **Pfade**: UNC-Pfade (`\\server\share`) und lange Pfade (`\\?\`) werden unterstützt; Encoding-Unterstützung für `windows-1252`/`UTF-16` bei Dateien.
 - **Updates**: `runnel update` lädt neue Version, prüft Signatur, ersetzt exe über Rename-Trick und startet Dienst neu.
@@ -1531,7 +1545,7 @@ Die Phasen sind in **kleine, einzeln prüfbare Schritte** (je ein Pull Request) 
 | **0.6 – Komfort** | S44, S46: Datenvorschau, Felder ermitteln | Rund nutzbares Produkt |
 | **0.7 – Erweiterbarkeit** | S49–S53: Plugin-Protokoll, Go-SDK, Plugin-Verwaltung, MCP-Server (`runnel mcp`) | Eigene Konnektoren |
 | **1.0** | Stabilisierung, Doku, Beispiele | Release |
-| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S56 (Mapping), S25c–e (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Quellen (S39b–g; S39a mit der Quelle `env` ist umgesetzt), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring mit Retention (S43) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
+| **Backlog** | Zurückgestellt nach „Tiefe vor Breite“: S20, S21, S23, S56 (Mapping), S25c–e (Executor), S26, S29, S36, S45, S47, S48, `maxErrors`; aus dem Betrieb Secret-Quellen (S39b–g; S39a mit der Quelle `env` ist umgesetzt), Netzwerkbetrieb des Editors (S40b), Run-Konfigurationen (S42), Wartung & Monitoring (S43: `/metrics`; Zustand seit S43a, Retention seit S26c, Fehler-Workflow seit S72) ([Roadmap](ROADMAP.md#zurückgestellt-tiefe-vor-breite)); KI-Bausteine (LLM, Agenten, MCP-Client, RAG, Freigaben – ADR 0012), Mail, Shell/PowerShell, JavaScript, Excel, XML, SFTP, weitere DB-Treiber und Transforms, SDKs für weitere Sprachen, Remote-Runner u. a. | nach Bedarf, je ein eigener Schritt |
 
 Die Bausteinlisten in Kap. 12 beschreiben den Zielumfang; was davon wann kommt, regelt die Roadmap.
 

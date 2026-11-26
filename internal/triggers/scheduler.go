@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -57,6 +58,8 @@ type Scheduler struct {
 	entries  []*entry // in the order of the files
 	problems model.Errors
 	sig      string // state of the files the triggers were loaded from
+	// running is set while Run runs (GET /health, S43a).
+	running atomic.Bool
 
 	http httpTriggers
 }
@@ -361,6 +364,8 @@ func (s *Scheduler) start(e *entry, now time.Time, params map[string]string, fil
 // Run reloads the triggers and starts their runs until ctx is done. Changed trigger
 // files (and project files) are picked up within PollInterval.
 func (s *Scheduler) Run(ctx context.Context) {
+	s.running.Store(true)
+	defer s.running.Store(false)
 	s.Reload()
 	defer s.http.close()
 	for {
@@ -383,6 +388,9 @@ func (s *Scheduler) Run(ctx context.Context) {
 		}
 	}
 }
+
+// Running reports whether Run is running, i.e. triggers start their runs.
+func (s *Scheduler) Running() bool { return s.running.Load() }
 
 func (s *Scheduler) currentSig() string {
 	s.mu.Lock()
