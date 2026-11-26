@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/runnelhq/runnel/internal/connections"
+	"github.com/runnelhq/runnel/internal/version"
 )
 
 // The golden files show what the editor and tools will see of the built-in actions;
@@ -19,6 +23,9 @@ func TestCatalog(t *testing.T) {
 		{"catalog-log.golden", []string{"catalog", "core.log"}},
 		{"catalog-start.golden", []string{"catalog", "core.start"}},
 		{"catalog.golden.json", []string{"catalog", "--json"}},
+		{"catalog-sftp.golden", []string{"catalog", "sftp"}},
+		{"catalog-expressions.golden", []string{"catalog", "--expressions"}},
+		{"catalog-expressions.golden.json", []string{"catalog", "--expressions", "--json"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.golden, func(t *testing.T) {
@@ -49,7 +56,48 @@ func TestCatalogJSONOfOneAction(t *testing.T) {
 
 func TestCatalogUnknownType(t *testing.T) {
 	code, _, errOut := run(t, "catalog", "core.copy")
-	if code != 1 || !strings.Contains(errOut, `unknown action or transform type "core.copy"`) {
+	if code != 1 || !strings.Contains(errOut, `unknown action, transform or connection type "core.copy"`) {
+		t.Errorf("exit code %d, stderr %q", code, errOut)
+	}
+}
+
+// Every built-in connection type is in the reference with its fields (roadmap E15a).
+func TestCatalogJSONConnectionTypes(t *testing.T) {
+	code, out, _ := run(t, "catalog", "--json")
+	if code != 0 {
+		t.Fatalf("exit code %d", code)
+	}
+	var ref struct {
+		Version         string `json:"version"`
+		ConnectionTypes []struct {
+			Type, Label, Description string
+			Schema                   *struct {
+				Type       string         `json:"type"`
+				Properties map[string]any `json:"properties"`
+			} `json:"schema"`
+		} `json:"connectionTypes"`
+	}
+	if err := json.Unmarshal([]byte(out), &ref); err != nil {
+		t.Fatal(err)
+	}
+	if ref.Version != version.Version {
+		t.Errorf("version %q, want %q", ref.Version, version.Version)
+	}
+	var got []string
+	for _, c := range ref.ConnectionTypes {
+		got = append(got, c.Type)
+		if c.Label == "" || c.Description == "" || c.Schema == nil || c.Schema.Type != "object" || len(c.Schema.Properties) == 0 {
+			t.Errorf("connection type %s: incomplete %+v", c.Type, c)
+		}
+	}
+	if want := connections.Builtin().Types(); !slices.Equal(got, want) {
+		t.Errorf("connection types %v, want %v", got, want)
+	}
+}
+
+func TestCatalogExpressionsWithType(t *testing.T) {
+	code, _, errOut := run(t, "catalog", "--expressions", "core.log")
+	if code != 1 || !strings.Contains(errOut, "--expressions takes no type") {
 		t.Errorf("exit code %d, stderr %q", code, errOut)
 	}
 }

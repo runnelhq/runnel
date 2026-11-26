@@ -309,7 +309,7 @@ flowchart LR
 | Validierung | `runnel validate <datei/ordner>` (Workflows, Pipelines, Trigger) | Lint/Prüfung in CI |
 | Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
 | Läufe anzeigen | `runnel runs [projektordner] [lauf-id] [--status] [--path] [--trigger] [--before] [--limit] [--json]` (seit S26b) | Läufe aus der Run-Historie (Server, Dienst, `runnel run`), einer mit Knoten und Log |
-| Katalog | `runnel catalog [typ]` | Actions und Transforms mit Schema |
+| Katalog | `runnel catalog [typ] [--json]` · `runnel catalog --expressions [--json]` | Actions, Transforms und Connection-Typen mit Schema · Namen und Funktionen der Ausdrücke; als JSON mit `version` auch an jedem Release (`runnel-catalog.json`, `runnel-expressions.json`, seit E15a) |
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments, Triggern, Connections und `plugin.yaml` (seit S58 bzw. S49a), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
 | Plugins | `runnel plugins [trust\|untrust] [projektordner] [--plugin <name>] [--yes] [--service]` (seit S49a) | Plugins anzeigen (freigegebene mit ihren Typen, seit S49b1) und für das Projekt auf diesem Rechner freigeben ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag; [docs/dev/PLUGINS.md](dev/PLUGINS.md)) |

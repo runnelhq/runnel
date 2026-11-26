@@ -125,9 +125,11 @@ steht in `%ProgramData%\runnel\logs\<name>.log`, Start, Stopp, Warnungen und Feh
 runnel catalog core.wait
 ```
 
-`runnel catalog` listet die verfügbaren Actions und Transforms nach Kategorien, `runnel catalog <typ>` beschreibt einen Baustein mit
-ihren Feldern (Typ, Pflichtfeld, erlaubte Werte, Standardwert, Beispiel). `--json` gibt die Descriptors mit
-JSON Schema aus – dieselben Daten, aus denen der Editor Palette und Eigenschaftsdialog erzeugt.
+`runnel catalog` listet die verfügbaren Actions und Transforms nach Kategorien und die Connection-Typen,
+`runnel catalog <typ>` beschreibt einen Baustein oder Connection-Typ (z. B. `sftp`) mit seinen Feldern (Typ, Pflichtfeld,
+erlaubte Werte, Standardwert, Beispiel). `--json` gibt die Descriptors mit JSON Schema aus – dieselben Daten, aus denen
+der Editor Palette und Eigenschaftsdialog erzeugt –, dazu `version` und `connectionTypes`. `runnel catalog --expressions`
+listet die Namen und Funktionen der Ausdrücke `{{ … }}`, mit `--json` wie der Ausdruckseditor sie erhält.
 
 ## Entwicklung
 
@@ -167,6 +169,8 @@ Fertige Builds gibt es unter [Releases](https://github.com/runnelhq/runnel/relea
 | `runnel_<version>_windows_amd64.zip` | `runnel.exe`, `LICENSE`, `README.md`, `THIRD_PARTY_NOTICES.txt` |
 | `runnel_<version>_linux_amd64.tar.gz` | `runnel` und dieselben Begleitdateien |
 | `runnel_<version>_<os>_amd64.cdx.json` | SBOM (Software-Stückliste) im Format CycloneDX 1.6 |
+| `runnel-catalog.json` | Referenz der Bausteine dieser Version: `runnel catalog --json` (Actions, Transforms, Connection-Typen) |
+| `runnel-expressions.json` | Referenz der Ausdrücke dieser Version: `runnel catalog --expressions --json` |
 | `SHA256SUMS` | Prüfsummen aller Dateien |
 
 ### Release erstellen

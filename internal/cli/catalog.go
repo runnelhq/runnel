@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,33 +13,62 @@ import (
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/connection"
+	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/schema"
 	"github.com/runnelhq/runnel/internal/server"
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/transforms"
+	"github.com/runnelhq/runnel/internal/version"
 )
 
+// catalogReference is the machine-readable reference of the building blocks of a version
+// (roadmap E15a): the catalog of /api/v1/catalog plus the version and the built-in
+// connection types. Releases attach it as runnel-catalog.json.
+type catalogReference struct {
+	Version string `json:"version"`
+	server.Catalog
+	ConnectionTypes []connection.Descriptor `json:"connectionTypes"`
+}
+
+// expressionsReference is the reference of expressions of a version: names and functions
+// as /api/v1/expressions returns them, without the variables of a project. Releases attach
+// it as runnel-expressions.json.
+type expressionsReference struct {
+	Version string `json:"version"`
+	server.Expressions
+}
+
 func newCatalogCommand() *cobra.Command {
-	var asJSON bool
+	var asJSON, expressions bool
 	cmd := &cobra.Command{
 		Use:   "catalog [type]",
-		Short: "List the available actions and transforms, or describe one and its fields",
-		Long: "Lists the available actions (workflows) and transforms (pipelines) by category, or\n" +
-			"describes one type and its configuration fields. A name can exist as action and as\n" +
+		Short: "List the available actions, transforms and connection types, or describe one and its fields",
+		Long: "Lists the available actions (workflows), transforms (pipelines) and connection types,\n" +
+			"or describes one type and its configuration fields. A name can exist as action and as\n" +
 			"transform (e.g. core.log); both are shown then. With --json, prints the descriptors in\n" +
-			"the form the server returns from /api/v1/catalog.",
+			"the form the server returns from /api/v1/catalog, with the version and the connection\n" +
+			"types. With --expressions, lists the names and functions of expressions instead.",
 		Example: "  runnel catalog\n" +
 			"  runnel catalog core.wait\n" +
-			"  runnel catalog --json",
+			"  runnel catalog sftp\n" +
+			"  runnel catalog --json > runnel-catalog.json\n" +
+			"  runnel catalog --expressions --json > runnel-expressions.json",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			acts, trs := actions.Builtin(), transforms.Builtin()
+			acts, trs, conns := actions.Builtin(), transforms.Builtin(), connections.Builtin()
 			out := cmd.OutOrStdout()
-			if len(args) == 0 {
-				if asJSON {
-					return writeJSON(out, server.NewCatalog(acts, trs))
-				}
-				return printCatalog(out, entries(acts.Descriptors(), trs.Descriptors()))
+			switch {
+			case expressions && len(args) > 0:
+				return fmt.Errorf("--expressions takes no type")
+			case expressions && asJSON:
+				return writeJSON(out, expressionsReference{Version: version.Version, Expressions: server.NewExpressions()})
+			case expressions:
+				return printExpressions(out, server.NewExpressions())
+			case len(args) == 0 && asJSON:
+				return writeJSON(out, catalogReference{Version: version.Version, Catalog: server.NewCatalog(acts, trs), ConnectionTypes: conns.Descriptors()})
+			case len(args) == 0:
+				return printCatalog(out, entries(acts.Descriptors(), trs.Descriptors(), conns.Descriptors()))
 			}
 			var found []entry
 			var raw []any
@@ -50,9 +80,13 @@ func newCatalogCommand() *cobra.Command {
 				found = append(found, transformEntry(d))
 				raw = append(raw, d)
 			}
+			if d, ok := conns.Descriptor(args[0]); ok {
+				found = append(found, connectionEntry(d))
+				raw = append(raw, d)
+			}
 			switch {
 			case len(found) == 0:
-				return fmt.Errorf("unknown action or transform type %q (run \"runnel catalog\" for a list)", args[0])
+				return fmt.Errorf("unknown action, transform or connection type %q (run \"runnel catalog\" for a list)", args[0])
 			case asJSON && len(raw) == 1:
 				return writeJSON(out, raw[0])
 			case asJSON:
@@ -72,12 +106,13 @@ func newCatalogCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print descriptors with their JSON Schema")
+	cmd.Flags().BoolVar(&expressions, "expressions", false, "list the names and functions of expressions")
 	return cmd
 }
 
-// entry is an action or a transform as the catalog shows it.
+// entry is an action, a transform or a connection type as the catalog shows it.
 type entry struct {
-	kind                              string // action or transform
+	kind                              string // action, transform or connection
 	typ, category, label, description string
 	schema                            *schema.Schema
 }
@@ -90,13 +125,20 @@ func transformEntry(d transform.Descriptor) entry {
 	return entry{"transform", d.Type, d.Category, d.Label, d.Description, d.Schema}
 }
 
-func entries(acts []action.Descriptor, trs []transform.Descriptor) []entry {
+func connectionEntry(d connection.Descriptor) entry {
+	return entry{"connection", d.Type, "", d.Label, d.Description, d.Schema}
+}
+
+func entries(acts []action.Descriptor, trs []transform.Descriptor, conns []connection.Descriptor) []entry {
 	var out []entry
 	for _, d := range acts {
 		out = append(out, actionEntry(d))
 	}
 	for _, d := range trs {
 		out = append(out, transformEntry(d))
+	}
+	for _, d := range conns {
+		out = append(out, connectionEntry(d))
 	}
 	return out
 }
@@ -119,7 +161,8 @@ func (p *printer) printf(format string, args ...any) {
 	}
 }
 
-// printCatalog lists actions and transforms grouped by category, in palette order.
+// printCatalog lists actions and transforms grouped by category, in palette order, then
+// the connection types.
 func printCatalog(w io.Writer, all []entry) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	p := &printer{w: tw}
@@ -139,6 +182,40 @@ func printCatalog(w io.Writer, all []entry) error {
 				if e.category == category {
 					p.printf("  %s\t%s\t%s\n", e.typ, e.label, e.description)
 				}
+			}
+		}
+	}
+	p.printf("connections\n")
+	for _, e := range all {
+		if e.kind == "connection" {
+			p.printf("  %s\t%s\t%s\n", e.typ, e.label, e.description)
+		}
+	}
+	if p.err != nil {
+		return p.err
+	}
+	return tw.Flush()
+}
+
+// printExpressions lists the names and functions of expressions, functions by group.
+func printExpressions(w io.Writer, ref server.Expressions) error {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	p := &printer{w: tw}
+	p.printf("names\n")
+	for _, d := range ref.Roots {
+		p.printf("  %s\t%s\t%s\n", d.Name, d.Type, d.Description)
+	}
+	var groups []string
+	for _, d := range ref.Functions {
+		if !slices.Contains(groups, d.Group) {
+			groups = append(groups, d.Group)
+		}
+	}
+	for _, g := range groups {
+		p.printf("functions / %s\n", g)
+		for _, d := range ref.Functions {
+			if d.Group == g {
+				p.printf("  %s\t%s\t%s\n", cmp.Or(d.Signature, d.Name), d.Type, d.Description)
 			}
 		}
 	}
@@ -168,7 +245,11 @@ func categoryOrder(of []entry, order []string) []string {
 func printDescriptor(w io.Writer, e entry) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	p := &printer{w: tw}
-	p.printf("%s %s – %s (category %s)\n%s\n", e.kind, e.typ, e.label, e.category, e.description)
+	if e.category != "" {
+		p.printf("%s %s – %s (category %s)\n%s\n", e.kind, e.typ, e.label, e.category, e.description)
+	} else {
+		p.printf("%s %s – %s\n%s\n", e.kind, e.typ, e.label, e.description)
+	}
 	if len(e.schema.Properties) == 0 {
 		p.printf("\nNo configuration.\n")
 	} else {

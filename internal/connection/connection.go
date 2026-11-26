@@ -117,6 +117,15 @@ func (r *Registry) Descriptor(typ string) (Descriptor, bool) {
 	return d, ok
 }
 
+// Descriptors returns the descriptions of all types, sorted by type.
+func (r *Registry) Descriptors() []Descriptor {
+	out := make([]Descriptor, 0, len(r.desc))
+	for _, t := range r.Types() {
+		out = append(out, r.desc[t])
+	}
+	return out
+}
+
 // Types returns the registered types, sorted.
 func (r *Registry) Types() []string {
 	return slices.Sorted(maps.Keys(r.defs))

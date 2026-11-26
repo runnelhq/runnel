@@ -79,3 +79,12 @@ transforms / output
   http.response    HTTP Response     Answers the caller of an HTTP trigger with the records as JSON and passes them on
   json.output      JSON Output       Writes records to a JSON or NDJSON file and passes them on
   xml.output       XML Output        Writes records as elements of an XML file and passes them on
+connections
+  ftp        FTP         A server for file transfer over FTP without encryption; only with insecure: true
+  ftps       FTPS        A server for file transfer over FTP with TLS
+  http       HTTP API    An HTTP API with its base address and sign-in, e.g. a REST API
+  postgres   PostgreSQL  A PostgreSQL database
+  sftp       SFTP        A server for file transfer over SSH
+  smtp       SMTP        A mail server for sending mails
+  sqlite     SQLite      A database in a single file, e.g. for local data and tests
+  sqlserver  SQL Server  A Microsoft SQL Server database, with a user or with the Windows account Runnel runs as
