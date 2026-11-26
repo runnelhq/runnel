@@ -63,7 +63,8 @@ Jede Action liefert einen Descriptor:
 - **Noch nicht enthalten:** `icon`, `ports` und `uiHints` aus dem Konzept. Sie kommen mit dem Schritt, der sie braucht
   (Icons mit E5/E6, Ports mit den Pipelines, Darstellungshinweise mit E7).
 - **Variablen:** Das Schema beschreibt den Wert **nach** dem Auflösen von `${…}`. Werte mit `${…}` oder `{{ … }}`
-  werden im Editor nicht gegen `enum`, `format` oder Zahlentypen geprüft; das tut die Action beim Ausführen.
+  werden im Editor nicht gegen `enum`, `format` oder Zahlentypen geprüft; das tut die Action beim Ausführen. Für
+  Zahlenfelder siehe Nachtrag 2026-11-26 (R5b2).
 
 ### 2. Schema wird aus dem Konfigurations-Struct erzeugt
 
@@ -205,3 +206,30 @@ Derselbe Mechanismus beschreibt auch die Dateiarten `Project`, `Environment` und
 `json`-Namen der Strukturen gehören zur API, z. B. die berechnete Liste `environments`). Abrufbar über
 `GET /api/v1/schemas/{kind}` und `runnel schema <art>`; Grundlage für die Hilfe im Editor (E18, E19) und für andere
 Editoren. Ein Test verlangt eine Beschreibung für jedes Feld.
+
+## Nachtrag 2026-11-26 (R5b2)
+
+**Zahlenfelder** der Konfiguration von Actions und Transforms folgen einer Regel, zentral in `action.DecodeConfig`
+bzw. `transform.DecodeConfig` – nicht mehr je Baustein:
+
+- Ein Feld vom Typ Ganz- oder Kommazahl (`int`, `*int`, `int64`, `uint`, `float64` …, auch verschachtelt wie
+  `paginate.maxPages` und in Listen wie `okCodes`) nimmt eine **Zahl** oder einen **Text** an. Ein Text, der eine Zahl
+  ist (`"42"`, wie ihn `${N}` nach dem Auflösen liefert), gilt als diese Zahl.
+- Ein Text mit `${…}` – in Actions auch mit `{{ … }}` – wird erst beim Start des Laufs aufgelöst (Pipelines) bzw. vor
+  der Ausführung der Action (Workflows). Bis dahin behält das Feld seinen Standardwert, Pflichtfelder gelten als
+  gesetzt. Transforms werten `{{ … }}` in ihrer Konfiguration nicht aus; dort ist es wie jeder andere Text ein Fehler.
+- Jeder andere Text ist ein Fehler mit dem Namen des Felds (Pfad bei verschachtelten Feldern) und dem Wert:
+  `field "commitSize": expected a whole number, got "abc"` (`a number` bei Kommazahlen, `a whole number of 0 or more`
+  bei `uint`), bei einem Wert eines anderen Typs `got number 1.5` bzw. `got bool`. `runnel validate` und der Editor
+  melden so einen Wert in der Datei mit der Position des Bausteins; ein Wert aus einer Variablen wird mit derselben
+  Meldung beim Start des Laufs (Pipeline: Exit-Code 2, „nicht gestartet“) bzw. beim Ausführen der Action gemeldet.
+- **Schema:** unverändert `type: integer` bzw. `number` – das Schema beschreibt den Wert nach dem Auflösen
+  (Abschnitt 2, „Variablen“); kein eigenes Format, kein `anyOf`. Der Editor schreibt einen Text mit `${…}` oder
+  `{{ … }}` in einem Zahlenfeld als Text, wie bisher.
+- **Zahlen als Text** (`type: string`): Felder, die auch einen Ausdruck mit Hilfe im Editor zeigen, bleiben Text
+  (`db.query` `maxRows`, `http.response` `status`, `core.sequence` `start`/`step`, `core.generate-rows` `count`,
+  `maxRecords`). Sie lesen den Wert mit `action.ParseWholeNumber` bzw. `transform.ParseWholeNumber` nach derselben
+  Regel und mit derselben Meldung, und zwar in `New`: Eine Zahl in der Datei prüft schon `runnel validate`, eine
+  Variable der Start des Laufs. Bereiche (z. B. `status` 200–599, `maxRecords` ab 1) prüft weiter der Baustein.
+- Regeln zwischen Feldern, die einen Wert brauchen, gelten für einen erst später aufgelösten Wert beim Start; Beispiel:
+  `paginate.sizeParam` braucht `size`, auch wenn `size` `${SIZE}` ist.

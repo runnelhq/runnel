@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -62,6 +61,9 @@ func newQuery(with map[string]any) (action.Action, error) {
 	if _, err := a.timeout(); err != nil {
 		return nil, err
 	}
+	if _, err := a.maxRows(); err != nil {
+		return nil, err
+	}
 	if _, err := sqldb.Args(a.SQL, a.Params); err != nil {
 		return nil, err
 	}
@@ -75,16 +77,17 @@ func (a *queryAction) timeout() (time.Duration, error) {
 	return sqldb.Timeout(a.Timeout)
 }
 
-// maxRows is checked when the action runs: it may be a variable before.
+// maxRows reads maxRows by the rule of the number fields (R5b2): a variable or an
+// expression is checked once it is resolved, when the action runs.
 func (a *queryAction) maxRows() (int, error) {
-	if a.MaxRows == "" {
-		return defaultMaxRows, nil
+	n, ok, err := action.ParseWholeNumber("maxRows", a.MaxRows, true)
+	if err != nil || !ok {
+		return defaultMaxRows, err
 	}
-	n, err := strconv.Atoi(a.MaxRows)
-	if err != nil || n < 1 {
+	if n < 1 {
 		return 0, fmt.Errorf("maxRows %q is not a whole number of at least 1", a.MaxRows)
 	}
-	return n, nil
+	return int(n), nil
 }
 
 func (a *queryAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {

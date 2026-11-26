@@ -207,6 +207,32 @@ test("changes the settings of the pipeline and jumps to problems", async ({ page
   await expect(page.getByTestId("error-count")).toHaveCount(0);
 });
 
+test("a number field takes a variable (R5b2)", async ({ page, request }) => {
+  // A log between tag and write with a number field (core.log every) that holds no number.
+  await request.put(fileURL, {
+    headers: { "If-Match": "*" },
+    data: original
+      .replace("  - { from: tag, to: write }\n", "  - { from: tag, to: show }\n  - { from: show, to: write }\n")
+      .replace("  - id: write\n", "  - id: show\n    type: core.log\n    with:\n      every: often\n  - id: write\n"),
+  });
+  await open(page);
+  await page.getByTestId("node-show").click();
+  await expect(page.getByRole("textbox", { name: "ID", exact: true })).toHaveValue("show");
+  await expect(field(page, "with.every").getByRole("alert")).toContainText('field "every": expected a whole number, got "often"');
+
+  // ${…} is written as text and accepted by the check of the server, like a number.
+  const every = field(page, "with.every").getByRole("textbox");
+  await every.fill("${BATCH}");
+  await every.blur();
+  await expect(field(page, "with.every").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByTestId("error-count")).toHaveCount(0);
+  expect(await yaml(page)).toContain("      every: ${BATCH}\n");
+  await page.getByTestId("node-show").click();
+  await every.fill("25");
+  await every.blur();
+  expect(await yaml(page)).toContain("      every: 25\n");
+});
+
 test("shows the fields of the incoming records and of the links", async ({ page, request }) => {
   // A filter between tag and write that uses a field of the records.
   await request.put(fileURL, {

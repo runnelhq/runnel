@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -33,11 +32,13 @@ var generateRowsDefinition = transform.Definition{
 }
 
 type generateRows struct {
-	// Count is text, so that it can be a variable (${ROWS}); it is checked when the
-	// pipeline runs. Count and NumberField were rows and rowNumberField until R5b.
+	// Count is text, so that it can be a variable (${ROWS}; number fields, R5b2). Count
+	// and NumberField were rows and rowNumberField until R5b.
 	Count       string       `json:"count" doc:"Number of records to create, e.g. 1000 or ${ROWS}" schema:"required,example=10"`
 	Fields      []constField `json:"fields" doc:"Fields of every record, with a constant value"`
 	NumberField string       `json:"numberField" doc:"Name of a field for the number of the record, starting at 1; empty: none"`
+
+	count int64
 }
 
 type constField struct {
@@ -50,6 +51,14 @@ func newGenerateRows(with map[string]any) (transform.Transform, error) {
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
+	count, ok, err := transform.ParseWholeNumber("count", t.Count)
+	if err != nil {
+		return nil, err
+	}
+	if (!ok && strings.TrimSpace(t.Count) == "") || count < 0 {
+		return nil, fmt.Errorf("count: %q is not a whole number of 0 or more", t.Count)
+	}
+	t.count = count
 	for i, f := range t.Fields {
 		if f.Name == "" {
 			return nil, errors.New("fields: every field needs a name")
@@ -77,11 +86,7 @@ func (t *generateRows) Init(*transform.InitContext) (record.Schema, error) {
 }
 
 func (t *generateRows) Process(ctx context.Context, _ <-chan transform.Batch, out *transform.Output) error {
-	count, err := strconv.ParseInt(strings.TrimSpace(t.Count), 10, 64)
-	if err != nil || count < 0 {
-		return fmt.Errorf("count: %q is not a whole number of 0 or more", t.Count)
-	}
-	for n := int64(1); n <= count; n++ {
+	for n := int64(1); n <= t.count; n++ {
 		r := record.Make(len(t.Fields) + 1)
 		if t.NumberField != "" {
 			r.Set(t.NumberField, n)

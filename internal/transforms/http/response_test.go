@@ -85,12 +85,27 @@ func TestResponse(t *testing.T) {
 		t.Errorf("whenEmpty with records %+v", sent[0])
 	}
 
-	// maxRecords and status are checked when the pipeline runs.
+	// maxRecords limits the answer; it and status are checked with the configuration,
+	// a variable once it is resolved (number fields, R5b2).
 	if _, _, _, err := run(t, map[string]any{"maxRecords": "1"}, rows...); err == nil || !strings.Contains(err.Error(), "more than 1 records for the answer") {
 		t.Errorf("maxRecords: %v", err)
 	}
-	if _, _, _, err := run(t, map[string]any{"status": "abc"}); err == nil || !strings.Contains(err.Error(), `invalid status "abc"`) {
-		t.Errorf("status: %v", err)
+	for _, tt := range []struct {
+		with map[string]any
+		want string
+	}{
+		{map[string]any{"status": "abc"}, `field "status": expected a whole number, got "abc"`},
+		{map[string]any{"status": "99"}, `invalid status "99" (expected a number from 200 to 599)`},
+		{map[string]any{"status": "{{ 404 }}"}, `field "status": expected a whole number, got "{{ 404 }}"`},
+		{map[string]any{"maxRecords": "0"}, `maxRecords: "0" is not a whole number of 1 or more`},
+		{map[string]any{"maxRecords": "x"}, `field "maxRecords": expected a whole number, got "x"`},
+	} {
+		if _, err := responseDefinition.New(tt.with); err == nil || err.Error() != tt.want {
+			t.Errorf("%v: %v, want %q", tt.with, err, tt.want)
+		}
+	}
+	if _, err := responseDefinition.New(map[string]any{"status": "${STATUS}", "maxRecords": "${N}"}); err != nil {
+		t.Errorf("variables: %v", err)
 	}
 
 	// Without a caller the records are passed on, nothing is sent.

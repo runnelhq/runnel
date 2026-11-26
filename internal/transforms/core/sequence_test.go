@@ -56,9 +56,13 @@ func TestSequenceErrors(t *testing.T) {
 	if _, err := newSequence(map[string]any{"name": " "}); err == nil || !strings.Contains(err.Error(), "needs a name") {
 		t.Errorf("empty name: %v", err)
 	}
-	tr := transformtest.New(t, sequenceDefinition, map[string]any{"name": "n", "step": "ten"})
-	if _, _, err := transformtest.Run(context.Background(), tr, position(1, "a")); err == nil || err.Error() != `step: "ten" is not a whole number` {
+	// start and step are checked with the configuration; a variable once it is resolved
+	// (number fields, R5b2).
+	if _, err := newSequence(map[string]any{"name": "n", "step": "ten"}); err == nil || err.Error() != `field "step": expected a whole number, got "ten"` {
 		t.Errorf("step: %v", err)
+	}
+	if _, err := newSequence(map[string]any{"name": "n", "start": "${START}", "step": "${STEP}"}); err != nil {
+		t.Errorf("variables: %v", err)
 	}
 }
 

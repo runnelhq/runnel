@@ -116,7 +116,8 @@ func newRequest(with map[string]any) (action.Action, error) {
 		}
 	}
 	if a.Paginate != nil {
-		if err := a.Paginate.Check(); err != nil {
+		// A size given as ${…} or {{ … }} is checked when the action runs (R5b2).
+		if err := a.Paginate.Check(); err != nil && (!errors.Is(err, pagination.ErrNeedsSize) || !sizeLater(with)) {
 			return nil, err
 		}
 	}
@@ -142,6 +143,13 @@ func newRequest(with map[string]any) (action.Action, error) {
 // dynamic reports whether a value is only known when the action runs.
 func dynamic(s string) bool {
 	return strings.Contains(s, "{{") || strings.Contains(s, "${")
+}
+
+// sizeLater reports whether paginate.size is resolved only when the action runs.
+func sizeLater(with map[string]any) bool {
+	p, _ := with["paginate"].(map[string]any)
+	s, ok := p["size"].(string)
+	return ok && dynamic(s)
 }
 
 func parseURL(s string) (*url.URL, error) {

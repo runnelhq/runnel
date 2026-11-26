@@ -63,14 +63,14 @@ func TestStreamLookupConfig(t *testing.T) {
 	keys := []any{map[string]any{"field": "id"}}
 	ret := []any{map[string]any{"lookupField": "name"}}
 	for want, with := range map[string]map[string]any{
-		`missing required field "keys"`:                         {"return": ret},
-		"keys: name at least one field":                         {"keys": []any{}, "return": ret},
-		"return: name at least one field":                       {"keys": keys, "return": []any{}},
-		`missing required field "return[0].lookupField"`:        {"keys": keys, "return": []any{map[string]any{"as": "x"}}},
-		`invalid notFound "skip"`:                               {"keys": keys, "return": ret, "notFound": "skip"},
-		`invalid multiple "all"`:                                {"keys": keys, "return": ret, "multiple": "all"},
-		`maxRecords: "0" is not a whole number of 1 or more`:    {"keys": keys, "return": ret, "maxRecords": "0"},
-		`maxRecords: "many" is not a whole number of 1 or more`: {"keys": keys, "return": ret, "maxRecords": "many"},
+		`missing required field "keys"`:                           {"return": ret},
+		"keys: name at least one field":                           {"keys": []any{}, "return": ret},
+		"return: name at least one field":                         {"keys": keys, "return": []any{}},
+		`missing required field "return[0].lookupField"`:          {"keys": keys, "return": []any{map[string]any{"as": "x"}}},
+		`invalid notFound "skip"`:                                 {"keys": keys, "return": ret, "notFound": "skip"},
+		`invalid multiple "all"`:                                  {"keys": keys, "return": ret, "multiple": "all"},
+		`maxRecords: "0" is not a whole number of 1 or more`:      {"keys": keys, "return": ret, "maxRecords": "0"},
+		`field "maxRecords": expected a whole number, got "many"`: {"keys": keys, "return": ret, "maxRecords": "many"},
 	} {
 		if _, err := streamLookupDefinition.New(with); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v: %v, want %q", with, err, want)

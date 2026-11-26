@@ -42,11 +42,14 @@ func newResponse(with map[string]any) (action.Action, error) {
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}
+	if _, err := action.ParseStatus(a.Status, true); err != nil {
+		return nil, err
+	}
 	return a, nil
 }
 
 func (a *responseAction) Execute(ctx context.Context, ec *action.ExecContext) (action.Result, error) {
-	status, err := action.ParseStatus(a.Status)
+	status, err := action.ParseStatus(a.Status, true)
 	if err != nil {
 		return action.Result{}, err
 	}

@@ -450,3 +450,22 @@ func (r *Registry) Types() []string {
 // DecodeConfig decodes a "with" configuration like action.DecodeConfig; numbers in
 // fields of type any arrive as json.Number (record.Normalize makes them int64 or float64).
 func DecodeConfig(with map[string]any, v any) error { return action.DecodeConfigNumbers(with, v) }
+
+// ParseWholeNumber reads a whole number written as text in a field of type string, like
+// action.ParseWholeNumber: ${…} is resolved before the pipeline runs, {{ … }} is no number.
+func ParseWholeNumber(field, text string) (n int64, ok bool, err error) {
+	return action.ParseWholeNumber(field, text, false)
+}
+
+// ParseMaxRecords reads maxRecords (core.to-result, core.stream-lookup, http.response):
+// a whole number of 1 or more; def when empty or resolved only before the pipeline runs.
+func ParseMaxRecords(text string, def int64) (int64, error) {
+	n, ok, err := ParseWholeNumber("maxRecords", text)
+	if err != nil || !ok {
+		return def, err
+	}
+	if n < 1 {
+		return 0, fmt.Errorf("maxRecords: %q is not a whole number of 1 or more", text)
+	}
+	return n, nil
+}

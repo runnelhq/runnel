@@ -170,4 +170,4 @@ Weitere Regeln aus der Durchsicht der Namen vor 1.0 (Roadmap R5), mit den Bauste
 - **Standardwerte statt „ohne Grenze“:** `maxWait` von `file.wait`/`transfer.wait` 1 h (`0`: bis zum Timeout der
   Action), `timeout` von `core.script` 1 min (Action; im Transform für `init` und `end`), `maxSize` von
   `transfer.download` 1 GB. Ein vergessener Wert hält so keinen Lauf unbegrenzt fest.
-- **Zahlen mit `${…}`** in allen Zahlenfeldern (Befund D2) folgen getrennt in R5b2.
+- **Zahlen mit `${…}`** in allen Zahlenfeldern (Befund D2) folgen getrennt in R5b2 (Regel: ADR 0014, Nachtrag R5b2).

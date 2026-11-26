@@ -62,7 +62,14 @@ func TestToResult(t *testing.T) {
 	if _, err := run(map[string]any{"maxRecords": "1"}, in...); err == nil || !strings.Contains(err.Error(), "more than 1 records for the result (maxRecords)") {
 		t.Errorf("limit: %v", err)
 	}
-	if _, err := run(map[string]any{"maxRecords": "0"}, in...); err == nil || !strings.Contains(err.Error(), `maxRecords: "0" is not a whole number of 1 or more`) {
-		t.Errorf("invalid limit: %v", err)
+	// An invalid limit is an error of the configuration (number fields, R5b2).
+	for limit, want := range map[string]string{"0": `maxRecords: "0" is not a whole number of 1 or more`,
+		"many": `field "maxRecords": expected a whole number, got "many"`} {
+		if _, err := toResultDefinition.New(map[string]any{"maxRecords": limit}); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("limit %q: %v", limit, err)
+		}
+	}
+	if _, err := toResultDefinition.New(map[string]any{"maxRecords": "${N}"}); err != nil {
+		t.Errorf("variable: %v", err)
 	}
 }

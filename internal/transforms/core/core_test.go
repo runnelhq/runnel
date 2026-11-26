@@ -40,12 +40,17 @@ func TestGenerateRows(t *testing.T) {
 			t.Errorf("%s: %v", old, err)
 		}
 	}
-	// The number is checked when the pipeline runs: it may be a variable before.
-	for _, rows := range []string{"-1", "many", "${ROWS}"} {
-		tr := transformtest.New(t, generateRowsDefinition, map[string]any{"count": rows})
-		if _, _, err := transformtest.Run(context.Background(), tr); err == nil || !strings.Contains(err.Error(), "is not a whole number") {
-			t.Errorf("rows %q: %v", rows, err)
+	// The number is checked with the configuration; a variable once it is resolved,
+	// before the pipeline runs (number fields, R5b2).
+	for count, want := range map[string]string{"-1": `count: "-1" is not a whole number of 0 or more`,
+		"many": `field "count": expected a whole number, got "many"`, "": `count: "" is not a whole number`,
+		"{{ 5 }}": `field "count": expected a whole number, got "{{ 5 }}"`} {
+		if _, err := generateRowsDefinition.New(map[string]any{"count": count}); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("count %q: %v, want %q", count, err, want)
 		}
+	}
+	if _, err := generateRowsDefinition.New(map[string]any{"count": "${ROWS}"}); err != nil {
+		t.Errorf("count ${ROWS}: %v", err)
 	}
 }
 

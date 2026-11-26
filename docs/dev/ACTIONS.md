@@ -99,8 +99,11 @@ Regeln:
 
   Optionen werden mit Komma getrennt (`schema:"required,example=30s"`); Werte dürfen daher kein Komma enthalten.
   Backslashes in Tags verdoppeln (`example=C:\\in`), sonst ist das ganze Tag ungültig.
-- **Typen:** `string`, `bool`, Ganz- und Kommazahlen, Slices, `map[string]T`, verschachtelte Structs, `any`. Felder,
-  die `${…}` oder `{{ … }}` enthalten dürfen, als `string` anlegen – auch Zahlen und Zeitangaben. Ergibt ein Ausdruck
+- **Typen:** `string`, `bool`, Ganz- und Kommazahlen, Slices, `map[string]T`, verschachtelte Structs, `any`.
+  **Zahlenfelder** als `int` (bzw. `*int`, wenn `0` etwas anderes heißt als „nicht gesetzt“) anlegen: `DecodeConfig`
+  nimmt eine Zahl, eine Zahl als Text und `${…}`/`{{ … }}` an, andere Texte sind ein Fehler mit dem Namen des Felds
+  ([ADR 0014, Nachtrag R5b2](../adr/0014-action-descriptor-schema.md)). Übrige Felder, die `${…}` oder `{{ … }}`
+  enthalten dürfen, als `string` anlegen – auch Zeitangaben. Ergibt ein Ausdruck
   für ein Textfeld eine Zahl oder ein Datum, erhält die Action den Wert als Text. Ebenso wird eine Zahl oder
   `true`/`false` in der Datei (`status: 404`) für ein Textfeld als Text übergeben – vor dem Lauf wie bei der
   Ausführung, wie in Pipelines.
@@ -116,7 +119,9 @@ Regeln:
 - **`New` prüft nur die Struktur:** Pflichtfelder, Typen, unbekannte Felder. `New` wird zweimal aufgerufen: vor dem Lauf
   mit dem Text aus der Datei (Werte können noch `${…}` und `{{ … }}` enthalten) und vor jeder Ausführung mit aufgelösten
   Variablen und ausgewerteten Ausdrücken.
-  **Werte** wie Dauern, Zahlen in Textform, leere Texte oder Pfade werden daher erst in `Execute` geprüft.
+  **Werte** wie Dauern, leere Texte oder Pfade werden daher erst in `Execute` geprüft (oder in `New` nur, wenn sie kein
+  `${…}`/`{{ … }}` enthalten). Zahlen prüft `DecodeConfig`; eine Zahl in einem Textfeld liest
+  `action.ParseWholeNumber` nach derselben Regel.
 - **Zeitangaben** als `string` übernehmen und in `Execute` mit `model.Duration(s).Value()` umwandeln.
 - **Actions ohne Konfiguration** lassen `Config` weg und lehnen jedes Feld ab (`len(with) > 0` → Fehler); Vorlage: `core/dummy.go`.
 - **Kategorie** (`Category`): eine der Konstanten `action.Category…` (Gruppe in der Palette).

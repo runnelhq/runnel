@@ -12,7 +12,6 @@ import (
 	"maps"
 	"reflect"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/connection"
@@ -70,18 +69,18 @@ type Response struct {
 	Fallback bool
 }
 
-// ParseStatus reads the HTTP status of an answer (http.response as action and transform): a
-// number from 200 to 599; empty is 200.
-func ParseStatus(s string) (int, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return 200, nil
+// ParseStatus reads the HTTP status of an answer (http.response as action and transform)
+// by the rule of the number fields (R5b2): a number from 200 to 599; empty, or resolved
+// only when the run starts (see Deferred), is 200.
+func ParseStatus(s string, expressions bool) (int, error) {
+	n, ok, err := ParseWholeNumber("status", s, expressions)
+	if err != nil || !ok {
+		return 200, err
 	}
-	n, err := strconv.Atoi(s)
-	if err != nil || n < 200 || n > 599 {
-		return 0, fmt.Errorf("invalid status %q (expected a number from 200 to 599)", s)
+	if n < 200 || n > 599 {
+		return 0, fmt.Errorf("invalid status %q (expected a number from 200 to 599)", strings.TrimSpace(s))
 	}
-	return n, nil
+	return int(n), nil
 }
 
 // Responder delivers the answer of a run to the waiting caller of an http trigger and
@@ -353,19 +352,26 @@ func (r *Registry) Types() []string {
 // Unknown fields and missing required fields (tag schema:"required") are errors.
 // Field names are those of the json tags. Fields of type any, map[string]any and []any
 // get the values as they are, so that exact numbers and dates keep their type.
+// Number fields also take a number as text, ${…} and {{ … }} (see Deferred, R5b2).
 func DecodeConfig(with map[string]any, v any) error {
 	return decodeConfig(with, v, false)
 }
 
-// DecodeConfigNumbers is DecodeConfig, but numbers in fields of type any are decoded as
-// json.Number instead of float64, so that whole numbers stay whole (e.g. constant
-// values of pipeline transforms; see record.Normalize).
+// DecodeConfigNumbers is DecodeConfig for transforms: numbers in fields of type any are
+// decoded as json.Number instead of float64, so that whole numbers stay whole (e.g.
+// constant values of pipeline transforms; see record.Normalize), and number fields take
+// ${…}, but not {{ … }}, which the configuration of a transform does not evaluate.
 func DecodeConfigNumbers(with map[string]any, v any) error {
 	return decodeConfig(with, v, true)
 }
 
-func decodeConfig(with map[string]any, v any, useNumber bool) error {
-	data, err := json.Marshal(with)
+func decodeConfig(with map[string]any, v any, transform bool) error {
+	useNumber := transform
+	values, _, err := numberTexts(with, reflect.TypeOf(v), "", !transform)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(values)
 	if err != nil {
 		return err
 	}
@@ -376,7 +382,7 @@ func decodeConfig(with map[string]any, v any, useNumber bool) error {
 	}
 	if err := dec.Decode(v); err != nil {
 		if typeErr, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
-			return fmt.Errorf("field %q: expected %s, got %s", typeErr.Field, typeErr.Type.Kind(), typeErr.Value)
+			return fmt.Errorf("field %q: expected %s, got %s", typeErr.Field, numberKind(typeErr.Type), typeErr.Value)
 		}
 		if field, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
 			return fmt.Errorf("unknown field %s", field)
