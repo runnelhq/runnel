@@ -1388,8 +1388,9 @@ Umgesetzt (Stand S16f): `core.generate-rows`, `core.dummy`, `core.log`, `core.fi
 
 - **`csv.input`** liest alle Spalten als Text (offenes Schema) oder mit `fields:` nur die genannten, mit Typ und Format
   (geschlossenes Schema). Spalten werden über die Kopfzeile gefunden (`fields[].from`, wenn die Spalte anders heißt
-  als das Feld; S70b), ohne Kopfzeile über die Position. Ein Wert, der
-  nicht passt, hält die Pipeline mit Datei, Zeile und Spalte an. `encoding: auto` erkennt UTF-8 und UTF-16 am BOM und
+  als das Feld; S70b), ohne Kopfzeile über die Position. Eine Zeile mit
+  anderer Zahl von Werten oder ein Wert, der nicht passt, geht mit Datei, Zeile und Spalte auf den Fehler-Link; ohne
+  Fehler-Link hält die Pipeline an. `encoding: auto` erkennt UTF-8 und UTF-16 am BOM und
   liest sonst UTF-8; ungültiges UTF-8 wird mit dem Hinweis auf `windows-1252` gemeldet.
 - **`excel.input`** liest ein Blatt einer Arbeitsmappe (`.xlsx`, `.xlsm`; S67a), nach Name (ohne Groß- und
   Kleinschreibung, wie Excel) oder Nummer, sonst das erste. Die Tabelle beginnt bei `range` (`A3`; mit letzter Spalte

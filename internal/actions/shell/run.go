@@ -49,7 +49,7 @@ type runAction struct {
 	Env       map[string]string `json:"env" doc:"Further environment variables; the only place for secrets (${secret:…}), as arguments are visible to other users" schema:"format=runnel-secret"`
 	Input     *string           `json:"input" doc:"Text for stdin; missing: stdin is empty, so that a program waiting for input does not hang"`
 	Encoding  string            `json:"encoding" doc:"Encoding of stdout and stderr; auto: UTF-8, else the OEM code page of Windows" schema:"enum=auto|utf-8|oem|windows-1252,default=auto"`
-	JSON      bool              `json:"json" doc:"Read stdout as JSON into output.json" schema:"default=false"`
+	JSON      bool              `json:"json" doc:"Read the last JSON value of stdout into output.json" schema:"default=false"`
 	MaxOutput string            `json:"maxOutput" doc:"Largest size of stdout and of stderr kept, e.g. 500KB or 10MB; more is dropped (truncated)" schema:"default=1MB"`
 	Timeout   string            `json:"timeout" doc:"Longest time the program may run; then it ends with all processes it started" schema:"format=runnel-duration,default=10m"`
 }
