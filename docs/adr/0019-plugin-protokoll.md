@@ -591,3 +591,20 @@ Befund aus dem Test mit `plugin-iban`: Bausteine mit unbekannter oder fehlender 
 - **Verhalten:** Ein Transform ohne Kategorie verhält sich wie einer der Kategorie `transform`.
 - **SDK:** `runnelhq/sdk-go` behandelt eine unbekannte Kategorie bisher als Programmierfehler; eine leere Kategorie
   sollte es zulassen (Änderung im SDK).
+
+## Nachtrag 2026-11-26 (Rust-SDK): leere Listen und IDs
+
+Befunde aus `runnelhq/sdk-rust` (v0.1.0) und `runnelhq/plugin-faker` (v0.1.0, Rust):
+
+- **Leere Listen:** Runnel schickte in `transform.init` für einen Transform ohne eingehende bzw. ausgehende Links
+  `"input": {"fields": null}` und `"targets": null` statt `[]`; das Rust-SDK lehnte die Anfrage ab. Seit dem Fix
+  schickt Runnel leere Listen als `[]`. Für alle Nachrichten gilt zusätzlich: `null` anstelle einer Liste oder eines
+  Objekts bedeutet leer bzw. nicht angegeben; Plugins und SDKs lesen es so (auch wegen älterer Versionen von Runnel).
+  Das Go-SDK liest `null` ohnehin als leere Liste, das Rust-SDK ab v0.1.0.
+- **IDs:** Runnel nummeriert Anfragen mit ganzen Zahlen ab 1. Plugins dürfen sich darauf verlassen, dass eine ID eine
+  ganze Zahl im Bereich von int64 oder ein Text ist. Eine andere ID (z. B. `1e999`, ein Objekt) beantworten sie mit
+  `-32600` und `"id": null`, statt sie zurückzuschicken; strenge JSON-Parser könnten die Antwort sonst nicht lesen.
+  Befund aus dem Zufallstest des Rust-SDK; das Go-SDK folgt in seinem Repository.
+- **Rust-SDK:** Schemas aus Rust-Structs mit `#[derive(Config)]`, dieselben wie im Go-SDK; Laufzeit ohne async
+  (Threads und Channels). Durchsatz eines Stroms mit fünf Feldern (vier Kerne): etwa 450.000 Records/s mit dem
+  Test-Client, etwa 380.000 mit Runnel.

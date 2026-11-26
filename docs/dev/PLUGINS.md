@@ -8,10 +8,13 @@ Nachtrag 2026-11-24).
 Diese Datei ist die verbindliche Beschreibung für Plugins und SDKs. Stand: **S50b** – Ablage, `plugin.yaml`, Freigabe,
 Protokoll, Actions in Workflows, eigene Connection-Typen und Transforms in Pipelines mit Schema und „Felder ermitteln“.
 
-In Go schreibt man Plugins am einfachsten mit dem [Go-SDK](https://github.com/runnelhq/sdk-go) (S51); Beispiele sind
-die offiziellen Plugins [`plugin-iban`](https://github.com/runnelhq/plugin-iban) (Actions und ein Transform mit
-Fehler-Link) und [`plugin-ldap`](https://github.com/runnelhq/plugin-ldap) (Connection-Typ mit Test, Actions und eine
-Eingabe mit „Felder ermitteln“). Die Tests von Runnel nutzen kein SDK, sondern sprechen das
+In Go schreibt man Plugins am einfachsten mit dem [Go-SDK](https://github.com/runnelhq/sdk-go) (S51), in Rust mit dem
+[Rust-SDK](https://github.com/runnelhq/sdk-rust) (Crate `runnel-plugin`, gleicher Umfang, dieselben Transkripte in
+`testdata/protocol/`). Beispiele sind die offiziellen Plugins [`plugin-iban`](https://github.com/runnelhq/plugin-iban)
+(Go: Actions und ein Transform mit Fehler-Link), [`plugin-ldap`](https://github.com/runnelhq/plugin-ldap) (Go:
+Connection-Typ mit Test, Actions und eine Eingabe mit „Felder ermitteln“) und
+[`plugin-faker`](https://github.com/runnelhq/plugin-faker) (Rust: Eingabe mit `transform.init`, Transform zum
+Pseudonymisieren, Action). Die Tests von Runnel nutzen kein SDK, sondern sprechen das
 Protokoll direkt (`internal/plugin/plugintest`).
 
 ## Ablage
@@ -140,7 +143,11 @@ Variable gestartet, gibt es einen kurzen Hinweis aus und endet.
 - **Abbruch:** `$/cancelRequest` (Notification, `{"id": n}`) bei Abbruch oder Timeout. Das Plugin soll die Arbeit
   beenden und kann mit dem Fehler `-32800` antworten; der Host wartet nicht darauf.
 - **Unbekannte Methoden** beantwortet das Plugin mit `-32601`; der Host behandelt das als „nicht angeboten“. Unbekannte
-  Felder ignorieren beide Seiten (Änderungen in Version 1 sind nur additiv).
+  Felder ignorieren beide Seiten (Änderungen in Version 1 sind nur additiv). `null` anstelle einer Liste oder eines
+  Objekts gilt als leer bzw. nicht angegeben; Runnel selbst schickt leere Listen als `[]`.
+- **IDs:** Runnel nummeriert Anfragen mit ganzen Zahlen ab 1. Eine ID ist eine ganze Zahl im Bereich von int64 oder ein
+  Text; eine andere (z. B. `1e999`, ein Objekt) beantwortet das Plugin mit `-32600` und `"id": null`, statt sie
+  zurückzuschicken.
 - **Fehler:** Endet das Plugin während einer Anfrage oder schreibt es etwas anderes als JSON-RPC auf stdout, scheitert
   die Anfrage mit den letzten Zeilen von stderr; der Lauf behandelt das wie jeden Fehler.
 - **Secrets**, die der Host in der `config` übergibt, maskiert er in stderr, Fehlermeldungen und `output` (mit S49b2).
