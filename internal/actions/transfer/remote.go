@@ -36,14 +36,28 @@ var errTooLarge = errors.New("larger than maxSize")
 
 // timeoutOf reads the field timeout of an action.
 func timeoutOf(text string) (time.Duration, error) {
+	return durationOf("timeout", text, defaultTimeout)
+}
+
+// durationOf reads a duration field of an action; empty is the fallback.
+func durationOf(field, text string, fallback time.Duration) (time.Duration, error) {
 	if strings.TrimSpace(text) == "" {
-		return defaultTimeout, nil
+		return fallback, nil
 	}
 	d, err := model.Duration(text).Value()
 	if err != nil || d <= 0 {
-		return 0, fmt.Errorf("timeout: %q is not a duration like 30s or 10m", text)
+		return 0, fmt.Errorf("%s: %q is not a duration like 30s or 10m", field, text)
 	}
 	return d, nil
+}
+
+// checkChoice checks the value of a field with fixed values; placeholders are checked
+// when the action runs.
+func checkChoice(field, v string, allowed ...string) error {
+	if v == "" || slices.Contains(allowed, v) || strings.Contains(v, "${") || strings.Contains(v, "{{") {
+		return nil
+	}
+	return fmt.Errorf("invalid %s %q (expected %s)", field, v, strings.Join(allowed[:len(allowed)-1], ", ")+" or "+allowed[len(allowed)-1])
 }
 
 // checkIfExists checks the value of ifExists, as in file.copy.
@@ -123,23 +137,47 @@ func (s *session) readDir(dir string) ([]fs.FileInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read folder %q on the server: %w", dir, plain(err))
 	}
+	// The library passes the base of each name; "x/.." would still come through as "..".
+	for _, e := range entries {
+		if n := e.Name(); n == "" || n == "." || n == ".." || strings.Contains(n, "/") {
+			return nil, fmt.Errorf("the server sent the unsafe name %q in folder %q", n, dir)
+		}
+	}
 	slices.SortFunc(entries, func(a, b fs.FileInfo) int { return strings.Compare(a.Name(), b.Name()) })
 	return entries, nil
+}
+
+// entry is a file, folder or link on the server with what the server reports about it.
+type entry struct {
+	path string
+	info fs.FileInfo
 }
 
 // match returns the entries on the server a path stands for, like file.Match: the path
 // itself, or the entries of its folder whose names match the wildcards of its last
 // element (case-sensitive, as on most servers). Nothing found is no error.
 func (s *session) match(p string) ([]string, error) {
+	found, err := s.find(p, true, 0)
+	out := make([]string, len(found))
+	for i, e := range found {
+		out[i] = e.path
+	}
+	return out, err
+}
+
+// find is match with the entries: with follow, links count as what they point to (a
+// broken link is missing); without, as links (delete and move act on the link itself).
+// More than limit entries is an error (0: no limit).
+func (s *session) find(p string, follow bool, limit int) ([]entry, error) {
 	if strings.TrimSpace(p) == "" {
 		return nil, errors.New("no path given")
 	}
 	if !hasWildcard(p) {
-		info, err := s.stat(p)
+		info, err := s.lookup(p, follow)
 		if info == nil || err != nil {
 			return nil, err
 		}
-		return []string{p}, nil
+		return []entry{{p, info}}, nil
 	}
 	dir, pattern := path.Split(p)
 	if dir == "" {
@@ -155,13 +193,47 @@ func (s *session) match(p string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	var out []entry
 	for _, e := range entries {
-		if ok, _ := path.Match(pattern, e.Name()); ok {
-			out = append(out, path.Join(dir, e.Name()))
+		if ok, _ := path.Match(pattern, e.Name()); !ok {
+			continue
 		}
+		info := e
+		if follow && e.Mode()&fs.ModeSymlink != 0 {
+			if info, err = s.stat(path.Join(dir, e.Name())); err != nil {
+				return nil, err
+			}
+			if info == nil {
+				continue
+			}
+		}
+		if limit > 0 && len(out) == limit {
+			return nil, fmt.Errorf("more than %d entries on the server match %q; narrow the pattern", limit, p)
+		}
+		out = append(out, entry{path.Join(dir, e.Name()), info})
 	}
 	return out, nil
+}
+
+// lookup is stat, or lstat without follow: a missing path is nil without error.
+func (s *session) lookup(p string, follow bool) (fs.FileInfo, error) {
+	if follow {
+		return s.stat(p)
+	}
+	info, err := s.sftp.Lstat(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("cannot read %q on the server: %w", p, plain(err))
+	}
+	return info, nil
+}
+
+// remoteName reports whether a name from the server is safe to join to a path on the
+// server: one element, not "." or "..", without / or \ (a separator on Windows servers).
+func remoteName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, `/\`)
 }
 
 // walk calls fn for the entries of a folder on the server in the order of their paths,

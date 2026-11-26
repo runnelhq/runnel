@@ -11,7 +11,8 @@ import (
 
 // BenchmarkTransfer uploads and downloads against the test server on this computer:
 // many small files (one connection per execution, a temporary file and a rename each)
-// and one large file (throughput of SFTP).
+// and one large file (throughput of SFTP); it deletes and moves many files with a pattern
+// (one call on the server per file).
 func BenchmarkTransfer(b *testing.B) {
 	srv := newTestServer(b)
 	project := b.TempDir()
@@ -46,6 +47,34 @@ func BenchmarkTransfer(b *testing.B) {
 			if _, _, err := execute(ctx, b, downloadDefinition, srv.conn(), map[string]any{"source": "large/big.bin", "target": "out/big.bin", "ifExists": "replace"}); err != nil {
 				b.Fatal(err)
 			}
+		}
+	})
+	b.Run("delete-100", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			b.StopTimer()
+			for i := range 100 {
+				writeFile(b, srv.root, fmt.Sprintf("del/%03d.csv", i), "x")
+			}
+			b.StartTimer()
+			res, _, err := execute(ctx, b, deleteDefinition, srv.conn(), map[string]any{"path": "del/*.csv"})
+			if err != nil || len(res.Output.([]any)) != 100 {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("move-100", func(b *testing.B) {
+		for i := range 100 {
+			writeFile(b, srv.root, fmt.Sprintf("a/%03d.csv", i), "x")
+		}
+		from, to := "a", "b"
+		b.ReportAllocs()
+		for b.Loop() {
+			res, _, err := execute(ctx, b, moveDefinition, srv.conn(), map[string]any{"source": from + "/*.csv", "target": to + "/"})
+			if err != nil || len(res.Output.([]any)) != 100 {
+				b.Fatal(err)
+			}
+			from, to = to, from
 		}
 	})
 }

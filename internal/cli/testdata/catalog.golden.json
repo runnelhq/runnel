@@ -1383,6 +1383,63 @@
       "example": "program: robocopy\nargs: [ data/out, \"\\\\\\\\server\\\\share\\\\in\", \"*.csv\", /MIR ]\nokCodes: [ 0, 1, 2, 3 ]\ntimeout: 10m\n"
     },
     {
+      "type": "transfer.delete",
+      "kind": "action",
+      "category": "network",
+      "label": "Delete Files on Server",
+      "description": "Deletes files or folders on a server (SFTP); output: the deleted paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively",
+            "examples": [
+              "/outgoing/*.csv"
+            ]
+          },
+          "recursive": {
+            "type": "boolean",
+            "description": "Also delete folders with everything in them",
+            "default": false
+          },
+          "ifMissing": {
+            "type": "string",
+            "description": "If nothing matches the path: skip (nothing is deleted) or fail",
+            "enum": [
+              "skip",
+              "fail"
+            ],
+            "default": "skip"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for each matching file or folder with its content, e.g. 5m; the timeout of the action limits all together",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "connection",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\npath: /outgoing/*.csv\n"
+    },
+    {
       "type": "transfer.download",
       "kind": "action",
       "category": "network",
@@ -1451,6 +1508,59 @@
       "example": "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: inbox/\nifExists: replace\n"
     },
     {
+      "type": "transfer.exists",
+      "kind": "action",
+      "category": "network",
+      "label": "File Exists on Server",
+      "description": "Checks whether files or folders exist on a server (SFTP); output: the matching paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively",
+            "examples": [
+              "/outgoing/*.csv"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "What has to exist",
+            "enum": [
+              "any",
+              "file",
+              "folder"
+            ],
+            "default": "any"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for the check, e.g. 1m; the timeout of the action limits all together",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "connection",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\npath: /outgoing/orders-*.csv\nkind: file\n"
+    },
+    {
       "type": "transfer.list",
       "kind": "action",
       "category": "network",
@@ -1514,6 +1624,110 @@
       "example": "connection: partner-sftp\nfolder: /outgoing\npattern: \"*.csv\"\n"
     },
     {
+      "type": "transfer.mkdir",
+      "kind": "action",
+      "category": "network",
+      "label": "Create Folder on Server",
+      "description": "Creates a folder with its parent folders on a server (SFTP); output: the path",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Folder to create on the server, e.g. /outgoing/archive (relative: to the folder after the sign-in)",
+            "examples": [
+              "/outgoing/archive"
+            ]
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time to create the folder, e.g. 1m; the timeout of the action limits all together",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "connection",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\npath: \"/outgoing/archive/{{ formatDate(today(), 'yyyy-MM-dd') }}\"\n"
+    },
+    {
+      "type": "transfer.move",
+      "kind": "action",
+      "category": "network",
+      "label": "Move Files on Server",
+      "description": "Moves or renames files or folders on a server (SFTP); output: the new paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "File or folder on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively",
+            "examples": [
+              "/outgoing/*.csv"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Folder on the same server, e.g. /outgoing/archive/; for a single file or folder also a new name",
+            "examples": [
+              "/outgoing/archive/"
+            ]
+          },
+          "ifExists": {
+            "type": "string",
+            "description": "If a file exists in the target: replace it, skip it (the source stays and is not in the output), or fail before anything is moved",
+            "enum": [
+              "replace",
+              "skip",
+              "fail"
+            ],
+            "default": "fail"
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for each file or folder, e.g. 1m; the timeout of the action limits all together",
+            "format": "runnel-duration",
+            "default": "10m"
+          }
+        },
+        "required": [
+          "connection",
+          "source",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\nsource: /outgoing/*.csv\ntarget: /outgoing/archive/\n"
+    },
+    {
       "type": "transfer.upload",
       "kind": "action",
       "category": "network",
@@ -1573,6 +1787,71 @@
         "additionalProperties": false
       },
       "example": "connection: partner-sftp\nsource: outbox/*.csv\ntarget: /incoming/\n"
+    },
+    {
+      "type": "transfer.wait",
+      "kind": "action",
+      "category": "network",
+      "label": "Wait for File on Server",
+      "description": "Waits until files exist on a server (SFTP); output: the matching paths",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "Connection of the server (a file in connections/)",
+            "format": "runnel-connection",
+            "examples": [
+              "partner-sftp"
+            ],
+            "x-runnel-connection": [
+              "sftp"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "File to wait for on the server, e.g. /outgoing/*.csv (relative: to the folder after the sign-in); wildcards are allowed in the name and match case-sensitively",
+            "examples": [
+              "/outgoing/*.csv"
+            ]
+          },
+          "interval": {
+            "type": "string",
+            "description": "How often to look, e.g. 5s or 1m",
+            "format": "runnel-duration",
+            "default": "5s"
+          },
+          "maxWait": {
+            "type": "string",
+            "description": "Give up and fail after this time; empty: wait until the action's timeout or the end of the run",
+            "format": "runnel-duration",
+            "examples": [
+              "2h"
+            ]
+          },
+          "stableFor": {
+            "type": "string",
+            "description": "The size of the files must not change for this time, e.g. 30s; empty: do not check",
+            "format": "runnel-duration",
+            "examples": [
+              "30s"
+            ]
+          },
+          "timeout": {
+            "type": "string",
+            "description": "Longest time for one look on the server, e.g. 30s; after it Runnel connects again",
+            "format": "runnel-duration",
+            "default": "1m"
+          }
+        },
+        "required": [
+          "connection",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "example": "connection: partner-sftp\npath: /outgoing/*.csv\ninterval: 1m\nmaxWait: 2h\nstableFor: 30s\n"
     }
   ],
   "transforms": [

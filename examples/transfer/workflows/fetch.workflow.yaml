@@ -1,5 +1,7 @@
-# Lists the CSV files in /outgoing on the server and downloads them into inbox/; files
-# that are already there stay (ifExists: skip).
+# Lists the CSV files in /outgoing on the server, moves them on the server into a folder
+# of the day under /outgoing/archive/ (S57b) and downloads them from there into inbox/;
+# files that are already in inbox/ stay (ifExists: skip). A file that arrives in /outgoing
+# while the workflow runs stays there for the next run.
 #   runnel run -v examples/transfer/workflows/fetch.workflow.yaml
 kind: Workflow
 apiVersion: runnel/v1
@@ -13,24 +15,32 @@ actions:
       connection: partner-sftp
       folder: /outgoing
       pattern: "*.csv"
+  - id: archive
+    type: transfer.move
+    with:
+      connection: partner-sftp
+      source: /outgoing/*.csv
+      target: "/outgoing/archive/{{ formatDate(today(), 'yyyy-MM-dd') }}/"
+      ifExists: replace
   - id: download
     type: transfer.download
     with:
       connection: partner-sftp
-      source: /outgoing/*.csv
+      source: "/outgoing/archive/{{ formatDate(today(), 'yyyy-MM-dd') }}/*.csv"
       target: inbox/
       ifExists: skip
       maxSize: 100MB
   - id: done
     type: core.log
     with:
-      message: "Found {{ len(results.list.output) }} files on the server, downloaded {{ len(results.download.output) }}"
+      message: "Found {{ len(results.list.output) }} files on the server, archived {{ len(results.archive.output) }}, downloaded {{ len(results.download.output) }}"
   - id: nothing
     type: core.log
     with:
       message: No CSV files on the server
 links:
   - { from: start, to: list }
-  - { from: list, to: download, when: "{{ len(result.output) > 0 }}" }
+  - { from: list, to: archive, when: "{{ len(result.output) > 0 }}" }
+  - { from: archive, to: download }
   - { from: list, to: nothing, when: "{{ len(result.output) == 0 }}" }
   - { from: download, to: done }

@@ -566,3 +566,29 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   … entries“); geschrieben wird nichts.
 - **Abhängigkeiten:** `github.com/pkg/sftp` v1.13.12 (BSD-2-Clause) mit `github.com/kr/fs` v0.1.0 (BSD-3-Clause) und
   `golang.org/x/crypto/ssh` (BSD-3-Clause, `x/crypto` war schon indirekt im Modul).
+
+## Nachtrag 2026-11-26 (S57b): weitere Actions für `sftp`
+
+- **Optionen wie `file.*` (ADR 0025):** `transfer.delete` (`path`, `recursive`, `ifMissing` mit Standard `skip`),
+  `transfer.move` (`source`, `target`, `ifExists` mit Standard `fail`), `transfer.mkdir` (`path`), `transfer.exists`
+  (`path`, `kind`) und `transfer.wait` (`path`, `interval`, `maxWait`, `stableFor`) haben Namen, Standardwerte, Output
+  und Meldungen der gleichnamigen `file.*`-Actions; dazu `timeout`. Pfade auf dem Server wie in S57a.
+- **`transfer.move` nur auf dem Server:** Quelle und Ziel liegen auf demselben Server; Runnel lässt den Server
+  umbenennen (`posix-rename@openssh.com`, wo vorhanden, sonst bei `ifExists: replace` Löschen und `rename` wie in S57a)
+  und kopiert nichts. Liegt das Ziel auf einem anderen Dateisystem des Servers, meldet der Server einen Fehler. Lokal ↔
+  Server bleibt bei `transfer.upload` und `transfer.download`.
+- **Verknüpfungen:** `transfer.delete` und `transfer.move` behandeln Verknüpfungen als Einträge für sich: gelöscht bzw.
+  verschoben wird die Verknüpfung, nie ihr Ziel, auch nicht beim rekursiven Löschen. `transfer.exists` und
+  `transfer.wait` zählen eine Verknüpfung als das, worauf sie zeigt (wie `file.exists`), eine kaputte als fehlend.
+- **`transfer.wait` mit einer Verbindung:** Das Warten nutzt eine SSH-Verbindung für alle Blicke auf den Server (keine
+  Anmeldung je `interval`). Bricht sie ab oder dauert ein Blick länger als `timeout` (Standard 1 Minute), schließt
+  Runnel sie, meldet eine Warnung und verbindet sich beim nächsten Blick neu; ein Fehler beim Neuverbinden wird beim
+  übernächsten Blick wiederholt, bis `maxWait`, das `timeout` der Action oder das Ende des Laufs erreicht ist. Ein
+  abgelehnter Hostschlüssel oder eine abgelehnte Anmeldung beenden das Warten sofort, damit kein Konto durch
+  Wiederholen gesperrt wird. Einen Pool über Actions hinweg gibt es weiterhin nicht.
+- **Grenzen:** `timeout` gilt je Treffer (beim Löschen mit dem Inhalt des Ordners, beim Verschieben je Eintrag) bzw.
+  für das Suchen der Treffer, Standard 10 Minuten. Mehr als 10000 Treffer eines Platzhalters sind bei `delete`,
+  `move`, `exists` und `wait` ein Fehler (wie die Grenze von `transfer.list`).
+- **Sicherheit:** Namen aus einer Ordnerliste des Servers, die `""`, `.`, `..` sind oder `/` enthalten, sind für alle
+  `transfer.*`-Actions ein Fehler (sonst könnte etwa ein rekursives Löschen den übergeordneten Ordner treffen); beim
+  Löschen und Verschieben zusätzlich Namen mit `\`, weil Windows-Server ihn als Trennzeichen lesen.

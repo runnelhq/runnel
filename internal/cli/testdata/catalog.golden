@@ -25,12 +25,17 @@ actions / files
   file.wait        Wait for File    Waits until files exist; output: the matching paths
   file.write       Write File       Writes a text or a value as JSON to a file, replacing it or appending; output: path and size
 actions / network
-  http.request       HTTP Request          Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer
-  http.response      HTTP Response         Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
-  mail.send          Send Mail             Sends a mail through a mail server, with text or HTML and attachments
-  transfer.download  Download Files        Downloads files or folders from a server (SFTP); output: the downloaded files
-  transfer.list      List Files on Server  Lists the files of a folder on a server (SFTP); output: path, name, size, modified and folder of each entry
-  transfer.upload    Upload Files          Uploads files or folders to a server (SFTP); output: the uploaded files
+  http.request       HTTP Request             Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer
+  http.response      HTTP Response            Answers the caller of an HTTP trigger with status, headers and body; output: sent and status
+  mail.send          Send Mail                Sends a mail through a mail server, with text or HTML and attachments
+  transfer.delete    Delete Files on Server   Deletes files or folders on a server (SFTP); output: the deleted paths
+  transfer.download  Download Files           Downloads files or folders from a server (SFTP); output: the downloaded files
+  transfer.exists    File Exists on Server    Checks whether files or folders exist on a server (SFTP); output: the matching paths
+  transfer.list      List Files on Server     Lists the files of a folder on a server (SFTP); output: path, name, size, modified and folder of each entry
+  transfer.mkdir     Create Folder on Server  Creates a folder with its parent folders on a server (SFTP); output: the path
+  transfer.move      Move Files on Server     Moves or renames files or folders on a server (SFTP); output: the new paths
+  transfer.upload    Upload Files             Uploads files or folders to a server (SFTP); output: the uploaded files
+  transfer.wait      Wait for File on Server  Waits until files exist on a server (SFTP); output: the matching paths
 actions / database
   db.execute  Execute SQL  Runs an SQL statement on a database, e.g. to insert, update or delete rows
   db.query    Query SQL    Reads the rows of an SQL query into the workflow; output: rows, count, first and value

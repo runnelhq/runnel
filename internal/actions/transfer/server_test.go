@@ -28,6 +28,10 @@ type testServer struct {
 	port        string
 	fingerprint string
 	clientKey   ed25519.PrivateKey
+
+	mu       sync.Mutex
+	conns    []net.Conn
+	accepted int // connections so far
 }
 
 const testPassword = "secret-pw"
@@ -71,18 +75,10 @@ func newTestServer(t testing.TB) *testServer {
 		t.Fatal(err)
 	}
 	_, srv.port, _ = net.SplitHostPort(l.Addr().String())
-	var (
-		wg    sync.WaitGroup
-		mu    sync.Mutex
-		conns []net.Conn
-	)
+	var wg sync.WaitGroup
 	t.Cleanup(func() {
 		_ = l.Close()
-		mu.Lock()
-		for _, c := range conns {
-			_ = c.Close()
-		}
-		mu.Unlock()
+		srv.drop()
 		wg.Wait()
 	})
 	wg.Go(func() {
@@ -91,13 +87,31 @@ func newTestServer(t testing.TB) *testServer {
 			if err != nil {
 				return
 			}
-			mu.Lock()
-			conns = append(conns, conn)
-			mu.Unlock()
+			srv.mu.Lock()
+			srv.conns = append(srv.conns, conn)
+			srv.accepted++
+			srv.mu.Unlock()
 			wg.Go(func() { srv.serve(conn, config) })
 		}
 	})
 	return srv
+}
+
+// drop closes all connections, as if the network failed.
+func (srv *testServer) drop() {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	for _, c := range srv.conns {
+		_ = c.Close()
+	}
+	srv.conns = nil
+}
+
+// connections returns the number of connections so far.
+func (srv *testServer) connections() int {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	return srv.accepted
 }
 
 // serve speaks SSH on one connection and starts SFTP on request.
