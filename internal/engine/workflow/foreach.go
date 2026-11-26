@@ -18,9 +18,9 @@ import (
 // entry is row in its expressions, up to parallel entries run at the same time, each
 // with the retries and timeout of the action. The output lists the entries with their
 // result (items) and counts them (succeeded, failed); the log messages of an entry start
-// with its number, e.g. "[2/5] ". With stopOnError (the default)
-// the first failed entry stops the others and fails the action; otherwise all entries
-// run and the action fails at the end if one of them failed.
+// with its number, e.g. "[2/5] ". By default the first failed entry stops the others
+// and fails the action; with continueOnEntryError all entries run and the action fails
+// at the end if one of them failed.
 func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any) (action.Result, error) {
 	v, err := r.evalText(a.ForEach, scope, values)
 	if err != nil {
@@ -34,7 +34,7 @@ func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Acti
 	default:
 		return action.Result{}, fmt.Errorf("forEach: the expression must return a list, got %s", expr.Format(v))
 	}
-	stop := a.StopOnError == nil || *a.StopOnError
+	stop := !a.ContinueOnEntryError
 	parallel := min(max(a.Parallel, 1), max(len(list), 1))
 
 	ctx, cancel := context.WithCancelCause(ctx)

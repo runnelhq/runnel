@@ -109,8 +109,12 @@ type Action struct {
 	ForEach string `yaml:"forEach,omitempty" json:"forEach,omitempty"`
 	// Parallel is the number of entries of forEach run at the same time; 0: 1.
 	Parallel int `yaml:"parallel,omitempty" json:"parallel,omitempty"`
-	// StopOnError stops forEach at the first failed entry; nil: true.
-	StopOnError *bool `yaml:"stopOnError,omitempty" json:"stopOnError,omitempty"`
+	// ContinueOnEntryError lets all entries of forEach run when one fails (the action
+	// fails at the end); false: the first failed entry stops the others. Same polarity as
+	// continueOnError (R5a).
+	ContinueOnEntryError bool `yaml:"continueOnEntryError,omitempty" json:"continueOnEntryError,omitempty"`
+	// StopOnError is the name with the opposite meaning until R5a, only read to report it.
+	StopOnError *bool `yaml:"stopOnError,omitempty" json:"-"`
 }
 
 // MaxParallel limits the entries of forEach that run at the same time.
@@ -363,9 +367,12 @@ func (w *Workflow) validate() error {
 			if a.Parallel != 0 {
 				add(path+".parallel", "%s: parallel is only possible with forEach", label)
 			}
-			if a.StopOnError != nil {
-				add(path+".stopOnError", "%s: stopOnError is only possible with forEach", label)
+			if a.ContinueOnEntryError {
+				add(path+".continueOnEntryError", "%s: continueOnEntryError is only possible with forEach", label)
 			}
+		}
+		if a.StopOnError != nil {
+			add(path+".stopOnError", "%s: stopOnError was replaced by continueOnEntryError with the opposite meaning: write continueOnEntryError: %t", label, !*a.StopOnError)
 		}
 		if a.Parallel < 0 || a.Parallel > MaxParallel {
 			add(path+".parallel", "%s: parallel must be between 1 and %d", label, MaxParallel)

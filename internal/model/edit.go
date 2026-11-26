@@ -43,7 +43,7 @@ type WorkflowEdit struct {
 type SetField struct {
 	ID string `json:"id"`
 	// Field is one of description, timeout, continueOnError, join, joinTimeout,
-	// retry.attempts, retry.backoff, retry.strategy, forEach, parallel, stopOnError or
+	// retry.attempts, retry.backoff, retry.strategy, forEach, parallel, continueOnEntryError or
 	// with.<name>.
 	Field string `json:"field"`
 	// Value is a text, a number or true/false.
@@ -64,7 +64,7 @@ var (
 	settableFields = map[string]bool{
 		"description": true, "timeout": true, "continueOnError": true, "join": true, "joinTimeout": true,
 		"retry.attempts": true, "retry.backoff": true, "retry.strategy": true,
-		"forEach": true, "parallel": true, "stopOnError": true,
+		"forEach": true, "parallel": true, "continueOnEntryError": true,
 	}
 	configKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 )

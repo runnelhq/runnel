@@ -46,15 +46,15 @@ links:
   - { from: start, to: each }
   - { from: each, to: report, when: always }
 `
-	// stopOnError (default): entry 2 fails the action; 3 and 4 do not run.
+	// Default: entry 2 fails the action; 3 and 4 do not run.
 	res, trace := runWorkflow(t, parse(t, body), nil)
 	logs := strings.Join(trace, "\n")
 	if res.Status != Succeeded || !strings.Contains(logs, "finished each: failed") || !strings.Contains(logs, "log report: 1/1/2") {
 		t.Errorf("stop: %s\n%s", res.Status, logs)
 	}
 
-	// stopOnError: false: all entries run, a warning per failed one, the action fails at the end.
-	body = strings.Replace(body, "    forEach:", "    stopOnError: false\n    forEach:", 1)
+	// continueOnEntryError: all entries run, a warning per failed one, the action fails at the end.
+	body = strings.Replace(body, "    forEach:", "    continueOnEntryError: true\n    forEach:", 1)
 	r, err := Prepare(parse(t, body), Options{Registry: testRegistry(t), Observer: func(e Event) {
 		if e.Kind == ActionFinished && e.ActionID == "each" {
 			if e.Err == nil || e.Err.Error() != "1 of 4 entries failed; first: entry 2: entry 2 failed" {
@@ -129,7 +129,10 @@ func TestForEachValidation(t *testing.T) {
 	for _, tt := range []struct{ action, want string }{
 		{`{ id: a, type: test.ok, with: { value: "{{ row.x }}" } }`, "unknown name row"},
 		{`{ id: a, type: test.ok, parallel: 2 }`, "parallel is only possible with forEach"},
-		{`{ id: a, type: test.ok, stopOnError: false }`, "stopOnError is only possible with forEach"},
+		{`{ id: a, type: test.ok, continueOnEntryError: true }`, "continueOnEntryError is only possible with forEach"},
+		// The name until R5a, with the opposite meaning (A6).
+		{`{ id: a, type: test.ok, forEach: "{{ [1] }}", stopOnError: false }`, "stopOnError was replaced by continueOnEntryError with the opposite meaning: write continueOnEntryError: true"},
+		{`{ id: a, type: test.ok, forEach: "{{ [1] }}", stopOnError: true }`, "write continueOnEntryError: false"},
 		{`{ id: a, type: test.ok, forEach: "${LIST}" }`, "forEach must be an expression that returns a list"},
 		{`{ id: a, type: test.ok, forEach: "{{ rows }}" }`, "unknown name rows"},
 		{`{ id: a, type: test.ok, forEach: "{{ [1] }}", parallel: 100 }`, "parallel must be between 1 and 64"},

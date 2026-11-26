@@ -116,7 +116,7 @@ variables: { … }
 
 - **Standardquelle:** `secretStore` im Environment, sonst in `project.yaml`, sonst `local`. So nutzt z. B. dev den lokalen
   Store und prod einen Tresor, ohne dass sich Workflows oder Connections ändern.
-- **Eingebaut immer vorhanden** (ohne Datei): `local` (lokaler Store des Projekts), `shared` (lokaler Store, für alle
+- **Eingebaut immer vorhanden** (ohne Datei; seit R5a nur `env` und `inline` setzbar, siehe Nachtrag 2026-11-26): `local` (lokaler Store des Projekts), `shared` (lokaler Store, für alle
   Projekte des Kontos gemeinsam) und `env` (Umgebungsvariablen; `${env:NAME}` bleibt als Schreibweise für nicht
   geheime Werte). Diese Namen sind für eigene Quellen reserviert.
 - **Typen:**
@@ -634,3 +634,11 @@ Abgestimmt mit dem Maintainer vor der Umsetzung.
   `transfer.download` lehnt sie ab, `delete` und `move` behandeln sie als Eintrag für sich (TESTPLAN K16).
 - **Verbindung testen:** wie bei `sftp`, „signed in to … as …; folder … has … entries“; geschrieben wird nichts.
 - **Größe:** S57c blieb nach Absprache mit dem Maintainer ein Schritt (Schnittstelle, beide Typen, Editor).
+
+## Nachtrag 2026-11-26 (R5a): Nur Quellen, die es gibt
+
+`secretStore` in `project.yaml` und Environments nimmt nur Quellen an, die heute funktionieren: `env` und `inline`.
+`shared` (S39e, nicht für 1.0) ist kein Wert mehr; `${secret:shared/NAME}` meldet eine unbekannte Quelle. `local` bleibt
+die Standardquelle ohne `secretStore:` (Nachtrag S39a), lässt sich aber erst mit S39d setzen: `secretStore: local`
+meldet bis dahin „the local secret store is not available yet“. Das Schema nennt nur `env` und `inline` und keinen
+Standardwert; S39d fügt `local` wieder hinzu (additiv). So sagt 1.0 keine Bedeutung eines nie gebauten Werts zu.

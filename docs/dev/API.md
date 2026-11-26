@@ -273,7 +273,7 @@ HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem 
 
 | Antwort | Bedeutung |
 |---|---|
-| `202` + `{"runId", "status"}`, Header `Location` | `response: accepted`: Lauf gestartet; `status` ist der Pfad des Laufs in dieser API |
+| `202` + `{"runId"}`, Header `Location` | `response: accepted`: Lauf gestartet; `Location` ist der Pfad des Laufs in dieser API (bis R5a stand er auch in `status`) |
 | Status, Header und Body von `http.response` | `response: run` (seit S38b1): die erste Antwort des Laufs |
 | `200` + `outputs` / `500` + `{"error", "runId"}` | `response: run` ohne `http.response`: Lauf erfolgreich bzw. gescheitert |
 | `504` + `{"error", "runId"}` | `response: run`: keine Antwort innerhalb von `timeout`; der Lauf läuft weiter |
@@ -282,7 +282,7 @@ HTTP-Trigger (seit S38a) antworten **nicht** unter `/api/v1`, sondern auf ihrem 
 | `403` | Anfrage aus einer Webseite (`Origin`) oder – bei einem lokalen Listener – an einen fremden Host-Namen |
 | `404` / `405` | kein Trigger für den Pfad bzw. deaktiviert / andere Methode (Header `Allow`) |
 | `413` / `415` | Body über 1 MiB / weder JSON noch Formular |
-| `429` | `maxConcurrent` des Triggers oder `settings.maxConcurrentRuns` erreicht |
+| `429` | `maxConcurrent` des Triggers (Standard 4, seit R5a) oder `settings.maxConcurrentRuns` erreicht |
 | `500` / `503` | Ziel kann nicht gestartet werden (Meldung im Server-Log) / Server wird beendet |
 
 Bei `response: run` trägt jede Antwort den Header `Runnel-Run-Id`.
@@ -341,7 +341,7 @@ POST /api/v1/workflows/edit
 | `deleteLinks` | entfernt Links über ihre Nummer in der Liste (ab 0, wie `$.links[i]`) |
 | `updateLinks` | ändert Links über ihre Nummer: `when` (`success` entfernt `when:`; auch ein Ausdruck `{{ … }}` in einer Zeile, er wird in Anführungszeichen geschrieben), `loop`, `disabled` – nur die angegebenen Felder, z. B. `[{"index": 2, "when": "failure"}]` oder `[{"index": 0, "disabled": true}]` |
 | `setWorkflow` | ändert ein Feld des Workflows selbst (`[{"field": "description", "value": "…"}]`): `name`, `description`, `settings.timeout`, `settings.maxConcurrentRuns`; `null` entfernt es. Eine fehlende Description kommt hinter `name:`, fehlende Settings vor `actions:` |
-| `set` | ändert ein Feld einer Action (`[{"id": "combine", "field": "with.message", "value": "Done"}]`); erlaubt sind `description`, `timeout`, `continueOnError`, `join`, `joinTimeout`, `retry.attempts`, `retry.backoff`, `retry.strategy`, `forEach`, `parallel`, `stopOnError` (seit E7c) und `with.<name>`. Werte: Text, Zahl oder `true`/`false`; `null` entfernt das Feld (mit dem letzten Eintrag auch `with:` bzw. `retry:`). Mehrzeilige Texte werden als `\|`-Block geschrieben, Texte, die YAML anders lesen würde (`true`, `1`, `a: b`), in Anführungszeichen; ein Kommentar am Zeilenende bleibt erhalten. Höchstens ein Feld je Action und Anfrage. Statt `value` setzt `map` ein Feld der Konfiguration auf eine Zuordnung von Texten (`{"id": "call", "field": "with.params", "value": null, "map": [{"key": "FILE", "value": "{{ row }}"}]}`); Schlüssel, die schon in der Datei stehen, behalten ihre Reihenfolge |
+| `set` | ändert ein Feld einer Action (`[{"id": "combine", "field": "with.message", "value": "Done"}]`); erlaubt sind `description`, `timeout`, `continueOnError`, `join`, `joinTimeout`, `retry.attempts`, `retry.backoff`, `retry.strategy`, `forEach`, `parallel`, `continueOnEntryError` (seit E7c als `stopOnError`, seit R5a mit umgekehrter Bedeutung) und `with.<name>`. Werte: Text, Zahl oder `true`/`false`; `null` entfernt das Feld (mit dem letzten Eintrag auch `with:` bzw. `retry:`). Mehrzeilige Texte werden als `\|`-Block geschrieben, Texte, die YAML anders lesen würde (`true`, `1`, `a: b`), in Anführungszeichen; ein Kommentar am Zeilenende bleibt erhalten. Höchstens ein Feld je Action und Anfrage. Statt `value` setzt `map` ein Feld der Konfiguration auf eine Zuordnung von Texten (`{"id": "call", "field": "with.params", "value": null, "map": [{"key": "FILE", "value": "{{ row }}"}]}`); Schlüssel, die schon in der Datei stehen, behalten ihre Reihenfolge |
 | `entries` | ändert einen Parameter oder Output (E7c), höchstens einen je Anfrage, adressiert über den Index: `{"list": "parameters", "op": "set", "index": 0, "field": "default", "value": "5s"}`. `op`: `add` (mit `name`, am Ende; ein Output bekommt `value: ""`), `set`, `delete` (der letzte Eintrag entfernt die ganze Liste), `move` (mit `by`: −1 oder 1). Felder: `name`, `description`, `type`, `default`, `required` (`true`/`false`), `enum` (Liste von Texten) bei Parametern, `name`, `description`, `type`, `value` bei Outputs; `null` oder ein leerer Text entfernen das Feld. Ein Eintrag im Block-Stil wird zeilengenau geändert, ein einzeiliger (`- { name: … }`) neu geschrieben, mit seinem Kommentar. Fehlende Listen entstehen an ihrer Stelle im Format (vor `outputs`, `settings`, `actions` …) |
 
 Fehlende Listen (`actions:`, `links:`, `layout:`) werden angelegt. Listen im Flow-Stil (`actions: [ … ]`) mit Einträgen

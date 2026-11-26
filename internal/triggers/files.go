@@ -46,7 +46,7 @@ func newWatch(t *model.Trigger, projectDir string) *watch {
 // sameWatch reports whether a changed trigger file still watches the same files, so
 // that the files already processed are kept.
 func sameWatch(a, b *model.Trigger) bool {
-	return a.Type == model.TriggerFile && b.Type == model.TriggerFile && a.With.Path == b.With.Path &&
+	return a.Type == model.TriggerFile && b.Type == model.TriggerFile && a.With.Folder == b.With.Folder &&
 		strings.EqualFold(a.FilePattern(), b.FilePattern()) && a.With.Existing == b.With.Existing
 }
 

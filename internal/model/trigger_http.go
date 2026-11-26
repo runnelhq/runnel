@@ -194,7 +194,7 @@ func (t *Trigger) checkHTTP() Errors {
 	default:
 		errs = append(errs, s.errorf("$.with.response", "invalid response %q (expected accepted or run)", w.Response))
 	}
-	if w.MaxConcurrent < 0 {
+	if w.MaxConcurrent != nil && *w.MaxConcurrent < 0 {
 		errs = append(errs, s.errorf("$.with.maxConcurrent", "maxConcurrent must not be negative (0: no own limit)"))
 	}
 	return errs

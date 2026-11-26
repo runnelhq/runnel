@@ -175,7 +175,11 @@ func compileProgram(code string, roots []string) (*vm.Program, error) {
 	if _, ok := env["row"]; ok {
 		env["row"] = types.Any
 	}
-	opts := append([]exprlang.Option{exprlang.Env(env), exprlang.MaxNodes(maxNodes)}, functions...)
+	if err := checkCalls(code); err != nil {
+		return nil, err
+	}
+	opts := append([]exprlang.Option{exprlang.Env(env), exprlang.MaxNodes(maxNodes)}, builtinOptions...)
+	opts = append(opts, functions...)
 	opts = append(opts, operators...)
 	return exprlang.Compile(code, opts...)
 }

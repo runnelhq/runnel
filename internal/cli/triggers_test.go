@@ -78,3 +78,12 @@ func TestValidateTriggers(t *testing.T) {
 		}
 	}
 }
+
+// TestTriggersNoProject: without a project nothing is listed; exit code 2 (R5a), not 1
+// for problems in trigger files.
+func TestTriggersNoProject(t *testing.T) {
+	code, _, errOut := run(t, "triggers", t.TempDir())
+	if code != exitUsage || !strings.Contains(errOut, "no project (project.yaml) found") {
+		t.Errorf("exit code %d, stderr %q", code, errOut)
+	}
+}

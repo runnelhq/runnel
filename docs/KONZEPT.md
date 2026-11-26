@@ -152,13 +152,14 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
     (`secretStore:`), sonst der lokale Store. Nur in Connections, Secret-Quellen, Feldern mit `format: runnel-secret`
     und als Token von HTTP-Triggern erlaubt, nie über eine Variable ([ADR 0022](adr/0022-connections-secrets.md),
     Kap. 8). Seit S39a gibt es die Quelle `env` (Umgebungsvariablen, `secretStore: env`), seit S39a2 `inline` (Klartext unter
-    `secrets:` im Environment, mit Warnung; für Entwicklung und einfache APIs); `local` folgt mit S39d
+    `secrets:` im Environment, mit Warnung; für Entwicklung und einfache APIs); `local` folgt mit S39d und lässt sich bis
+    dahin nicht als `secretStore` setzen (R5a)
   - `${NAME:-text}` bzw. `${env:NAME:-text}` – Standardwert (seit K1): `text`, wenn die Variable nicht gesetzt oder
     leer ist (wie in der Shell), z. B. `${env:TEMP:-C:\Temp}`. Der Standardwert ist wörtlicher Text ohne `}` und ohne
     weitere `${…}`; ein Verweis mit Standardwert gilt in der Prüfung nie als fehlende Variable. Secrets haben keinen
     Standardwert (`${secret:NAME:-…}` ist ein Fehler), damit kein Secret in einer Datei des Projekts landet
   - `$${` – ein wörtliches `${`
-  - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md)
+  - `{{ expression }}` – Ausdruck in [`expr-lang`](https://github.com/expr-lang/expr), z. B. `{{ formatDate(now(), 'yyyyMMdd') }}`, `{{ record.amount * 1.19 }}` – Details und Funktionsbibliothek: [ADR 0006](adr/0006-ausdruckssprache.md); nutzbar sind nur die Funktionen der Referenz (`runnel catalog --expressions`, seit R5a)
 - Das Projekt wird über `project.yaml` im Ordner des Workflows oder einem übergeordneten Ordner gefunden (wie `.git`).
 - **Relative Pfade** in allen Actions, Transforms und Triggern beziehen sich auf den Projektordner, ohne Projekt auf den
   Ordner der Workflow- bzw. Pipeline-Datei – nie auf das Arbeitsverzeichnis von Runnel
@@ -302,18 +303,18 @@ flowchart LR
 
 | Modus | Befehl | Einsatz |
 |---|---|---|
-| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v]` (`--run-config` mit S42, Backlog) | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet, 130 abgebrochen |
+| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v]` (`--run-config` mit S42, Backlog) | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet (auch bei falschem Aufruf, seit R5a), 130 abgebrochen |
 | Server | `runnel serve [projektordner] [--port 7300] [--triggers 127.0.0.1:7301] [--stop-timeout]` | Editor + Scheduler + HTTP-Trigger (eigener Listener) |
 | Desktop | `runnel desktop` (geplant) | Server + WebView2-Fenster (Einzelplatz) |
 | Windows-Dienst | `runnel service install/start/stop/status/uninstall` (seit S41) | Dauerbetrieb auf Server |
-| Validierung | `runnel validate <datei/ordner>` (Workflows, Pipelines, Trigger) | Lint/Prüfung in CI |
+| Validierung | `runnel validate <datei/ordner>` (Workflows, Pipelines, Trigger) | Lint/Prüfung in CI. Exit-Code: 0 keine Fehler, 1 Fehler gefunden (mit `--strict` auch Warnungen), 2 nichts geprüft (falscher Aufruf, Pfad fehlt; seit R5a) |
 | Trigger anzeigen | `runnel triggers [projektordner]` | Trigger mit Zeitplan und nächstem Zeitpunkt |
 | Läufe anzeigen | `runnel runs [projektordner] [lauf-id] [--status] [--path] [--trigger] [--before] [--limit] [--json]` (seit S26b) | Läufe aus der Run-Historie (Server, Dienst, `runnel run`), einer mit Knoten und Log |
 | Katalog | `runnel catalog [typ] [--json]` · `runnel catalog --expressions [--json]` | Actions, Transforms und Connection-Typen mit Schema · Namen und Funktionen der Ausdrücke; als JSON mit `version` auch an jedem Release (`runnel-catalog.json`, `runnel-expressions.json`, seit E15a) |
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments, Triggern, Connections und `plugin.yaml` (seit S58 bzw. S49a), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
 | Plugins | `runnel plugins [trust\|untrust] [projektordner] [--plugin <name>] [--yes] [--service]` (seit S49a) | Plugins anzeigen (freigegebene mit ihren Typen, seit S49b1) und für das Projekt auf diesem Rechner freigeben ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag; [docs/dev/PLUGINS.md](dev/PLUGINS.md)) |
-| Zustand | `runnel health [--addr 127.0.0.1:7300] [--service <name>] [--json]` (seit S43a) | Zustand des laufenden Servers bzw. Dienstes für Monitoring. Exit-Code: 0 `ok`, 1 `degraded`, 2 `fail`, 3 nicht erreichbar |
+| Zustand | `runnel health [--addr 127.0.0.1:7300] [--service <name>] [--json]` (seit S43a) | Zustand des laufenden Servers bzw. Dienstes für Monitoring. Exit-Code: 0 `ok`, 1 `degraded`, 2 `fail`, 3 nicht erreichbar oder falscher Aufruf |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
@@ -612,7 +613,7 @@ Datei-Überwachung (seit S38):
 type: file
 target: workflows/import.workflow.yaml
 with:
-  path: inbox              # Ordner: relativ zum Projekt oder absolut, auch \\server\freigabe\eingang
+  folder: inbox            # Ordner (bis R5a: path): relativ zum Projekt oder absolut, auch \\server\freigabe\eingang
   pattern: "orders-*.csv"  # Dateiname, Groß-/Kleinschreibung egal; Standard *
   interval: 10s            # Abstand der Abfragen; Standard 10s, mindestens 1s
   param: FILE              # Parameter des Ziels, der den Pfad bekommt
@@ -654,7 +655,7 @@ with:
   auth: { token: ${env:IMPORT_TOKEN} }   # oder: auth: none
   response: accepted         # sofort 202 mit der Lauf-ID; run: Antwort aus dem Lauf (seit S38b1)
   timeout: 30s               # nur bei run: so lange wartet der Aufrufer höchstens (Standard 30s)
-  maxConcurrent: 5           # laufende Runs dieses Triggers, darüber 429; 0 (Standard): kein eigenes Limit
+  maxConcurrent: 5           # laufende Runs dieses Triggers, darüber 429; Standard 4 (seit R5a), 0: kein eigenes Limit
   history: all               # all | errors | none – welche Läufe behalten werden (seit S38b2)
 ```
 
@@ -683,8 +684,8 @@ with:
   feste `params` des Triggers gewinnen. JSON-Werte, die kein Text sind, kommen als JSON-Text an (für Parameter vom Typ
   `json`). Fehlt ein Pflichtparameter oder passt ein Typ nicht: `400` mit der Meldung, ohne Lauf. Andere Formate:
   `415`, Body über 1 MiB: `413`.
-- **Antwort bei `accepted`:** `202` mit `{ "runId": …, "status": "/api/v1/runs/…" }` (der Status steht in der API des
-  Editors).
+- **Antwort bei `accepted`:** `202` mit `{ "runId": … }`; den Lauf zeigt der Editor bzw. `GET /api/v1/runs/{id}` auf
+  dem Rechner des Servers (bis R5a stand dieser Pfad zusätzlich in `status`).
 - **Antwort bei `run` (seit S38b1):** Der Aufrufer wartet auf den Lauf, höchstens `timeout`.
   - Die erste ausgeführte Action **`http.response`** antwortet (`status`, `headers`, `body` mit Ausdrücken; ein Text geht
     als Text, andere Werte als JSON); spätere schreiben eine Warnung ins Log. Der Workflow arbeitet nach der Antwort
@@ -1280,7 +1281,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
   type: core.run-pipeline
   forEach: "{{ results.list.output }}"   # eine Liste aus einem Ausdruck
   parallel: 2                            # Einträge gleichzeitig, Standard 1 (höchstens 64)
-  stopOnError: false                     # Standard true
+  continueOnEntryError: true             # Standard false (bis R5a: stopOnError, umgekehrt)
   with:
     pipeline: pipelines/total.pipeline.yaml
     params:
@@ -1290,8 +1291,9 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 - `with` wird je Eintrag ausgewertet; `row` ist nur in Actions mit `forEach` erlaubt (sonst meldet `runnel validate`
   „unknown name row“). `retry` und `timeout` gelten je Eintrag; Log-Meldungen beginnen mit `[2/5] `.
 - `result.output`: `items` (je Eintrag in Reihenfolge der Liste: `row`, `success`, `output`, `error`), `succeeded`,
-  `failed`. Mit `stopOnError: true` beendet der erste Fehler die übrigen Einträge und lässt die Action scheitern;
-  mit `false` laufen alle, die Action scheitert am Ende, wenn einer fehlschlug (je Fehler eine Warnung im Log).
+  `failed`. Standardmäßig beendet der erste Fehler die übrigen Einträge und lässt die Action scheitern; mit
+  `continueOnEntryError: true` laufen alle, die Action scheitert am Ende, wenn einer fehlschlug (je Fehler eine Warnung
+  im Log). `stopOnError` (bis R5a) ist ein Fehler mit dem Ersatz.
 - Eine leere Liste ist erfolgreich (`items` leer); ein Wert, der keine Liste ist, ist ein Fehler.
 
 ### 12.2 Pipeline-Transforms

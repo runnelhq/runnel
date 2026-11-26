@@ -87,7 +87,7 @@ export function triggerTemplate(name: string, type: string, target: string): str
   const with_: Record<string, string> = {
     cron: '  schedule: "0 2 * * 1-5"\n',
     interval: "  every: 1h\n",
-    file: "  path: inbox\n  pattern: \"*.csv\"\n",
+    file: "  folder: inbox\n  pattern: \"*.csv\"\n",
     http: `  method: POST\n  path: /hooks/${name}\n  auth:\n    token: \${secret:${name}-token}\n`,
   };
   return `kind: Trigger\napiVersion: runnel/v1\nname: ${name}\ntype: ${type}\ntarget: ${target}\nenabled: false\nwith:\n${with_[type]}`;

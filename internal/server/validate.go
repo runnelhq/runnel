@@ -90,7 +90,7 @@ func connectionVariants(sc *schema.Schema, reg *connection.Registry) {
 // model.ParseTrigger).
 var triggerRequired = map[string][]string{
 	model.TriggerCron: {"schedule"}, model.TriggerInterval: {"every"},
-	model.TriggerFile: {"path"}, model.TriggerHTTP: {"method", "path", "auth"},
+	model.TriggerFile: {"folder"}, model.TriggerHTTP: {"method", "path", "auth"},
 }
 
 // triggerVariants adds the fields under with: for each trigger type to the schema of

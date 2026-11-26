@@ -89,7 +89,7 @@ actions:
 	}
 	file := func(with, params string) *model.Trigger {
 		t.Helper()
-		tr, err := model.ParseTrigger("triggers/f.yaml", []byte("kind: Trigger\napiVersion: runnel/v1\nname: f\ntype: file\ntarget: workflows/target.workflow.yaml\n"+params+"with:\n  path: in\n"+with))
+		tr, err := model.ParseTrigger("triggers/f.yaml", []byte("kind: Trigger\napiVersion: runnel/v1\nname: f\ntype: file\ntarget: workflows/target.workflow.yaml\n"+params+"with:\n  folder: in\n"+with))
 		if err != nil {
 			t.Fatal(err)
 		}

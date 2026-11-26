@@ -59,10 +59,13 @@ const (
 	ExistingIgnore = "ignore"
 )
 
-// Defaults and limits of file and interval triggers.
+// Defaults and limits of file, interval and http triggers.
 const (
 	DefaultFileInterval = 10 * time.Second
-	MinTriggerInterval  = time.Second
+	// DefaultHTTPMaxConcurrent is the most runs of an http trigger at the same time if
+	// with.maxConcurrent is not set (R5a): a caller in the network cannot start any number.
+	DefaultHTTPMaxConcurrent = 4
+	MinTriggerInterval       = time.Second
 )
 
 // Trigger is the content of a file in triggers/: it starts a workflow or a pipeline
@@ -112,8 +115,11 @@ type TriggerSettings struct {
 	// Every is the time between two runs (interval), e.g. 15m.
 	Every Duration `yaml:"every,omitempty" json:"every,omitempty" doc:"interval: time between two runs, e.g. 15m" schema:"format=runnel-duration,example=15m,group=When"`
 
-	// Path is the folder to watch (file), relative to the project or absolute (also UNC).
-	Path string `yaml:"path,omitempty" json:"path,omitempty" doc:"file: folder to watch, relative to the project folder or absolute (also UNC); http: path of the address with placeholders, e.g. /api/customers/{id}" schema:"example=inbox,group=When"`
+	// Folder is the folder to watch (file), relative to the project or absolute (also
+	// UNC); "folder" as in file.list (ADR 0025, R5a).
+	Folder string `yaml:"folder,omitempty" json:"folder,omitempty" doc:"file: folder to watch, relative to the project folder or absolute (also UNC)" schema:"example=inbox,group=When"`
+	// Path is the path of the address with placeholders (http).
+	Path string `yaml:"path,omitempty" json:"path,omitempty" doc:"http: path of the address with placeholders, e.g. /api/customers/{id}" schema:"example=/api/customers/{id},group=When"`
 	// Pattern selects files by name, e.g. "*.csv" (file; default "*"); case is ignored.
 	Pattern string `yaml:"pattern,omitempty" json:"pattern,omitempty" doc:"file: names of the files, e.g. *.csv; upper and lower case are ignored" schema:"default=*,group=When"`
 	// Interval is the time between two looks into the folder (file; default 10s).
@@ -134,8 +140,9 @@ type TriggerSettings struct {
 	// Response is accepted (default: 202 with the run id at once) or run (the caller
 	// waits for the answer of the run, at most timeout).
 	Response string `yaml:"response,omitempty" json:"response,omitempty" doc:"http: answer at once with 202 and the run id (accepted), or wait for the answer of the run (run)" schema:"enum=accepted|run,default=accepted,group=Answer"`
-	// MaxConcurrent limits the running runs of the trigger (http; 0: no own limit).
-	MaxConcurrent int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty" doc:"http: most runs of this trigger at the same time; 0: no own limit" schema:"default=0,group=Answer"`
+	// MaxConcurrent limits the running runs of the trigger (http; nil: 4, 0: no own
+	// limit, only if set; R5a), see HTTPMaxConcurrent.
+	MaxConcurrent *int `yaml:"maxConcurrent,omitempty" json:"maxConcurrent,omitempty" doc:"http: most runs of this trigger at the same time; a request beyond it gets 429. 0: no own limit (only the limits of the project)" schema:"default=4,group=Answer"`
 	// Timeout is how long the caller waits with response: run (default 30s). History
 	// is all, errors or none: which runs are kept when they have ended.
 	Timeout Duration `yaml:"timeout,omitempty" json:"timeout,omitempty" doc:"http: how long the caller waits for the answer with response: run" schema:"format=runnel-duration,default=30s,group=More"`
@@ -157,6 +164,15 @@ func (t *Trigger) PollInterval() time.Duration {
 	return d
 }
 
+// HTTPMaxConcurrent returns the most runs of an http trigger at the same time: with.maxConcurrent,
+// DefaultHTTPMaxConcurrent if it is not set; 0 means no own limit.
+func (t *Trigger) HTTPMaxConcurrent() int {
+	if t.With.MaxConcurrent == nil {
+		return DefaultHTTPMaxConcurrent
+	}
+	return *t.With.MaxConcurrent
+}
+
 // FileMode returns each or batch.
 func (t *Trigger) FileMode() string {
 	if t.With.Mode == "" {
@@ -175,8 +191,8 @@ func (t *Trigger) FilePattern() string {
 
 // Folder returns the folder of a file trigger: absolute, or relative to projectDir.
 func (t *Trigger) Folder(projectDir string) string {
-	p := filepath.FromSlash(t.With.Path)
-	if filepath.IsAbs(p) || strings.HasPrefix(t.With.Path, `\\`) {
+	p := filepath.FromSlash(t.With.Folder)
+	if filepath.IsAbs(p) || strings.HasPrefix(t.With.Folder, `\\`) {
 		return p
 	}
 	return filepath.Join(projectDir, p)
@@ -302,7 +318,7 @@ func (t *Trigger) validate() error {
 var fieldsOf = map[string][]string{
 	TriggerCron:     {"schedule", "timezone", "overlap", "history"},
 	TriggerInterval: {"every", "overlap", "history"},
-	TriggerFile:     {"path", "pattern", "interval", "param", "mode", "existing", "overlap", "history"},
+	TriggerFile:     {"folder", "pattern", "interval", "param", "mode", "existing", "overlap", "history"},
 	TriggerHTTP:     {"method", "path", "auth", "response", "timeout", "maxConcurrent", "history"},
 }
 
@@ -311,13 +327,18 @@ var fieldsOf = map[string][]string{
 func (t *Trigger) unusedFields() Errors {
 	set := map[string]bool{
 		"schedule": t.With.Schedule != "", "timezone": t.With.Timezone != "", "overlap": t.With.Overlap != "",
-		"every": t.With.Every != "", "path": t.With.Path != "", "pattern": t.With.Pattern != "",
+		"every": t.With.Every != "", "folder": t.With.Folder != "", "path": t.With.Path != "", "pattern": t.With.Pattern != "",
 		"interval": t.With.Interval != "", "param": t.With.Param != "", "mode": t.With.Mode != "", "existing": t.With.Existing != "",
-		"method": t.With.Method != "", "auth": t.With.Auth != nil, "response": t.With.Response != "", "maxConcurrent": t.With.MaxConcurrent != 0,
+		"method": t.With.Method != "", "auth": t.With.Auth != nil, "response": t.With.Response != "", "maxConcurrent": t.With.MaxConcurrent != nil,
 		"timeout": t.With.Timeout != "", "history": t.With.History != "",
 	}
 	var errs Errors
 	for _, f := range slices.Sorted(maps.Keys(set)) {
+		if f == "path" && set[f] && t.Type == TriggerFile {
+			// The folder of a file trigger was "path" before R5a.
+			errs = append(errs, t.src.errorf("$.with.path", "file triggers have no path; use folder for the folder to watch (renamed in R5a, like folder of file.list)"))
+			continue
+		}
 		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
 			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))
 		}
@@ -360,13 +381,13 @@ func (t *Trigger) checkInterval() Errors {
 func (t *Trigger) checkFile() Errors {
 	s, w := t.src, t.With
 	var errs Errors
-	if strings.TrimSpace(w.Path) == "" {
-		errs = append(errs, s.errorf("$.with", `missing required field "path" (the folder to watch, relative to the project or absolute)`))
+	if strings.TrimSpace(w.Folder) == "" && w.Path == "" {
+		errs = append(errs, s.errorf("$.with", `missing required field "folder" (the folder to watch, relative to the project or absolute)`))
 	}
 	if _, err := filepath.Match(strings.ToLower(t.FilePattern()), ""); err != nil {
 		errs = append(errs, s.errorf("$.with.pattern", "invalid pattern %q (e.g. *.csv or orders-*.txt)", w.Pattern))
 	} else if strings.ContainsAny(w.Pattern, `/\`) {
-		errs = append(errs, s.errorf("$.with.pattern", "pattern %q matches file names only; put the folder into path", w.Pattern))
+		errs = append(errs, s.errorf("$.with.pattern", "pattern %q matches file names only; put the folder into folder", w.Pattern))
 	}
 	errs = append(errs, t.checkDuration("interval", w.Interval, false)...)
 	if w.Param == "" {
@@ -541,7 +562,7 @@ func (t *Trigger) Describe() string {
 	case TriggerInterval:
 		return "every " + string(t.With.Every)
 	case TriggerFile:
-		return fmt.Sprintf("new %s in %s", t.FilePattern(), t.With.Path)
+		return fmt.Sprintf("new %s in %s", t.FilePattern(), t.With.Folder)
 	case TriggerHTTP:
 		return t.HTTPMethod() + " " + t.With.Path
 	}

@@ -283,7 +283,7 @@ func TestFileTrigger(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "workflows", "file.workflow.yaml"), "kind: Workflow\napiVersion: runnel/v1\nname: file\n"+
 		"parameters:\n  - { name: FILE, required: true }\nactions:\n  - { id: start, type: core.start }\n")
 	writeFile(t, filepath.Join(dir, "triggers", "inbox.yaml"), "kind: Trigger\napiVersion: runnel/v1\nname: inbox\ntype: file\n"+
-		"target: workflows/file.workflow.yaml\nwith: { path: inbox, param: FILE }\n")
+		"target: workflows/file.workflow.yaml\nwith: { folder: inbox, param: FILE }\n")
 	writeFile(t, filepath.Join(dir, "inbox", "a.csv"), "x\n")
 	s.triggers.Reload()
 	if p := s.triggers.Problems(); len(p) != 0 {

@@ -63,20 +63,39 @@ func TestStreamLookupConfig(t *testing.T) {
 	keys := []any{map[string]any{"field": "id"}}
 	ret := []any{map[string]any{"lookupField": "name"}}
 	for want, with := range map[string]map[string]any{
-		`missing required field "keys"`:                  {"return": ret},
-		"keys: name at least one field":                  {"keys": []any{}, "return": ret},
-		"return: name at least one field":                {"keys": keys, "return": []any{}},
-		`missing required field "return[0].lookupField"`: {"keys": keys, "return": []any{map[string]any{"as": "x"}}},
-		`invalid notFound "skip"`:                        {"keys": keys, "return": ret, "notFound": "skip"},
-		`invalid multiple "all"`:                         {"keys": keys, "return": ret, "multiple": "all"},
-		"maxRecords must be at least 1":                  {"keys": keys, "return": ret, "maxRecords": 0},
+		`missing required field "keys"`:                         {"return": ret},
+		"keys: name at least one field":                         {"keys": []any{}, "return": ret},
+		"return: name at least one field":                       {"keys": keys, "return": []any{}},
+		`missing required field "return[0].lookupField"`:        {"keys": keys, "return": []any{map[string]any{"as": "x"}}},
+		`invalid notFound "skip"`:                               {"keys": keys, "return": ret, "notFound": "skip"},
+		`invalid multiple "all"`:                                {"keys": keys, "return": ret, "multiple": "all"},
+		`maxRecords: "0" is not a whole number of 1 or more`:    {"keys": keys, "return": ret, "maxRecords": "0"},
+		`maxRecords: "many" is not a whole number of 1 or more`: {"keys": keys, "return": ret, "maxRecords": "many"},
 	} {
 		if _, err := streamLookupDefinition.New(with); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v: %v, want %q", with, err, want)
 		}
 	}
+	// maxRecords is text like in core.to-result (R5a): a variable is accepted before it is
+	// resolved; a whole number limits the lookup data.
+	if _, err := streamLookupDefinition.New(map[string]any{"keys": keys, "return": ret, "maxRecords": "${N}"}); err != nil {
+		t.Errorf("variable: %v", err)
+	}
+	info := []record.Record{rec("id", "1", "name", "a"), rec("id", "2", "name", "b")}
+	for _, limit := range []string{"1", " 1 "} {
+		tr := transformtest.New(t, streamLookupDefinition, map[string]any{"keys": keys, "return": ret, "maxRecords": limit})
+		if _, _, _, err := transformtest.RunWithInfo(context.Background(), tr, info, rec("id", "1")); err == nil ||
+			!strings.Contains(err.Error(), "has more than 1 records (maxRecords)") {
+			t.Errorf("maxRecords %q: %v", limit, err)
+		}
+	}
+	tr := transformtest.New(t, streamLookupDefinition, map[string]any{"keys": keys, "return": ret, "maxRecords": "2"})
+	if _, _, _, err := transformtest.RunWithInfo(context.Background(), tr, info, rec("id", "1")); err != nil {
+		t.Errorf("maxRecords 2: %v", err)
+	}
+
 	// Without an info link (outside the engine) Process reports it.
-	tr := transformtest.New(t, streamLookupDefinition, map[string]any{"keys": keys, "return": ret})
+	tr = transformtest.New(t, streamLookupDefinition, map[string]any{"keys": keys, "return": ret})
 	if _, _, err := transformtest.Run(context.Background(), tr); err == nil || err.Error() != "core.stream-lookup needs an info link with the lookup data" {
 		t.Errorf("%v", err)
 	}

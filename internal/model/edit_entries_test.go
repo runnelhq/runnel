@@ -132,7 +132,7 @@ func TestEditEntriesErrors(t *testing.T) {
 	}
 }
 
-// forEach, parallel, stopOnError and a mapping (with.params) can be set on an action.
+// forEach, parallel, continueOnEntryError and a mapping (with.params) can be set on an action.
 func TestEditWorkflowSetRepeatAndMap(t *testing.T) {
 	src := "kind: Workflow\napiVersion: runnel/v1\nname: x\nactions:\n  - id: start\n    type: core.start\n  - id: call\n    type: core.run-workflow\n    with:\n      workflow: workflows/child.workflow.yaml\nlinks:\n  - { from: start, to: call }\n"
 	got := edit(t, src, WorkflowEdit{Set: []SetField{{ID: "call", Field: "forEach", Value: "{{ [1, 2] }}"}}})
@@ -140,9 +140,9 @@ func TestEditWorkflowSetRepeatAndMap(t *testing.T) {
 		t.Errorf("forEach:\n%s", got)
 	}
 	got = edit(t, got, WorkflowEdit{Set: []SetField{{ID: "call", Field: "parallel", Value: 2}}})
-	got = edit(t, got, WorkflowEdit{Set: []SetField{{ID: "call", Field: "stopOnError", Value: false}}})
-	if !strings.Contains(got, "    parallel: 2\n    stopOnError: false\n") {
-		t.Errorf("parallel, stopOnError:\n%s", got)
+	got = edit(t, got, WorkflowEdit{Set: []SetField{{ID: "call", Field: "continueOnEntryError", Value: true}}})
+	if !strings.Contains(got, "    parallel: 2\n    continueOnEntryError: true\n") {
+		t.Errorf("parallel, continueOnEntryError:\n%s", got)
 	}
 	m := []KeyValue{{Key: "FILE", Value: "{{ row }}"}, {Key: "COUNT", Value: "5"}}
 	got = edit(t, got, WorkflowEdit{Set: []SetField{{ID: "call", Field: "with.params", Map: m}}})

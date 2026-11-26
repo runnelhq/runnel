@@ -117,7 +117,7 @@ Action zu wiederholen:
     params:
       FILE: "{{ row.path }}"         # 'row' = aktueller Ergebnis-Datensatz
     parallel: 4
-    stopOnError: false               # weitermachen, Gesamtergebnis = failure, wenn einer fehlschlägt
+    stopOnError: false               # weitermachen, Gesamtergebnis = failure, wenn einer fehlschlägt (seit R5a: continueOnEntryError: true)
 ```
 
 **c) Ergebnis-Datensätze**
@@ -199,8 +199,9 @@ Abstimmung mit dem Maintainer zur Umsetzung von 3c:
   unter `with` von `core.run-pipeline`/`core.run-workflow` – so lässt sich z. B. auch `file.copy` je Datei wiederholen.
   Die Engine wertet `with` je Eintrag mit `row` aus; `retry` und `timeout` gelten je Eintrag.
 - **Ergebnis:** `output.items` (je Eintrag `row`, `success`, `output`, `error`, in der Reihenfolge der Liste), dazu
-  `output.succeeded` und `output.failed`. `stopOnError` (Standard `true`) beendet beim ersten Fehler die übrigen
-  Einträge; mit `false` scheitert die Action erst am Ende, wenn ein Eintrag fehlschlug (wie oben unter 3b).
+  `output.succeeded` und `output.failed`. `stopOnError` (Standard `true`; seit R5a `continueOnEntryError`, Standard
+  `false`, siehe Nachtrag 2026-11-26) beendet beim ersten Fehler die übrigen Einträge; mit `false` scheitert die Action
+  erst am Ende, wenn ein Eintrag fehlschlug (wie oben unter 3b).
 - `parallel` ist standardmäßig 1, höchstens 64.
 
 ## Nachtrag 2026-11-22 (S25b): Dynamische Ziele absichern
@@ -222,3 +223,12 @@ Werte aus Parametern können von außen kommen, etwa aus Pfad, Query oder Body e
 könnte ein Aufrufer mit `params.TYPE = "../../anderes-projekt/x"` beliebige Workflow- oder Pipeline-Dateien des
 Rechners starten. Die Grenze „nur Dateien des Projekts“ gilt deshalb immer; `allowedTargets` schränkt innerhalb des
 Projekts weiter ein. Ablehnungen sind getestet (`..`, absolute Pfade, Ziele außerhalb der Muster).
+
+## Nachtrag 2026-11-26 (R5a): `continueOnEntryError` statt `stopOnError`
+
+`stopOnError` (Standard `true`) stand mit entgegengesetzter Logik neben `continueOnError` im selben Action-Block. Es
+heißt jetzt `continueOnEntryError` (Standard `false`): `true` lässt alle Einträge laufen, die Action scheitert am Ende,
+wenn einer fehlschlug; `false` beendet beim ersten Fehler die übrigen Einträge. Gleiche Polarität wie
+`continueOnError`, das für die Action als Ganzes gilt. Ein Workflow mit `stopOnError` ist ein Fehler mit dem Ersatz,
+z. B. `stopOnError was replaced by continueOnEntryError with the opposite meaning: write continueOnEntryError: true`
+(bewusster Bruch vor 1.0, ADR 0029). Die Beispiele oben mit `stopOnError` gelten sinngemäß.

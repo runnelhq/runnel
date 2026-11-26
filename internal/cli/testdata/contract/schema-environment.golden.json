@@ -36,10 +36,8 @@
     },
     "secretStore": {
       "type": "string",
-      "description": "Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables), inline (secrets: in this file, plain text) or local (the local secret store, not available yet)",
+      "description": "Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables) or inline (secrets: in this file, plain text)",
       "enum": [
-        "local",
-        "shared",
         "env",
         "inline"
       ]

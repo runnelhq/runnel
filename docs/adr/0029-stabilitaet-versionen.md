@@ -39,7 +39,7 @@ Die Zusagen gelten ab `v1.0.0`. Vorabversionen (`-alpha`, `-beta`, `-rc`) sagen 
 | **Ausdrücke** `{{ … }}`, Variablen `${…}` | Namen im Kontext (`params`, `results`, `record`, `run` …), Funktionen mit Namen, Parametern und Ergebnis; Formate von Zahlen und Datum (`#.##0,00`, `dd.MM.yyyy`) |
 | **Ausführung** | Semantik von Links, Join, Retry, Timeout, Fehler-Links, Fehler-Workflow; Typen der Datensätze (ADR 0007) |
 | **Plugin-Protokoll** v1 (ADR 0019) | Methoden, Nachrichten, Felder und Wertetypen; Kredite; Fehlercodes. `protocolVersion: 1` bleibt für alle 1.x |
-| **CLI** | Befehle, Flags und ihre Bedeutung; Exit-Codes (`runnel run`: 0 Erfolg, 1 Lauf fehlgeschlagen, 2 nicht gestartet, 130 abgebrochen; `runnel health`: 0–3); Ausgaben mit `--json` |
+| **CLI** | Befehle, Flags und ihre Bedeutung; Exit-Codes (`runnel run`: 0 Erfolg, 1 Lauf fehlgeschlagen, 2 nicht gestartet, 130 abgebrochen; `runnel health`: 0–3; falsche Aufrufe siehe Nachtrag R5a); Ausgaben mit `--json` |
 | **HTTP-Trigger** (ADR 0018) | Adressen, Authentifizierung, Statuscodes und Antworten (`response`) |
 | **Öffentliche HTTP-API** unter `/api/v1` | Abschnitt 5 |
 | **Release-Dateien** | Aufbau von `runnel-catalog.json` und `runnel-expressions.json` |
@@ -159,3 +159,15 @@ dauerhafter Mechanismus für umbenannte Felder; Test für Golden-Dateien gegen d
   werden nach `name` bzw. `type` verglichen.
 - Die Basis ändert nur der Release-Prozess ([docs/dev/RELEASE.md](../dev/RELEASE.md)), nicht `-update`. Vor `v1.0.0`
   darf ein PR mit bewusstem Bruch (z. B. R5) die Basis mit Begründung mitändern.
+
+## Nachtrag 2026-11-26 (R5a): Exit-Codes bei falschem Aufruf
+
+- Ein falscher Aufruf (unbekannter Befehl oder Flag, Flag ohne Wert, fehlendes oder überzähliges Argument,
+  widersprüchliche Flags) beendet **jeden Befehl mit 2**, `runnel health` mit **3** (Zustand unbekannt, wie
+  Monitoring-Werkzeuge es erwarten). Nichts wird gestartet. Vorher war es 1 – bei `run` „Lauf fehlgeschlagen“, bei
+  `validate` „Fehler gefunden“.
+- `runnel validate`: 0 keine Fehler, 1 Fehler gefunden (mit `--strict` auch Warnungen), 2 nichts geprüft (falsche
+  Argumente, Pfad fehlt, keine Dateien gefunden, ungültiges `--param` oder `--env`). `runnel triggers`: 1 Fehler in
+  Trigger-Dateien, 2 kein Projekt oder falscher Aufruf.
+- Umsetzung in `internal/cli/root.go`: Fehler von Cobra beim Lesen der Flags (`SetFlagErrorFunc`) und beim Prüfen der
+  Argumente und Flag-Gruppen (`Args` jedes Befehls) sind Aufruffehler; die Hilfe jedes Befehls nennt die Exit-Codes.

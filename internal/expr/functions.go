@@ -12,9 +12,9 @@ import (
 	exprlang "github.com/expr-lang/expr"
 )
 
-// The function library, part 1 (ADR 0006): dates, text, null and empty values. The
-// built-in functions of expr-lang (upper, lower, trim, split, replace, len, now, …)
-// are available as well. The type declarations let compiling find wrong arguments.
+// The function library, part 1 (ADR 0006): dates, text, null and empty values. Of the
+// built-in functions of expr-lang, only those in Functions are available (allow.go).
+// The type declarations let compiling find wrong arguments.
 var functions = []exprlang.Option{
 	exprlang.Function("today", func(...any) (any, error) { return today(), nil }, new(func() time.Time)),
 	dateFunc("addDays", func(t time.Time, n int) any { return t.AddDate(0, 0, n) }),
