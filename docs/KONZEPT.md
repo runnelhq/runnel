@@ -914,6 +914,9 @@ Regeln: [ADR 0028](adr/0028-javascript-core-script.md).
   Ohne `fields` folgen die Typen den Werten (ganze Zahl → `int`, `Date` → `datetime`, `Uint8Array` → `binary`, Objekt
   oder Liste → `json`), das Schema ist offen. `copies` ist erlaubt, je Kopie eine eigene Laufzeit (globale Variablen
   gelten je Kopie). Beispiel `examples/pipelines/pipelines/script.pipeline.yaml`.
+- Editor (seit S73c): Code-Feld mit JavaScript-Hervorhebung, Zeilennummern und Vorschlägen für `record` (Felder des
+  eingehenden Schemas), `params` (Schlüssel aus `params`), `console` und `require('./scripts/…')`; Syntaxfehler meldet
+  schon die Prüfung (`runnel validate`, Editor) am Feld und an der Zeile.
 - Werte: Text, Zahlen, Boolean, Listen und Objekte wie in JSON; `decimal` und `date` kommen als Text (`"12.50"`),
   ganze Zahlen über ±2^53 als `BigInt`, Zeitpunkte als `Date`. Ganze Zahlen kommen als `int` zurück, andere als `float`.
 - Sandbox: kein Zugriff auf Dateisystem, Netzwerk, Prozesse und Umgebungsvariablen; `http`/`fs` im Skript gibt es in

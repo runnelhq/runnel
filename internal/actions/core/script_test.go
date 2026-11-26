@@ -22,6 +22,8 @@ func TestScriptConfig(t *testing.T) {
 	actiontest.ConfigError(t, scriptDefinition, map[string]any{"script": "return 1", "file": "scripts/a.js"}, "either script or file")
 	actiontest.ConfigError(t, scriptDefinition, map[string]any{"file": "scripts/a.ps1"}, "expected a .js file")
 	actiontest.ConfigError(t, scriptDefinition, map[string]any{"script": "return 1", "timeout": "1s"}, "timeout")
+	// Syntax errors are found when checking, with the line in the script.
+	actiontest.ConfigError(t, scriptDefinition, map[string]any{"script": "const a = 1;\nlet x = ;"}, "script, line 2: syntax error:")
 }
 
 // The code gets params and its return value is the output; console.* goes to the log.

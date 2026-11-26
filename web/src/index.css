@@ -355,6 +355,72 @@
   border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md);
 }
 
+/* Code field of core.script (S73c): the frame of the expression editor, line numbers, grows up to a maximum height and
+   then scrolls; JavaScript tokens from the classes of @lezer/highlight (tok-*). */
+.runnel-script .cm-editor {
+  max-height: 360px;
+}
+.runnel-script .cm-editor .cm-content {
+  min-height: 72px;
+}
+.runnel-script .cm-scroller {
+  overflow: auto;
+}
+.runnel-script .cm-line {
+  padding: 0 8px 0 4px;
+}
+.runnel-script .cm-gutters {
+  background: var(--muted);
+  color: var(--code-gutter);
+  border-right: 1px solid var(--border);
+  border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md);
+}
+.runnel-script .cm-lineNumbers .cm-gutterElement {
+  min-width: 24px;
+  padding: 0 6px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.runnel-script .cm-matchingBracket {
+  background: var(--expression-soft);
+  outline: 1px solid color-mix(in srgb, var(--expression) 40%, transparent);
+}
+.runnel-script .cm-nonmatchingBracket {
+  color: var(--destructive);
+}
+.runnel-script .rs-error-line {
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+.runnel-script .tok-keyword {
+  color: var(--expression);
+  font-weight: 600;
+}
+.runnel-script .tok-string,
+.runnel-script .tok-string2,
+.runnel-script .tok-number,
+.runnel-script .tok-bool,
+.runnel-script .tok-atom,
+.runnel-script .tok-literal {
+  color: var(--code-string);
+}
+.runnel-script .tok-comment {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.runnel-script .tok-definition,
+.runnel-script .tok-className {
+  color: var(--code-function);
+}
+.runnel-script .tok-variableName2 {
+  color: var(--expression);
+}
+.runnel-script .tok-punctuation,
+.runnel-script .tok-operator {
+  color: var(--muted-foreground);
+}
+.runnel-script .tok-invalid {
+  color: var(--destructive);
+}
+
 /* YAML editor (mockup design/mockups/e9-yaml.html): colours as in the read-only view (E4). */
 .runnel-yaml .cm-editor {
   height: 100%;

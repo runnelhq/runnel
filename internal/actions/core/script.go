@@ -46,6 +46,12 @@ func newScript(with map[string]any) (action.Action, error) {
 	case a.File != "" && !strings.EqualFold(filepath.Ext(a.File), ".js"):
 		return nil, fmt.Errorf("file %q: expected a .js file", a.File)
 	}
+	// Syntax errors are found when checking, e.g. by runnel validate and in the editor (S73c).
+	if a.Script != "" {
+		if err := script.Check("script", a.Script, true, "params"); err != nil {
+			return nil, err
+		}
+	}
 	return a, nil
 }
 
