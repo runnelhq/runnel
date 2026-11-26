@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Help per building block (mockup design/mockups/e15-help.html, E15d): opened from the
 // palette ("?", F1), from the properties panel ("?", "Open help", F1), back with
-// "‹ Properties" or Esc, the switch between action and transform, a plugin without
-// details and "Copy example". Against "runnel serve ../examples/hello"; nothing is changed.
+// "‹ Properties" or Esc, the switch between action and transform, the search, a plugin
+// without details and "Copy example". Against "runnel serve ../examples/hello"; nothing is changed.
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
 const help = (page: Page) => page.getByTestId("help-panel");
@@ -116,17 +116,21 @@ test("switches between action and transform of the same type", async ({ page }) 
   await expect(help(page).getByRole("group", { name: "Same type as" })).toHaveCount(0);
 });
 
-test("shows sub-fields, conditions and allowed values", async ({ page }) => {
+test("searches building blocks of both kinds with Ctrl+K", async ({ page }) => {
   await open(page);
-  await page.getByTestId("palette-http.request").hover();
-  await page.getByTestId("palette-http.request").getByRole("button").click();
-  await expect(help(page).getByRole("heading", { name: "HTTP Request" })).toBeVisible();
-  // Sub-fields of an object right after it, with the condition of x-runnel-only.
-  await expect(page.getByTestId("help-field-maxRetries")).toContainText("└maxRetries");
-  await expect(page.getByTestId("help-field-start")).toContainText("Only with style: page, offset");
-  await expect(page.getByTestId("help-field-connection")).toContainText("connection");
-  await expect(page.getByTestId("help-field-timeout")).toContainText("duration");
-  await expect(page.getByTestId("help-field-method")).toContainText("GETPOSTPUTPATCHDELETEHEAD");
+  await select(page, "greet");
+  await page.keyboard.press("F1");
+  await page.keyboard.press("Control+k");
+  await expect(help(page).getByRole("textbox", { name: "Search building blocks" })).toBeFocused();
+  await page.keyboard.type("group by");
+  const option = page.getByRole("listbox", { name: "Building blocks" }).getByRole("option").first();
+  await expect(option).toContainText("core.group-by");
+  await expect(option).toContainText("Transform");
+  await page.keyboard.press("Enter");
+  await expect(help(page).getByRole("heading", { name: "Group By" })).toBeVisible();
+  await expect(page.getByTestId("help-badges")).toContainText("Error link for records");
+  await expect(page.getByTestId("help-field-separator")).toContainText("Only with function: concat");
+  await expect(page.getByTestId("help-field-name")).toContainText("└name");
 });
 
 test("a plugin without the new keys shows a neutral note", async ({ page }) => {

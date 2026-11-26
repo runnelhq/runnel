@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { categoryLabel, tileColor, transformCategoryLabel, useCatalog, type CatalogKind, type Descriptor } from "../catalog";
 import { exampleStep, helpFields, helpType, showValue, usePluginVersion, useVersion, type HelpField } from "../help";
-import { ActionIcon, BackIcon, CloseIcon, CodeIcon, CopyIcon, PlugIcon } from "./Icons";
+import { ActionIcon, BackIcon, CloseIcon, CodeIcon, CopyIcon, PlugIcon, SearchIcon } from "./Icons";
 
 /** What the help shows and how it was opened. */
 export interface HelpTarget {
@@ -65,12 +65,13 @@ export function HelpPanel(props: {
         ) : (
           <span className="label-caps">Help</span>
         )}
+        <SearchBlocks actions={actions} transforms={transforms} onOpen={props.onOpen} />
         <button
           type="button"
           title="Close help"
           aria-label="Close help"
           onClick={props.onClose}
-          className="ml-auto grid size-[26px] cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="grid size-[26px] cursor-pointer place-items-center rounded-md border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <CloseIcon width={14} height={14} />
         </button>
@@ -556,5 +557,114 @@ function FieldRow(props: { f: HelpField; last: boolean }) {
         )}
       </td>
     </tr>
+  );
+}
+
+/**
+ * "Search building blocks" (Ctrl+K) in the head of the help: finds actions and
+ * transforms (also of plugins) by type, label and description, as the palette does, and
+ * opens their help.
+ */
+function SearchBlocks(props: {
+  actions: Map<string, Descriptor>;
+  transforms: Map<string, Descriptor>;
+  onOpen: (type: string, kind: CatalogKind) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+
+  // Ctrl+K jumps into the search while the help is shown.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        input.current?.focus();
+        input.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const found = useMemo(() => {
+    if (words.length === 0) return [];
+    const all = [
+      ...[...props.actions.values()].map((d) => ({ d, kind: "workflow" as const })),
+      ...[...props.transforms.values()].map((d) => ({ d, kind: "pipeline" as const })),
+    ];
+    return all
+      .filter(({ d }) => words.every((w) => `${d.type} ${d.label} ${d.description}`.toLowerCase().includes(w)))
+      .sort((a, b) => a.d.label.localeCompare(b.d.label) || a.kind.localeCompare(b.kind))
+      .slice(0, 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.actions, props.transforms, words.join(" ")]);
+
+  const open = (i: number) => {
+    const r = found[i];
+    if (!r) return;
+    setQuery("");
+    input.current?.blur();
+    props.onOpen(r.d.type, r.kind);
+  };
+
+  return (
+    <div className="relative ml-auto">
+      <label className="flex h-[26px] w-[220px] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground">
+        <SearchIcon width={14} height={14} />
+        <input
+          ref={input}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setActive(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((a) => Math.max(0, Math.min(found.length - 1, a + (e.key === "ArrowDown" ? 1 : -1))));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              open(active);
+            } else if (e.key === "Escape" && query) {
+              e.preventDefault(); // clears the search, the help stays
+              setQuery("");
+            }
+          }}
+          placeholder="Search building blocks"
+          aria-label="Search building blocks"
+          className="min-w-0 flex-1 border-0 bg-transparent text-foreground outline-none"
+        />
+        <kbd className="rounded-[3px] border border-border px-1 font-mono text-[10px]">Ctrl+K</kbd>
+      </label>
+      {words.length > 0 && (
+        <ul
+          role="listbox"
+          aria-label="Building blocks"
+          className="absolute top-full right-0 z-10 m-0 mt-1 max-h-[360px] w-[360px] list-none overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {found.map(({ d, kind }, i) => (
+            <li
+              key={`${kind}:${d.type}`}
+              role="option"
+              aria-selected={i === active}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => open(i)}
+              onMouseEnter={() => setActive(i)}
+              className={"flex h-[34px] cursor-pointer items-center gap-2 rounded-md px-2 " + (i === active ? "bg-accent text-accent-foreground" : "")}
+            >
+              <Tile d={d} size={22} icon={13} radius="rounded-sm" />
+              <span className="min-w-0 flex-1 leading-tight">
+                <span className="block truncate text-xs">{d.label}</span>
+                <small className="block truncate font-mono text-[10px] text-muted-foreground">{d.type}</small>
+              </span>
+              <span className="text-2xs text-muted-foreground">{kindName(kind)}</span>
+            </li>
+          ))}
+          {found.length === 0 && <li className="px-2 py-1.5 text-xs text-muted-foreground">No building block matches “{query}”.</li>}
+        </ul>
+      )}
+    </div>
   );
 }
