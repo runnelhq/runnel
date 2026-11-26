@@ -175,8 +175,8 @@ links:
 apiVersion: runnel/v1
 name: parent
 outputs:
-  - { name: COUNT, type: integer, value: "{{ len(results.load.output.rows) }}" }
-  - { name: FIRST, value: "{{ results.load.output.rows[0].name }}" }
+  - { name: COUNT, type: integer, value: "{{ len(results.load.output.records) }}" }
+  - { name: FIRST, value: "{{ results.load.output.records[0].name }}" }
 actions:
   - { id: start, type: core.start }
   - id: load
@@ -213,7 +213,7 @@ func TestRunPipelineCallWithInvalidRows(t *testing.T) {
 	if err != nil || len(rows) != 2 || strings.Join(rows[1].Names(), ",") != "a,b" {
 		t.Errorf("%v %v", rows, err)
 	}
-	if _, err := Records([]map[string]any{{"x": struct{}{}}}); err == nil || !strings.Contains(err.Error(), "rows[0].x") {
+	if _, err := Records([]map[string]any{{"x": struct{}{}}}); err == nil || !strings.Contains(err.Error(), "records[0].x") {
 		t.Errorf("invalid value: %v", err)
 	}
 }

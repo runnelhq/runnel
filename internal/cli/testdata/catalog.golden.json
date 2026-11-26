@@ -318,14 +318,14 @@
           "description": "Records that went to error links, in all transforms"
         },
         {
-          "name": "output.rows",
+          "name": "output.records",
           "type": "list",
           "description": "The records that reached core.to-result, each as an object"
         }
       ],
       "errors": "Fails when the pipeline stops with an error or cannot be started (file outside the project folder or missing, parameter not declared or invalid), when the pipeline is not in allowedTargets and when records is not a list. Records on error links do not fail the action.",
       "limits": [
-        "output.rows holds at most maxRecords of core.to-result (default 100,000)."
+        "output.records holds at most maxRecords of core.to-result (default 100,000)."
       ]
     },
     {
@@ -3583,7 +3583,7 @@
       "kind": "transform",
       "category": "execution",
       "label": "Records to Workflow",
-      "description": "Returns the records to the calling workflow (output.rows) and passes them on",
+      "description": "Returns the records to the calling workflow (output.records) and passes them on",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -3597,7 +3597,7 @@
         "additionalProperties": false
       },
       "example": "maxRecords: 1000\n",
-      "records": "Passes all records on unchanged and adds them to the result of the pipeline: core.run-pipeline returns them as output.rows.",
+      "records": "Passes all records on unchanged and adds them to the result of the pipeline: core.run-pipeline returns them as output.records.",
       "errors": "Stops the pipeline when there are more records than maxRecords, or maxRecords is not a whole number of 1 or more.",
       "limits": [
         "maxRecords limits the records held in memory for the result (default 100,000)."

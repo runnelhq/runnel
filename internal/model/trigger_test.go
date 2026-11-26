@@ -197,12 +197,12 @@ func TestParseIntervalAndFileTriggers(t *testing.T) {
 	}
 }
 
-// The folder of a file trigger is folder (R5a); the old name path is an error that names
-// the new one. maxConcurrentRuns of an http trigger is 4 unless set; an explicit 0 is no limit.
+// The folder of a file trigger is folder (R5a); the old name path is not used by file
+// triggers. maxConcurrentRuns of an http trigger is 4 unless set; an explicit 0 is no limit.
 func TestFileTriggerFolderAndHTTPLimit(t *testing.T) {
 	_, err := ParseTrigger("triggers/inbox.yaml", []byte(strings.Replace(fileSource, "folder: data/in", "path: data/in", 1)))
-	if err == nil || !strings.Contains(err.Error(), "triggers/inbox.yaml:7:9: file triggers have no path; use folder for the folder to watch") ||
-		strings.Contains(err.Error(), `missing required field "folder"`) {
+	if err == nil || !strings.Contains(err.Error(), "triggers/inbox.yaml:7:9: path is not used by file triggers (fields: folder,") ||
+		!strings.Contains(err.Error(), `missing required field "folder"`) {
 		t.Errorf("old name: %v", err)
 	}
 	base := "kind: Trigger\napiVersion: runnel/v1\nname: api\ntype: http\ntarget: workflows/import.workflow.yaml\nwith:\n  method: GET\n  path: /x\n  auth: none\n"
@@ -226,11 +226,11 @@ func TestFileTriggerFolderAndHTTPLimit(t *testing.T) {
 }
 
 // maxConcurrent of an http trigger is maxConcurrentRuns since R5b; the old name is an
-// error that names the new one.
+// unknown field.
 func TestHTTPTriggerOldMaxConcurrent(t *testing.T) {
 	src := "kind: Trigger\napiVersion: runnel/v1\nname: api\ntype: http\ntarget: workflows/import.workflow.yaml\nwith:\n  method: GET\n  path: /x\n  auth: none\n  maxConcurrent: 2\n"
 	_, err := ParseTrigger("triggers/api.yaml", []byte(src))
-	if err == nil || !strings.Contains(err.Error(), `triggers/api.yaml:10:3: field "maxConcurrent" was renamed before 1.0: use maxConcurrentRuns`) {
+	if err == nil || !strings.Contains(err.Error(), `triggers/api.yaml:10:3: unknown field "maxConcurrent"`) {
 		t.Errorf("old name: %v", err)
 	}
 }

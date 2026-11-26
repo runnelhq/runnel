@@ -48,9 +48,6 @@ type splitField struct {
 
 func newSplitField(with map[string]any) (transform.Transform, error) {
 	t := &splitField{}
-	if err := renamed(with, map[string]string{"rows": "asRecords", "indexField": "numberField"}); err != nil {
-		return nil, err
-	}
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}

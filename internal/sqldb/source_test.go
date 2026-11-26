@@ -51,7 +51,7 @@ func TestSource(t *testing.T) {
 		new(conn(connections.TypePostgres, map[string]any{"host": "h", "database": "d", "user": "u", "timeout": "10ms"})):                "timeout: invalid duration",
 		new(conn(connections.TypePostgres, map[string]any{"host": "h", "database": "d"})):                                                `missing required field "user"`,
 		// connectTimeout is timeout since R5b.
-		new(conn(connections.TypeSQLServer, map[string]any{"host": "h", "database": "d", "connectTimeout": "5s"})): `field "connectTimeout" was renamed before 1.0: use timeout`,
+		new(conn(connections.TypeSQLServer, map[string]any{"host": "h", "database": "d", "connectTimeout": "5s"})): `connection db: unknown field "connectTimeout"`,
 	} {
 		if _, _, err := source(context.Background(), reg, *c); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v: %v, want %q", c.With, err, want)

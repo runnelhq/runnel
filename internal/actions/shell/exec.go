@@ -58,11 +58,7 @@ func execute(ctx context.Context, ec *action.ExecContext, name string, cmd proc.
 
 // decode decodes the configuration of an action of the namespace and checks format:
 // with json, stdout is read as JSON into output.value, like file.read with format: json.
-// Until R5b this was json: true with output.json.
 func decode(with map[string]any, v any, format *string) error {
-	if err := action.Renamed(with, "json", "format: json (the value is then output.value, as in file.read)"); err != nil {
-		return err
-	}
 	if err := action.DecodeConfig(with, v); err != nil {
 		return err
 	}

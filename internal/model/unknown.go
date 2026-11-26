@@ -14,28 +14,17 @@ import (
 // fields as well, but reports only one of them, and with several not always the same.
 func unknownFields(file string, node ast.Node, t reflect.Type) Errors {
 	var errs Errors
-	walkFields(node, t, func(key ast.Node, st reflect.Type, name string, known []string) {
-		msg := fmt.Sprintf("unknown field %q%s", name, Suggest(name, known))
-		if use, ok := renamedFields[st][name]; ok {
-			msg = fmt.Sprintf("field %q was renamed before 1.0: use %s", name, use)
-		}
-		errs = append(errs, &Error{File: file, Pos: nodePos(key), Msg: msg})
+	walkFields(node, t, func(key ast.Node, name string, known []string) {
+		errs = append(errs, &Error{File: file, Pos: nodePos(key),
+			Msg: fmt.Sprintf("unknown field %q%s", name, Suggest(name, known))})
 	})
 	errs.Sort()
 	return errs
 }
 
-// renamedFields holds fields renamed before 1.0 by struct and old name, with what to
-// write instead (R5b): a clean break with a clear message instead of "unknown field".
-// Renames after 1.0 keep the old name until the next major version (ADR 0029).
-var renamedFields = map[reflect.Type]map[string]string{
-	reflect.TypeFor[TriggerSettings](): {"maxConcurrent": "maxConcurrentRuns (as in settings of project.yaml)"},
-	reflect.TypeFor[Project]():         {"workflow": "settings.defaultJoin instead of workflow.defaultJoin"},
-}
-
 // walkFields compares the keys of mappings with the fields of structs (yaml tags) and
 // descends into known fields, slices and maps. Values of other types are not checked here.
-func walkFields(node ast.Node, t reflect.Type, unknown func(key ast.Node, st reflect.Type, name string, known []string)) {
+func walkFields(node ast.Node, t reflect.Type, unknown func(key ast.Node, name string, known []string)) {
 	node = unwrap(node)
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
@@ -59,7 +48,7 @@ func walkFields(node ast.Node, t reflect.Type, unknown func(key ast.Node, st ref
 			}
 			ft, ok := fields[name]
 			if !ok {
-				unknown(kv.Key, t, name, known)
+				unknown(kv.Key, name, known)
 				continue
 			}
 			walkFields(kv.Value, ft, unknown)

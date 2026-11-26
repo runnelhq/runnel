@@ -647,14 +647,14 @@ Standardwert; S39d fügt `local` wieder hinzu (additiv). So sagt 1.0 keine Bedeu
 
 - **`timeout` in `postgres` und `sqlserver`:** Die Zeit für den Verbindungsaufbau heißt `timeout` wie bei `sftp`,
   `ftps`, `ftp` und `smtp` (Standard bleibt 30 s); die Beschreibung sagt, dass er nur den Aufbau begrenzt (Abfragen haben
-  ihr eigenes `timeout` in Action bzw. Transform). `connectTimeout` ist ein Fehler mit dem neuen Namen; die Prüfung
-  kennt dafür je Connection-Typ eine Liste umbenannter Felder (`connection.Definition.Renamed`).
+  ihr eigenes `timeout` in Action bzw. Transform). Der alte Name `connectTimeout` ist ein unbekanntes
+  Feld.
 - **`auth: basic` bei `smtp`:** Anmeldung mit `user` und `password` heißt wie bei der Connection `http` `basic`;
-  `oauth2` und `none` stimmen schon überein. Leer bleibt `basic`, wenn `user` gesetzt ist. `auth: password` ist ein
-  Fehler mit dem neuen Namen, andere unbekannte Werte jetzt ebenfalls (vorher als Passwort-Anmeldung behandelt).
+  `oauth2` und `none` stimmen schon überein. Leer bleibt `basic`, wenn `user` gesetzt ist. `auth: password` ist wie
+  jeder andere unbekannte Wert ein ungültiger Wert (vorher als Passwort-Anmeldung behandelt).
 - **`transfer.exists`:** `include: all|files|folders` (Standard `all`) wie `transfer.list` statt `kind: any|file|folder`.
 - **`transfer.wait`:** `maxWait` hat den Standard 1 h (wie `file.wait`); `0` wartet bis zum `timeout` der Action oder
   zum Ende des Laufs.
 - **`transfer.download`:** `maxSize` hat den Standard 1 GB wie `http.request` mit `saveTo`; eine Datei ohne Grenze gibt
   es nicht mehr, größere Werte (z. B. `20GB`) sind möglich.
-- Alte Namen und Werte sind Fehler mit dem neuen Namen, ohne Übergangszeit (bewusster Bruch vor 1.0, ADR 0029).
+- Alte Namen sind unbekannte Felder, alte Werte ungültige Werte, ohne Übergangszeit (bewusster Bruch vor 1.0, ADR 0029).

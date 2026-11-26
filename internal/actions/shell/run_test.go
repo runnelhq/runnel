@@ -93,8 +93,8 @@ func TestRun(t *testing.T) {
 	}
 	// The old field json and other formats are errors.
 	for want, with := range map[string]map[string]any{
-		`field "json" was renamed before 1.0: use format: json`: {"program": "x", "json": true},
-		`invalid format "xml" (expected text or json)`:          {"program": "x", "format": "xml"},
+		`unknown field "json"`:                         {"program": "x", "json": true},
+		`invalid format "xml" (expected text or json)`: {"program": "x", "format": "xml"},
 	} {
 		if _, err := newRun(with); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%v: %v, want %q", with, err, want)

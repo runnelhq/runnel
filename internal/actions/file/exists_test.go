@@ -36,5 +36,5 @@ func TestExistsConfig(t *testing.T) {
 	actiontest.ConfigError(t, existsDefinition, map[string]any{"path": "x", "type": "file"}, `unknown field "type"`)
 	actiontest.ConfigError(t, existsDefinition, map[string]any{"path": "x", "include": "file"}, `invalid include "file" (expected all, files or folders)`)
 	// kind is include since R5b, as in file.list.
-	actiontest.ConfigError(t, existsDefinition, map[string]any{"path": "x", "kind": "file"}, `field "kind" was renamed before 1.0: use include`)
+	actiontest.ConfigError(t, existsDefinition, map[string]any{"path": "x", "kind": "file"}, `unknown field "kind"`)
 }

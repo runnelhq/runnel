@@ -702,7 +702,7 @@ with:
     `http.response` hinter demselben Filter (`examples/pipelines/pipelines/customer-api.pipeline.yaml`). Die Datensätze
     gehen weiter; ohne wartenden Aufrufer tut er nichts.
   - **Datensätze aus dem Body (seit S38c):** Ist das Ziel eine Pipeline, darf der Body eine JSON-Liste von Objekten
-    sein; sie kommt wie `rows` bei `core.run-pipeline` als Datensätze an (`core.from-result`, Felder nach Namen
+    sein; sie kommt wie `records` bei `core.run-pipeline` als Datensätze an (`core.from-result`, Felder nach Namen
     sortiert). Parameter kommen dann aus Pfad und Query.
   - Kommt bis `timeout` keine Antwort: `504`; der Lauf läuft weiter.
 - **Historie und Last (seit S38b2):**
@@ -1277,7 +1277,7 @@ Regeln wie `core.run-workflow` (nur `params`, Pfade relativ zum Projektordner, L
 - Datensätze auf Fehler-Links lassen die Action nicht scheitern; eine Pipeline, die abbricht, schon.
 - **Datensätze hinein und heraus (S24a, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** `records: "{{ … }}"` (bis R5b `rows`)
   gibt der Pipeline eine Liste mit (z. B. die Dateiliste von `file.list`), die `core.from-result` als Datensätze
-  weitergibt; was `core.to-result` erreicht, kommt als `output.rows` zurück (höchstens `maxRecords`, Standard 100.000).
+  weitergibt; was `core.to-result` erreicht, kommt als `output.records` zurück (bis R5b `output.rows`; höchstens `maxRecords`, Standard 100.000).
 
 **Wiederholung je Eintrag (umgesetzt mit S24b, [ADR 0008](adr/0008-ausfuehrungsvarianten.md), Nachtrag):** Jede
 Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` und `timeout`:
@@ -1299,7 +1299,7 @@ Action kann sich für jeden Eintrag einer Liste wiederholen – neben `retry` un
 - `result.output`: `items` (je Eintrag in Reihenfolge der Liste: `row`, `success`, `output`, `error`), `succeeded`,
   `failed`. Standardmäßig beendet der erste Fehler die übrigen Einträge und lässt die Action scheitern; mit
   `continueOnEntryError: true` laufen alle, die Action scheitert am Ende, wenn einer fehlschlug (je Fehler eine Warnung
-  im Log). `stopOnError` (bis R5a) ist ein Fehler mit dem Ersatz.
+  im Log). `stopOnError` (bis R5a) ist ein unbekanntes Feld.
 - Eine leere Liste ist erfolgreich (`items` leer); ein Wert, der keine Liste ist, ist ein Fehler.
 
 ### 12.2 Pipeline-Transforms

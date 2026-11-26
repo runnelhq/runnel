@@ -187,5 +187,5 @@ Alias für `http.respond` gibt es nicht, da noch kein Release erschienen ist; Wo
 - Die Grenze der gleichzeitigen Läufe eines HTTP-Triggers heißt `with.maxConcurrentRuns` wie `settings.maxConcurrentRuns`
   in `project.yaml` und im Workflow: dieselbe Art Grenze mit derselben Antwort `429`. Standard (4) und Bedeutung von `0`
   bleiben wie im Nachtrag R5a.
-- `maxConcurrent` ist ein Fehler mit Position und dem neuen Namen, ohne Übergangszeit (bewusster Bruch vor 1.0,
+- Der alte Name `maxConcurrent` ist ein unbekanntes Feld, ohne Übergangszeit (bewusster Bruch vor 1.0,
   ADR 0029). Die `429`-Meldung nennt `maxConcurrentRuns`.

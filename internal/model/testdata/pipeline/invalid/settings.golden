@@ -1,4 +1,4 @@
 settings.pipeline.yaml:7:15: settings.bufferSize (500) must be at least settings.batchSize (1000)
 settings.pipeline.yaml:11:13: transform "a": copies must be between 1 and 64
 settings.pipeline.yaml:14:19: transform "b": invalid distribution "random" (expected copy or roundRobin)
-settings.pipeline.yaml:17:19: transform "c": distribution distribute was renamed before 1.0: use roundRobin
+settings.pipeline.yaml:17:19: transform "c": invalid distribution "distribute" (expected copy or roundRobin)

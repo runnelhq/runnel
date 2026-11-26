@@ -64,7 +64,8 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 ### Bruch
 
 Bewusste Änderungen aus der Durchsicht der Namen und Standardwerte vor 1.0 (R5a, R5b, ADR 0029). Alte Namen sind
-ein Fehler mit Position und dem neuen Namen (`field "…" was renamed before 1.0: use …`):
+unbekannte Felder (`unknown field "…"`), alte Werte ungültige Werte mit den erlaubten; einen Hinweis auf den neuen
+Namen gibt es nicht:
 
 - **Exit-Codes:** Ein falscher Aufruf endet bei allen Befehlen mit 2 statt 1, bei `runnel health` mit 3.
   `runnel validate` und `runnel triggers` enden mit 2, wenn nichts geprüft werden konnte (Pfad fehlt, kein Projekt,
@@ -94,8 +95,8 @@ ein Fehler mit Position und dem neuen Namen (`field "…" was renamed before 1.0
 - **`shell.run`, `shell.powershell`:** `json: true` heißt `format: json`, der Wert steht in `output.value` statt
   `output.json`; `output.duration` (Text) ist `output.durationMs` (Zahl) (ADR 0023, Nachtrag R5b).
 - **`core.generate-rows`:** `rows` heißt `count`, `rowNumberField` heißt `numberField`. **`core.split-field`:**
-  `rows: true` heißt `asRecords: true`, `indexField` heißt `numberField`. **`core.run-pipeline`:** `rows` heißt `records`
-  (ADR 0025, Nachtrag R5b).
+  `rows: true` heißt `asRecords: true`, `indexField` heißt `numberField`. **`core.run-pipeline`:** `rows` heißt `records`,
+  die zurückgegebenen Datensätze stehen in `output.records` statt `output.rows` (ADR 0025, Nachtrag R5b).
 - **`core.switch`:** `default` heißt `else` wie bei `core.filter`.
 - **Pipelines:** `distribution: distribute` heißt `distribution: roundRobin`.
 - **`archive.create`:** `output.files` heißt `output.count`.

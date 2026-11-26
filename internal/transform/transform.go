@@ -174,7 +174,7 @@ func (o *Output) Respond(r action.Response) bool {
 // must not be changed (emit copies).
 func (o *Output) Rows() []record.Record { return o.rows }
 
-// AddResult adds a record to the result of the run, e.g. for output.rows of
+// AddResult adds a record to the result of the run, e.g. for output.records of
 // core.run-pipeline. The record must not be changed afterwards.
 func (o *Output) AddResult(r record.Record) error {
 	if o.result == nil {

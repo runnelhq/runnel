@@ -335,11 +335,6 @@ func (t *Trigger) unusedFields() Errors {
 	}
 	var errs Errors
 	for _, f := range slices.Sorted(maps.Keys(set)) {
-		if f == "path" && set[f] && t.Type == TriggerFile {
-			// The folder of a file trigger was "path" before R5a.
-			errs = append(errs, t.src.errorf("$.with.path", "file triggers have no path; use folder for the folder to watch (renamed in R5a, like folder of file.list)"))
-			continue
-		}
 		if set[f] && !slices.Contains(fieldsOf[t.Type], f) {
 			errs = append(errs, t.src.errorf("$.with."+f, "%s is not used by %s triggers (fields: %s)", f, t.Type, strings.Join(fieldsOf[t.Type], ", ")))
 		}
@@ -382,7 +377,7 @@ func (t *Trigger) checkInterval() Errors {
 func (t *Trigger) checkFile() Errors {
 	s, w := t.src, t.With
 	var errs Errors
-	if strings.TrimSpace(w.Folder) == "" && w.Path == "" {
+	if strings.TrimSpace(w.Folder) == "" {
 		errs = append(errs, s.errorf("$.with", `missing required field "folder" (the folder to watch, relative to the project or absolute)`))
 	}
 	if _, err := filepath.Match(strings.ToLower(t.FilePattern()), ""); err != nil {

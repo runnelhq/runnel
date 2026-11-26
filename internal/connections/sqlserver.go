@@ -10,7 +10,6 @@ var sqlServerDefinition = connection.Definition{
 	Label:       "SQL Server",
 	Description: "A Microsoft SQL Server database, with a user or with the Windows account Runnel runs as",
 	Config:      SQLServer{},
-	Renamed:     map[string]string{"connectTimeout": "timeout (as in the other connection types)"},
 	Warn: func(with map[string]any) map[string]string {
 		w := map[string]string{}
 		if v, _ := with["trustServerCertificate"].(bool); v {

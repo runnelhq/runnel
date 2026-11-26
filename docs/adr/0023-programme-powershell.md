@@ -227,5 +227,5 @@ Mit dem Maintainer bestätigt:
   `file.read` (`format: json` → `output.value`). Andere Werte von `format` sind ein Fehler.
 - Die Laufzeit heißt `output.durationMs` und ist eine Zahl in Millisekunden statt des Texts `duration` (`"1.25s"`), wie
   `durationMs` der Läufe in der API und `results.<id>.durationMs`; mit Text ließ sich nicht rechnen.
-- `json` ist ein Fehler mit dem Hinweis auf `format: json` (bewusster Bruch vor 1.0, ADR 0029); Ausdrücke mit
+- Der alte Name `json` ist ein unbekanntes Feld (bewusster Bruch vor 1.0, ADR 0029); Ausdrücke mit
   `output.json` oder `output.duration` liefern nichts mehr und müssen angepasst werden.

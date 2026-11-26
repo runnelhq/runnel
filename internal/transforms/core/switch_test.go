@@ -115,9 +115,10 @@ func TestSwitchInit(t *testing.T) {
 	}
 }
 
-// default of core.switch is else since R5b, as in core.filter.
+// default of core.switch is else since R5b, as in core.filter; the old name is an unknown
+// field.
 func TestSwitchOldDefault(t *testing.T) {
-	if _, err := newSwitch(map[string]any{"cases": switchCases, "default": "others"}); err == nil || !strings.Contains(err.Error(), `field "default" was renamed before 1.0: use else`) {
+	if _, err := newSwitch(map[string]any{"cases": switchCases, "default": "others"}); err == nil || !strings.Contains(err.Error(), `unknown field "default"`) {
 		t.Errorf("%v", err)
 	}
 }

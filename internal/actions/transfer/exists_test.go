@@ -53,7 +53,7 @@ func testExists(t *testing.T, srv *testServer) {
 	}
 	actiontest.ConfigError(t, existsDefinition, map[string]any{"connection": "s", "path": "a", "include": "links"}, `invalid include "links" (expected all, files or folders)`)
 	// kind is include since R5b, as in transfer.list.
-	actiontest.ConfigError(t, existsDefinition, map[string]any{"connection": "s", "path": "a", "kind": "file"}, `field "kind" was renamed before 1.0: use include`)
+	actiontest.ConfigError(t, existsDefinition, map[string]any{"connection": "s", "path": "a", "kind": "file"}, `unknown field "kind"`)
 }
 
 func TestExistsLimit(t *testing.T) {

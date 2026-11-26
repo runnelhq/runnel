@@ -39,9 +39,6 @@ type existsAction struct {
 
 func newExists(with map[string]any) (action.Action, error) {
 	a := &existsAction{}
-	if err := action.Renamed(with, "kind", "include: all, files or folders (as in transfer.list)"); err != nil {
-		return nil, err
-	}
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}

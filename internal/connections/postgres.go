@@ -10,7 +10,6 @@ var postgresDefinition = connection.Definition{
 	Label:       "PostgreSQL",
 	Description: "A PostgreSQL database",
 	Config:      Postgres{},
-	Renamed:     map[string]string{"connectTimeout": "timeout (as in the other connection types)"},
 	Warn: func(with map[string]any) map[string]string {
 		switch v, _ := with["sslMode"].(string); v {
 		case "disable":

@@ -23,7 +23,8 @@ Antworten fest, die für Mappings nicht passen. Diese ADR entscheidet beides gem
 Stand heute:
 
 - **Aufrufe aus Workflows:** `core.run-pipeline` ruft eine Pipeline aus einem Workflow auf (ADR 0017, Nachtrag S18).
-  Datensätze gehen über `rows` und `core.from-result` hinein und über `core.to-result` und `output.rows` heraus. Beide
+  Datensätze gehen über `records` und `core.from-result` hinein und über `core.to-result` und `output.records` heraus
+  (bis R5b `rows` und `output.rows`). Beide
   Richtungen sind Listen im Speicher (ADR 0008, Nachtrag S24a).
 - **Ziele:** Sie liegen immer im Projektordner und lassen sich mit `allowedTargets` einschränken (ADR 0008, Nachtrag
   S25b).

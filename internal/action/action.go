@@ -349,16 +349,6 @@ func (r *Registry) Types() []string {
 	return types
 }
 
-// Renamed returns an error if with has the field old, renamed to use before 1.0 (R5b):
-// a clear message instead of "unknown field". It is a clean break; renames after 1.0
-// go through Deprecated (ADR 0029).
-func Renamed(with map[string]any, old, use string) error {
-	if _, ok := with[old]; ok {
-		return fmt.Errorf("field %q was renamed before 1.0: use %s", old, use)
-	}
-	return nil
-}
-
 // DecodeConfig decodes a "with" configuration into the struct pointed to by v.
 // Unknown fields and missing required fields (tag schema:"required") are errors.
 // Field names are those of the json tags. Fields of type any, map[string]any and []any

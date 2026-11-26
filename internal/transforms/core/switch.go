@@ -46,9 +46,6 @@ type switchCase struct {
 
 func newSwitch(with map[string]any) (transform.Transform, error) {
 	t := &switchRecords{}
-	if err := action.Renamed(with, "default", "else (as in core.filter)"); err != nil {
-		return nil, err
-	}
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}

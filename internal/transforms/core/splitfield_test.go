@@ -73,8 +73,8 @@ func TestSplitFieldErrors(t *testing.T) {
 	}{
 		{map[string]any{"field": "n", "separator": ";"}, "set asRecords: true"},
 		// rows and indexField are asRecords and numberField since R5b.
-		{map[string]any{"field": "n", "separator": ";", "rows": true}, `field "rows" was renamed before 1.0: use asRecords`},
-		{map[string]any{"field": "n", "separator": ";", "asRecords": true, "indexField": "i"}, `field "indexField" was renamed before 1.0: use numberField`},
+		{map[string]any{"field": "n", "separator": ";", "rows": true}, `unknown field "rows"`},
+		{map[string]any{"field": "n", "separator": ";", "asRecords": true, "indexField": "i"}, `unknown field "indexField"`},
 		{map[string]any{"field": "n", "separator": ";", "asRecords": true, "into": []any{"a"}}, "choose one"},
 		{map[string]any{"field": "n", "separator": ";", "into": []any{"a"}, "numberField": "i"}, "only with asRecords"},
 		{map[string]any{"field": "n", "separator": "", "asRecords": true}, "separator"},

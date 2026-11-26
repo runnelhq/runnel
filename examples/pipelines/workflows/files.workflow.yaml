@@ -3,7 +3,7 @@
 # - "list" lists the CSV files of data/.
 # - "check" gives the list to pipelines/files.pipeline.yaml (records); the pipeline reads
 #   it with core.from-result and returns the large files with core.to-result.
-# - "report" uses the returned records: results.check.output.rows.
+# - "report" uses the returned records: results.check.output.records.
 kind: Workflow
 apiVersion: runnel/v1
 name: files
@@ -14,7 +14,7 @@ parameters:
 outputs:
   - name: LARGE
     type: integer
-    value: "{{ len(results.check.output.rows) }}"
+    value: "{{ len(results.check.output.records) }}"
 actions:
   - id: start
     type: core.start
@@ -33,7 +33,7 @@ actions:
   - id: report
     type: core.log
     with:
-      message: "{{ len(results.list.output) }} file(s), at least ${MIN_SIZE} bytes: {{ join(map(results.check.output.rows, .name), ', ') }}"
+      message: "{{ len(results.list.output) }} file(s), at least ${MIN_SIZE} bytes: {{ join(map(results.check.output.records, .name), ', ') }}"
 links:
   - { from: start, to: list }
   - { from: list, to: check }

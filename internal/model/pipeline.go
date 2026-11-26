@@ -172,8 +172,6 @@ func (p *Pipeline) validate() error {
 		}
 		switch t.Distribution {
 		case "", DistributeCopy, DistributeRoundRobin:
-		case "distribute":
-			add(path+".distribution", "%s: distribution distribute was renamed before 1.0: use roundRobin", label)
 		default:
 			add(path+".distribution", "%s: invalid distribution %q (expected copy or roundRobin)", label, t.Distribution)
 		}

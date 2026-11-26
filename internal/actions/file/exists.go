@@ -47,9 +47,6 @@ func kindOf(include string) (string, error) {
 
 func newExists(with map[string]any) (action.Action, error) {
 	a := &exists{}
-	if err := action.Renamed(with, "kind", "include: all, files or folders (as in file.list)"); err != nil {
-		return nil, err
-	}
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}

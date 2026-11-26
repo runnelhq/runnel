@@ -33,9 +33,10 @@ func TestGenerateRows(t *testing.T) {
 			t.Errorf("%v accepted", with)
 		}
 	}
-	// rows and rowNumberField are count and numberField since R5b.
-	for old, want := range map[string]string{"rows": "use count", "rowNumberField": "use numberField"} {
-		if _, err := generateRowsDefinition.New(map[string]any{"count": "1", old: "1"}); err == nil || !strings.Contains(err.Error(), want) {
+	// rows and rowNumberField are count and numberField since R5b; the old names are
+	// unknown fields.
+	for _, old := range []string{"rows", "rowNumberField"} {
+		if _, err := generateRowsDefinition.New(map[string]any{"count": "1", old: "1"}); err == nil || !strings.Contains(err.Error(), `unknown field "`+old+`"`) {
 			t.Errorf("%s: %v", old, err)
 		}
 	}

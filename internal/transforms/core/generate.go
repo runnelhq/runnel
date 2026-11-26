@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -49,9 +47,6 @@ type constField struct {
 
 func newGenerateRows(with map[string]any) (transform.Transform, error) {
 	t := &generateRows{}
-	if err := renamed(with, map[string]string{"rows": "count", "rowNumberField": "numberField"}); err != nil {
-		return nil, err
-	}
 	if err := transform.DecodeConfig(with, t); err != nil {
 		return nil, err
 	}
@@ -99,14 +94,4 @@ func (t *generateRows) Process(ctx context.Context, _ <-chan transform.Batch, ou
 		}
 	}
 	return ctx.Err()
-}
-
-// renamed reports fields renamed before 1.0 (R5b), by old name.
-func renamed(with map[string]any, use map[string]string) error {
-	for _, old := range slices.Sorted(maps.Keys(use)) {
-		if err := action.Renamed(with, old, use[old]); err != nil {
-			return err
-		}
-	}
-	return nil
 }

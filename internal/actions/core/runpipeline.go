@@ -15,7 +15,7 @@ import (
 // plus the variables of the project and environment. The output are the counts of its
 // transforms, e.g. {{ results.load.output.transforms.write.written }}, and the number
 // of records that went to error links ({{ results.load.output.errors }}). Records can
-// be passed in (records, read by core.from-result) and come back (output.rows, written by
+// be passed in (records, read by core.from-result) and come back (output.records, written by
 // core.to-result). A failed pipeline fails the action.
 var runPipelineDefinition = action.Definition{
 	Type:        "core.run-pipeline",
@@ -29,10 +29,10 @@ var runPipelineDefinition = action.Definition{
 		Outputs: []action.OutputField{
 			{Name: "output.transforms", Type: "object", Description: "Counts per transform id: read, written and errors"},
 			{Name: "output.errors", Type: "integer", Description: "Records that went to error links, in all transforms"},
-			{Name: "output.rows", Type: "list", Description: "The records that reached core.to-result, each as an object"},
+			{Name: "output.records", Type: "list", Description: "The records that reached core.to-result, each as an object"},
 		},
 		Errors: "Fails when the pipeline stops with an error or cannot be started (file outside the project folder or missing, parameter not declared or invalid), when the pipeline is not in allowedTargets and when records is not a list. Records on error links do not fail the action.",
-		Limits: []string{"output.rows holds at most maxRecords of core.to-result (default 100,000)."},
+		Limits: []string{"output.records holds at most maxRecords of core.to-result (default 100,000)."},
 	},
 }
 
@@ -48,9 +48,6 @@ type runPipeline struct {
 
 func newRunPipeline(with map[string]any) (action.Action, error) {
 	a := &runPipeline{}
-	if err := action.Renamed(with, "rows", "records (the records for core.from-result)"); err != nil {
-		return nil, err
-	}
 	if err := action.DecodeConfig(with, a); err != nil {
 		return nil, err
 	}

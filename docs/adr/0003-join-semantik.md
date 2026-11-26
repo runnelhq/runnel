@@ -124,5 +124,5 @@ Ergänzende Festlegungen aus der Implementierung (`internal/engine/workflow/sche
 - Der Projektstandard steht unter `settings` von `project.yaml` (`settings.defaultJoin`), neben `maxConcurrentRuns`,
   `history` und `onError`: Workflow- und Pipeline-Dateien haben alles Steuernde unter `settings`, und `workflow:` hatte
   nur diesen einen Wert. Werte und Rangfolge bleiben.
-- Der Block `workflow:` ist ein Fehler mit dem Hinweis auf `settings.defaultJoin` (bewusster Bruch vor 1.0, ADR 0029).
+- Der Block `workflow:` ist ein unbekanntes Feld (bewusster Bruch vor 1.0, ADR 0029).
   Das Formular von `project.yaml` im Editor und `/forms/edit` setzen `settings.defaultJoin`.
