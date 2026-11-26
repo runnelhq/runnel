@@ -30,6 +30,7 @@
 | [0026](0026-run-historie.md) | Run-Historie in einer eingebetteten SQLite-Datenbank | Angenommen |
 | [0027](0027-fehler-workflow.md) | Fehler-Workflow | Angenommen |
 | [0028](0028-javascript-core-script.md) | JavaScript mit `core.script` | Angenommen |
+| [0029](0029-stabilitaet-versionen.md) | Stabilität und Versionen ab 1.0 | Angenommen |
 
 ## Wann eine ADR?
 
