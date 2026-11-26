@@ -123,6 +123,10 @@ type Schema struct {
 	// Variants: see VariantsKey; the schema of this mapping by the value of the sibling
 	// field type, e.g. with: of a connection file.
 	Variants map[string]*Schema `json:"x-runnel-variants,omitempty"`
+	// Deprecated marks a field that is renamed or deprecated (ADR 0029); Replacement
+	// tells what to write instead, e.g. "use ifExists: replace (removed in 2.0)".
+	Deprecated  bool   `json:"deprecated,omitempty"`
+	Replacement string `json:"x-runnel-replacement,omitempty"`
 	// AdditionalProperties is false for structs (unknown fields are errors) and the
 	// value schema for maps.
 	AdditionalProperties any `json:"additionalProperties,omitempty"`

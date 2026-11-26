@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "Type of the file",
+      "enum": [
+        "Plugin"
+      ]
+    },
+    "apiVersion": {
+      "type": "string",
+      "description": "Version of the file format",
+      "enum": [
+        "runnel/v1"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the plugin; must match its folder under plugins/",
+      "examples": [
+        "iban"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of the plugin (SemVer), e.g. 1.2.0",
+      "examples": [
+        "1.0.0"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What the plugin does"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace of the types the plugin offers, e.g. iban for iban.validate; not one of Runnel's own (core, file, http, …)",
+      "examples": [
+        "iban"
+      ]
+    },
+    "executable": {
+      "description": "Program of the plugin, relative to its folder (e.g. bin/iban.exe), a command of the computer (e.g. python), or a mapping by operating system: windows, linux, darwin"
+    },
+    "args": {
+      "type": "array",
+      "description": "Arguments of the program, e.g. [main.py] for a script; files in the folder of the plugin are relative to it",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "kind",
+    "apiVersion",
+    "name",
+    "version",
+    "namespace",
+    "executable"
+  ],
+  "additionalProperties": false
+}

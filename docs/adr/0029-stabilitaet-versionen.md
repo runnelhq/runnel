@@ -130,3 +130,32 @@ bleiben **intern** und dürfen sich in jeder Version ändern. **Öffentlich** un
 
 Umsetzung (Roadmap Phase 1.0): Kennzeichnung öffentlich/intern in `docs/dev/API.md`; `deprecated` im Katalog und
 dauerhafter Mechanismus für umbenannte Felder; Test für Golden-Dateien gegen den letzten Tag; CHANGELOG und PR-Vorlage.
+
+## Nachtrag 2026-11-26 (R4, Umsetzung)
+
+**Abkündigen (Abschnitt 4):**
+- `Deprecated` in `action.Definition` und `transform.Definition` (Typ `action.Deprecated`): altes Feld (`overwrite`,
+  in Listen `fields[].rename`, in Zuordnungen `auth.user`), neuer Name (`RenamedTo`, leer für ein nur abgekündigtes Feld),
+  optional `Convert` für den Wert und `Schema` für den alten Typ, Ersatz (`Use`) und `RemovedIn`. Connection-Typen
+  haben den Mechanismus noch nicht; er kommt, wenn einer gebraucht wird.
+- `Register` bildet das alte Feld vor `New` (bei Transforms auch vor `DetectFields`) auf das neue ab. Texte mit `${…}`
+  oder `{{ … }}` wandelt `Convert` erst nach dem Auflösen um.
+- Warnung mit Position am alten Feld in `runnel validate`, im Editor (`/validate`) und vor dem Lauf (`runnel run`):
+  `action "copy": field "overwrite" is deprecated: use ifExists: replace (removed in 2.0)`. Altes und neues Feld
+  zusammen sind ein Fehler an `with`: `fields "overwrite" and "ifExists" cannot be used together; …`.
+- Im Schema steht ein umbenanntes Feld hinter dem neuen, als Kopie von dessen Schema (oder `Schema`), mit
+  `"deprecated": true` (JSON Schema) und `"x-runnel-replacement": "use ifExists: replace (removed in 2.0)"`; ein nur
+  abgekündigtes Feld bekommt dieselben Schlüssel. `runnel catalog <typ>` zeigt `deprecated: …`. Abgekündigte Typen und
+  Funktionen folgen, wenn es die erste gibt.
+
+**Golden-Dateien als Vertrag (Abschnitt 7):**
+- Basis in `internal/cli/testdata/contract/`: `catalog.golden.json`, `catalog-expressions.golden.json`,
+  `schema-project.golden.json`, `schema-environment.golden.json`, `schema-trigger.golden.json`,
+  `schema-connection.golden.json`, `schema-plugin.golden.json`. Weitere JSON-Ausgaben der CLI (`version`, `runs`,
+  `health` mit `--json`) haben keine Golden-Datei und werden von ihren Tests feldweise geprüft.
+- `TestContractGoldens` (`internal/cli/contract_test.go`): Jeder Pfad der Basis besteht mit gleichem JSON-Typ; `type`
+  und `default` behalten ihren Wert; Werte aus `enum` und `x-runnel-connection` bleiben; kein Feld kommt zu `required`
+  hinzu. Frei sind Texte sowie `example`, `examples`, `limits`, `x-runnel-only`, `x-runnel-group`. Listen von Objekten
+  werden nach `name` bzw. `type` verglichen.
+- Die Basis ändert nur der Release-Prozess ([docs/dev/RELEASE.md](../dev/RELEASE.md)), nicht `-update`. Vor `v1.0.0`
+  darf ein PR mit bewusstem Bruch (z. B. R5) die Basis mit Begründung mitändern.

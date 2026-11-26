@@ -107,6 +107,9 @@ func checkSchema(t *testing.T, s *schema.Schema, path string) {
 func sample(s *schema.Schema) map[string]any {
 	with := map[string]any{}
 	for _, p := range s.Properties {
+		if p.Schema.Deprecated { // its new name is in the sample (ADR 0029)
+			continue
+		}
 		with[p.Name] = sampleValue(p.Schema)
 	}
 	return with

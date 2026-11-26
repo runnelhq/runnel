@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/connections"
 	"github.com/runnelhq/runnel/internal/version"
 )
@@ -118,5 +119,30 @@ func compareGolden(t *testing.T, name, got string) {
 	}
 	if got != strings.ReplaceAll(string(want), "\r\n", "\n") {
 		t.Errorf("output differs from %s (run with -update if intended)\n--- got:\n%s\n--- want:\n%s", path, got, want)
+	}
+}
+
+// A renamed field shows as deprecated with its replacement (ADR 0029); nothing built in is
+// deprecated yet, so a test definition is used.
+func TestCatalogDeprecated(t *testing.T) {
+	r := action.NewRegistry()
+	r.Register(action.Definition{Type: "test.copy", Category: action.CategoryFiles, Label: "Copy", Description: "Copies a file",
+		Config: struct {
+			IfExists string `json:"ifExists" doc:"If the target exists" schema:"enum=replace|fail,default=fail"`
+		}{},
+		Deprecated: []action.Deprecated{{Field: "overwrite", RenamedTo: "ifExists", Use: "ifExists: replace", RemovedIn: "2.0"}},
+		New:        func(map[string]any) (action.Action, error) { return nil, nil }})
+	d, _ := r.Descriptor("test.copy")
+	var b strings.Builder
+	if err := printDescriptor(&b, actionEntry(d)); err != nil {
+		t.Fatal(err)
+	}
+	want := `  ifExists   If the target exists
+             string, one of replace|fail, default fail
+  overwrite  If the target exists
+             string, deprecated: use ifExists: replace (removed in 2.0), one of replace|fail, default fail
+`
+	if !strings.Contains(b.String(), want) {
+		t.Errorf("got:\n%s\nwant:\n%s", b.String(), want)
 	}
 }

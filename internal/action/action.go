@@ -185,6 +185,9 @@ type Definition struct {
 	// early) and again before each execution with variables resolved. New must only
 	// check the structure; values that may contain variables are checked in Execute.
 	New func(with map[string]any) (Action, error)
+	// Deprecated lists renamed and deprecated fields of the configuration (ADR 0029):
+	// Register maps them to their new names before New and marks them in the schema.
+	Deprecated []Deprecated
 }
 
 // Descriptor describes an action type for the editor, the API (/catalog) and tools
@@ -261,6 +264,19 @@ func (r *Registry) Register(d Definition) {
 		var err error
 		if s, err = schema.For(d.Config); err != nil {
 			panic(fmt.Sprintf("action type %s: %v", d.Type, err))
+		}
+	}
+	if len(d.Deprecated) > 0 {
+		if err := DeprecateSchema(s, d.Deprecated); err != nil {
+			panic(fmt.Sprintf("action type %s: %v", d.Type, err))
+		}
+		newFn, deps := d.New, d.Deprecated
+		d.New = func(with map[string]any) (Action, error) {
+			with, err := MapDeprecated(with, deps)
+			if err != nil {
+				return nil, err
+			}
+			return newFn(with)
 		}
 	}
 	r.defs[d.Type] = d

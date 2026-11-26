@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "Type of the file",
+      "enum": [
+        "Environment"
+      ]
+    },
+    "apiVersion": {
+      "type": "string",
+      "description": "Version of the file format",
+      "enum": [
+        "runnel/v1"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the environment; must match the file name",
+      "examples": [
+        "prod"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What the environment is for, e.g. the production system"
+    },
+    "variables": {
+      "type": "object",
+      "description": "Variables of this environment, used as ${NAME}; they override those of project.yaml",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "secretStore": {
+      "type": "string",
+      "description": "Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables), inline (secrets: in this file, plain text) or local (the local secret store, not available yet)",
+      "enum": [
+        "local",
+        "shared",
+        "env",
+        "inline"
+      ]
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Secrets of this environment in plain text for secretStore: inline, used as ${secret:NAME}; only for development and simple APIs",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "kind",
+    "apiVersion",
+    "name"
+  ],
+  "additionalProperties": false
+}

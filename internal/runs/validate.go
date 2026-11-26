@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/runnelhq/runnel/internal/action"
@@ -53,6 +54,7 @@ func CheckWorkflow(w *model.Workflow, diags model.Errors, c WorkflowCheck) (mode
 	if c.Variables && c.Project != nil {
 		diags = append(diags, checkConnectionRefs(workflowSteps(w, c.Registry), c.Project)...)
 	}
+	diags = append(diags, DeprecatedInWorkflow(w, c.Registry)...)
 	if !diags.HasErrors() {
 		diags = append(diags, workflow.Check(w, workflow.Options{Registry: c.Registry})...)
 		diags = append(diags, CheckCalls(w, c.ProjectDir, c.File)...)
@@ -76,10 +78,44 @@ func CheckPipeline(p *model.Pipeline, diags model.Errors, registry *transform.Re
 		diags = append(diags, checkConnectionRefs(pipelineSteps(p, registry), project)...)
 		diags = append(diags, CheckOnError(p.ErrorAt, p.WarningAt, p.Settings.OnError, project.Dir, "")...)
 	}
+	diags = append(diags, DeprecatedInPipeline(p, registry)...)
 	if !diags.HasErrors() && registry != nil {
 		diags = append(diags, pipeline.Check(p, pipeline.Options{Registry: registry})...)
 	}
 	diags.Sort()
+	return diags
+}
+
+// DeprecatedInWorkflow warns about each renamed or deprecated field in the actions of
+// a workflow, with the replacement (ADR 0029, section 4).
+func DeprecatedInWorkflow(w *model.Workflow, reg *action.Registry) model.Errors {
+	var diags model.Errors
+	for i, a := range w.Actions {
+		if reg == nil {
+			break
+		}
+		if def, ok := reg.Lookup(a.Type); ok {
+			for _, u := range action.FindDeprecated(a.With, def.Deprecated) {
+				diags = append(diags, w.WarningAt(fmt.Sprintf("$.actions[%d].with%s", i, u.Path), "action %q: %s", a.ID, u.Message))
+			}
+		}
+	}
+	return diags
+}
+
+// DeprecatedInPipeline is DeprecatedInWorkflow for the transforms of a pipeline.
+func DeprecatedInPipeline(p *model.Pipeline, reg *transform.Registry) model.Errors {
+	var diags model.Errors
+	for i, t := range p.Transforms {
+		if reg == nil {
+			break
+		}
+		if def, ok := reg.Lookup(t.Type); ok {
+			for _, u := range action.FindDeprecated(t.With, def.Deprecated) {
+				diags = append(diags, p.WarningAt(fmt.Sprintf("$.transforms[%d].with%s", i, u.Path), "transform %q: %s", t.ID, u.Message))
+			}
+		}
+	}
 	return diags
 }
 

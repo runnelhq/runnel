@@ -146,6 +146,44 @@ gelten. `runnel catalog <typ>` zeigt es, `runnel catalog --json` (und `/api/v1/c
 Texte englisch, als Sätze mit Punkt; Felder der Konfiguration mit ihrem Namen (`maxSize`), Zahlen mit Tausender-Komma
 (`100,000`). Jede Angabe am Code prüfen – Standardwerte stehen in den Konstanten und `schema`-Tags, nicht im Gedächtnis.
 
+### Felder umbenennen oder abkündigen (`Deprecated`, ADR 0029)
+
+Ab `v1.0.0` darf kein Feld umbenannt oder entfernt werden ([ADR 0029](../adr/0029-stabilitaet-versionen.md),
+Abschnitt 3). Ein besserer Name kommt deshalb als neues Feld; das alte bleibt bis zur nächsten Major-Version gültig und
+wird in der Definition abgekündigt:
+
+```go
+	Config: transfer{}, // enthält nur noch IfExists, nicht mehr Overwrite
+	Deprecated: []action.Deprecated{{
+		Field: "overwrite", RenamedTo: "ifExists", Use: "ifExists: replace", RemovedIn: "2.0",
+		Schema:  &schema.Schema{Type: "boolean", Description: "Replace files that exist in the target"},
+		Convert: func(old any) (any, error) { … true → "replace", false → "fail" … },
+	}},
+```
+
+| Feld | Inhalt |
+|---|---|
+| `Field` | altes Feld in `with`; `fields[].rename` für ein Feld in jedem Eintrag der Liste `fields`, `auth.user` für ein Feld in einer Zuordnung |
+| `RenamedTo` | neues Feld in derselben Zuordnung; leer für ein Feld, das nur abgekündigt ist (es bleibt dann in `Config`) |
+| `Convert` | wandelt den alten Wert in den neuen um (optional); Texte mit `${…}` oder `{{ … }}` erst nach dem Auflösen |
+| `Schema` | Schema des alten Felds, wenn es vom neuen abweicht (z. B. mit `Convert`); sonst eine Kopie des neuen |
+| `Use` | Ersatz in der Warnung, z. B. `ifExists: replace`; leer: `RenamedTo` |
+| `RemovedIn` | Major-Version ohne das Feld, z. B. `2.0` |
+
+Was daraus folgt, erledigt `Register`:
+
+- Vor `New` steht der Wert unter dem neuen Namen; `New` und `Config` kennen nur ihn. Stehen altes und neues Feld
+  zusammen in einer Datei, ist das ein Fehler.
+- `runnel validate`, der Editor und `runnel run` warnen mit Position:
+  `warning: action "copy": field "overwrite" is deprecated: use ifExists: replace (removed in 2.0)`.
+- Im Schema steht das alte Feld hinter dem neuen mit `"deprecated": true` und `"x-runnel-replacement"`;
+  `runnel catalog <typ>` zeigt es als `deprecated: use … (removed in 2.0)`. Die Golden-Dateien des Katalogs wachsen
+  dadurch nur.
+- Ein Eintrag im [CHANGELOG](../../CHANGELOG.md) unter „Abgekündigt“ gehört zum selben PR.
+
+Tests: altes Feld (Warnung, gleiches Ergebnis wie das neue), beide zusammen (Fehler), Umwandlung mit `Convert`.
+Beispiele unter `examples/` nutzen immer den neuen Namen.
+
 ## 5. Ausführen (`Execute`)
 
 ```go
@@ -229,7 +267,7 @@ Pflicht:
 - [ ] Typname im passenden, reservierten Namensraum; bei neuem Namensraum: `namespaces.go`, `register.go`, `actions.go`
 - [ ] Eine Datei je Action, Tests daneben, Eintrag in `register.go`
 - [ ] `Category`, `Label`, `Description`, `Config` gesetzt; jedes Feld mit `doc`, Pflichtfelder mit `required` und `example`
-- [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name)
+- [ ] Namen der Parameter nach ADR 0025 (gleiche Sache, gleicher Name); umbenannte Felder über `Deprecated` (ADR 0029)
 - [ ] `Example` (die `with:`-Werte in YAML) für den Abschnitt „Help“ im Editor; der Vertragstest prüft es
 - [ ] `Reference`: `Outputs` (Teile von `result.output`), `Errors`, `Limits` – am Code geprüft
 - [ ] Konfiguration über `DecodeConfig`; `New` prüft nur Struktur, Werte werden in `Execute` geprüft

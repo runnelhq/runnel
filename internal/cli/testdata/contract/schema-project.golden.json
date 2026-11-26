@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "Type of the file",
+      "enum": [
+        "Project"
+      ]
+    },
+    "apiVersion": {
+      "type": "string",
+      "description": "Version of the file format",
+      "enum": [
+        "runnel/v1"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the project",
+      "examples": [
+        "my-project"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "description": "What the project does; shown in the editor"
+    },
+    "defaultEnvironment": {
+      "type": "string",
+      "description": "Environment used when a run names none, e.g. dev; the name of a file in environments/",
+      "examples": [
+        "dev"
+      ]
+    },
+    "variables": {
+      "type": "object",
+      "description": "Variables for all environments, used as ${NAME}; an environment can override them. Values may use other variables, e.g. ${BASE}\\inbox",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "secretStore": {
+      "type": "string",
+      "description": "Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables), inline (secrets: in the file, plain text) or local (the local secret store, not available yet)",
+      "enum": [
+        "local",
+        "shared",
+        "env",
+        "inline"
+      ],
+      "default": "local"
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Secrets in plain text for secretStore: inline, used as ${secret:NAME} where no environment has its own; only for development and simple APIs",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "description": "Defaults for all workflows of the project",
+      "properties": {
+        "defaultJoin": {
+          "type": "string",
+          "description": "When an action with several incoming links starts, if it sets no join: all (every link decided), first or each",
+          "enum": [
+            "all",
+            "first",
+            "each"
+          ],
+          "default": "all"
+        }
+      },
+      "additionalProperties": false
+    },
+    "settings": {
+      "type": "object",
+      "description": "Limits for the runs of the project",
+      "properties": {
+        "maxConcurrentRuns": {
+          "type": "integer",
+          "description": "Most runs of the project at the same time on the server; a start beyond it is rejected. 0: no limit",
+          "default": 0
+        },
+        "history": {
+          "type": "object",
+          "description": "Run history of the project: which runs are kept",
+          "properties": {
+            "keepDays": {
+              "type": "integer",
+              "description": "Days ended runs are kept in the run history; older ones are removed",
+              "default": 30
+            },
+            "maxRuns": {
+              "type": "integer",
+              "description": "Most runs kept in the run history of the project; the oldest beyond it are removed",
+              "default": 10000
+            },
+            "cli": {
+              "type": "string",
+              "description": "Which ended runs of runnel run are kept in the run history: all, errors (only failed ones) or none; runnel run --history overrides it",
+              "enum": [
+                "all",
+                "errors",
+                "none"
+              ],
+              "default": "all"
+            }
+          },
+          "additionalProperties": false
+        },
+        "onError": {
+          "type": "string",
+          "description": "Workflow started when a run of the project fails (not for runs in the editor), relative to the project; it gets the FAILED_… parameters it declares. A workflow or pipeline can set its own or none",
+          "examples": [
+            "workflows/on-error.workflow.yaml"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "kind",
+    "apiVersion",
+    "name"
+  ],
+  "additionalProperties": false
+}

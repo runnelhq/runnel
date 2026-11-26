@@ -20,6 +20,9 @@ export interface Schema {
   "x-runnel-variants"?: Record<string, Schema>;
   /** The section of a form the field belongs to (x-runnel-group, S39c2a). */
   "x-runnel-group"?: string;
+  /** The field is renamed or deprecated (ADR 0029); x-runnel-replacement tells what to write instead. */
+  deprecated?: boolean;
+  "x-runnel-replacement"?: string;
 }
 
 /** Descriptor of an action or transform type (GET /catalog, ADR 0014). */

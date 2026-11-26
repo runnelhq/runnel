@@ -21,7 +21,7 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Fuzzing | `make fuzz FUZZTIME=1m` |
 | Benchmarks | `make bench` |
 | Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
-| Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – nur das betroffene Paket, nie `./... -update`; danach Diff prüfen (Pakete mit Golden-Dateien: `cli`, `model`, `schema`, `server`, `transforms/csv`) |
+| Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – nur das betroffene Paket, nie `./... -update`; danach Diff prüfen (Pakete mit Golden-Dateien: `cli`, `model`, `schema`, `server`, `transforms/csv`); die Basis des Vertragstests in `internal/cli/testdata/contract/` ändert nur der Release ([docs/dev/RELEASE.md](docs/dev/RELEASE.md)) |
 | Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel catalog --expressions` · `bin/runnel schema trigger` · `bin/runnel triggers examples/hello` · `bin/runnel runs examples/hello` · `bin/runnel plugins examples/hello` · `bin/runnel serve examples/hello` · `bin/runnel health` (bei laufendem Server) |
 
 **Vor jedem Push:** `make lint` und `make test` müssen grün sein. Bei Änderungen am Editor zusätzlich in `web/`

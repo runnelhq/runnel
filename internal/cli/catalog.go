@@ -302,6 +302,9 @@ func printFields(p *printer, s *schema.Schema, prefix string) {
 // fieldFacts summarizes type and options of a field, e.g. "string, required, e.g. 30s".
 func fieldFacts(s *schema.Schema, required bool) string {
 	facts := []string{typeName(s)}
+	if s.Deprecated {
+		facts = append(facts, "deprecated: "+s.Replacement)
+	}
 	if required {
 		facts = append(facts, "required")
 	}
