@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -134,12 +135,12 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 		return nil, fmt.Errorf("cannot create the history folder %s: %w", dir, err)
 	}
 	path := filepath.Join(dir, FileName)
-	q := url.Values{}
-	q.Add("_pragma", "busy_timeout(5000)")
-	q.Add("_pragma", "foreign_keys(1)")
-	q.Add("_pragma", "journal_mode(WAL)")
-	q.Add("_pragma", "synchronous(NORMAL)")
-	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?"+q.Encode())
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		if err := create(ctx, dir, path); err != nil {
+			return nil, fmt.Errorf("cannot create the history %s: %w", path, err)
+		}
+	}
+	db, err := sql.Open("sqlite", dsn(path))
 	if err != nil {
 		return nil, fmt.Errorf("cannot open the history %s: %w", path, err)
 	}
@@ -156,6 +157,51 @@ func Open(ctx context.Context, dir string) (*Store, error) {
 		return nil, fmt.Errorf("cannot open the history %s: %w", path, err)
 	}
 	return s, nil
+}
+
+// dsn is the data source of the history file with the settings of every connection.
+func dsn(path string) string {
+	q := url.Values{}
+	q.Add("_pragma", "busy_timeout(5000)")
+	q.Add("_pragma", "foreign_keys(1)")
+	q.Add("_pragma", "journal_mode(WAL)")
+	q.Add("_pragma", "synchronous(NORMAL)")
+	return "file:" + filepath.ToSlash(path) + "?" + q.Encode()
+}
+
+// create makes a new history file without racing other processes that open it at the
+// same time (e.g. the service and runnel run on the first start): the tables are made
+// in a private temporary file, which then gets the name of the history with a hard
+// link. The link fails if the file exists meanwhile; then the other process's file is
+// used. Where hard links are not supported, the file is migrated in place as before.
+func create(ctx context.Context, dir, path string) error {
+	tmp, err := os.CreateTemp(dir, ".runs-*.db")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	_ = tmp.Close()
+	defer func() {
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			_ = os.Remove(name + suffix)
+		}
+	}()
+	db, err := sql.Open("sqlite", dsn(name))
+	if err != nil {
+		return err
+	}
+	s := &Store{db: db, path: name}
+	err = s.migrate(ctx)
+	if cerr := db.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err
+	}
+	// An error means the file exists meanwhile (made by another process) or hard links
+	// are not supported; in both cases Open uses the file at path as it is.
+	_ = os.Link(name, path)
+	return nil
 }
 
 // Path returns the file of the history.
