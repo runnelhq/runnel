@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runnelhq/runnel/internal/model"
 )
@@ -159,13 +160,53 @@ var binaryTypes = map[string]bool{
 	".xlsx": true, ".xls": true, ".xlsm": true, ".docx": true, ".doc": true, ".pptx": true, ".pdf": true,
 }
 
-// isBinary reports content the editor cannot show as text: a NUL byte in its first 8 KB,
-// except in text encoded as UTF-16 with a byte order mark (Fix K13).
+// sniffSize is how much of a file decides whether it is text (R8).
+const sniffSize = 8 << 10
+
+// isBinary reports content the editor cannot show as text, judged by its first 8 KiB
+// (R8): a NUL byte, or bytes that are neither UTF-8 nor plausible Windows-1252 text, the
+// legacy encoding the editor reads and saves (K13). Text encoded as UTF-16 with a byte
+// order mark is text (Fix K13), as is an empty file.
 func isBinary(data []byte) bool {
 	if bytes.HasPrefix(data, []byte{0xff, 0xfe}) || bytes.HasPrefix(data, []byte{0xfe, 0xff}) {
 		return false
 	}
-	return bytes.IndexByte(data[:min(len(data), 8000)], 0) >= 0
+	head := data[:min(len(data), sniffSize)]
+	if bytes.IndexByte(head, 0) >= 0 {
+		return true
+	}
+	if len(head) < len(data) {
+		head = cutPartialRune(head)
+	}
+	return !utf8.Valid(head) && !isWindows1252Text(head)
+}
+
+// cutPartialRune drops a UTF-8 sequence cut off at the end of a sniffed part, so that a
+// valid file is not taken for binary because its first 8 KiB end inside a character.
+func cutPartialRune(b []byte) []byte {
+	for i := len(b) - 1; i >= 0 && i >= len(b)-utf8.UTFMax; i-- {
+		if utf8.RuneStart(b[i]) {
+			if !utf8.FullRune(b[i:]) {
+				return b[:i]
+			}
+			break
+		}
+	}
+	return b
+}
+
+// isWindows1252Text reports bytes that read as text in Windows-1252: no control
+// characters other than tab, line breaks and form feed, and none of the bytes that
+// Windows-1252 leaves undefined. Binary data almost always contains some of them.
+func isWindows1252Text(b []byte) bool {
+	for _, c := range b {
+		switch {
+		case c == '\t' || c == '\n' || c == '\r' || c == '\f':
+		case c < 0x20 || c == 0x7f || c == 0x81 || c == 0x8d || c == 0x8f || c == 0x90 || c == 0x9d:
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) handleGetFile(w http.ResponseWriter, r *http.Request) {
@@ -332,9 +373,13 @@ func etag(data []byte) string {
 	return `"` + hex.EncodeToString(sum[:16]) + `"`
 }
 
-// imageTypes are the images a Markdown document may show (E17); SVG is left out because
-// it can contain scripts.
-var imageTypes = map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
+// imageTypes are the images the editor shows (E17, R8). SVG can contain scripts: the
+// editor shows it only as <img>, which runs none, and opened directly the sandbox CSP of
+// handleGetFile blocks them.
+var imageTypes = map[string]string{
+	".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+	".svg": "image/svg+xml",
+}
 
 func contentType(name string) string {
 	if t := imageTypes[strings.ToLower(path.Ext(name))]; t != "" {

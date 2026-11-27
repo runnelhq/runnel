@@ -55,6 +55,7 @@ import {
   CodeIcon,
   CopyIcon,
   EyeIcon,
+  FileIcon,
   FormIcon,
   LinesIcon,
   LockIcon,
@@ -92,7 +93,7 @@ interface Doc {
   encoding: string;
 }
 
-type State = { status: "loading" } | { status: "loaded"; doc: Doc } | { status: "error"; notFound: boolean; message: string };
+type State = { status: "loading" } | { status: "loaded"; doc: Doc } | { status: "error"; code?: number; message: string };
 
 /** Functions of a file view that the app calls, e.g. to save before closing a tab. */
 export interface FileHandle {
@@ -291,7 +292,7 @@ export function FileView(props: {
         !cancelled &&
         setState({
           status: "error",
-          notFound: err instanceof APIError && err.status === 404,
+          code: err instanceof APIError ? err.status : undefined,
           message: err instanceof Error ? err.message : String(err),
         }),
     );
@@ -927,28 +928,7 @@ export function FileView(props: {
 
   if (!active) return null;
 
-  if (state.status === "error") {
-    return (
-      <div className="grid flex-1 place-items-center p-8" role="alert">
-        <div className="max-w-[420px] text-center">
-          <span className="inline-grid size-10 place-items-center rounded-full bg-danger-soft text-lg font-bold text-destructive">
-            ✖
-          </span>
-          <h2 className="mt-4 mb-1 text-md font-semibold">{state.notFound ? "File not found" : "File could not be loaded"}</h2>
-          <p className="mt-0 mb-4 text-muted-foreground">
-            <code className="text-xs">{path}</code>{" "}
-            {state.notFound
-              ? "no longer exists. It may have been renamed or deleted outside the editor."
-              : `could not be loaded: ${state.message}`}
-          </p>
-          <SmallButton onClick={props.onReloadExplorer}>
-            <ReloadIcon width={14} height={14} />
-            Reload explorer
-          </SmallButton>
-        </div>
-      </div>
-    );
-  }
+  if (state.status === "error") return <FileNotice path={path} code={state.code} message={state.message} onReloadExplorer={props.onReloadExplorer} />;
 
   const slash = path.lastIndexOf("/");
   const editable = isGraph && !!graph;
@@ -1530,7 +1510,51 @@ function NotAGraph(props: { path: string; kind: GraphKind; validation: Validatio
   );
 }
 
-function Badge(props: {
+/**
+ * Why a file is not shown: it no longer exists (404), it is binary (415: by its extension
+ * or its content, R8) or it could not be loaded.
+ */
+export function FileNotice(props: { path: string; code?: number; message: string; onReloadExplorer: () => void }) {
+  const { path } = props;
+  if (props.code === 415) {
+    return (
+      <div className="grid flex-1 place-items-center p-8" role="status" data-testid="binary-notice">
+        <div className="max-w-[420px] text-center">
+          <span className="inline-grid size-10 place-items-center rounded-full bg-secondary text-muted-foreground">
+            <FileIcon width={18} height={18} />
+          </span>
+          <h2 className="mt-4 mb-1 text-md font-semibold">Binary file – can't be shown</h2>
+          <p className="mt-0 mb-4 text-muted-foreground">
+            <code className="text-xs">{path}</code> is a binary file, e.g. a program, an archive or a database. Open it in the program it belongs to.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  const notFound = props.code === 404;
+  return (
+    <div className="grid flex-1 place-items-center p-8" role="alert">
+      <div className="max-w-[420px] text-center">
+        <span className="inline-grid size-10 place-items-center rounded-full bg-danger-soft text-lg font-bold text-destructive">
+          ✖
+        </span>
+        <h2 className="mt-4 mb-1 text-md font-semibold">{notFound ? "File not found" : "File could not be loaded"}</h2>
+        <p className="mt-0 mb-4 text-muted-foreground">
+          <code className="text-xs">{path}</code>{" "}
+          {notFound
+            ? "no longer exists. It may have been renamed or deleted outside the editor."
+            : `could not be loaded: ${props.message}`}
+        </p>
+        <SmallButton onClick={props.onReloadExplorer}>
+          <ReloadIcon width={14} height={14} />
+          Reload explorer
+        </SmallButton>
+      </div>
+    </div>
+  );
+}
+
+export function Badge(props: {
   children: React.ReactNode;
   title?: string;
   testId?: string;

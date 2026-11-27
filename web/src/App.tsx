@@ -7,13 +7,14 @@ import { ErrorBoundary, FileError, PanelError } from "./components/ErrorBoundary
 import { FileView, type FileHandle } from "./components/FileView";
 import { Header } from "./components/Header";
 import { RunsView } from "./components/RunsView";
+import { ImageView } from "./components/ImageView";
 import { Palette, type PaletteTarget } from "./components/Palette";
 import { ReferencePanel, type ReferenceAction, type ReferenceTarget } from "./components/ReferencePanel";
 import { missingIn, useVariables } from "./reference";
 import { Splitter, useExplorerHeight } from "./components/Splitter";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
-import { fetchTree, fullPath, movedPath, type Entry } from "./files";
+import { fetchTree, fullPath, kindOf, movedPath, type Entry } from "./files";
 import type { RunView } from "./run";
 import { runsTab, useRunningCount } from "./runs";
 import { useTriggers } from "./forms";
@@ -280,29 +281,42 @@ export function App() {
                   key={`${path}#${reloads[path] ?? 0}`}
                   fallback={(error, retry) => (path === active ? <FileError path={path} error={error} onRetry={retry} /> : null)}
                 >
-                  <FileView
-                    path={path}
-                    active={path === active}
-                    projectDir={project?.dir ?? null}
-                    project={project}
-                    onRun={setRun}
-                    epoch={epoch}
-                    onSummary={setSummary}
-                    onPalette={setPaletteTarget}
-                    onReference={setReference}
-                    request={request?.path === path ? request : null}
-                    variableWarning={variableWarning(path)}
-                    onDirty={onDirty}
-                    onRegister={onRegister}
-                    onReloadExplorer={loadTree}
-                    files={files}
-                    onOpenFile={open}
-                    showRun={showRun?.path === path ? showRun : null}
-                    onRunsOf={(p) => {
-                      open(runsTab);
-                      setRunsRequest((r) => ({ filter: { path: p }, seq: (r?.seq ?? 0) + 1 }));
-                    }}
-                  />
+                  {kindOf(path) === "image" ? (
+                    <ImageView
+                      path={path}
+                      active={path === active}
+                      epoch={epoch}
+                      onSummary={setSummary}
+                      onRun={setRun}
+                      onPalette={setPaletteTarget}
+                      onReference={setReference}
+                      onReloadExplorer={loadTree}
+                    />
+                  ) : (
+                    <FileView
+                      path={path}
+                      active={path === active}
+                      projectDir={project?.dir ?? null}
+                      project={project}
+                      onRun={setRun}
+                      epoch={epoch}
+                      onSummary={setSummary}
+                      onPalette={setPaletteTarget}
+                      onReference={setReference}
+                      request={request?.path === path ? request : null}
+                      variableWarning={variableWarning(path)}
+                      onDirty={onDirty}
+                      onRegister={onRegister}
+                      onReloadExplorer={loadTree}
+                      files={files}
+                      onOpenFile={open}
+                      showRun={showRun?.path === path ? showRun : null}
+                      onRunsOf={(p) => {
+                        open(runsTab);
+                        setRunsRequest((r) => ({ filter: { path: p }, seq: (r?.seq ?? 0) + 1 }));
+                      }}
+                    />
+                  )}
                 </ErrorBoundary>
               ))}
             </>

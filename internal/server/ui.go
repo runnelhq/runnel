@@ -12,8 +12,10 @@ import (
 )
 
 // contentSecurityPolicy allows only the editor's own files and API: no scripts, styles
-// or fonts from elsewhere, no framing by other pages.
-const contentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+// or fonts from elsewhere, no framing by other pages. Images may also be blob: URLs, which
+// only the editor's own scripts create: an image of the project loaded through the file
+// API (R8).
+const contentSecurityPolicy = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; " +
 	"connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 // handleUI serves the embedded editor. Files under assets/ carry a content hash in

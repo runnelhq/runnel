@@ -36,6 +36,9 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 - **Editor:** Icons aller Bausteine, Listen im Panel, Kopieren und Einfügen, Markdown-Dokumente, Reference und
   Variables, Vervollständigung im YAML-Editor, Formulare für Trigger, Environments und `project.yaml`, viele offene
   Dateien, Link teilen, Hilfe je Baustein mit Suche (Strg+K).
+- **Bilder und Binärdateien im Editor:** PNG, JPEG, GIF, WebP und SVG öffnen als Bild mit Abmessungen und
+  Dateigröße statt als Text; andere Binärdateien zeigen „Binary file – can't be shown“. Der Server erkennt
+  Binärdateien zusätzlich am Inhalt (Nullbytes, weder UTF-8 noch Windows-1252) und antwortet mit `415`.
 - **Abkündigen** (ADR 0029): umbenannte Felder gelten unter beiden Namen, `validate` warnt mit Ersatz; im Katalog
   tragen sie `deprecated` und `x-runnel-replacement`. Abgekündigt ist noch nichts.
 - Relative Pfade beziehen sich auf den Projektordner (ADR 0020); dynamische Ziele mit `allowedTargets`.
