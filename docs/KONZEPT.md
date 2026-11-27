@@ -303,6 +303,7 @@ flowchart LR
 
 | Modus | Befehl | Einsatz |
 |---|---|---|
+| Neues Projekt | `runnel init [ordner] [--name <name>] [--force]` (seit R9) | Legt `project.yaml`, die Ordner `workflows/`, `pipelines/`, `triggers/`, `environments/`, `connections/`, das Environment `dev`, einen Beispiel-Workflow und `.gitignore` an. Exit-Code: 0 angelegt, 1 Datei nicht schreibbar, 2 nichts angelegt (Ordner nicht leer, ungültiger Name, falscher Aufruf); `--force` ergänzt nur fehlende Dateien |
 | Einmal-Ausführung | `runnel run <datei> [--environment prod] [--param k=v]` (`--run-config` mit S42, Backlog) | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet (auch bei falschem Aufruf, seit R5a), 130 abgebrochen |
 | Server | `runnel serve [projektordner] [--port 7300] [--triggers 127.0.0.1:7301] [--stop-timeout]` | Editor + Scheduler + HTTP-Trigger (eigener Listener) |
 | Desktop | `runnel desktop` (geplant) | Server + WebView2-Fenster (Einzelplatz) |

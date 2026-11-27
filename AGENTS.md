@@ -21,8 +21,8 @@ Entscheidungen: [docs/adr/](docs/adr/README.md), Plan: [docs/ROADMAP.md](docs/RO
 | Fuzzing | `make fuzz FUZZTIME=1m` |
 | Benchmarks | `make bench` |
 | Editor | `make web` (Build) · `make e2e` (Playwright) · in `web/`: `npm run dev`, `npm run typecheck` |
-| Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – nur das betroffene Paket, nie `./... -update`; danach Diff prüfen (Pakete mit Golden-Dateien: `cli`, `model`, `schema`, `server`, `transforms/csv`); die Basis des Vertragstests in `internal/cli/testdata/contract/` ändert nur der Release ([docs/dev/RELEASE.md](docs/dev/RELEASE.md)) |
-| Ausprobieren | `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel catalog --expressions` · `bin/runnel schema trigger` · `bin/runnel triggers examples/hello` · `bin/runnel runs examples/hello` · `bin/runnel plugins examples/hello` · `bin/runnel serve examples/hello` · `bin/runnel health` (bei laufendem Server) |
+| Golden-Dateien neu erzeugen | `go test ./internal/<paket> -update` – nur das betroffene Paket, nie `./... -update`; danach Diff prüfen (Pakete mit Golden-Dateien: `cli`, `model`, `scaffold`, `schema`, `server`, `transforms/csv`); die Basis des Vertragstests in `internal/cli/testdata/contract/` ändert nur der Release ([docs/dev/RELEASE.md](docs/dev/RELEASE.md)) |
+| Ausprobieren | `bin/runnel init demo` (Ordner außerhalb des Repositorys, z. B. unter `%TEMP%`) · `bin/runnel validate examples` · `bin/runnel run -v examples/hello/workflows/hello.workflow.yaml` · `bin/runnel run examples/pipelines/pipelines/numbers.pipeline.yaml` · `bin/runnel catalog core.log` · `bin/runnel catalog --expressions` · `bin/runnel schema trigger` · `bin/runnel triggers examples/hello` · `bin/runnel runs examples/hello` · `bin/runnel plugins examples/hello` · `bin/runnel serve examples/hello` · `bin/runnel health` (bei laufendem Server) |
 
 **Vor jedem Push:** `make lint` und `make test` müssen grün sein. Bei Änderungen am Editor zusätzlich in `web/`
 `npm run typecheck` und die betroffenen Playwright-Tests (`npx playwright test e2e/<datei>`); vollständig prüft die CI.
@@ -35,7 +35,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | Pfad | Inhalt |
 |---|---|
 | `cmd/runnel/` | Einstiegspunkt, Signalbehandlung |
-| `internal/cli/` | Befehle (`version`, `validate`, `run`, `runs`, `catalog`, `schema`, `serve`, `triggers`, `service`, `plugins`, `health`) |
+| `internal/cli/` | Befehle (`version`, `init`, `validate`, `run`, `runs`, `catalog`, `schema`, `serve`, `triggers`, `service`, `plugins`, `health`) |
 | `internal/model/` | Dateiformate (Workflow, Pipeline, Project, Environment, Trigger, Connection, Plugin), Laden, Feld- und Graph-Prüfung, Namensräume |
 | `internal/vars/` | `${…}`-Variablen und Ebenen |
 | `internal/paths/` | Relative Pfade von Actions und Transforms auflösen: Bezugsordner eines Laufs im Kontext (Projektordner, ADR 0020) |
@@ -62,6 +62,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/plugintrust/` | Freigabe von Plugins je Projekt und Rechner (ADR 0019): Hash über den Plugin-Ordner, Dateien der Freigaben für Benutzer und Dienst |
 | `internal/history/` | Run-Historie (ADR 0026): SQLite-Datei je Projekt im Datenordner, Migrationen, Läufe, Status je Knoten, Log, Lebenszeichen und abgebrochene Läufe; geschrieben vom Manager in `internal/runs/record.go` |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
+| `internal/scaffold/` | Neues Projekt anlegen (`runnel init`, R9; später der Editor, R10): Dateien und Ordner, Name aus dem Ordner, nicht leere Ordner ablehnen, vorhandene Dateien nie überschreiben |
 | `internal/version/` | Versionsinformationen (`runnel version`, `/api/v1/version`) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |
