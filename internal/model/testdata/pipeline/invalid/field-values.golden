@@ -1,7 +1,7 @@
 field-values.pipeline.yaml:1:7: kind must be "Pipeline", got "Workflow"
 field-values.pipeline.yaml:2:13: unsupported apiVersion "runnel/v2" (supported: runnel/v1)
 field-values.pipeline.yaml:5:11: invalid parameter name "1FILE" (letters, digits and _, not starting with a digit)
-field-values.pipeline.yaml:8:14: parameter "LIMIT": default value "many" is not an integer
+field-values.pipeline.yaml:8:14: parameter "LIMIT": default value "many" is not a whole number (expected e.g. 1234)
 field-values.pipeline.yaml:10:9: invalid transform id "2read" (letters, digits, - and _, starting with a letter)
 field-values.pipeline.yaml:13:11: transform "map": invalid type "Mapper" (expected "<namespace>.<name>", e.g. "csv.input")
 field-values.pipeline.yaml:14:5: transform "write": missing required field "type"

@@ -1,10 +1,12 @@
-typed-values.workflow.yaml:6:11: parameter "A": invalid type "text" (expected string, integer, number, boolean, json)
-typed-values.workflow.yaml:9:14: parameter "B": default value "many" is not an integer
+typed-values.workflow.yaml:6:11: parameter "A": invalid type "text" (expected string, int, decimal, float, bool, date, datetime, json)
+typed-values.workflow.yaml:9:14: parameter "B": default value "many" is not a whole number (expected e.g. 1234)
 typed-values.workflow.yaml:12:14: parameter "C": default value "z" is not one of the allowed values x, y
-typed-values.workflow.yaml:15:18: parameter "D": allowed value "maybe" is not a boolean (expected true or false)
+typed-values.workflow.yaml:15:18: parameter "D": allowed value "maybe" is not true or false (also 1/0, yes/no)
 typed-values.workflow.yaml:16:11: duplicate parameter "A"
-typed-values.workflow.yaml:20:12: output "OUT": value "1.5" is not an integer
-typed-values.workflow.yaml:21:11: duplicate output "OUT"
-typed-values.workflow.yaml:23:11: invalid output name "9X" (letters, digits and _, not starting with a digit)
-typed-values.workflow.yaml:25:5: output "EMPTY": missing required field "value"
-typed-values.workflow.yaml:27:11: output "BAD_TYPE": invalid type "list" (expected string, integer, number, boolean, json)
+typed-values.workflow.yaml:18:11: parameter "E": invalid type "integer" (expected string, int, decimal, float, bool, date, datetime, json)
+typed-values.workflow.yaml:21:14: parameter "F": default value "01.11.2026" is not a date (expected YYYY-MM-DD)
+typed-values.workflow.yaml:25:12: output "OUT": value "1.5" is not a whole number (expected e.g. 1234)
+typed-values.workflow.yaml:26:11: duplicate output "OUT"
+typed-values.workflow.yaml:28:11: invalid output name "9X" (letters, digits and _, not starting with a digit)
+typed-values.workflow.yaml:30:5: output "EMPTY": missing required field "value"
+typed-values.workflow.yaml:32:11: output "BAD_TYPE": invalid type "list" (expected string, int, decimal, float, bool, date, datetime, json)

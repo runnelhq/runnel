@@ -14,7 +14,7 @@ parameters:
     default: 2s   # short
   - { name: DELAY_B, default: 1s }   # flow style
   - name: COUNT
-    type: integer
+    type: int
     default: "3"
 outputs:
   - name: MESSAGE
@@ -44,7 +44,7 @@ func TestEditEntries(t *testing.T) {
 		{"add block field", EntryEdit{List: "parameters", Op: "set", Index: 0, Field: "description", Value: "Wait of branch A"},
 			"    default: 2s   # short\n", "    default: 2s   # short\n    description: Wait of branch A\n"},
 		{"remove block field", EntryEdit{List: "parameters", Op: "set", Index: 2, Field: "type", Value: nil},
-			"    type: integer\n", ""},
+			"    type: int\n", ""},
 		{"required", EntryEdit{List: "parameters", Op: "set", Index: 2, Field: "required", Value: true},
 			"    default: \"3\"\n", "    default: \"3\"\n    required: true\n"},
 		{"enum block", EntryEdit{List: "parameters", Op: "set", Index: 2, Field: "enum", Value: []any{"1", "3", "a, b"}},

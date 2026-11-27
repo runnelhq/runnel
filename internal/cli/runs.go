@@ -148,7 +148,7 @@ func listRuns(ctx context.Context, out io.Writer, dir, id string, o runsOptions)
 		if trigger == "" {
 			trigger = "editor"
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, r.Started.Local().Format(time.DateTime), r.Status,
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, r.StartedAt.Local().Format(time.DateTime), r.Status,
 			duration(r), trigger, r.Path)
 	}
 	_ = w.Flush()
@@ -159,7 +159,7 @@ func listRuns(ctx context.Context, out io.Writer, dir, id string, o runsOptions)
 }
 
 func duration(r runs.Run) string {
-	if r.Finished == nil {
+	if r.FinishedAt == nil {
 		return "-"
 	}
 	return runs.Round(time.Duration(r.DurationMs) * time.Millisecond).String()
@@ -167,8 +167,8 @@ func duration(r runs.Run) string {
 
 // printRun prints a run with its actions and log.
 func printRun(out io.Writer, d runs.Detail) {
-	_, _ = fmt.Fprintf(out, "Run %s of %s (%s %q)\n", d.ID, d.Path, d.Kind, d.Workflow)
-	_, _ = fmt.Fprintf(out, "  %s, started %s, duration %s", d.Status, d.Started.Local().Format(time.DateTime), duration(d.Run))
+	_, _ = fmt.Fprintf(out, "Run %s of %s (%s %q)\n", d.ID, d.Path, d.Kind, d.Name)
+	_, _ = fmt.Fprintf(out, "  %s, started %s, duration %s", d.Status, d.StartedAt.Local().Format(time.DateTime), duration(d.Run))
 	if d.Trigger != "" {
 		_, _ = fmt.Fprintf(out, ", trigger %s", d.Trigger)
 	}

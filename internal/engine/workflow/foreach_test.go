@@ -13,9 +13,9 @@ import (
 func TestForEach(t *testing.T) {
 	w := parse(t, `
 outputs:
-  - { name: SECOND, type: integer, value: "{{ results.each.output.items[1].output }}" }
-  - { name: ROW, type: integer, value: "{{ results.each.output.items[2].row }}" }
-  - { name: COUNT, type: integer, value: "{{ results.each.output.succeeded }}" }
+  - { name: SECOND, type: int, value: "{{ results.each.output.items[1].output }}" }
+  - { name: ROW, type: int, value: "{{ results.each.output.items[2].row }}" }
+  - { name: COUNT, type: int, value: "{{ results.each.output.succeeded }}" }
 actions:
   - { id: start, type: core.start }
   - id: each

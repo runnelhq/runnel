@@ -3,13 +3,16 @@ package model
 import (
 	"os"
 	"strings"
+	"time"
 
+	"github.com/runnelhq/runnel/internal/record"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
 // ExprValues returns what expressions see as vars (all variables, resolved) and params
-// (the declared parameters, converted to their type; ADR 0006). Workflows and pipelines
-// share it.
+// (the declared parameters, converted to their type; ADR 0006). A date becomes a time at
+// midnight, local time, as for fields of records, so that it works with today(),
+// formatDate() and < >. Workflows and pipelines share it.
 func ExprValues(scope *vars.Scope, params []Parameter) (variables, parameters map[string]any) {
 	variables = map[string]any{}
 	for _, name := range scope.Names() {
@@ -24,6 +27,9 @@ func ExprValues(scope *vars.Scope, params []Parameter) (variables, parameters ma
 			continue
 		}
 		if v, err := p.Type.Parse(text); err == nil {
+			if d, ok := v.(record.Date); ok {
+				v = d.In(time.Local)
+			}
 			parameters[p.Name] = v
 		} else {
 			parameters[p.Name] = text

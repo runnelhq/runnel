@@ -61,11 +61,11 @@ func TestStartAndRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.Status != StatusRunning || run.Workflow != "test" || len(run.ID) != 26 {
+	if run.Status != StatusRunning || run.Name != "test" || len(run.ID) != 26 {
 		t.Errorf("run %+v", run)
 	}
 	d := waitFor(t, m, run.ID, finished)
-	if d.Status != workflow.Succeeded || d.Finished == nil || d.Error != "" {
+	if d.Status != workflow.Succeeded || d.FinishedAt == nil || d.Error != "" {
 		t.Errorf("run %+v", d.Run)
 	}
 	states := map[string]workflow.Status{}
@@ -206,10 +206,10 @@ func TestEventsWake(t *testing.T) {
 }
 
 func TestPrepareErrors(t *testing.T) {
-	s := spec("parameters:\n  - { name: TARGET, required: true }\n  - { name: N, type: integer }\nactions:\n  - { id: start, type: core.start }\n")
+	s := spec("parameters:\n  - { name: TARGET, required: true }\n  - { name: N, type: int }\nactions:\n  - { id: start, type: core.start }\n")
 	s.Params = map[string]string{"N": "many", "EXTRA": "1"}
 	_, err := Prepare(s)
-	if !errors.Is(err, ErrMissingParameters) || !strings.Contains(err.Error(), `parameter N (integer): "many" is not an integer; missing required parameter(s) [TARGET]`) {
+	if !errors.Is(err, ErrMissingParameters) || !strings.Contains(err.Error(), `parameter N (int): "many" is not a whole number (expected e.g. 1234); missing required parameter(s) [TARGET]`) {
 		t.Errorf("error %v", err)
 	}
 

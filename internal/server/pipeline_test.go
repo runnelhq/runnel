@@ -127,7 +127,7 @@ links:
   - { from: even, to: out }
 `)
 	run := startRun(t, s, `{"path": "pipelines/numbers.pipeline.yaml"}`)
-	if run.Kind != "pipeline" || run.Workflow != "numbers" || len(run.LinkRows) != 2 {
+	if run.Kind != "pipeline" || run.Name != "numbers" || len(run.LinkRows) != 2 {
 		t.Errorf("run %+v", run)
 	}
 	d := waitRun(t, s, run.ID, func(d runs.Detail) bool { return d.Status != runs.StatusRunning })

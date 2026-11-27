@@ -17,7 +17,7 @@ name: routing
 parameters:
   - name: LARGE
     description: Amount from which an order needs a release
-    type: number
+    type: decimal
     default: "10000"
 transforms:
   - id: read

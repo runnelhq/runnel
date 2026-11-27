@@ -20,11 +20,11 @@ apiVersion: runnel/v1
 name: child
 parameters:
   - { name: NAME, required: true }
-  - { name: COUNT, type: integer, default: "1" }
-  - { name: FAIL, type: boolean, default: "false" }
+  - { name: COUNT, type: int, default: "1" }
+  - { name: FAIL, type: bool, default: "false" }
 outputs:
   - { name: GREETING, value: "Hello {{ params.NAME }}" }
-  - { name: DOUBLE, type: integer, value: "{{ params.COUNT * 2 }}" }
+  - { name: DOUBLE, type: int, value: "{{ params.COUNT * 2 }}" }
 actions:
   - { id: start, type: core.start }
   - { id: greet, type: core.log, with: { message: "Hello {{ params.NAME }}" } }
@@ -288,7 +288,7 @@ func TestCheckCalls(t *testing.T) {
 		{"      workflow: workflows/child.workflow.yaml", `:13:7: action "call": missing required parameter NAME of workflow workflows/child.workflow.yaml`},
 		{"      workflow: workflows/child.workflow.yaml\n      params: { NAME: x, COUNT: many, COLOR: red }",
 			`:14:46: action "call": parameter COLOR is not declared by workflow workflows/child.workflow.yaml (declared: NAME, COUNT, FAIL)` + "\n" +
-				`workflows/parent.workflow.yaml:14:33: action "call": parameter COUNT (integer): "many" is not an integer`},
+				`workflows/parent.workflow.yaml:14:33: action "call": parameter COUNT (int): "many" is not a whole number`},
 		{"      workflow: workflows/none.workflow.yaml", `:13:17: action "call": workflow file workflows/none.workflow.yaml not found`},
 		{"      workflow: workflows/broken.workflow.yaml", `workflow file workflows/broken.workflow.yaml has errors; check it with "runnel validate"`},
 		{"      workflow: workflows/a.workflow.yaml", ""}, // a and b call each other, but not parent

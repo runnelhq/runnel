@@ -13,7 +13,7 @@ name: customer-api
 parameters:
   - name: KDNR
     description: Customer number
-    type: integer
+    type: int
     required: true
 transforms:
   - id: read

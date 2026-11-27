@@ -463,7 +463,7 @@ links:
 // Expressions per record see vars, params (with their type), env and run (ADR 0006).
 func TestRunPassesValuesToExpressions(t *testing.T) {
 	body := `parameters:
-  - { name: MIN, type: integer, default: "4" }
+  - { name: MIN, type: int, default: "4" }
 transforms:
   - { id: gen, type: core.generate-rows, with: { count: 10, numberField: n } }
   - id: keep

@@ -215,8 +215,13 @@ func TestHealthFailedTriggerRun(t *testing.T) {
 		t.Errorf("status %s, check %+v", h.Status, c)
 	}
 	f := h.Runs.LastFailed
-	if f == nil || f.ID != id || f.File != "workflows/broken.workflow.yaml" || f.Trigger != "cron:nightly" || f.Time.IsZero() || !strings.Contains(f.Error, "boom") {
+	if f == nil || f.ID != id || f.Path != "workflows/broken.workflow.yaml" || f.Trigger != "cron:nightly" || f.Time.IsZero() || !strings.Contains(f.Error, "boom") {
 		t.Errorf("last failed %+v", f)
+	}
+	// The names of the fields (R5c): uptimeSeconds, lastFailed.path.
+	if body := do(t, s, "GET", "/api/v1/health", "").Body.String(); !strings.Contains(body, `"uptimeSeconds":`) ||
+		!strings.Contains(body, `"path": "workflows/broken.workflow.yaml"`) || strings.Contains(body, `"uptime":`) {
+		t.Errorf("field names: %s", body)
 	}
 
 	// A failed run started by hand is reported, but does not degrade the status.

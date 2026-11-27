@@ -291,8 +291,8 @@ export interface EntryEdit {
 /** Allowed names of parameters and outputs (like variables). */
 export const entryNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** Types of parameters and outputs (model.ValueType); string is the default. */
-export const valueTypes = ["string", "integer", "number", "boolean", "json"];
+/** Types of parameters and outputs (model.ValueType), those of fields (ADR 0007); string is the default. */
+export const valueTypes = ["string", "int", "decimal", "float", "bool", "date", "datetime", "json"];
 
 /** What a problem belongs to: an action, a link or the workflow, and the field in the properties panel. */
 export interface ProblemTarget {

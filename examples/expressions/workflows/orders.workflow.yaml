@@ -10,7 +10,7 @@ apiVersion: runnel/v1
 name: orders
 parameters:
   - name: ORDERS
-    type: integer
+    type: int
     default: "7"
   - name: DAY
     default: "{{ formatDate(addDays(today(), -1), 'dd.MM.yyyy') }}"

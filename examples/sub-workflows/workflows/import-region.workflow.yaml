@@ -11,11 +11,11 @@ parameters:
     required: true
     enum: [north, south, east, west]
   - name: ORDERS
-    type: integer
+    type: int
     default: "10"
 outputs:
   - name: IMPORTED
-    type: integer
+    type: int
     value: "{{ params.ORDERS }}"
   - name: SUMMARY
     value: "{{ params.REGION }}: {{ params.ORDERS }} orders"

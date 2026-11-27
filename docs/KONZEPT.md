@@ -141,7 +141,7 @@ Links können deaktiviert werden (bleiben im Design, werden nicht ausgeführt).
   0. Eingebaut: `PROJECT_DIR` – absoluter Pfad des Projektordners ([ADR 0020](adr/0020-relative-pfade.md))
   1. Standardwerte der Workflow-Parameter (`parameters[].default`)
   2. Project (`project.yaml`, Abschnitt `variables`)
-  3. Environment (`environments/<name>.yaml`; Auswahl per `--env`, sonst `defaultEnvironment` des Projekts)
+  3. Environment (`environments/<name>.yaml`; Auswahl per `--environment`, sonst `defaultEnvironment` des Projekts)
   4. Beim Start übergebene Parameter (CLI `--param KEY=VALUE`, HTTP-Anfrage, Trigger, aufrufende Action)
   5. Zur Laufzeit gesetzte Variablen (Action „Set Variables“, ab S08)
 - Syntax:
@@ -291,7 +291,7 @@ flowchart LR
 
 **Runner / Executor** (`runnel run`, `runnel serve`)
 - Lädt Workflow-/Pipeline-YAML, validiert, löst Variablen auf, führt aus.
-- Funktioniert **vollständig ohne Editor und ohne Server** (`runnel run workflows/x.workflow.yaml --env prod`) – ideal für Windows-Aufgabenplanung oder CI.
+- Funktioniert **vollständig ohne Editor und ohne Server** (`runnel run workflows/x.workflow.yaml --environment prod`) – ideal für Windows-Aufgabenplanung oder CI.
 - Im Server-Modus zusätzlich: Scheduler, Trigger, Ausführungshistorie, Live-Status.
 
 **Editor**
@@ -303,7 +303,7 @@ flowchart LR
 
 | Modus | Befehl | Einsatz |
 |---|---|---|
-| Einmal-Ausführung | `runnel run <datei> [--env prod] [--param k=v]` (`--run-config` mit S42, Backlog) | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet (auch bei falschem Aufruf, seit R5a), 130 abgebrochen |
+| Einmal-Ausführung | `runnel run <datei> [--environment prod] [--param k=v]` (`--run-config` mit S42, Backlog) | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet (auch bei falschem Aufruf, seit R5a), 130 abgebrochen |
 | Server | `runnel serve [projektordner] [--port 7300] [--triggers 127.0.0.1:7301] [--stop-timeout]` | Editor + Scheduler + HTTP-Trigger (eigener Listener) |
 | Desktop | `runnel desktop` (geplant) | Server + WebView2-Fenster (Einzelplatz) |
 | Windows-Dienst | `runnel service install/start/stop/status/uninstall` (seit S41) | Dauerbetrieb auf Server |
@@ -314,7 +314,7 @@ flowchart LR
 | Schemas der Dateien | `runnel schema <art>` | JSON Schema von `project.yaml`, Environments, Triggern, Connections und `plugin.yaml` (seit S58 bzw. S49a), z. B. für VS Code mit `# yaml-language-server: $schema=…` |
 | Secrets (geplant) | `runnel secret set/list/delete/missing/export/import [--service]` | Lokalen Secret-Store pflegen, fehlende Secrets finden (S39d/S39e, [ADR 0022](adr/0022-connections-secrets.md)) |
 | Plugins | `runnel plugins [trust\|untrust] [projektordner] [--plugin <name>] [--yes] [--service]` (seit S49a) | Plugins anzeigen (freigegebene mit ihren Typen, seit S49b1) und für das Projekt auf diesem Rechner freigeben ([ADR 0019](adr/0019-plugin-protokoll.md), Nachtrag; [docs/dev/PLUGINS.md](dev/PLUGINS.md)) |
-| Zustand | `runnel health [--addr 127.0.0.1:7300] [--service <name>] [--json]` (seit S43a) | Zustand des laufenden Servers bzw. Dienstes für Monitoring. Exit-Code: 0 `ok`, 1 `degraded`, 2 `fail`, 3 nicht erreichbar oder falscher Aufruf |
+| Zustand | `runnel health [--addr 127.0.0.1:7300] [--service-name <name>] [--json]` (seit S43a) | Zustand des laufenden Servers bzw. Dienstes für Monitoring. Exit-Code: 0 `ok`, 1 `degraded`, 2 `fail`, 3 nicht erreichbar oder falscher Aufruf |
 | Portable (geplant) | `runnel.exe` + `runnel.portable` im Ordner | Alle Daten neben der exe, z. B. USB / Netzlaufwerk |
 
 ---
@@ -464,9 +464,10 @@ Regeln des Workflow-Formats (umgesetzt in `internal/model`):
 - Pflichtfelder: `kind: Workflow`, `apiVersion: runnel/v1`, `name`; je Action `id` und `type`; je Link `from` und `to`.
 - Action-IDs: Buchstaben, Ziffern, `-` und `_`, beginnend mit einem Buchstaben. Action-Typen: `<namespace>.<name>`, z. B. `file.copy`.
 - Parameternamen: Buchstaben, Ziffern und `_`, nicht mit einer Ziffer beginnend (für `${NAME}`).
-- Parameter können einen Typ haben (`type`: `string` – Standard –, `integer`, `number`, `boolean`, `json`) und erlaubte
-  Werte (`enum`); Standardwerte und beim Start übergebene Werte werden dagegen geprüft. Als Variable `${NAME}` bleibt der
-  Wert Text.
+- Parameter und Outputs können einen Typ haben, dieselben wie Felder in Pipelines (`type`: `string` – Standard –, `int`,
+  `decimal`, `float`, `bool`, `date`, `datetime`, `json`; ADR 0007, Nachtrag R5c), Parameter auch erlaubte Werte
+  (`enum`); Standardwerte und beim Start übergebene Werte werden dagegen geprüft (Zahlen als `1234.5`, Datum als
+  `2026-11-20`). Als Variable `${NAME}` bleibt der Wert Text, in Ausdrücken (`params.NAME`) hat er den Typ.
 - `outputs` (Name, optional Typ und Beschreibung, `value`) bilden das Ergebnis eines Workflows; sie werden nur bei
   erfolgreichem Ende ausgewertet. Parameter und Outputs sind der Werkzeug-Vertrag für Sub-Workflows, Agenten und MCP
   ([ADR 0012](adr/0012-ki-faehigkeit.md)).
@@ -1474,7 +1475,7 @@ Sortieren/Gruppieren großer Datenmengen: externes Sortieren mit temporären Dat
   - **Log:** vollständig in `%ProgramData%\runnel\logs\<name>.log` (der Ordner wird beim Installieren für das Konto
     beschreibbar gemacht), Start, Stopp, Warnungen und Fehler zusätzlich in der Ereignisanzeige.
   - Der Dienst startet die `runnel.exe`, mit der er installiert wurde; nach dem Verschieben neu installieren.
-  - **Überwachung:** `runnel health --service <name>` (Port aus der Befehlszeile des Dienstes) bzw. ein Monitoring-Agent
+  - **Überwachung:** `runnel health --service-name <name>` (Port aus der Befehlszeile des Dienstes) bzw. ein Monitoring-Agent
     auf demselben Rechner mit `GET http://127.0.0.1:<port>/api/v1/health` (seit S43a, Kap. 9.3).
 - **Code-Signing** der exe (Authenticode) – wichtig, damit SmartScreen/Virenscanner nicht anschlagen.
 - **Pfade**: UNC-Pfade (`\\server\share`) und lange Pfade (`\\?\`) werden unterstützt; Encoding-Unterstützung für `windows-1252`/`UTF-16` bei Dateien.

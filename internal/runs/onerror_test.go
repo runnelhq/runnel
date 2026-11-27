@@ -151,8 +151,8 @@ func TestStartFailure(t *testing.T) {
 		t.Error("editor run reported")
 	}
 	f, ok := StartFailure(dir, "workflows/a.workflow.yaml", data, "cron:a", "prod", false, errors.New("secret TOKEN is not set"))
-	if !ok || f.Run.ID != "" || f.Run.Workflow != "a" || f.Run.Environment != "prod" || f.Target != "workflows/on-error.workflow.yaml" ||
-		f.Run.Error != "secret TOKEN is not set" || f.Run.Finished == nil {
+	if !ok || f.Run.ID != "" || f.Run.Name != "a" || f.Run.Environment != "prod" || f.Target != "workflows/on-error.workflow.yaml" ||
+		f.Run.Error != "secret TOKEN is not set" || f.Run.FinishedAt == nil {
 		t.Fatalf("%+v %v", f, ok)
 	}
 	spec := ErrorSpec(f, dir, filepath.Join(dir, "workflows", "on-error.workflow.yaml"), []byte("kind: Workflow\napiVersion: runnel/v1\nname: e\n"+
@@ -240,7 +240,7 @@ func TestCheckOnError(t *testing.T) {
 	head := "kind: Workflow\napiVersion: runnel/v1\nname: w\nactions:\n  - { id: start, type: core.start }\n"
 	write("ok.workflow.yaml", head+"parameters:\n  - { name: FAILED_RUN, type: string, required: true }\n  - { name: X, default: a }\n")
 	write("extra.workflow.yaml", head+"parameters:\n  - { name: TO, required: true }\n")
-	write("typed.workflow.yaml", head+"parameters:\n  - { name: FAILED_STARTED, type: integer }\n")
+	write("typed.workflow.yaml", head+"parameters:\n  - { name: FAILED_STARTED, type: int }\n")
 	self := write("self.workflow.yaml", head)
 	at := func(path, format string, args ...any) *model.Error {
 		return &model.Error{Path: path, Msg: fmt.Sprintf(format, args...)}
@@ -253,7 +253,7 @@ func TestCheckOnError(t *testing.T) {
 		{"none", self, ""},
 		{"workflows/missing.workflow.yaml", "", "error workflow workflows/missing.workflow.yaml not found"},
 		{"workflows/extra.workflow.yaml", "", "required parameter TO is not given; an error workflow only gets FAILED_RUN"},
-		{"workflows/typed.workflow.yaml", "", "parameter FAILED_STARTED must be of type string, not integer"},
+		{"workflows/typed.workflow.yaml", "", "parameter FAILED_STARTED must be of type string, not int"},
 		{"workflows/self.workflow.yaml", self, "warning: onError names this workflow itself; it is ignored here"},
 	} {
 		got := ""

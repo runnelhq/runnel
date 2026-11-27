@@ -76,7 +76,7 @@ func TestRunOnError(t *testing.T) {
 func TestValidateOnError(t *testing.T) {
 	dir, _ := historyProject(t, "settings:\n  onError: workflows/missing.workflow.yaml\n")
 	writeProjectFile(t, dir, "workflows/extra.workflow.yaml", "kind: Workflow\napiVersion: runnel/v1\nname: extra\n"+
-		"parameters:\n  - { name: TO, required: true }\n  - { name: FAILED_STARTED, type: integer }\nactions:\n  - { id: start, type: core.start }\n")
+		"parameters:\n  - { name: TO, required: true }\n  - { name: FAILED_STARTED, type: int }\nactions:\n  - { id: start, type: core.start }\n")
 	writeProjectFile(t, dir, "workflows/self.workflow.yaml", "kind: Workflow\napiVersion: runnel/v1\nname: self\n"+
 		"settings:\n  onError: workflows/self.workflow.yaml\nactions:\n  - { id: start, type: core.start }\n")
 	writeProjectFile(t, dir, "workflows/uses.workflow.yaml", "kind: Workflow\napiVersion: runnel/v1\nname: uses\n"+
@@ -88,7 +88,7 @@ func TestValidateOnError(t *testing.T) {
 	for _, want := range []string{
 		"project.yaml:5:12: error: error workflow workflows/missing.workflow.yaml not found",
 		"workflows/uses.workflow.yaml:5:12: error: error workflow workflows/extra.workflow.yaml: required parameter TO is not given",
-		"workflows/uses.workflow.yaml:5:12: error: error workflow workflows/extra.workflow.yaml: parameter FAILED_STARTED must be of type string, not integer",
+		"workflows/uses.workflow.yaml:5:12: error: error workflow workflows/extra.workflow.yaml: parameter FAILED_STARTED must be of type string, not int",
 		"workflows/self.workflow.yaml:5:12: warning: onError names this workflow itself; it is ignored here",
 		"pipelines/p.pipeline.yaml:5:12: error: onError \"pipelines/p.pipeline.yaml\" must be a workflow file",
 	} {

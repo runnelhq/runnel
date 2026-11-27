@@ -35,7 +35,7 @@ Noch vor Version 1.0 (Stand: Phase 0.5 abgeschlossen, siehe [Roadmap](docs/ROADM
 Die vollständige Liste der Bausteine zeigt `runnel catalog`.
 
 ```bash
-runnel run --env prod examples/hello/workflows/hello.workflow.yaml
+runnel run --environment prod examples/hello/workflows/hello.workflow.yaml
 ```
 
 ```
@@ -44,7 +44,7 @@ runnel run --env prod examples/hello/workflows/hello.workflow.yaml
 23:28:02.494 INFO  workflow "hello" succeeded in 1s
 ```
 
-`runnel run <datei>` führt einen Workflow oder eine Pipeline aus (bei Pipelines mit den Zählern je Transform): `--env` wählt das Environment des Projekts, `--param KEY=VALUE` setzt
+`runnel run <datei>` führt einen Workflow oder eine Pipeline aus (bei Pipelines mit den Zählern je Transform): `--environment` wählt das Environment des Projekts, `--param KEY=VALUE` setzt
 Parameter, `-v` (oder `--log-level debug`) zeigt zusätzlich Debug-Meldungen und jeden Action-Start; `--log-level warn`
 zeigt nur Warnungen und Fehler, `--log-format json` gibt jede Zeile als JSON-Objekt aus (z. B. für Splunk oder ELK). Exit-Code: `0` erfolgreich, `1` fehlgeschlagen,
 `2` nicht gestartet (ungültiger Workflow oder Aufruf), `130` abgebrochen – passend für die Windows-Aufgabenplanung.
@@ -62,7 +62,7 @@ runnel validate examples/hello
 `triggers/**/*.yaml`; Ordner werden rekursiv durchsucht) auf
 Syntax- und Feldfehler, Links auf unbekannte Actions, Zyklen ohne `loop: true`, unerreichbare Actions, nicht
 definierte Variablen sowie – wie vor einem Lauf – unbekannte Action-Typen und ungültige Konfigurationen (`with:`). Das zugehörige Projekt (`project.yaml` im Ordner oder darüber) und seine Environments werden
-mitgeprüft; Variablen gegen jedes Environment oder nur gegen eines (`--env prod`). Mit `--param KEY=VALUE` lassen
+mitgeprüft; Variablen gegen jedes Environment oder nur gegen eines (`--environment prod`). Mit `--param KEY=VALUE` lassen
 sich Startparameter angeben. Meldungen erscheinen als `datei:zeile:spalte: error|warning: text`; bei Fehlern ist der
 Exit-Code 1 (mit `--strict` auch bei Warnungen), bei einem falschen Aufruf oder fehlenden Pfad 2. Beispiele liegen unter [`examples/`](examples/).
 

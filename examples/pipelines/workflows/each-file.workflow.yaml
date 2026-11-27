@@ -15,7 +15,7 @@ parameters:
     default: inbox
 outputs:
   - name: FILES
-    type: integer
+    type: int
     value: "{{ results.totals.output.succeeded }}"
 actions:
   - id: start

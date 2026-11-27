@@ -20,7 +20,7 @@ parameters:
     default: out/orders-export.csv
   - name: MIN_AMOUNT
     description: Smallest amount of an order to export
-    type: number
+    type: decimal
     default: "100"
 transforms:
   - id: read

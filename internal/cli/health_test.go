@@ -17,7 +17,7 @@ import (
 const healthBody = `{
   "status": "%STATUS%",
   "version": "v1.2.3",
-  "uptime": 7384,
+  "uptimeSeconds": 7384,
   "startedAt": "2026-11-26T08:00:00+01:00",
   "project": {"name": "flows", "dir": "D:\\flows"},
   "checks": [
@@ -28,7 +28,7 @@ const healthBody = `{
   "scheduler": {"running": true, "triggers": 3, "active": 2,
     "problems": [%PROBLEMS%]},
   "runs": {"running": 0, "onErrorQueue": 0,
-    "lastFailed": {"id": "01JD", "time": "2026-11-26T09:30:00+01:00", "file": "workflows/import.workflow.yaml", "trigger": "cron:nightly", "error": "boom\nsecond line"}},
+    "lastFailed": {"id": "01JD", "time": "2026-11-26T09:30:00+01:00", "path": "workflows/import.workflow.yaml", "trigger": "cron:nightly", "error": "boom\nsecond line"}},
   "history": {"enabled": true, "writable": true, "sizeBytes": 1024},
   "disk": {"path": "C:\\ProgramData\\runnel\\history", "freeBytes": 1, "totalBytes": 2}
 }`
@@ -108,13 +108,14 @@ func TestHealthUnknown(t *testing.T) {
 		{[]string{"--addr", "example.com:7300"}, "listens on this computer only"},
 		{[]string{"--bogus"}, "unknown flag: --bogus"},
 		{[]string{"--timeout", "soon"}, "invalid argument"},
-		{[]string{"--service", "no such name"}, "invalid service name"},
+		{[]string{"--service-name", "no such name"}, "invalid service name"},
+		{[]string{"--service", "runnel"}, "unknown flag: --service"},
 	}
 	if runtime.GOOS != "windows" {
 		cases = append(cases, struct {
 			args []string
 			want string
-		}{[]string{"--service", "runnel"}, "only available on Windows"})
+		}{[]string{"--service-name", "runnel"}, "only available on Windows"})
 	}
 	for _, c := range cases {
 		code, out, errOut := run(t, append([]string{"health"}, c.args...)...)

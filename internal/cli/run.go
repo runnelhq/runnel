@@ -52,7 +52,7 @@ func newRunCommand() *cobra.Command {
 		Long: "Runs a workflow (*" + workflowSuffix + ") or a pipeline (*" + pipelineSuffix + ") and prints its log;\n" +
 			"for a pipeline, the number of records each transform read and wrote.\n\n" +
 			"Variables come from the parameters, the project (project.yaml in the file's\n" +
-			"directory or above), the environment (--env, default: defaultEnvironment\n" +
+			"directory or above), the environment (--environment, default: defaultEnvironment\n" +
 			"of the project) and --param, in this order of precedence (last wins).\n\n" +
 			"Ctrl+C cancels the run cleanly (running actions and transforms are stopped); press it twice to exit at once.\n\n" +
 			"The run is kept in the run history of the project (see \"runnel runs\"): all runs, only failed ones or none,\n" +
@@ -68,7 +68,7 @@ func newRunCommand() *cobra.Command {
 			return runWorkflow(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), args[0], opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.env, "env", "", "environment of the project to use")
+	cmd.Flags().StringVar(&opts.env, "environment", "", "environment of the project to use")
 	cmd.Flags().StringArrayVar(&opts.params, "param", nil, "parameter `KEY=VALUE` (repeatable)")
 	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "also log debug messages and every action or transform start and end (--log-level debug)")
 	logFlags(cmd, &opts.log)
@@ -164,7 +164,7 @@ func readRunFile(file, env string) (data []byte, projectDir string, err error) {
 	case found:
 		projectDir = displayPath(root)
 	case env != "":
-		return nil, "", fmt.Errorf("--env %s: no project (%s) found for %s", env, model.ProjectFile, file)
+		return nil, "", fmt.Errorf("--environment %s: no project (%s) found for %s", env, model.ProjectFile, file)
 	}
 	return data, projectDir, nil
 }

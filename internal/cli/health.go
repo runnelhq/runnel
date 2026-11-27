@@ -28,7 +28,7 @@ const (
 )
 
 func newHealthCommand() *cobra.Command {
-	var addr, service string
+	var addr, serviceName string
 	var asJSON bool
 	var timeout time.Duration
 	cmd := &cobra.Command{
@@ -36,14 +36,14 @@ func newHealthCommand() *cobra.Command {
 		Short: "Show the health of a running server or service",
 		Long: "Asks the running \"runnel serve\" or service on this computer for its health (" + server.APIPrefix + "/health):\n" +
 			"scheduler, trigger files, failed runs, run history, disk space and the listener of http triggers.\n" +
-			"--service reads the port from the installed Windows service, else --addr is used.\n\n" +
+			"--service-name reads the port from the installed Windows service, else --addr is used.\n\n" +
 			"Exit code: 0 ok, 1 degraded, 2 fail, 3 not reachable or unknown (as monitoring tools expect).",
 		Args: cobra.NoArgs,
 		// An invalid command line leaves the health unknown.
 		Annotations: map[string]string{annotationUsageExit: strconv.Itoa(healthExitUnreachable)},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if service != "" {
-				port, err := servicePort(service)
+			if serviceName != "" {
+				port, err := servicePort(serviceName)
 				if err != nil {
 					return healthUnknown(cmd, err)
 				}
@@ -72,7 +72,7 @@ func newHealthCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&addr, "addr", net.JoinHostPort("127.0.0.1", strconv.Itoa(DefaultPort)), "address of the server on this computer")
-	cmd.Flags().StringVar(&service, "service", "", "name of an installed Windows service (e.g. runnel): use its port")
+	cmd.Flags().StringVar(&serviceName, "service-name", "", "name of an installed Windows service (e.g. runnel): use its port")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print the answer of the server as JSON")
 	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Second, "how long to wait for the answer")
 	return cmd
@@ -99,7 +99,7 @@ func fetchHealth(ctx context.Context, addr string, timeout time.Duration) (*serv
 	client := &http.Client{Transport: &http.Transport{Proxy: nil}} // never through a proxy
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("no runnel server reachable at %s (is it running? see --addr, --service): %w", addr, err)
+		return nil, fmt.Errorf("no runnel server reachable at %s (is it running? see --addr, --service-name): %w", addr, err)
 	}
 	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
@@ -144,7 +144,7 @@ func portOf(name, command string) (int, error) {
 func printHealth(w io.Writer, h *server.Health) {
 	p := func(format string, args ...any) { _, _ = fmt.Fprintf(w, format, args...) }
 	p("Status:   %s\n", h.Status)
-	p("Server:   runnel %s, up %s (since %s)\n", h.Version, (time.Duration(h.Uptime) * time.Second).String(), h.StartedAt.Format(time.RFC3339))
+	p("Server:   runnel %s, up %s (since %s)\n", h.Version, (time.Duration(h.UptimeSeconds) * time.Second).String(), h.StartedAt.Format(time.RFC3339))
 	p("Project:  %s (%s)\n", h.Project.Name, h.Project.Dir)
 	p("Checks:\n")
 	for _, c := range h.Checks {
@@ -158,7 +158,7 @@ func printHealth(w io.Writer, h *server.Health) {
 		p("  %s: %s: %s\n", pos, pr.Severity, pr.Message)
 	}
 	if f := h.Runs.LastFailed; f != nil {
-		what := f.File
+		what := f.Path
 		if f.Trigger != "" {
 			what += " (" + f.Trigger + ")"
 		}

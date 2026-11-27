@@ -262,7 +262,7 @@ export function useRun(path: string) {
   const show = useCallback(
     (d: RunDetail, workflow: Workflow) => {
       const history = { trigger: d.trigger, params: d.params };
-      const meta = { environment: d.environment ?? "", started: Date.parse(d.started), history };
+      const meta = { environment: d.environment ?? "", started: Date.parse(d.startedAt), history };
       if (d.status === "running") return follow(d.id, workflow, meta);
       source.current?.close();
       const actions: Record<string, ActionRun> = {};
@@ -273,7 +273,7 @@ export function useRun(path: string) {
       setRun({
         id: d.id,
         kind: d.kind,
-        workflow: d.workflow,
+        workflow: d.name,
         environment: meta.environment,
         status: d.status,
         started: meta.started,

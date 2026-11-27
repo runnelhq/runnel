@@ -11,7 +11,7 @@ name: segments
 parameters:
   - name: KEY_ACCOUNT
     description: Revenue from which a customer is a key account
-    type: number
+    type: decimal
     default: "10000"
   - name: OUT_DIR
     description: Folder for the two files

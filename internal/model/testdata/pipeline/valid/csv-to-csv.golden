@@ -10,7 +10,7 @@
     },
     {
       "name": "MIN_SALES",
-      "type": "number",
+      "type": "decimal",
       "default": "0"
     }
   ],

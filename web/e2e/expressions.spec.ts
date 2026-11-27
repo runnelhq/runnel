@@ -15,7 +15,7 @@ apiVersion: runnel/v1
 name: orders
 parameters:
   - name: ORDERS
-    type: integer
+    type: int
     default: "7"
   - name: DAY
     default: "2026-11-19"
@@ -81,7 +81,7 @@ test("suggests names after {{ and inserts them", async ({ page }) => {
   await page.keyboard.type("params.");
   await expect(suggestions(page).getByRole("option")).toHaveCount(2);
   await expect(suggestions(page).getByRole("option").first()).toContainText("ORDERS");
-  await expect(suggestions(page).getByRole("option").first()).toContainText("integer");
+  await expect(suggestions(page).getByRole("option").first()).toContainText("int");
   await page.waitForTimeout(100); // see interactionDelay below
   await page.keyboard.press("Enter");
   await expect(message(page)).toHaveText("Checking ${TARGET} {{ params.ORDERS }}");

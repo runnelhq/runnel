@@ -43,8 +43,8 @@ type Run struct {
 	Path string `json:"path"`
 	// Kind is "workflow" or "pipeline" (S25a3).
 	Kind string `json:"kind"`
-	// Workflow is the name of the workflow or pipeline.
-	Workflow string `json:"workflow"`
+	// Name is the name of the workflow or pipeline.
+	Name string `json:"name"`
 	// Trigger names what started the run, e.g. "cron:nightly" (S37); empty: by hand.
 	Trigger string `json:"trigger,omitempty"`
 	// Client is the address of the caller of an http trigger (S38a).
@@ -55,8 +55,8 @@ type Run struct {
 	Environment string            `json:"environment,omitempty"`
 	Params      map[string]string `json:"params,omitempty"`
 	Status      workflow.Status   `json:"status"`
-	Started     time.Time         `json:"started"`
-	Finished    *time.Time        `json:"finished,omitempty"`
+	StartedAt   time.Time         `json:"startedAt"`
+	FinishedAt  *time.Time        `json:"finishedAt,omitempty"`
 	DurationMs  int64             `json:"durationMs"`
 	Error       string            `json:"error,omitempty"`
 	Outputs     map[string]any    `json:"outputs,omitempty"`
@@ -79,8 +79,8 @@ type ActionState struct {
 	ID         string          `json:"id"`
 	Type       string          `json:"type"`
 	Status     workflow.Status `json:"status"`
-	Started    *time.Time      `json:"started,omitempty"`
-	Finished   *time.Time      `json:"finished,omitempty"`
+	StartedAt  *time.Time      `json:"startedAt,omitempty"`
+	FinishedAt *time.Time      `json:"finishedAt,omitempty"`
 	DurationMs int64           `json:"durationMs,omitempty"`
 	Error      string          `json:"error,omitempty"`
 	// Runs counts how often the action ran (loops, join: each).
@@ -309,7 +309,7 @@ func (m *Manager) PrepareRun(path string, spec Spec) (*Pending, *Prepared, error
 		lim = limits{} // an error workflow can always report (ADR 0027)
 	}
 	return &Pending{History: spec.History, id: id, env: p.Env, steps: steps, hash: fileHash(spec.Data),
-		run: Run{ID: id, Path: path, Kind: "workflow", Workflow: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger,
+		run: Run{ID: id, Path: path, Kind: "workflow", Name: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger,
 			Client: spec.Client, Parent: spec.Parent},
 		lim:     lim,
 		onError: onErrorOf(spec.Trigger, spec.NoOnError, p.Project, p.Workflow.Settings.OnError, path),
@@ -350,7 +350,7 @@ func (m *Manager) PreparePipelineRun(path string, spec PipelineSpec) (*Pending, 
 		steps[i] = [2]string{t.ID, t.Type}
 	}
 	return &Pending{History: spec.History, id: id, env: p.Env, steps: steps, hash: fileHash(spec.Data),
-		run: Run{ID: id, Path: path, Kind: "pipeline", Workflow: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
+		run: Run{ID: id, Path: path, Kind: "pipeline", Name: p.Pipeline.Name, Params: spec.Params, Trigger: spec.Trigger, Client: spec.Client,
 			LinkRows: make([]int64, len(p.Pipeline.Links))},
 		lim:     limitsOf(p.Project, 0),
 		onError: onErrorOf(spec.Trigger, spec.NoOnError, p.Project, p.Pipeline.Settings.OnError, path),
@@ -368,7 +368,7 @@ func (m *Manager) Launch(p *Pending) (Run, error) {
 func (m *Manager) add(p *Pending) (Run, error) {
 	ctx, cancel := context.WithCancel(m.ctx)
 	id, run := p.id, p.run
-	run.Status, run.Started = StatusRunning, time.Now()
+	run.Status, run.StartedAt = StatusRunning, time.Now()
 	if p.env != nil {
 		run.Environment = p.env.Name
 	}
@@ -565,12 +565,12 @@ func (m *Manager) apply(id string, we workflow.Event, counts *pipeline.Counts, r
 	a := e.byID[we.ActionID]
 	switch we.Kind {
 	case workflow.RunStarted:
-		e.run.Started = we.Time
-		ev.Message = e.run.Workflow
+		e.run.StartedAt = we.Time
+		ev.Message = e.run.Name
 	case workflow.ActionStarted:
 		if a != nil {
 			t := we.Time
-			a.Status, a.Started, a.Finished, a.DurationMs, a.Error = StatusRunning, &t, nil, 0, ""
+			a.Status, a.StartedAt, a.FinishedAt, a.DurationMs, a.Error = StatusRunning, &t, nil, 0, ""
 			a.Runs++
 		}
 	case workflow.ActionWaiting:
@@ -580,7 +580,7 @@ func (m *Manager) apply(id string, we workflow.Event, counts *pipeline.Counts, r
 	case workflow.ActionFinished, workflow.ActionSkipped:
 		if a != nil {
 			t := we.Time
-			a.Finished = &t
+			a.FinishedAt = &t
 			a.Status, a.DurationMs, a.Error = we.Status, ev.DurationMs, ev.Error
 			if we.Kind == workflow.ActionSkipped {
 				a.Status = workflow.Skipped
@@ -611,9 +611,9 @@ func (m *Manager) apply(id string, we workflow.Event, counts *pipeline.Counts, r
 		}
 	case workflow.RunFinished:
 		t := we.Time
-		e.run.Status, e.run.Finished, e.run.DurationMs, e.run.Error = we.Status, &t, ev.DurationMs, ev.Error
+		e.run.Status, e.run.FinishedAt, e.run.DurationMs, e.run.Error = we.Status, &t, ev.DurationMs, ev.Error
 		e.run.Outputs, ev.Outputs = we.Outputs, we.Outputs
-		ev.Message = e.run.Workflow
+		ev.Message = e.run.Name
 	}
 	if e.history != HistoryNone {
 		m.publish(ev)

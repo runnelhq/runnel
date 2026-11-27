@@ -275,7 +275,7 @@ func putRun(ctx context.Context, tx *history.Tx, op recOp) error {
 		return err
 	}
 	h := history.Run{ID: op.run.ID, Path: op.run.Path, Kind: op.run.Kind, Trigger: op.run.Trigger, Status: string(op.run.Status),
-		Started: op.run.Started, Finished: op.run.Finished, Error: op.run.Error, FileHash: op.hash, Parent: op.run.Parent, Data: data}
+		Started: op.run.StartedAt, Finished: op.run.FinishedAt, Error: op.run.Error, FileHash: op.hash, Parent: op.run.Parent, Data: data}
 	if len(data) > history.MaxDataBytes {
 		// Outputs or parameters too large: keep the run without them, with a note.
 		small := op.run
@@ -344,7 +344,7 @@ func fromHistory(h history.Run) (Run, error) {
 	r.ID, r.Status, r.Error = h.ID, workflow.Status(h.Status), h.Error
 	if h.Finished != nil {
 		f := *h.Finished
-		r.Finished = &f
+		r.FinishedAt = &f
 		if r.DurationMs == 0 {
 			r.DurationMs = f.Sub(h.Started).Milliseconds()
 		}

@@ -6,7 +6,7 @@
     {
       "name": "CUSTOMER_ID",
       "description": "Customer number in the ERP",
-      "type": "integer",
+      "type": "int",
       "required": true
     },
     {
@@ -19,12 +19,27 @@
     },
     {
       "name": "LIMIT",
-      "type": "number",
+      "type": "float",
       "default": "2.5"
     },
     {
+      "name": "AMOUNT",
+      "type": "decimal",
+      "default": "12.50"
+    },
+    {
+      "name": "SINCE",
+      "type": "date",
+      "default": "2026-11-01"
+    },
+    {
+      "name": "AT",
+      "type": "datetime",
+      "default": "2026-11-01T06:00:00Z"
+    },
+    {
       "name": "DRY_RUN",
-      "type": "boolean",
+      "type": "bool",
       "default": "false"
     },
     {
@@ -34,7 +49,7 @@
     },
     {
       "name": "RETRIES",
-      "type": "integer",
+      "type": "int",
       "default": "${DEFAULT_RETRIES}",
       "enum": [
         "1",
@@ -51,7 +66,7 @@
     },
     {
       "name": "COUNT",
-      "type": "integer",
+      "type": "int",
       "value": "42"
     }
   ],

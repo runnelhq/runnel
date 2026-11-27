@@ -7,7 +7,7 @@ parameters:
   - name: CUSTOMER
     default: Grace
   - name: AMOUNT
-    type: number
+    type: decimal
     default: "42.50"
 outputs:
   - name: CLEANED
