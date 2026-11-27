@@ -1,0 +1,569 @@
+<!doctype html>
+<!--
+  Mockup E15f – Help for connection types in the editor: the reference of a connection type
+  (description, fields, what "Test connection" checks, errors, example) from the catalog
+  (connectionTypes[] with example, errors and test since E15e), shown like the help of
+  actions and transforms (E15c) as a wide panel on the right. It opens from the connection
+  form ("?" next to the type, F1), from "New → Connection" ("?" on a type card) and from the
+  help search (Ctrl+K), which now also finds connection types.
+  Builds on the approved mockups E15c (help panel), S39b (connection form, new connection)
+  and S52 (plugins). Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                     (default light)
+    state = open | sftp | ftp | plugin | new | search        (default open)
+    controls = 0                                        hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>connection help – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5; color: var(--foreground);
+         background: var(--background); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  code, .mono { font-family: var(--rn-font-mono); }
+  a { color: var(--primary); text-underline-offset: 2px; }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; position: relative; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 248px 1fr; min-height: 0; }
+  .body.wide { grid-template-columns: 248px 1fr 600px; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 3px 8px;
+                      border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); white-space: nowrap; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); color: var(--sidebar-foreground);
+          border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; height: 36px; padding: 0 16px; flex: none; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; flex: none; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .k { color: var(--muted-foreground); display: inline-flex; }
+  .row.selected .k { color: var(--accent-foreground); }
+  .row .tag { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); font-weight: 400; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); flex: none; }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); white-space: nowrap; }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; white-space: nowrap; }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+           font-size: var(--rn-text-2xs); font-weight: 600; background: var(--secondary); color: var(--secondary-foreground); white-space: nowrap; }
+  .badge.outline { background: transparent; border: 1px solid var(--border); color: var(--muted-foreground); font-weight: 500; }
+  .badge.plugin { background: var(--accent); color: var(--accent-foreground); }
+  .badge.warn { background: var(--warning-soft); color: var(--warning); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; white-space: nowrap; }
+  .btn.small { height: 24px; padding: 0 8px; font-size: var(--rn-text-2xs); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--muted-foreground); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn.hover { background: var(--accent); color: var(--accent-foreground); }
+  .btn.split { border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md); }
+  .btn.split + .btn { border-radius: 0 var(--rn-radius-md) var(--rn-radius-md) 0; margin-left: -1px; padding: 0 6px; }
+  .btn svg.i { width: 13px; height: 13px; }
+  .btn kbd, kbd { font: 10px var(--rn-font-mono); }
+  .btn kbd { opacity: .75; }
+  .icon-btn { display: inline-grid; place-items: center; width: 26px; height: 26px; border: 1px solid transparent; border-radius: var(--rn-radius-md);
+              background: transparent; color: var(--muted-foreground); }
+  .icon-btn.hover { background: var(--accent); color: var(--accent-foreground); border-color: var(--border); }
+  .icon-btn.focus { outline: 2px solid var(--ring); outline-offset: 1px; color: var(--foreground); }
+  .qmark { font: 600 12px/1 var(--rn-font-sans); }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  footer .ok { color: var(--success); }
+  .tooltip { position: absolute; z-index: 5; max-width: 320px; padding: 7px 10px; border-radius: var(--rn-radius-md); background: var(--popover);
+             color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); line-height: 1.45; }
+  .tooltip small { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .tooltip kbd { padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
+
+  /* Connection form (S39b) */
+  .formwrap { flex: 1; overflow: auto; background: var(--background); }
+  .form { max-width: 680px; margin: 0 auto; padding: 16px 28px 40px; }
+  .conn-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .tile { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-netzwerk); color: var(--rn-tiefe-0); flex: none; }
+  .tile.db { background: var(--rn-kategorie-datenbank); }
+  .tile.gen { background: var(--rn-kategorie-allgemein); }
+  .conn-head .tile { width: 36px; height: 36px; }
+  .conn-head .tile svg.i { width: 20px; height: 20px; }
+  .conn-head h2 { margin: 0; font-size: var(--rn-text-lg); font-weight: 600; }
+  .conn-head .sub { display: flex; align-items: center; gap: 4px; font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .conn-head .sub .icon-btn { width: 20px; height: 20px; border-radius: 50%; border-color: var(--border); }
+  .lead { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 12px 48px; }
+  .sec { border-top: 1px solid var(--border); padding: 10px 0 4px; }
+  .sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; font-size: var(--rn-text-sm); font-weight: 600; }
+  .sec.closed h3 { color: var(--muted-foreground); font-weight: 500; margin-bottom: 4px; }
+  .sec h3 .count { font-weight: 400; margin-left: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 110px; gap: 0 14px; }
+  .fld { margin-bottom: 10px; position: relative; }
+  .fld .lab { display: flex; align-items: baseline; gap: 6px; font-size: var(--rn-text-xs); font-weight: 500; margin-bottom: 4px; }
+  .fld .lab .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .fld .lab .req { color: var(--destructive); font-weight: 700; }
+  .inp { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border: 1px solid var(--input); border-radius: var(--rn-radius-md);
+         background: var(--background); font-size: var(--rn-text-xs); min-width: 0; overflow: hidden; white-space: nowrap; }
+  .inp.mono { font-family: var(--rn-font-mono); }
+  .inp.ph { color: var(--muted-foreground); }
+  .inp.warn { border-color: var(--warning); }
+  .help { font-size: var(--rn-text-2xs); color: var(--muted-foreground); margin-top: 3px; }
+  .note { display: flex; gap: 6px; align-items: flex-start; font-size: var(--rn-text-2xs); margin-top: 4px; padding: 5px 8px; border-radius: var(--rn-radius-sm); }
+  .note.warn { background: var(--warning-soft); color: var(--warning); }
+  .note.warn b { color: var(--foreground); font-weight: 600; }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--rn-text-xs); }
+  .box { width: 14px; height: 14px; border: 1px solid var(--input); border-radius: 3px; display: inline-grid; place-items: center; background: var(--background); }
+  .box.on { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .box svg.i { width: 11px; height: 11px; stroke-width: 2.4; }
+  .secret { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 3px 4px 3px 9px; border: 1px solid var(--input);
+            border-radius: var(--rn-radius-md); background: var(--muted); font-size: var(--rn-text-xs); }
+  .secret .ref { font-family: var(--rn-font-mono); color: var(--expression); }
+  .secret .ref i { font-style: normal; color: var(--muted-foreground); }
+  .secret .envs { display: inline-flex; gap: 4px; margin-left: auto; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: var(--rn-radius-full);
+          font-size: 10px; font-weight: 600; background: var(--success-soft); color: var(--success); white-space: nowrap; }
+  .result { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border-radius: var(--rn-radius-md); font-size: var(--rn-text-xs); }
+  .result.ok { background: var(--success-soft); }
+  .result.ok .sym { color: var(--success); font-weight: 700; }
+  .result.fail { background: var(--danger-soft); }
+  .result.fail .sym { color: var(--destructive); font-weight: 700; }
+  .result .t { font-weight: 600; }
+  .result .m { color: var(--muted-foreground); font-size: var(--rn-text-2xs); margin-top: 2px; }
+  .result ul { margin: 6px 0 0; padding-left: 16px; }
+  .result .fp { font-family: var(--rn-font-mono); background: var(--background); border-radius: var(--rn-radius-sm); padding: 1px 5px; }
+
+  /* Help panel (E15c), here for a connection type */
+  .side { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--background); position: relative; }
+  .side[hidden] { display: none; }
+  .side .panel-title { gap: 6px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border); }
+  .search { display: flex; align-items: center; gap: 6px; height: 26px; width: 240px; margin-left: auto; padding: 0 8px; border: 1px solid var(--input);
+            border-radius: var(--rn-radius-md); background: var(--background); color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .search.focus { border-color: var(--ring); outline: 3px solid color-mix(in srgb, var(--ring) 22%, transparent); color: var(--foreground); }
+  .search kbd { margin-left: auto; padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted-foreground); }
+  .caret { display: inline-block; width: 1px; height: 14px; background: var(--foreground); }
+  .scroll { overflow: auto; flex: 1; min-height: 0; }
+  .hhead { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 16px 20px 8px; }
+  .hhead .tile { width: 40px; height: 40px; border-radius: var(--rn-radius-lg); }
+  .hhead .tile svg.i { width: 22px; height: 22px; }
+  .hhead h2 { margin: 0; font-size: var(--rn-text-lg); font-weight: 600; line-height: 1.2; }
+  .hhead .t { font: var(--rn-text-xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 10px; }
+  .hdesc { margin: 0 20px 12px; font-size: var(--rn-text-sm); }
+  .caution { display: flex; gap: 8px; margin: 0 20px 12px; padding: 9px 12px; border-radius: var(--rn-radius-md); background: var(--warning-soft);
+             font-size: var(--rn-text-xs); line-height: 1.5; }
+  .caution .sym { color: var(--warning); font-weight: 700; }
+  .caution b { font-weight: 600; }
+  .jump { position: sticky; top: 0; z-index: 2; display: flex; gap: 4px; padding: 6px 16px; background: var(--background); border-bottom: 1px solid var(--border); }
+  .jump a { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: var(--rn-radius-sm);
+            font-size: var(--rn-text-xs); color: var(--muted-foreground); text-decoration: none; }
+  .jump a.on { background: var(--muted); color: var(--foreground); font-weight: 500; }
+  .jump a .n { font-size: 10px; color: var(--muted-foreground); }
+  .jump .compact { display: none; align-items: center; gap: 6px; margin-right: 8px; font-weight: 600; font-size: var(--rn-text-xs); }
+  .jump .compact .tile { width: 18px; height: 18px; border-radius: var(--rn-radius-sm); }
+  .jump .compact .tile svg.i { width: 11px; height: 11px; }
+  .jump.stuck .compact { display: inline-flex; }
+  .hs { padding: 14px 20px 4px; }
+  .hs h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: var(--rn-text-sm); font-weight: 600; }
+  .hs h3 small { font-weight: 400; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .hs h3 small .mono { font-size: var(--rn-text-2xs); }
+  .hs p { margin: 0 0 8px; font-size: var(--rn-text-xs); line-height: 1.55; }
+  .testbox { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); font-size: var(--rn-text-xs); line-height: 1.55; }
+  .testbox .sym { color: var(--muted-foreground); display: inline-flex; padding-top: 2px; }
+  .testbox .acts { margin-left: auto; }
+  .ref { width: 100%; border-collapse: collapse; font-size: var(--rn-text-xs); }
+  .ref th { text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground);
+            padding: 4px 8px 5px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .ref td { vertical-align: top; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--border); line-height: 1.45; }
+  .ref tr.grp td { padding: 8px 0 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); }
+  .ref .n { font: 500 var(--rn-text-xs) var(--rn-font-mono); white-space: nowrap; }
+  .ref .n .req { color: var(--destructive); font-weight: 700; }
+  .ref .n small { display: block; font: 10px var(--rn-font-sans); color: var(--muted-foreground); margin-top: 1px; }
+  .ref .ty { font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); white-space: nowrap; }
+  .ref .ty .lk { display: inline-flex; vertical-align: -2px; }
+  .ref .df { font: var(--rn-text-2xs) var(--rn-font-mono); white-space: nowrap; }
+  .ref .df .none { color: var(--muted-foreground); font-family: var(--rn-font-sans); }
+  .ref .d .eg { margin-top: 2px; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+  .ref .d .eg .mono { font-size: var(--rn-text-2xs); color: var(--foreground); }
+  .ref tr.hl td { background: var(--muted); }
+  .legend { margin: 6px 0 0; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .legend .req { color: var(--destructive); font-weight: 700; }
+  .ex { margin: 0 0 8px; padding: 10px 12px; border-radius: var(--rn-radius-md); background: var(--muted); font: var(--rn-text-xs)/1.6 var(--rn-font-mono); white-space: pre; }
+  .ex .k { font-weight: 500; }
+  .ex .s { color: var(--muted-foreground); }
+  .ex .x { color: var(--expression); background: var(--expression-soft); border-radius: 3px; }
+  .acts { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .acts small { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .acts small .mono { font-size: var(--rn-text-2xs); }
+  .missing { display: flex; gap: 10px; margin: 6px 20px 8px; padding: 10px 12px; border-radius: var(--rn-radius-md); background: var(--muted);
+             font-size: var(--rn-text-xs); color: var(--muted-foreground); line-height: 1.5; }
+  .missing .sym { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font-weight: 700; font-size: 11px; }
+  .missing b { color: var(--foreground); font-weight: 600; }
+
+  /* Search results (E15d2), now with connection types */
+  .results { position: absolute; top: 34px; right: 8px; z-index: 6; width: 380px; padding: 4px; border: 1px solid var(--border); border-radius: var(--rn-radius-md);
+             background: var(--popover); color: var(--popover-foreground); box-shadow: var(--rn-shadow-md); }
+  .results .mh { display: flex; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); padding: 6px 8px 2px; }
+  .results .mh span { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .results .r { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: var(--rn-radius-md); }
+  .results .r.hl { background: var(--accent); color: var(--accent-foreground); }
+  .results .r .tile { width: 22px; height: 22px; border-radius: var(--rn-radius-sm); }
+  .results .r .tile svg.i { width: 13px; height: 13px; }
+  .results .r .t { flex: 1; min-width: 0; line-height: 1.2; font-size: var(--rn-text-xs); }
+  .results .r .t small { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .results .r .t b { background: color-mix(in srgb, var(--ring) 22%, transparent); font-weight: inherit; border-radius: 2px; }
+  .results .r .kd { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .results .sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .results .more { font-size: var(--rn-text-2xs); color: var(--muted-foreground); padding: 4px 8px 2px; }
+
+  /* New connection (S39b), with short description and test */
+  .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--rn-tiefe-950) 40%, transparent); display: grid; place-items: center; z-index: 10; }
+  .dialog { width: 780px; background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--rn-radius-lg);
+            box-shadow: var(--rn-shadow-lg); padding: 18px 20px 16px; }
+  .dialog h2 { margin: 0 0 4px; font-size: var(--rn-text-md); font-weight: 600; }
+  .dialog .intro { font-size: var(--rn-text-xs); color: var(--muted-foreground); margin: 0 0 14px; }
+  .dialog .foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .dialog .foot small { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .type { position: relative; display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--background); min-height: 76px; }
+  .type.sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .type b { display: block; font-size: var(--rn-text-xs); padding-right: 22px; }
+  .type .dsc { font-size: 10px; color: var(--muted-foreground); line-height: 1.35; display: block; }
+  .type .meta { display: flex; gap: 8px; margin-top: 4px; font-size: 10px; color: var(--muted-foreground); }
+  .type .meta span { display: inline-flex; align-items: center; gap: 3px; }
+  .type .meta svg.i { width: 11px; height: 11px; }
+  .type .meta .w { color: var(--warning); font-weight: 600; }
+  .type .q { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; }
+  .chosen { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; padding: 9px 11px; border-radius: var(--rn-radius-md); background: var(--muted); font-size: var(--rn-text-2xs); line-height: 1.5; }
+  .chosen .sym { color: var(--muted-foreground); display: inline-flex; padding-top: 1px; }
+  .chosen b { font-weight: 600; }
+  .chosen .btn { margin-left: auto; }
+  .fldname { display: flex; align-items: center; height: 30px; padding: 0 9px; border: 1px solid var(--ring); outline: 3px solid color-mix(in srgb, var(--ring) 22%, transparent);
+             border-radius: var(--rn-radius-md); font: var(--rn-text-xs) var(--rn-font-mono); margin-bottom: 3px; }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px; font: 12px/1 var(--rn-font-mono);
+                   background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E15f</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="open" href="#">open</a> <a data-state="sftp" href="#">sftp</a> <a data-state="ftp" href="#">ftp</a>
+  <a data-state="plugin" href="#">plugin</a> <a data-state="new" href="#">new</a> <a data-state="search" href="#">search</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>orders</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\orders</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body" id="body">
+    <aside>
+      <div class="panel-title"><span class="label">Explorer</span></div>
+      <ul class="tree" id="tree"></ul>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div style="display:flex;flex:1;min-height:0" id="view"></div>
+    </main>
+    <section class="side" id="side" hidden></section>
+  </div>
+  <footer><span class="ok">● Connected</span><span class="mono">127.0.0.1:7300</span><span id="foot"></span><span class="spacer"></span><span>Runnel v0.1.0</span></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "open";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  // Signs of the connection types as in the editor (S39b, Icons.tsx); plugins get the plug.
+  const C = {
+    db: '<ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/>',
+    sqlite: '<path d="M6 3h8l4 4v14H6zM14 3v4h4"/><ellipse cx="12" cy="12" rx="3.5" ry="1.4"/><path d="M8.5 12v4c0 .8 1.6 1.4 3.5 1.4s3.5-.6 3.5-1.4v-4"/>',
+    http: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+    smtp: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+    srv: '<path d="M4 4h16v6H4zM4 14h16v6H4zM7.5 7h.01M7.5 17h.01M12 10v4"/>',
+    plug: '<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0zM12 17v4"/>',
+  };
+  const I = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    env: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    code: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
+    form: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+    check: '<path d="M5 12l5 5 9-10"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    upload: '<path d="M12 16V4M7 9l5-5 5 5M5 20h14"/>',
+    download: '<path d="M12 4v12M7 11l5 5 5-5M5 20h14"/>',
+    list: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    newfile: '<path d="M13 21H6V3h8l4 4v5M14 3v4h4M18 15v6M15 18h6"/>',
+  };
+  const tile = (k, cls = "", size) => `<span class="tile ${cls}">${icon(C[k], size)}</span>`;
+  const qBtn = (cls = "", label = "Help") => `<button class="icon-btn ${cls}" aria-label="${label}" title="${label} (F1)"><span class="qmark">?</span></button>`;
+
+  // ---------- Reference content from the catalog (runnel catalog --json, connectionTypes[], E15e) ----------
+  const T = {
+    sftp: {
+      label: "SFTP", icon: "srv", cls: "",
+      description: "A server for file transfer over SSH",
+      fields: [
+        ["Server", [{ n: "host", req: 1, ty: "string", d: "Name or address of the server", eg: "sftp.example.com" },
+                    { n: "port", ty: "string", d: "TCP port; empty: 22", eg: "22" }]],
+        ["Security", [{ n: "hostKey", ty: "string", hl: 1, d: "Fingerprint of the host key as <span class=mono>ssh-keygen -l</span> shows it, e.g. SHA256:…; several separated by spaces. Without it Runnel does not connect and names the fingerprint of the server to check", eg: "SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg" }]],
+        ["Sign-in", [{ n: "user", req: 1, ty: "string", d: "User name for the sign-in", eg: "runnel" },
+                     { n: "password", ty: "secret", d: "Password of the user; use ${secret:NAME}" },
+                     { n: "privateKey", ty: "secret", d: "Private key in PEM format (OpenSSH, PKCS#1 or PKCS#8), instead of or together with password; use ${secret:NAME}" },
+                     { n: "passphrase", ty: "secret", d: "Passphrase of a protected privateKey; use ${secret:NAME}" }]],
+        ["More", [{ n: "timeout", ty: "duration", df: "15s", d: "Longest time to connect and sign in" }]],
+      ],
+      test: "Connects, checks the host key against <span class=mono>hostKey</span>, signs in and lists the start folder; without <span class=mono>hostKey</span> it names the fingerprint of the server. Nothing is written.",
+      errors: "Fails without <span class=mono>hostKey</span>, naming the fingerprint of the server to check with its administrator, and when the host key does not match <span class=mono>hostKey</span>; Runnel never trusts a host key on first use. Also fails when the server does not answer within <span class=mono>timeout</span>, the sign-in is refused (user, password or key), neither <span class=mono>password</span> nor <span class=mono>privateKey</span> is set, <span class=mono>privateKey</span> is no PEM key or needs <span class=mono>passphrase</span>, or the server offers no SFTP.",
+      example: [["kind", "Connection"], ["apiVersion", "runnel/v1"], ["name", "partner-sftp"], ["description", "SFTP server of the partner"], ["type", "sftp"], ["with", ""],
+        ["  host", "sftp.example.com"], ["  hostKey", "SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg"], ["  user", "runnel"], ["  privateKey", "${secret:partner-sftp-key}"]],
+    },
+    ftp: {
+      label: "FTP", icon: "srv", cls: "",
+      description: "A server for file transfer over FTP without encryption; only with <span class=mono>insecure: true</span>",
+      fields: [
+        ["Server", [{ n: "host", req: 1, ty: "string", d: "Name or address of the server", eg: "ftp.example.com" },
+                    { n: "port", ty: "string", d: "TCP port; empty: 21", eg: "21" }]],
+        ["Security", [{ n: "insecure", ty: "boolean", df: "false", hl: 1, d: "Required: FTP sends the password and all data unencrypted; set it only for a server without TLS in a trusted network. <span class=mono>validate</span> warns" }]],
+        ["Sign-in", [{ n: "user", req: 1, ty: "string", d: "User name for the sign-in", eg: "runnel" },
+                     { n: "password", ty: "secret", d: "Password of the user; use ${secret:NAME}" }]],
+        ["More", [{ n: "timeout", ty: "duration", df: "15s", d: "Longest time to connect and sign in" }]],
+      ],
+      test: "Connects without encryption (only with <span class=mono>insecure: true</span>), signs in and lists the start folder. Nothing is written.",
+      errors: "Fails without <span class=mono>insecure: true</span> (use ftps if the server offers TLS), and when the server does not answer within <span class=mono>timeout</span> or refuses the sign-in (user or password).",
+      example: [["kind", "Connection"], ["apiVersion", "runnel/v1"], ["name", "legacy-ftp"], ["description", "Old FTP server in the plant network"], ["type", "ftp"], ["with", ""],
+        ["  host", "ftp.plant.local"], ["  insecure", "true"], ["  user", "runnel"], ["  password", "${secret:legacy-ftp-password}"]],
+    },
+    iban: {
+      label: "IBAN service", icon: "plug", cls: "gen", plugin: "iban 1.2.0",
+      description: "Account of the IBAN service",
+      fields: [["", [{ n: "url", req: 1, ty: "string", d: "Base address of the service" },
+                     { n: "apiKey", ty: "secret", d: "API key of the account" }]]],
+      test: "Asks the plugin to check the connection (<span class=mono>connection.test</span>); what it checks depends on the plugin.",
+    },
+  };
+
+  function fieldRows(groups) {
+    return groups.map(([g, fs]) => (g ? `<tr class="grp"><td colspan="4">${g}</td></tr>` : "") + fs.map(f => {
+      const ty = f.ty === "secret" ? `<span class="lk">${icon(I.lock, 12)}</span> secret` : f.ty;
+      return `<tr class="${f.hl ? "hl" : ""}"><td class="n">${f.n}${f.req ? '<span class="req" title="Required">*</span><small>required</small>' : ""}</td>
+        <td class="ty">${ty}</td><td class="df">${f.df ? esc(f.df) : '<span class="none">–</span>'}</td>
+        <td class="d">${f.d}${f.eg ? `<div class="eg">e.g. <span class="mono">${esc(f.eg)}</span></div>` : ""}</td></tr>`;
+    }).join("")).join("");
+  }
+  const exampleHtml = (ex) => ex.map(([k, v]) => {
+    const val = v.startsWith("${") ? `<span class="x">${esc(v)}</span>` : v === "" ? "" : `<span class="s">${esc(v)}</span>`;
+    return `<span class="k">${k}:</span>${v === "" ? "" : " "}${val}`;
+  }).join("\n");
+
+  function helpPanel(type, o = {}) {
+    const t = T[type];
+    const nFields = t.fields.reduce((n, [, fs]) => n + fs.length, 0);
+    const sections = [["Fields", nFields], ["Test connection"]];
+    if (t.errors) sections.push(["Errors"]);
+    if (t.example) sections.push(["Example"]);
+    const badges = [`<span class="badge">Connection type</span>`];
+    badges.push(t.plugin ? `<span class="badge plugin">${icon(C.plug, 12)}Plugin ${t.plugin}</span>` : `<span class="badge outline">Built-in · v0.1.0</span>`);
+    badges.push(`<span class="badge outline" title="Test connection checks connections of this type">${icon(C.plug, 12)}Test connection</span>`);
+    let html = `<div class="hhead">${tile(t.icon, t.cls, 22)}<div><h2>${t.label}</h2><div class="t">${type}</div></div><span></span></div>
+      <div class="badges">${badges.join("")}</div>
+      <p class="hdesc">${t.description}</p>
+      ${t.caution ? `<div class="caution"><span class="sym">⚠</span><span>${t.caution}</span></div>` : ""}
+      <nav class="jump ${o.stuck ? "stuck" : ""}"><span class="compact">${tile(t.icon, t.cls)}${t.label}</span>${sections.map(([s, n], i) =>
+        `<a href="#" class="${i === (o.on || 0) ? "on" : ""}">${s}${n ? `<span class="n">${n}</span>` : ""}</a>`).join("")}</nav>`;
+    html += `<div class="hs"><h3>Fields <small>under <span class="mono">with:</span>, in the groups of the form</small></h3>
+      <table class="ref"><thead><tr><th style="width:120px">Name</th><th style="width:78px">Type</th><th style="width:60px">Default</th><th>Description</th></tr></thead>
+      <tbody>${fieldRows(t.fields)}</tbody></table>
+      <p class="legend"><span class="req">*</span> required · ${icon(I.lock, 11)} secret: takes <span class="mono">\${secret:NAME}</span>, the form shows only the reference</p></div>`;
+    html += `<div class="hs"><h3>Test connection <small>with the button in the file bar, for the chosen environment</small></h3>
+      <div class="testbox"><span class="sym">${icon(C.plug, 15)}</span><span>${t.test}</span></div></div>`;
+    if (!t.errors) {
+      html += `<div class="missing"><span class="sym">i</span><div><b>No more details from the plugin.</b> The plugin <span class="mono">iban</span> describes the fields of its
+        connection type and offers a test, but no errors or example. Its documentation, or the message of Test connection, shows more.</div></div>`;
+      return html;
+    }
+    html += `<div class="hs"><h3>Errors <small>when connecting and signing in fail</small></h3><p>${t.errors}</p></div>`;
+    html += `<div class="hs"><h3>Example <small><span class="mono">connections/&lt;name&gt;.yaml</span></small></h3><div class="ex">${exampleHtml(t.example)}</div>
+      <div class="acts"><button class="btn small">${icon(I.copy, 12)}Copy example</button>
+      <small>Also in the terminal: <span class="mono">runnel catalog ${type}</span></small></div></div>`;
+    return html;
+  }
+
+  // ---------- Which file is open ----------
+  const files = { open: "partner-sftp.yaml", sftp: "partner-sftp.yaml", search: "partner-sftp.yaml", ftp: "legacy-ftp.yaml", plugin: "bank.yaml", new: "partner-sftp.yaml" };
+  const openFile = files[state];
+  const rows = [["folder", "connections", 0, "5"], ["db", "erp-sql.yaml", 1, "sqlserver"], ["plug", "bank.yaml", 1, "iban"], ["srv", "legacy-ftp.yaml", 1, "ftp"],
+    ["srv", "partner-sftp.yaml", 1, "sftp"], ["smtp", "mail.yaml", 1, "smtp"],
+    ["folder", "environments", 0, "2"], ["env", "dev.yaml", 1], ["env", "prod.yaml", 1],
+    ["folder", "workflows", 0, "2"], ["wf", "import.workflow.yaml", 1], ["wf", "upload.workflow.yaml", 1], ["proj", "project.yaml", 0]];
+  document.getElementById("tree").innerHTML = rows.map(([k, n, d, t]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === openFile ? "selected" : ""}">${k === "folder" ? chev : '<span style="width:12px"></span>'}` +
+    `<span class="k">${icon(C[k] || I[k])}</span>${n}${t ? `<span class="tag">${t}</span>` : ""}</div></li>`).join("");
+
+  const typeOf = { "partner-sftp.yaml": "sftp", "legacy-ftp.yaml": "ftp", "bank.yaml": "iban" };
+  const ctype = typeOf[openFile];
+  document.getElementById("tabs").innerHTML = `<div class="tab active">${icon(C[T[ctype].icon])} ${openFile} ×</div>`;
+    const narrow = ["sftp", "ftp", "plugin", "search"].includes(state); // the help takes 600 px: the file bar keeps the name, not the folder and badge
+  document.getElementById("filebar").innerHTML = `<span class="crumbs" style="flex:none">${narrow ? "" : "connections / "}<b>${openFile}</b></span>${narrow ? "" : '<span class="badge">Connection</span>'}<div class="spacer"></div>
+    <span style="display:inline-flex"><button class="btn split ${state === "open" ? "hover" : ""}">${icon(C.plug, 13)}Test connection</button><button class="btn" aria-label="Environment">prod ${icon(I.down, 12)}</button></span>
+    <button class="btn" style="opacity:.5">Save <kbd>Ctrl+S</kbd></button>
+    <div class="segmented"><button aria-pressed="true">${icon(I.form, 14)}Form</button><button>${icon(I.code, 14)}YAML</button></div>`;
+  document.getElementById("foot").textContent = `Connection · ${ctype}`;
+
+  // ---------- The connection form (S39b) with "?" next to the type ----------
+  const fld = (label, key, inner, o = {}) => `<div class="fld"><div class="lab">${label}${o.req ? '<span class="req">*</span>' : ""}<span class="key">${key}</span></div>${inner}${o.help ? `<div class="help">${o.help}</div>` : ""}${o.after || ""}</div>`;
+  const inp = (v, o = {}) => `<div class="inp ${o.mono ? "mono" : ""} ${o.ph ? "ph" : ""} ${o.cls || ""}">${v}</div>`;
+  const secret = (ref) => `<div class="secret">${icon(I.lock, 14)}<span class="ref"><i>\${secret:</i>${ref}<i>}</i></span><span class="envs"><span class="pill">● dev <span style="font-weight:400">local</span></span><span class="pill">● prod <span style="font-weight:400">local</span></span></span><button class="btn small">Change…</button></div>`;
+  const head = (name, t, desc, qcls) => `<div class="conn-head">${tile(T[t].icon, T[t].cls)}<div><h2>${name}</h2>
+      <div class="sub">${T[t].label} <span class="mono">· ${t}</span> ${qBtn(qcls, `Help for ${T[t].label}`)}</div></div></div>
+      <p class="lead">${desc} <span class="mono" style="font-size:10px">description</span></p>`;
+  let form;
+  if (ctype === "sftp") {
+    const noKey = state === "sftp";
+    const result = noKey
+      ? `<div class="result fail"><span class="sym">✖</span><div><div class="t">Host key not checked: hostKey is empty</div>
+          <div class="m">Environment prod · sftp.partner.example:22 · 0.4 s</div>
+          <ul><li>The server shows <span class="fp">SHA256:p7Qm2x0Lk8vR4nTzYwA1dE6sGhJ9uC3bF5oN2iKqXlM</span>. Check it with the administrator of the server, then enter it in <span class="mono">hostKey</span>.</li>
+          <li>Runnel never trusts a host key on first use; nothing was signed in or read.</li></ul></div></div>`
+      : `<div class="result ok"><span class="sym">✔</span><div><div class="t">Connected in 412 ms</div><div class="m">Environment dev · OpenSSH_9.6 · start folder listed · checked 5 min ago</div></div></div>`;
+    form = head("partner-sftp", "sftp", "SFTP server of the partner", state === "open" ? "focus" : "") + result + `
+      <div class="sec"><h3>${chev}Server</h3><div class="grid2">${fld("Host", "host", inp("sftp.partner.example", { mono: 1 }), { req: 1 })}${fld("Port", "port", inp("22 (default)", { ph: 1 }))}</div></div>
+      <div class="sec"><h3>${chev}Security</h3>${fld("Host key", "hostKey", noKey ? inp("Fingerprint, e.g. SHA256:…", { ph: 1, cls: "warn" }) : inp("SHA256:p7Qm2x0Lk8vR4nTzYwA1dE6sGhJ9uC3bF5oN2iKqXlM", { mono: 1 }),
+        noKey ? { after: `<div class="note warn"><span>⚠</span><span><b>Required to connect.</b> Test connection names the fingerprint of the server; compare it with the one the administrator gives you.</span></div>` }
+              : { help: "Checked on every connect; Runnel never trusts a host key on first use" })}</div>
+      <div class="sec"><h3>${chev}Sign-in</h3>${fld("User", "user", inp("runnel", { mono: 1 }), { req: 1 })}${fld("Private key", "privateKey", secret("partner-sftp-key"))}</div>
+      <div class="sec closed"><h3>${chevRight}More<span class="count">password, passphrase, timeout</span></h3></div>`;
+  } else if (ctype === "ftp") {
+    form = head("legacy-ftp", "ftp", "Old FTP server in the plant network", "") + `
+      <div class="sec"><h3>${chev}Server</h3><div class="grid2">${fld("Host", "host", inp("ftp.plant.local", { mono: 1 }), { req: 1 })}${fld("Port", "port", inp("21 (default)", { ph: 1 }))}</div></div>
+      <div class="sec"><h3>${chev}Security</h3><div class="fld"><span class="check"><span class="box on">${icon(I.check)}</span>Connect without encryption <span class="mono" style="color:var(--muted-foreground);font-size:10px">insecure</span></span></div></div>
+      <div class="sec"><h3>${chev}Sign-in</h3>${fld("User", "user", inp("runnel", { mono: 1 }), { req: 1 })}${fld("Password", "password", secret("legacy-ftp-password"))}</div>
+      <div class="sec closed"><h3>${chevRight}More<span class="count">timeout</span></h3></div>`;
+  } else {
+    form = head("bank", "iban", "Account of the IBAN service", "") + `
+      <div class="sec"><h3>${chev}Connection</h3>${fld("url", "url", inp("https://api.iban-service.example/v2", { mono: 1 }), { req: 1 })}${fld("apiKey", "apiKey", secret("iban-api-key"))}</div>`;
+  }
+  document.getElementById("view").innerHTML = `<div class="formwrap"><div class="form">${form}</div></div>`;
+
+  // ---------- Right panel: help ----------
+  const helpOpen = ["sftp", "ftp", "plugin", "search"].includes(state);
+  const side = document.getElementById("side");
+  if (helpOpen) {
+    document.getElementById("body").classList.add("wide");
+    side.hidden = false;
+    const searching = state === "search";
+    const type = state === "plugin" ? "iban" : state === "ftp" ? "ftp" : "sftp";
+    side.innerHTML = `<div class="panel-title"><span class="label">Help</span>
+        <div class="search ${searching ? "focus" : ""}">${icon(I.search, 14)}${searching ? '<span>ftp</span><span class="caret"></span>' : "Search help"}<kbd>Ctrl+K</kbd></div>
+        <button class="icon-btn" aria-label="Close help">${icon(I.close, 14)}</button></div>
+      <div class="scroll" id="hscroll">${helpPanel(type, state === "sftp" ? { stuck: true, on: 1 } : {})}<div style="height:16px"></div></div>`;
+    if (state === "sftp") {
+      // Scrolled to "Test connection": the bar with the sections stays at the top and names the type.
+      const sc = document.getElementById("hscroll");
+      const target = [...sc.querySelectorAll(".hs h3")].find(h => h.textContent.startsWith("Test connection"));
+      sc.scrollTop = target.parentElement.offsetTop - 44;
+    }
+    if (searching) {
+      const r = (k, cls, label, ty, kind, hl) => `<div class="r ${hl ? "hl" : ""}">${tile(k, cls)}<span class="t">${label}<small>${ty}</small></span><span class="kd">${kind}</span></div>`;
+      const net = (d, label, ty) => `<div class="r"><span class="tile">${icon(d)}</span><span class="t">${label}<small>${ty}</small></span><span class="kd">Action</span></div>`;
+      side.insertAdjacentHTML("beforeend", `<div class="results" role="listbox" aria-label="Help">
+        <div class="mh">Connection types<span>3</span></div>
+        ${r("srv", "", "<b>FTP</b>", "<b>ftp</b>", "Connection", true)}${r("srv", "", "<b>FTP</b>S", "<b>ftp</b>s", "Connection")}${r("srv", "", "S<b>FTP</b>", "s<b>ftp</b>", "Connection")}
+        <div class="sep"></div>
+        <div class="mh">Actions and transforms<span>8</span></div>
+        ${net(I.download, "Download Files", "transfer.download")}${net(I.upload, "Upload Files", "transfer.upload")}${net(I.list, "List Files on Server", "transfer.list")}
+        <div class="more">5 more · Found in the description: “(SFTP, FTPS or <b>FTP</b>)”</div></div>`);
+    }
+  }
+
+  // ---------- open: the ways to the help ----------
+  const app = document.getElementById("app");
+  if (state === "open") {
+    // Positions relative to the app (below the control bar, if shown).
+    const top0 = app.getBoundingClientRect().top;
+    const tb = document.querySelector(".btn.split").getBoundingClientRect();
+    app.insertAdjacentHTML("beforeend", `<div class="tooltip" style="left:${tb.left - 120}px;top:${tb.bottom - top0 + 6}px;max-width:340px">
+      <b>Test connection</b> with the environment prod: connects, checks the host key against <span class="mono">hostKey</span>, signs in and lists the start folder.
+      Nothing is written.<small><b>?</b> next to the type or <kbd>F1</kbd> for the help of SFTP</small></div>`);
+    const rc = document.querySelector(".conn-head .icon-btn").getBoundingClientRect();
+    app.insertAdjacentHTML("beforeend", `<div class="tooltip" style="left:${rc.left - 20}px;top:${rc.top - top0 - 38}px;white-space:nowrap">Help for SFTP <kbd>F1</kbd></div>`);
+  }
+
+  // ---------- new: New → Connection with description and test ----------
+  if (state === "new") {
+    const types = [["db", "db", "SQL Server", "sqlserver", "A Microsoft SQL Server database, with a user or with the Windows account Runnel runs as"],
+      ["db", "db", "PostgreSQL", "postgres", "A PostgreSQL database"], ["sqlite", "db", "SQLite", "sqlite", "A database in a single file, e.g. for local data and tests"],
+      ["http", "", "HTTP API", "http", "An HTTP API with its base address and sign-in, e.g. a REST API"], ["smtp", "", "SMTP", "smtp", "A mail server for sending mails"],
+      ["srv", "", "SFTP", "sftp", "A server for file transfer over SSH"], ["srv", "", "FTPS", "ftps", "A server for file transfer over FTP with TLS"],
+      ["srv", "", "FTP", "ftp", "A server for file transfer over FTP without encryption; only with insecure: true", ""],
+      ["plug", "gen", "IBAN service", "iban", "Account of the IBAN service", "", "iban 1.2.0"],
+      ["plug", "gen", "Archive", "dms", "Document archive of the DMS", "", "dms 0.4.0", true]];
+    const card = ([k, cls, label, ty, d, warn, plugin, noTest]) => `<div class="type ${ty === "sftp" ? "sel" : ""}">${tile(k, cls)}<div style="min-width:0"><b>${label}</b><span class="dsc">${d}</span>
+      <div class="meta">${noTest ? "<span>No test</span>" : `<span>${icon(C.plug)}Test</span>`}${plugin ? `<span>${icon(C.plug)}Plugin ${plugin}</span>` : ""}${warn ? `<span class="w">⚠ ${warn}</span>` : ""}</div></div>
+      ${ty === "sftp" ? `<span class="q">${qBtn("focus", "Help for SFTP")}</span>` : ""}</div>`;
+    app.insertAdjacentHTML("beforeend", `<div class="scrim"><div class="dialog" role="dialog" aria-label="New connection">
+      <h2>New connection</h2><p class="intro">A connection holds the address and sign-in of a system in one place; workflows name it with <span class="mono">connection:</span>.</p>
+      <div class="fld"><div class="lab">Name<span class="key">name</span></div><div class="fldname">partner-sftp<span class="caret"></span></div><div class="help">Creates <span class="mono">connections/partner-sftp.yaml</span></div></div>
+      <div class="lab" style="font-size:var(--rn-text-xs);font-weight:500;margin:4px 0">Type</div>
+      <div class="types">${types.map(card).join("")}</div>
+      <div class="chosen"><span class="sym">${icon(C.plug, 14)}</span><span><b>Test connection for SFTP:</b> connects, checks the host key against <span class="mono">hostKey</span>, signs in and lists the start folder; without <span class="mono">hostKey</span> it names the fingerprint of the server. Nothing is written.</span>
+        <button class="btn small">Help <kbd>F1</kbd></button></div>
+      <div class="foot"><small>The form shows the fields of the type next.</small><span class="spacer"></span><button class="btn">Cancel</button><button class="btn primary">Create</button></div>
+    </div></div>`);
+  }
+</script>
+</body>
+</html>
