@@ -727,6 +727,18 @@ S39d ist geteilt (Store und CLI vor DPAPI und Dienst): S39d1 setzt den Store mit
   local secret store … (DPAPI; was it made by another account or on another computer?)“ gemeldet. Für den Store des
   Benutzers gilt DPAPI des **Benutzers** (an Konto und Anmeldung gebunden). Ist `RUNNEL_MASTER_KEY` gesetzt, hat er
   auch unter Windows Vorrang; die Meldung „set RUNNEL_MASTER_KEY …“ gibt es nur noch auf Systemen ohne DPAPI.
+- **`RUNNEL_MASTER_KEY` unter Windows:** Ist die Variable gesetzt, gilt sie für den Store des Benutzers **und** den des
+  Dienstes; DPAPI und `key.dpapi` werden dann nicht benutzt (Test `TestMasterKeyBeforeDPAPI`). Sinnvoll für Umzug auf
+  einen anderen Rechner oder ein anderes Konto (ein DPAPI-Schlüssel lässt sich dort nicht entschlüsseln), portablen
+  Betrieb und CI. Zu beachten:
+  - **Kein Mischen:** Ein Store, den DPAPI schützt, lässt sich mit `RUNNEL_MASTER_KEY` nicht lesen und umgekehrt
+    („stored with another key“); beim Wechsel setzt man die Secrets mit `runnel secret set` neu.
+  - **Schwächerer Schutz:** Der Schlüssel liegt dann ungeschützt dort, wo die Variable gesetzt ist (Umgebung des
+    Benutzers, Skript, Registry des Dienstes); wer ihn und die Datei des Stores hat, kann alle Werte entschlüsseln. Im
+    normalen Betrieb unter Windows ist DPAPI die Empfehlung.
+  - **Dienst:** Die Variable muss in der Umgebung des Dienstes gesetzt sein **und** beim Setzen mit
+    `runnel secret set --service` in der Konsole, mit demselben Wert; sonst schreibt die Konsole mit DPAPI und der Dienst
+    liest mit dem Master-Key oder umgekehrt.
 - **Store des Dienstes (`--service`):** `runnel secret set/list/delete/missing --service` arbeiten auf
   `%ProgramData%\runnel\secrets\`. Der Schalter heißt wie bei `runnel plugins` `--service` (nicht `--service-name`
   wie bei `runnel health`, das einen Dienst über seinen Namen findet; hier geht es um den Store der Dienste). DPAPI

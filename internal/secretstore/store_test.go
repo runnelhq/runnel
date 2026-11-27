@@ -245,3 +245,22 @@ func TestDefault(t *testing.T) {
 		t.Errorf("default %+v", d)
 	}
 }
+
+// TestMasterKeyBeforeDPAPI: RUNNEL_MASTER_KEY wins over DPAPI for the store of the user and
+// of the service, so no key file is made (on Windows too).
+func TestMasterKeyBeforeDPAPI(t *testing.T) {
+	t.Setenv(MasterKeyEnv, testKey)
+	project := t.TempDir()
+	for _, machine := range []bool{false, true} {
+		s := &Store{Dir: filepath.Join(t.TempDir(), "secrets"), Machine: machine}
+		if err := s.Set(project, "pw", "Pa55word!", now); err != nil {
+			t.Fatal(err)
+		}
+		if v, ok, err := s.Get(project, "pw"); err != nil || !ok || v != "Pa55word!" {
+			t.Fatalf("machine=%v: Get = %q, %v, %v", machine, v, ok, err)
+		}
+		if _, err := os.Stat(filepath.Join(s.Dir, keyFile)); !os.IsNotExist(err) {
+			t.Fatalf("machine=%v: key file made although %s is set: %v", machine, MasterKeyEnv, err)
+		}
+	}
+}
