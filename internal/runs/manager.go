@@ -142,6 +142,10 @@ type Manager struct {
 	// run of each trigger, since the start (GET /health, S43a).
 	lastFailed *Run
 	byTrigger  map[string]workflow.Status
+	// steps holds the data of the steps of the last run started in the editor, the run
+	// stepsRun (E23a); nil: none.
+	steps    *stepRecorder
+	stepsRun string
 }
 
 type entry struct {
@@ -262,6 +266,8 @@ type Pending struct {
 	start   func(context.Context)
 	// e is the run's entry once Launch has registered it (WaitLaunched).
 	e *entry
+	// recorder keeps the data of the steps (Spec.StepData); nil: none.
+	recorder *stepRecorder
 }
 
 // ID returns the id of the run.
@@ -311,9 +317,10 @@ func (m *Manager) PrepareRun(path string, spec Spec) (*Pending, *Prepared, error
 	return &Pending{History: spec.History, id: id, env: p.Env, steps: steps, hash: fileHash(spec.Data),
 		run: Run{ID: id, Path: path, Kind: "workflow", Name: p.Workflow.Name, Params: spec.Params, Trigger: spec.Trigger,
 			Client: spec.Client, Parent: spec.Parent},
-		lim:     lim,
-		onError: onErrorOf(spec.Trigger, spec.NoOnError, p.Project, p.Workflow.Settings.OnError, path),
-		start:   func(ctx context.Context) { p.Runner.Run(ctx) }}, p, nil
+		lim:      lim,
+		onError:  onErrorOf(spec.Trigger, spec.NoOnError, p.Project, p.Workflow.Settings.OnError, path),
+		start:    func(ctx context.Context) { p.Runner.Run(ctx) },
+		recorder: p.steps}, p, nil
 }
 
 // StartPipeline prepares and starts a pipeline run in the background, like Start (S25a3).
@@ -392,6 +399,9 @@ func (m *Manager) add(p *Pending) (Run, error) {
 	m.runs[id] = e
 	m.order = append(m.order, id)
 	p.e = e
+	if p.recorder != nil { // the data of the previous run of the editor is dropped
+		m.steps, m.stepsRun = p.recorder, id
+	}
 	m.prune()
 	if m.recording(e) {
 		m.rec.send(recOp{kind: recRun, run: snapshot(e), hash: e.hash})
@@ -898,6 +908,9 @@ func (m *Manager) wait(ctx context.Context) error {
 
 // Shutdown cancels all runs and waits until they have ended or ctx is done.
 func (m *Manager) Shutdown(ctx context.Context) error {
+	m.mu.Lock()
+	m.steps = nil
+	m.mu.Unlock()
 	m.cancel()
 	return m.wait(ctx)
 }

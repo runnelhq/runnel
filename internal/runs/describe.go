@@ -35,7 +35,7 @@ func Describe(name, env string, e workflow.Event) (Line, bool) {
 	case workflow.ActionWaiting:
 		l.Level, l.Detail, l.Msg = slog.LevelDebug, true, e.Message
 	case workflow.ActionSkipped:
-		l.Level, l.Detail, l.Msg = slog.LevelDebug, true, "skipped (no incoming link applies)"
+		l.Level, l.Detail, l.Msg = slog.LevelDebug, true, "skipped ("+workflow.SkipReason+")"
 	case workflow.ActionFinished:
 		if e.Err == nil && e.Status != workflow.Cancelled {
 			// Also an action that ends the run on purpose (core.abort: failed, no error).

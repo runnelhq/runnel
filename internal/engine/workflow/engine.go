@@ -62,6 +62,8 @@ type Options struct {
 	Connections connection.Resolver
 	// Plugins runs actions of plugins (ADR 0019) and is closed when the run ends; nil: none.
 	Plugins action.PluginRunner
+	// Steps receives the input and output of each step (E23a); nil: none.
+	Steps StepRecorder
 }
 
 // Status is the final state of a run.
@@ -278,16 +280,18 @@ func (r *Runner) outputs(rc *runContext) (map[string]any, error) {
 
 // executeAction runs an action including retries and per-attempt timeouts, once or for
 // each entry of forEach. values is the context of its expressions (ADR 0006).
-func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any) (action.Result, error) {
+// trace receives the data of the execution; nil: none.
+func (r *Runner) executeAction(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, trace StepTrace) (action.Result, error) {
 	if a.ForEach != "" {
-		return r.executeForEach(ctx, runID, a, scope, values)
+		return r.executeForEach(ctx, runID, a, scope, values, trace)
 	}
-	return r.executeWithRetry(ctx, runID, a, scope, values, "")
+	return r.executeWithRetry(ctx, runID, a, scope, values, "", 0, trace)
 }
 
 // executeWithRetry runs an action including retries and per-attempt timeouts. prefix
-// starts its log messages, e.g. "[2/5] " for an entry of forEach.
-func (r *Runner) executeWithRetry(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, prefix string) (action.Result, error) {
+// starts its log messages, e.g. "[2/5] " for an entry of forEach, whose number is entry
+// (0 without forEach).
+func (r *Runner) executeWithRetry(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, prefix string, entry int, trace StepTrace) (action.Result, error) {
 	attempts := 1
 	var retry model.Retry
 	if a.Retry != nil {
@@ -295,7 +299,10 @@ func (r *Runner) executeWithRetry(ctx context.Context, runID string, a *model.Ac
 		attempts = max(retry.Attempts, 1)
 	}
 	for attempt := 1; ; attempt++ {
-		res, err := r.attempt(ctx, runID, a, scope, values, prefix)
+		res, with, err := r.attempt(ctx, runID, a, scope, values, prefix)
+		if trace != nil {
+			trace.Attempt(entry, values["row"], attempt, with, res, err)
+		}
 		if err == nil || attempt >= attempts || ctx.Err() != nil {
 			return res, err
 		}
@@ -307,8 +314,9 @@ func (r *Runner) executeWithRetry(ctx context.Context, runID string, a *model.Ac
 	}
 }
 
-// attempt runs an action once: resolves variables, creates and executes it within its timeout.
-func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, prefix string) (action.Result, error) {
+// attempt runs an action once: resolves variables, creates and executes it within its
+// timeout. It also returns the configuration as it reached the action.
+func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, prefix string) (action.Result, map[string]any, error) {
 	timeout, _ := a.Timeout.Value()
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -318,12 +326,12 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 
 	with, err := r.evalWith(a, scope, values)
 	if err != nil {
-		return action.Result{}, err
+		return action.Result{}, nil, err
 	}
 	def, _ := r.opts.Registry.Lookup(a.Type)
 	act, err := def.New(with)
 	if err != nil {
-		return action.Result{}, err
+		return action.Result{}, with, err
 	}
 	ec := &action.ExecContext{
 		RunID:      runID,
@@ -348,7 +356,7 @@ func (r *Runner) attempt(ctx context.Context, runID string, a *model.Action, sco
 	if err != nil && errors.Is(context.Cause(ctx), errActionTimeout) {
 		err = fmt.Errorf("timed out after %s", timeout)
 	}
-	return res, err
+	return res, with, err
 }
 
 // errActionTimeout marks the cancellation of an action by its own timeout.

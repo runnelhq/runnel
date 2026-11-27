@@ -198,6 +198,21 @@ statt „keine Datenbank“. „Keine externe Datenbank“ in README und Konzept
   nicht mehr stimmen muss. Geänderte Links bei gleichen Actions erkennt er nicht.
 - Ein noch laufender Lauf aus der Liste wird wie ein im Editor gestarteter über `/events?run=<id>&since=0` verfolgt.
 
+## Nachtrag 2026-11-27 (E23a): Daten je Schritt nur im Speicher
+
+- Ein- und Ausgaben der Schritte (Tab „Data“, Mockup E23) hält der Server **nur im Speicher** und nur für den letzten
+  im Editor gestarteten Workflow-Lauf (`POST /runs` mit `path`); ein neuer Lauf aus dem Editor und das Beenden des
+  Servers verwerfen sie. Läufe von Triggern, `runnel run`, dem Dienst, Fehler-Workflows und aufgerufene Workflows
+  sammeln nichts (die Engine ruft den Rekorder nur, wenn er gesetzt ist). Die Historie speichert keine Schrittdaten;
+  `settings.history.stepData` folgt später.
+- Vor dem Speichern werden Felder mit Format `runnel-secret` (und Werte von `params` mit `${secret:…}`) durch ihre
+  Referenz aus der Datei ersetzt, ohne Referenz durch `***`; alle übrigen Texte und Schlüssel laufen durch die Maske des
+  Laufs (ADR 0022), auch die Ausgaben und Fehler der Actions. Die aufgelöste Connection des Schritts folgt denselben
+  Regeln.
+- Grenzen: je Ausführung bzw. Eintrag von `forEach` Input, Zeile und Output je höchstens 1 MB, je Lauf 20 MB; gekürzt
+  wird deterministisch (Schlüssel sortiert, erste Einträge, Anfang der Texte) mit Angabe der echten Länge. Über der
+  Grenze des Laufs behalten Schritte nur Status, Versuche und Fehler.
+
 ## Nachtrag 2026-11-25 (Fix): Monotone Lauf-IDs
 
 Die Historie sortiert Läufe nach ID (ULID). Bisher war der Zufallsteil einer ULID unabhängig: Zwei Läufe, die in

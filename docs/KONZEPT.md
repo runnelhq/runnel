@@ -838,6 +838,11 @@ type Transform interface {
 - **Preview**: Pipeline bis zu einem gewählten Transform mit `limit: 100` ausführen, Records je Link anzeigen (Tabelle + JSON).
 - **Sampling im Lauf**: Bei jedem Lauf werden die ersten N Records pro Link gespeichert (abschaltbar) → nachträgliche Fehlersuche.
 - **Breakpoints** (Phase 2): Pause bei Bedingung, z. B. `{{ record.kdnr == 4711 }}`.
+- **Daten je Schritt im Workflow** (seit E23a, Editor mit E23b): Für den letzten im Editor gestarteten Lauf hält der
+  Server je Schritt Input (`with:` nach Variablen und Ausdrücken, mit Quelle; Secret-Felder als Referenz), aufgelöste
+  Connection, Output bzw. Fehler, Versuche und die Einträge von `forEach` – nur im Speicher, je Ausführung bzw. Eintrag
+  bis 1 MB, je Lauf bis 20 MB, darüber gekürzt; bekannte Secret-Werte maskiert wie im Log. Nicht für Trigger, CLI und
+  Dienst, nie in der Run-Historie ([ADR 0026](adr/0026-run-historie.md), Nachtrag E23a; API in `docs/dev/API.md`).
 - **Teilausführung im Workflow**: „Ab hier ausführen“ (optional mit Ergebnissen des letzten Laufs) und „Nur diese Action ausführen“ (s. [ADR 0008](adr/0008-ausfuehrungsvarianten.md)).
 
 ### 6.4 Run-Queue & Ressourcen
@@ -1110,6 +1115,7 @@ Umgesetzte Endpunkte mit Statuscodes und Beispielen: [docs/dev/API.md](dev/API.m
 | GET | `/runs?status=&path=&trigger=&before=&limit=` | Läufe: laufende aus dem Speicher, beendete aus der Run-Historie (seit S26a), Filter und Seiten (seit S26b) |
 | GET | `/runs/{id}` | Details inkl. Knotenstatus und Log |
 | POST | `/runs/{id}/cancel` · `/runs/{id}/resume` | Steuern (`resume` mit S29, Backlog) |
+| GET | `/runs/{id}/steps` · `/runs/{id}/steps/{action}` | Daten je Schritt des letzten Laufs aus dem Editor (seit E23a) |
 | POST | `/preview` | Pipeline-Vorschau bis Transform X (S44, `docs/dev/API.md`) |
 | GET | `/secrets` | Namen der Secrets mit Änderungszeit und Ablauf, nie Werte (geplant, S39g) |
 | PUT/DELETE | `/secrets/{name}` | Secret setzen bzw. löschen, Wert nie lesbar zurück (geplant, S39g; im Netzbetrieb standardmäßig aus) |

@@ -9,6 +9,13 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
 
 ### Neu
 
+- **Daten je Schritt eines Workflows** (E23a, Server): Für den letzten im Editor gestarteten Lauf liefern
+  `GET /api/v1/runs/{id}/steps` und `GET /api/v1/runs/{id}/steps/{action}` je Action, was sie bekommen und geliefert hat:
+  `with:` nach Variablen und Ausdrücken mit dem Text aus der Datei, Secret-Felder nur als Referenz, die aufgelöste
+  Connection, Ausgabe oder Fehler, Versuche, Einträge von `forEach` (`?entry=`) und mehrfache Ausführungen (`?run=`).
+  Nur im Speicher, bis 1 MB je Schritt und 20 MB je Lauf (darüber gekürzt, mit Angabe der echten Länge); bekannte
+  Secret-Werte sind maskiert. Der Tab „Data“ im Editor folgt mit E23b.
+
 - **Katalog der Connection-Typen** (E15e, Issue #264): `runnel catalog --json` und `runnel-catalog.json` nennen je
   Connection-Typ zusätzlich `example` (eine vollständige Connection-Datei), `errors` (wann das Verbinden scheitert,
   z. B. unbekannter Host-Key oder nicht vertrautes Zertifikat) und `test` (was „Test connection“ prüft);

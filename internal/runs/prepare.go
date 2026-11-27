@@ -58,6 +58,9 @@ type Spec struct {
 	// NoOnError starts no error workflow when the run fails (ADR 0027), e.g. for runs of
 	// the editor or with runnel run --no-on-error.
 	NoOnError bool
+	// StepData keeps the input and output of each step in memory for the editor (E23a):
+	// only for the runs started in the editor, never for called workflows.
+	StepData bool
 
 	// chain lists the workflows that called this one (core.run-workflow).
 	chain []caller
@@ -94,6 +97,8 @@ type Prepared struct {
 	// Undeclared lists parameters given at start but not declared by the workflow;
 	// they are still available as variables.
 	Undeclared []string
+	// steps keeps the data of the steps (Spec.StepData); nil: none.
+	steps *stepRecorder
 }
 
 // Prepare loads, checks and prepares a run. Problems in the files are returned as
@@ -148,6 +153,11 @@ func Prepare(spec Spec) (*Prepared, error) {
 	if errs := resolveConnections(workflowSteps(w, spec.Registry), conns); len(errs) > 0 {
 		return p, errs
 	}
+	var steps workflow.StepRecorder
+	if spec.StepData {
+		p.steps = newStepRecorder(w, spec.Registry, mask, conns, p.Project)
+		steps = p.steps
+	}
 	p.Runner, err = workflow.Prepare(w, workflow.Options{
 		Registry:    spec.Registry,
 		DefaultJoin: defaultJoin,
@@ -163,6 +173,7 @@ func Prepare(spec Spec) (*Prepared, error) {
 		Request:     spec.Request,
 		Respond:     spec.Respond,
 		BaseDir:     BaseDir(spec.ProjectDir, spec.file()),
+		Steps:       steps,
 	})
 	return p, err
 }

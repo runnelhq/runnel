@@ -28,6 +28,8 @@ type completion struct {
 	res      action.Result
 	err      error
 	start    time.Time
+	// trace receives the data of the execution (StepRecorder); nil: none.
+	trace StepTrace
 }
 
 // scheduler runs one workflow run. All state is owned by the goroutine calling run;
@@ -166,9 +168,13 @@ func (s *scheduler) activate(id string) {
 	s.running++
 	// The context is taken now: later results do not change what this action sees.
 	values := s.rc.values(s.rc.results[s.trigger[id]])
+	var trace StepTrace
+	if rec := s.r.opts.Steps; rec != nil {
+		trace = rec.Begin(a)
+	}
 	go func() {
-		res, err := s.r.executeAction(s.ctx, s.runID, a, s.rc.scope, values)
-		s.done <- completion{actionID: id, res: res, err: err, start: start}
+		res, err := s.r.executeAction(s.ctx, s.runID, a, s.rc.scope, values, trace)
+		s.done <- completion{actionID: id, res: res, err: err, start: start, trace: trace}
 	}()
 }
 
@@ -185,6 +191,9 @@ func (s *scheduler) finished(c completion) {
 	end := s.r.opts.Now()
 	s.r.emit(Event{Time: end, Kind: ActionFinished, RunID: s.runID, ActionID: a.ID, ActionType: a.Type,
 		Status: status, Err: c.err, Message: c.res.Message, Duration: end.Sub(c.start)})
+	if c.trace != nil {
+		c.trace.End(status, end.Sub(c.start), c.res, c.err)
+	}
 	result := s.rc.record(a, status, c.res, c.err, end.Sub(c.start))
 
 	if s.ended {
@@ -340,6 +349,9 @@ func (s *scheduler) skip(id string) {
 	s.activated[id] = true
 	a := s.r.actions[id]
 	s.r.emit(Event{Time: s.r.opts.Now(), Kind: ActionSkipped, RunID: s.runID, ActionID: a.ID, ActionType: a.Type, Status: Skipped})
+	if rec := s.r.opts.Steps; rec != nil {
+		rec.Skipped(a, SkipReason)
+	}
 	s.rc.results[a.ID] = map[string]any{"id": a.ID, "type": a.Type, "status": string(Skipped), "success": false,
 		"output": nil, "durationMs": int64(0), "error": ""}
 	for _, li := range s.r.out[id] {
@@ -411,6 +423,10 @@ func (s *scheduler) joinTimedOut(jt joinTimeout) {
 			waiting = append(waiting, s.r.w.Links[li].From)
 		}
 	}
-	s.finished(completion{actionID: id, start: s.r.opts.Now(),
-		err: fmt.Errorf("join timeout: still waiting for %v after %s", waiting, jt.after)})
+	c := completion{actionID: id, start: s.r.opts.Now(),
+		err: fmt.Errorf("join timeout: still waiting for %v after %s", waiting, jt.after)}
+	if rec := s.r.opts.Steps; rec != nil {
+		c.trace = rec.Begin(s.r.actions[id]) // the action did not run; its failure is its data
+	}
+	s.finished(c)
 }

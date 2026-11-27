@@ -21,7 +21,7 @@ import (
 // with its number, e.g. "[2/5] ". By default the first failed entry stops the others
 // and fails the action; with continueOnEntryError all entries run and the action fails
 // at the end if one of them failed.
-func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any) (action.Result, error) {
+func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Action, scope *vars.Scope, values map[string]any, trace StepTrace) (action.Result, error) {
 	v, err := r.evalText(a.ForEach, scope, values)
 	if err != nil {
 		return action.Result{}, fmt.Errorf("forEach: %w", err)
@@ -33,6 +33,9 @@ func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Acti
 	case nil:
 	default:
 		return action.Result{}, fmt.Errorf("forEach: the expression must return a list, got %s", expr.Format(v))
+	}
+	if trace != nil {
+		trace.Entries(len(list))
 	}
 	stop := !a.ContinueOnEntryError
 	parallel := min(max(a.Parallel, 1), max(len(list), 1))
@@ -63,9 +66,15 @@ func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Acti
 				}
 				vals := maps.Clone(values)
 				vals["row"] = list[i]
-				res, err := r.executeWithRetry(ctx, runID, a, scope, vals, fmt.Sprintf("[%d/%d] ", i+1, len(list)))
+				res, err := r.executeWithRetry(ctx, runID, a, scope, vals, fmt.Sprintf("[%d/%d] ", i+1, len(list)), i+1, trace)
 				if err != nil && errors.Is(context.Cause(ctx), errStopped) {
+					if trace != nil {
+						trace.Entry(i+1, Cancelled)
+					}
 					continue // stopped because another entry failed: not counted
+				}
+				if trace != nil {
+					trace.Entry(i+1, entryStatus(err))
 				}
 				mu.Lock()
 				outcomes[i] = outcome{done: true, res: res, err: err}
@@ -112,4 +121,11 @@ func (r *Runner) executeForEach(ctx context.Context, runID string, a *model.Acti
 		return res, fmt.Errorf("%d of %d entries failed; first: entry %d: %w", failed, len(list), first+1, outcomes[first].err)
 	}
 	return res, nil
+}
+
+func entryStatus(err error) Status {
+	if err != nil {
+		return Failed
+	}
+	return Succeeded
 }

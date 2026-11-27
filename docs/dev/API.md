@@ -74,6 +74,8 @@ zugesagt, nicht im Netz erreichbar.
 | GET | `/runs` | **öffentlich** | `{"runs": [Run …]}`, neueste zuerst: laufende und kürzlich beendete aus dem Speicher, dazu die aus der Run-Historie (seit S26a). Filter (S26b): `status`, `path` (Datei im Projekt), `trigger` (z. B. `cron:nightly`, `cli` für `runnel run`, `error` für Fehler-Workflows, `editor` für Läufe ohne Trigger – aus dem Editor oder mit `POST /runs`, seit S26e1), `parent` (Lauf-ID: die Läufe, die zu diesem gehören, z. B. der Fehler-Lauf eines fehlgeschlagenen Laufs; seit S72b), `before` (Lauf-ID: ältere Läufe, nächste Seite), `limit` (Standard 200, höchstens 1.000; sonst `400`) |
 | GET | `/runs/{id}` | **öffentlich** | Lauf mit `actions` (Status je Knoten) und `log`, auch aus der Run-Historie; `500`, wenn sie nicht lesbar ist (Details im Server-Log) |
 | POST | `/runs/{id}/cancel` | **öffentlich** | Lauf abbrechen: `202`; bereits beendet `409` |
+| GET | `/runs/{id}/steps` | intern | Schritte mit Daten im letzten im Editor gestarteten Lauf (E23a), siehe [Daten je Schritt](#daten-je-schritt-runsidsteps) |
+| GET | `/runs/{id}/steps/{action}` | intern | Ein- und Ausgabe einer Action in diesem Lauf (E23a), siehe [Daten je Schritt](#daten-je-schritt-runsidsteps) |
 | GET | `/events` | intern | Live-Ereignisse (Server-Sent Events), siehe unten |
 | GET | `/plugins` | intern | Plugins des Projekts (S52a), siehe [Plugins](#plugins) |
 | POST | `/plugins/{name}/trust` | intern | Plugin für das Konto des Servers freigeben, siehe unten |
@@ -282,6 +284,64 @@ ausgehenden Links (`{ "1": 2, "2": 2 }`).
 Läufe liegen **nur im Speicher**: die letzten 100, dazu die letzten 100 von HTTP-Triggern (seit S38b2; Läufe mit
 `history: errors` nur, wenn sie gescheitert sind, mit `history: none` gar nicht), laufende werden nie verworfen. Beim Beenden des Servers (Strg+C)
 werden laufende Läufe abgebrochen. Die dauerhafte Historie folgt mit S26 (zurückgestellt, siehe Backlog der Roadmap), ohne dass sich diese API ändert.
+
+## Daten je Schritt (`/runs/{id}/steps`)
+
+Seit E23a hält der Server für den **letzten im Editor gestarteten Lauf** eines Workflows (`POST /runs` mit `path`, ohne
+`trigger`) je Schritt, was die Action bekommen und geliefert hat – für den Tab „Data“ (Mockup E23, Editor mit E23b).
+Nur im Speicher: Ein neuer Lauf aus dem Editor verwirft die Daten des vorigen, ebenso das Beenden des Servers; nichts
+davon geht in die Run-Historie, in Log-Dateien oder an Plugins. Läufe von Triggern (auch „Run target now“), von
+`runnel run`, des Dienstes, Fehler-Workflows, aufgerufene Workflows (`core.run-workflow`) und Pipelines haben keine
+Daten. `settings.history.stepData` (Daten in der Historie) folgt später.
+
+```
+GET /api/v1/runs/{id}/steps
+→ 200 {"runId": "01M8…", "steps": [{"actionId": "total", "type": "core.script", "runs": 1, "status": "succeeded"},
+                                   {"actionId": "each", "type": "core.log", "runs": 1, "status": "succeeded", "entries": 3},
+                                   {"actionId": "never", "type": "core.log", "runs": 1, "status": "skipped"}]}
+```
+
+`steps` nennt die Actions mit Daten in der Reihenfolge der Datei (für das Zeichen `{ }` am Knoten): `runs` Ausführungen
+(Schleifen, `join: each`), `status` der letzten, `entries` die Einträge von `forEach`.
+
+```
+GET /api/v1/runs/{id}/steps/{action}[?run=N][&entry=N]
+→ 200 {
+  "runId": "01M8…", "actionId": "total", "type": "core.script", "run": 1, "runs": 1,
+  "status": "succeeded", "durationMs": 3, "attempts": 2, "attemptErrors": ["…"],
+  "input": {"params": {"key": "${secret:DEMO_KEY}", "rate": 0.19, "stage": "development"}, "script": "…"},
+  "inputSources": {"params.rate": "{{ 0.19 }}", "params.stage": "${STAGE}"},
+  "secrets": ["params.key"],
+  "connection": {"name": "api", "type": "http", "with": {"baseUrl": "https://api.example.com/v1", "auth": "bearer",
+                 "token": "${secret:shop-api-token}"}, "secrets": ["token"]},
+  "output": {"echo": "key ***", "items": [1, 2, 3]},
+  "truncated": [{"part": "output", "path": "items", "kind": "list", "length": 8200, "kept": 2431}]
+}
+```
+
+- `run` wählt die Ausführung (ab 1, Standard die letzte), `entry` einen Eintrag von `forEach` (ab 1); ohne `entry` zeigt
+  ein Schritt mit `forEach` kein `input`, als `output` die Liste der Einträge (`items`, `succeeded`, `failed`) und in
+  `entries` je Eintrag `index` und `status` (`succeeded`, `failed`, `running`, `cancelled` – nach dem Fehler eines anderen
+  Eintrags abgebrochen –, `skipped` – nicht gelaufen). Mit `entry` gelten `attempts`, `row`, `input`, `output`, `error`
+  und `truncated` für diesen Eintrag, dazu `entry` und `entryStatus`.
+- `input` ist `with:` nach Variablen und Ausdrücken, so wie es die Action erreicht hat (beim letzten Versuch);
+  `inputSources` nennt je Pfad den Text aus der Datei für Werte aus `${…}` oder `{{ … }}`. Felder mit Format
+  `runnel-secret` (auch einzelne Werte von `params` mit `${secret:…}`) enthalten ihre **Referenz** aus der Datei, ohne
+  Referenz `***`; `secrets` nennt ihre Pfade. `connection` ist die Connection des Schritts, aufgelöst für das
+  Environment des Laufs, mit denselben Regeln für ihre Secret-Felder.
+- Werte, die ein Secret des Laufs enthalten, sind überall maskiert wie im Log (`***`, ab 4 Zeichen), auch wenn eine
+  Action ein Secret in ihrer Ausgabe oder ihrem Fehler wiederholt.
+- `attempts` zählt die Versuche (`retry`), `attemptErrors` die Fehler der früheren (höchstens 10); `error` ist der Fehler
+  der Action (gescheitert, auch `core.abort`), `reason` bei `skipped` der Grund der Engine („no incoming link applies“).
+- **Grenzen:** `input`, `row` und `output` je Ausführung bzw. Eintrag höchstens 1 MB (geschätzte Größe als JSON), alle
+  Daten eines Laufs höchstens 20 MB; Fehlertexte 16 KB. Darüber wird gekürzt, immer gleich: Schlüssel sortiert, Listen
+  und Objekte behalten die ersten Einträge, Texte den Anfang (nie mitten in einem Zeichen). `truncated` nennt jede
+  Stelle mit `part` (`input`, `row`, `output`), `path` (wie in Ausdrücken, leer für den Teil selbst), `kind` (`list`,
+  `object`, `text`), der echten Länge `length` (Einträge, Schlüssel bzw. Bytes) und `kept`. Ist die Grenze des Laufs
+  erreicht, behalten weitere Schritte nur Status, Versuche und Fehler (`dropped: true`).
+- `404` „no data kept for this run“, wenn der Lauf nicht der zuletzt im Editor gestartete ist (oder keine Daten hat);
+  `404` „no data for this step“ für eine unbekannte Action, Ausführung oder einen Eintrag; `400` für `run` oder `entry`,
+  die keine Zahl ab 1 sind. Wie alle Endpunkte nur lokal und ohne fremden `Origin` (`403`).
 
 ## HTTP-Trigger (eigener Listener)
 
