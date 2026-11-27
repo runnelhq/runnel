@@ -59,7 +59,7 @@ den Workflow, Transforms Datensätze für Pipelines (z. B. eine Zeile je Laufwer
 
 ### System (`plugin-system`)
 
-Zustand des eigenen Rechners abfragen, zunächst **nur die aktuellen Werte**. Vergleiche mit Grenzwerten, Meldung beim
+Zustand des eigenen Rechners abfragen, zunächst **nur die aktuellen Werte**, und Windows-Dienste steuern. Vergleiche mit Grenzwerten, Meldung beim
 Wechsel des Zustands und Verlauf über die Zeit gehören nicht dazu; geprüft wird im Workflow mit `core.check`.
 
 | Nr. | Baustein | Art | Inhalt |
@@ -68,14 +68,17 @@ Wechsel des Zustands und Verlauf über die Zeit gehören nicht dazu; geprüft wi
 | P31 | `system.cpu` | Action | mittlere Auslastung über eine kurze Messdauer (`duration`, Standard 5 s, mit Obergrenze): `percent`, `cores` |
 | P32 | `system.memory` | Action | Arbeitsspeicher: `used`, `total`, `percent` |
 | P33 | `system.services` | Action, Transform | Windows-Dienste nach Namen oder Muster (`MSSQL*`): `name`, `displayName`, `state`, `startType` |
+| P34 | `system.service-start`, `system.service-stop`, `system.service-restart` | Action | Windows-Dienst starten, stoppen bzw. neu starten und warten, bis er läuft bzw. steht (`timeout`); Output der Zustand danach; abhängige Dienste nur mit ausdrücklicher Option |
 
 - **Plattformen:** Windows über die Windows-API (`golang.org/x/sys/windows`), ohne PowerShell; `disk`, `cpu` und
   `memory` auch unter Linux, `system.services` nur unter Windows mit klarer Meldung auf anderen Systemen.
-- **Rechte:** Abfragen gehen ohne Administratorrechte, auch im Dienst als LocalService.
+- **Rechte:** Abfragen gehen ohne Administratorrechte, auch im Dienst als LocalService. Starten, Stoppen und Neustart
+  brauchen das Recht am jeweiligen Dienst (meist Administrator); fehlt es, eine verständliche Meldung (Testplan unter
+  Windows).
 - **Nur der eigene Rechner;** andere Rechner (Remote-SCM, WMI) wären ein eigenes Thema.
 - **Sprache:** Go mit `sdk-go`. Den freien Platz liest Runnel für `/health` schon selbst (`internal/server/diskfree_*.go`).
-- **Später, nicht Teil des Plugins:** Dienste starten oder neu starten; Grenzwerte und Meldung beim Wechsel brauchen
-  einen Zustand zwischen Läufen im Kern (wäre ein Schritt der [Roadmap](ROADMAP.md) mit ADR).
+- **Später, nicht Teil des Plugins:** Grenzwerte und Meldung beim Wechsel brauchen einen Zustand zwischen Läufen im
+  Kern (wäre ein Schritt der [Roadmap](ROADMAP.md) mit ADR).
 
 ## Ideen für neue SDKs (nach 1.0)
 
