@@ -7,10 +7,12 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
 
 ## Unveröffentlicht
 
-## v0.1.0-rc.1 – 2026-11-27
+## v0.1.0-alpha.13 – 2026-11-27
 
-Erster Release Candidate für 1.0, seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch ohne
-Abkündigung; ab diesem Stand prüft der Vertragstest jede Änderung gegen diese Version (ADR 0029).
+Test-Release vor dem ersten Release Candidate für 1.0; fasst alles seit `v0.1.0-alpha.7` (2026-11-21) zusammen, auch
+`v0.1.0-alpha.8` bis `v0.1.0-alpha.12`. Vor 1.0 ändern sich Formate und Namen noch ohne Abkündigung; ab diesem Stand
+prüft der Vertragstest jede Änderung gegen diese Version (ADR 0029). `v0.1.0-rc.1` folgt nach dem manuellen Test unter
+Windows mit den Korrekturen daraus.
 
 ### Neu
 
