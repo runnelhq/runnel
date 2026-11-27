@@ -15,6 +15,12 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
   Connection, Ausgabe oder Fehler, Versuche, Einträge von `forEach` (`?entry=`) und mehrfache Ausführungen (`?run=`).
   Nur im Speicher, bis 1 MB je Schritt und 20 MB je Lauf (darüber gekürzt, mit Angabe der echten Länge); bekannte
   Secret-Werte sind maskiert. Der Tab „Data“ im Editor folgt mit E23b.
+- **Tab „Data“ im Editor** (E23b1): Nach einem Lauf aus dem Editor zeigt der Tab „Data“ unter dem Canvas für den
+  gewählten Schritt, was ihn erreicht hat (Input mit Quelle der Werte, Secrets als `***` mit Referenz, aufgelöste
+  Connection) und was er geliefert hat (Output als Baum oder JSON, „Copy“), dazu den Pfad eines Werts für Ausdrücke
+  („Copy path“, „{{ }}“), den Fehler gescheiterter und den Grund übersprungener Schritte und das Log des Schritts.
+  Knoten mit Daten tragen das Zeichen `{ }`; „Show data“ im Panel öffnet den Tab. Tabelle und Einträge von `forEach`
+  folgen mit E23b2.
 
 - **Katalog der Connection-Typen** (E15e, Issue #264): `runnel catalog --json` und `runnel-catalog.json` nennen je
   Connection-Typ zusätzlich `example` (eine vollständige Connection-Datei), `errors` (wann das Verbinden scheitert,

@@ -539,6 +539,20 @@ export const HistoryIcon = (p: P) => (
   </Icon>
 );
 
+/** Data of a step in the last run (mockup E23): curly braces. */
+export const BracesIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M8 4H7a2 2 0 0 0-2 2v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h1M16 4h1a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2h-1" />
+  </Icon>
+);
+
+/** A link that opens another view (mockup E23). */
+export const ExternalIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </Icon>
+);
+
 /** Triggers of runs in the list (mockup S26d): schedule, http, runnel run, editor. */
 export const ClockIcon = (p: P) => (
   <Icon {...p}>

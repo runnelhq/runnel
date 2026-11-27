@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { formatDuration, type RunView } from "../run";
 import { problemTarget, type Problem, type Workflow } from "../workflow";
-import { ChevronIcon } from "./Icons";
+import { BracesIcon, ChevronIcon } from "./Icons";
 import { pluginInMessage } from "../plugins";
 
 /** Names of fields for "Where", as labelled in the properties panel. */
@@ -46,7 +46,7 @@ function where(wf: Workflow, p: Problem): string {
   return `${wf.kind === "pipeline" ? "Pipeline" : "Workflow"}${field}`;
 }
 
-export type BottomTab = "problems" | "log" | "preview";
+export type BottomTab = "problems" | "log" | "preview" | "data";
 
 const debugKey = "runnel.log.debug";
 
@@ -86,6 +86,8 @@ export function BottomPanel(props: {
   log?: boolean;
   /** The data preview of a pipeline (S44): its content, whether it failed, and how to end it. */
   preview?: { content: ReactNode; failed: boolean; onClose: () => void } | null;
+  /** The data of the chosen step in the last run of a workflow (mockup E23): its content and whether that step failed. */
+  data?: { content: ReactNode; failed: boolean; following: boolean } | null;
   problems: Problem[];
   tab: BottomTab | null;
   onTab: (tab: BottomTab | null) => void;
@@ -99,7 +101,8 @@ export function BottomPanel(props: {
 }) {
   const { problems, tab } = props;
   const errors = problems.filter((p) => p.severity === "error").length;
-  const tabButton = (t: BottomTab, label: string, extra?: ReactNode) => (
+  const failedMark = <span className="inline-grid h-4 min-w-[18px] place-items-center rounded-full bg-danger-soft px-[5px] text-[10px] font-semibold text-destructive">!</span>;
+  const tabButton = (t: BottomTab, label: ReactNode, extra?: ReactNode) => (
     <button
       type="button"
       aria-expanded={tab === t}
@@ -133,14 +136,17 @@ export function BottomPanel(props: {
           ),
         )}
         {props.log !== false && tabButton("log", "Log")}
-        {props.preview &&
+        {props.data &&
           tabButton(
-            "preview",
-            "Preview",
-            props.preview.failed && (
-              <span className="inline-grid h-4 min-w-[18px] place-items-center rounded-full bg-danger-soft px-[5px] text-[10px] font-semibold text-destructive">!</span>
-            ),
+            "data",
+            <>
+              <BracesIcon width={13} height={13} />
+              Data
+            </>,
+            props.data.failed && failedMark,
           )}
+        {props.data?.following && tab === "data" && <span className="ml-auto text-2xs text-muted-foreground">Follows the selection on the canvas</span>}
+        {props.preview && tabButton("preview", "Preview", props.preview.failed && failedMark)}
         {props.preview && (
           <button
             type="button"
@@ -155,6 +161,7 @@ export function BottomPanel(props: {
       </div>
       {tab === "problems" && <ProblemsTable {...props} />}
       {tab === "preview" && props.preview?.content}
+      {tab === "data" && props.data?.content}
       {tab === "log" && props.log !== false && <LogView run={props.run} pipeline={props.pipeline} focus={props.logFocus} onSelectAction={props.onSelectAction} />}
     </section>
   );

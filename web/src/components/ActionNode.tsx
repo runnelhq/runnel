@@ -2,7 +2,7 @@ import { Handle, NodeToolbar, Position, type Node, type NodeProps } from "@xyflo
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatDuration, type ActionRun } from "../run";
 import { idPattern, type Problem } from "../workflow";
-import { ActionIcon } from "./Icons";
+import { ActionIcon, BracesIcon } from "./Icons";
 
 export interface ActionNodeData extends Record<string, unknown> {
   id: string;
@@ -32,6 +32,8 @@ export interface ActionNodeData extends Record<string, unknown> {
   onStartRename?: () => void;
   /** Status in the current or last run (mockup E8). */
   run?: ActionRun;
+  /** The action has data in the last run started in the editor (mockup E23), and how to show it. */
+  stepData?: { onShow: () => void };
   /** Set while the id is edited: ids in use and the callback with the new id (null: keep). */
   rename?: { taken: Set<string>; onDone: (id: string | null) => void };
 }
@@ -182,6 +184,21 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
             )}
           </span>
         </>
+      )}
+      {data.stepData && (
+        <button
+          type="button"
+          data-testid={`data-sign-${data.id}`}
+          title="Data of the last run – click to show"
+          aria-label={`Show the data of ${data.id}`}
+          onClick={data.stepData.onShow}
+          className={
+            "nodrag absolute right-2.5 -bottom-[9px] inline-flex h-[17px] cursor-pointer items-center rounded-full border bg-card px-[5px] text-muted-foreground shadow-sm " +
+            (selected ? "border-node-selected text-foreground" : "border-border")
+          }
+        >
+          <BracesIcon width={10} height={10} />
+        </button>
       )}
       {severity && (
         <span
