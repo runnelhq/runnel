@@ -55,6 +55,12 @@ export async function fetchFile(path: string): Promise<FileContent> {
   return { ...decode(bytes), etag: res.headers.get("ETag") };
 }
 
+/** A file as it is, e.g. an image to show (R8). */
+export async function fetchBlob(path: string): Promise<Blob> {
+  const res = await check(await fetch(fileURL(path), { cache: "no-store" }));
+  return res.blob();
+}
+
 /**
  * Decodes a file like the runner reads it: UTF-8 (with or without BOM) or UTF-16 with
  * BOM. Anything else is shown as Windows-1252, the usual legacy encoding on Windows.
@@ -176,8 +182,8 @@ export const kindLabel: Record<FileKind, string> = {
 /** The name of a tab: the file name, "Runs" for the list of runs (S26e1). */
 export const tabName = (path: string) => (path === ":runs" ? "Runs" : path.slice(path.lastIndexOf("/") + 1));
 
-/** Images a document can show (as the server serves them, E17). */
-export const isImage = (path: string) => /\.(png|jpe?g|gif|webp)$/i.test(path);
+/** Images the editor shows (as the server's fileKind "image", E17, R8); SVG only as <img>, which runs no scripts. */
+export const isImage = (path: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(path);
 
 /**
  * Files the editor does not open (as the server's fileKind "binary"): programs, libraries,

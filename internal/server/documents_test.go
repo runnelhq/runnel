@@ -9,7 +9,8 @@ import (
 )
 
 // TestDocumentsAndImages: Markdown documents and images (E17) have kinds of their own and
-// are served with their type; files of the project never run as a page.
+// are served with their type; files of the project never run as a page, an SVG image (R8)
+// runs no scripts when opened directly.
 func TestDocumentsAndImages(t *testing.T) {
 	dir, s := newProject(t)
 	png := "\x89PNG\r\n\x1a\n"
@@ -24,7 +25,7 @@ func TestDocumentsAndImages(t *testing.T) {
 	for _, tt := range []struct{ path, kind, contentType string }{
 		{"README.md", "document", "text/plain; charset=utf-8"},
 		{"docs/overview.png", "image", "image/png"},
-		{"docs/x.svg", "other", "application/octet-stream"},
+		{"docs/x.svg", "image", "image/svg+xml"},
 	} {
 		if got := fileKind(tt.path); got != tt.kind {
 			t.Errorf("fileKind(%s) = %s, want %s", tt.path, got, tt.kind)
@@ -32,7 +33,7 @@ func TestDocumentsAndImages(t *testing.T) {
 		rec := do(t, s, "GET", "/api/v1/files/"+tt.path, "")
 		h := rec.Header()
 		if rec.Code != http.StatusOK || h.Get("Content-Type") != tt.contentType || h.Get("X-Content-Type-Options") != "nosniff" ||
-			!strings.Contains(h.Get("Content-Security-Policy"), "sandbox") {
+			!strings.Contains(h.Get("Content-Security-Policy"), "sandbox") || !strings.Contains(h.Get("Content-Security-Policy"), "default-src 'none'") {
 			t.Errorf("GET %s: status %d, headers %v", tt.path, rec.Code, h)
 		}
 	}
