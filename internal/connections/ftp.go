@@ -14,6 +14,14 @@ var ftpsDefinition = connection.Definition{
 	Label:       "FTPS",
 	Description: "A server for file transfer over FTP with TLS",
 	Config:      FTPS{},
+	Example: example("partner-ftps", "FTPS server of the partner", TypeFTPS,
+		"  host: ftp.example.com\n  tls: explicit\n  user: runnel\n  password: ${secret:partner-ftps-password}\n"),
+	Errors: "Fails when the certificate of the server is not trusted by the system and fingerprint is not set, " +
+		"naming the SHA256 fingerprint of the certificate to check with the administrator of the server, and when " +
+		"the certificate does not match fingerprint. Also fails when the server does not answer within timeout, " +
+		"does not offer AUTH TLS (tls: explicit) or refuses the sign-in.",
+	Test: "Connects, starts TLS, checks the certificate (trusted by the system or matching fingerprint), signs in " +
+		"and lists the start folder. Nothing is written.",
 }
 
 var ftpDefinition = connection.Definition{
@@ -21,6 +29,12 @@ var ftpDefinition = connection.Definition{
 	Label:       "FTP",
 	Description: "A server for file transfer over FTP without encryption; only with insecure: true",
 	Config:      FTP{},
+	Example: example("legacy-ftp", "Old FTP server in the plant network", TypeFTP,
+		"  host: ftp.plant.local\n  insecure: true\n  user: runnel\n  password: ${secret:legacy-ftp-password}\n"),
+	Errors: "Fails without insecure: true (use ftps if the server offers TLS), and when the server does not answer " +
+		"within timeout or refuses the sign-in (user or password).",
+	Test: "Connects without encryption (only with insecure: true), signs in and lists the start folder. Nothing is " +
+		"written.",
 	Warn: func(with map[string]any) map[string]string {
 		if v, _ := with["insecure"].(bool); !v {
 			return map[string]string{"insecure": "without insecure: true runs cannot connect; use ftps if the server offers TLS"}

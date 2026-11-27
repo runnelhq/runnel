@@ -35,6 +35,15 @@ type Definition struct {
 	Schema *schema.Schema
 	// Plugin names the plugin that provides the type; empty for built-in types.
 	Plugin string
+	// Example is a complete connection file (kind: Connection) in YAML for the catalog and
+	// the website (E15e); the contract test checks it like validate does.
+	Example string
+	// Errors tells when connecting fails, e.g. an unknown host key; English sentences with
+	// a final period, like the errors of actions (E15e).
+	Errors string
+	// Test tells what Test connection of the editor checks, in English sentences with a
+	// final period; empty: the type offers no test (E15e).
+	Test string
 }
 
 // Descriptor is the description of a connection type for checks and the editor.
@@ -43,6 +52,9 @@ type Descriptor struct {
 	Label       string         `json:"label"`
 	Description string         `json:"description"`
 	Schema      *schema.Schema `json:"schema"`
+	Example     string         `json:"example,omitempty"`
+	Errors      string         `json:"errors,omitempty"`
+	Test        string         `json:"test,omitempty"`
 }
 
 // Registry holds the connection types.
@@ -72,7 +84,8 @@ func (r *Registry) Register(d Definition) {
 		}
 	}
 	r.defs[d.Type] = d
-	r.desc[d.Type] = Descriptor{Type: d.Type, Label: d.Label, Description: d.Description, Schema: s}
+	r.desc[d.Type] = Descriptor{Type: d.Type, Label: d.Label, Description: d.Description, Schema: s,
+		Example: d.Example, Errors: d.Errors, Test: d.Test}
 }
 
 // With returns a copy of the registry with the connection types of the plugins of a

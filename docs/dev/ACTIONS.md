@@ -151,6 +151,21 @@ gelten. `runnel catalog <typ>` zeigt es, `runnel catalog --json` (und `/api/v1/c
 Texte englisch, als Sätze mit Punkt; Felder der Konfiguration mit ihrem Namen (`maxSize`), Zahlen mit Tausender-Komma
 (`100,000`). Jede Angabe am Code prüfen – Standardwerte stehen in den Konstanten und `schema`-Tags, nicht im Gedächtnis.
 
+### Connection-Typen: Beispiel, Fehler und Test (seit E15e)
+
+Braucht eine Action einen neuen eingebauten Connection-Typ, kommt er als eigene Datei nach `internal/connections/`
+(eingetragen in `Builtin()`). Seine `connection.Definition` beschreibt neben `Config` und `Warn` für den Katalog
+([ADR 0014, Nachtrag 2026-11-27](../adr/0014-action-descriptor-schema.md)):
+
+| Feld | Inhalt |
+|---|---|
+| `Example` | vollständige Connection-Datei in YAML (`kind: Connection` … `with:`), Geheimnisse als `${secret:NAME}`; der Helfer `example(name, description, typ, with)` schreibt den Kopf |
+| `Errors` | wann Verbinden und Anmelden scheitern (Host-Key, Zertifikat, Anmeldung, Zeitlimit), Sätze mit Punkt |
+| `Test` | was „Test connection“ (`internal/conntest`) prüft und dass nichts geschrieben wird; leer nur ohne Test |
+
+Der Vertragstest in `internal/connections/connections_test.go` verlangt alle drei und prüft das Beispiel wie
+`runnel validate`. Im JSON heißen sie `example`, `errors` und `test`; `runnel catalog <typ>` zeigt sie.
+
 ### Felder umbenennen oder abkündigen (`Deprecated`, ADR 0029)
 
 Ab `v1.0.0` darf kein Feld umbenannt oder entfernt werden ([ADR 0029](../adr/0029-stabilitaet-versionen.md),

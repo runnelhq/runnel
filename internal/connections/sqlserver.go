@@ -10,6 +10,12 @@ var sqlServerDefinition = connection.Definition{
 	Label:       "SQL Server",
 	Description: "A Microsoft SQL Server database, with a user or with the Windows account Runnel runs as",
 	Config:      SQLServer{},
+	Example: example("erp-db", "ERP database", TypeSQLServer,
+		"  host: db01.example.local\n  database: ERP\n  user: runnel\n  password: ${secret:erp-db-password}\n"),
+	Errors: "Fails when the server does not answer within timeout, the login is refused, the database cannot be opened " +
+		"or the certificate of the server is not trusted (unless trustServerCertificate: true), and when both port " +
+		"and instance are set. Without user the Windows account Runnel runs as signs in, which works only on Windows.",
+	Test: "Connects and signs in like a run, then pings the server and reads its version. Nothing is written.",
 	Warn: func(with map[string]any) map[string]string {
 		w := map[string]string{}
 		if v, _ := with["trustServerCertificate"].(bool); v {

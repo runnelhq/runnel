@@ -267,6 +267,10 @@ func fingerprint(dir string, store plugintrust.Store) string {
 	return b.String()
 }
 
+// PluginConnectionTest is the text of Test connection for a connection type of a plugin
+// that answers connection.test (catalog key test, E15e).
+const PluginConnectionTest = "Asks the plugin to check the connection (connection.test); what it checks depends on the plugin."
+
 // describe starts a trusted plugin, reads its types into e and ends it again.
 func describe(ctx context.Context, projectDir string, p *model.Plugin, store plugintrust.Store, e *entry) error {
 	pr, err := Start(ctx, p, Options{ProjectDir: projectDir, RunnelVersion: version.Version, Env: environ(projectDir)})
@@ -287,7 +291,11 @@ func describe(ctx context.Context, projectDir string, p *model.Plugin, store plu
 	}
 	e.tests = map[string]bool{}
 	for _, c := range d.Connections {
-		e.conns = append(e.conns, connection.Definition{Type: c.Type, Label: c.Label, Description: c.Description, Schema: c.Schema, Plugin: p.Name})
+		def := connection.Definition{Type: c.Type, Label: c.Label, Description: c.Description, Schema: c.Schema, Plugin: p.Name}
+		if c.Test {
+			def.Test = PluginConnectionTest
+		}
+		e.conns = append(e.conns, def)
 		e.tests[c.Type] = c.Test
 	}
 	return nil

@@ -18,3 +18,21 @@ Fields (with:):
               string
   timeout     Longest time to connect and sign in
               string, duration, default 15s
+
+Errors:
+  Fails without hostKey, naming the fingerprint of the server to check with its administrator, and when the host key does not match hostKey; Runnel never trusts a host key on first use. Also fails when the server does not answer within timeout, the sign-in is refused (user, password or key), neither password nor privateKey is set, privateKey is no PEM key or needs passphrase, or the server offers no SFTP.
+
+Test connection:
+  Connects, checks the host key against hostKey, signs in and lists the start folder; without hostKey it names the fingerprint of the server. Nothing is written.
+
+Example (connections/<name>.yaml):
+  kind: Connection
+  apiVersion: runnel/v1
+  name: partner-sftp
+  description: SFTP server of the partner
+  type: sftp
+  with:
+    host: sftp.example.com
+    hostKey: SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg
+    user: runnel
+    privateKey: ${secret:partner-sftp-key}

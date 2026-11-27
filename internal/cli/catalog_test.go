@@ -63,7 +63,8 @@ func TestCatalogUnknownType(t *testing.T) {
 	}
 }
 
-// Every built-in connection type is in the reference with its fields (roadmap E15a).
+// Every built-in connection type is in the reference with its fields (roadmap E15a), an
+// example, its errors and what Test connection checks (E15e).
 func TestCatalogJSONConnectionTypes(t *testing.T) {
 	code, out, _ := run(t, "catalog", "--json")
 	if code != 0 {
@@ -73,6 +74,7 @@ func TestCatalogJSONConnectionTypes(t *testing.T) {
 		Version         string `json:"version"`
 		ConnectionTypes []struct {
 			Type, Label, Description string
+			Example, Errors, Test    string
 			Schema                   *struct {
 				Type       string         `json:"type"`
 				Properties map[string]any `json:"properties"`
@@ -88,7 +90,8 @@ func TestCatalogJSONConnectionTypes(t *testing.T) {
 	var got []string
 	for _, c := range ref.ConnectionTypes {
 		got = append(got, c.Type)
-		if c.Label == "" || c.Description == "" || c.Schema == nil || c.Schema.Type != "object" || len(c.Schema.Properties) == 0 {
+		if c.Label == "" || c.Description == "" || c.Schema == nil || c.Schema.Type != "object" || len(c.Schema.Properties) == 0 ||
+			c.Example == "" || c.Errors == "" || c.Test == "" {
 			t.Errorf("connection type %s: incomplete %+v", c.Type, c)
 		}
 	}

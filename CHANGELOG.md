@@ -7,6 +7,13 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
 
 ## Unveröffentlicht
 
+### Neu
+
+- **Katalog der Connection-Typen** (E15e, Issue #264): `runnel catalog --json` und `runnel-catalog.json` nennen je
+  Connection-Typ zusätzlich `example` (eine vollständige Connection-Datei), `errors` (wann das Verbinden scheitert,
+  z. B. unbekannter Host-Key oder nicht vertrautes Zertifikat) und `test` (was „Test connection“ prüft);
+  `runnel catalog sftp` zeigt sie als „Errors“, „Test connection“ und „Example“.
+
 ### Behoben
 
 - **Historie beim ersten Start:** Öffneten zwei Prozesse (z. B. der Dienst und `runnel run`) gleichzeitig die noch nicht

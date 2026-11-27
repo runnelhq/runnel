@@ -18,3 +18,10 @@ func Builtin() *connection.Registry {
 	r.Register(ftpDefinition)
 	return r
 }
+
+// example returns a connection file of a type for the catalog (Definition.Example); with
+// are the fields under with:, each line indented by two spaces.
+func example(name, description, typ, with string) string {
+	return "kind: Connection\napiVersion: runnel/v1\nname: " + name + "\ndescription: " + description +
+		"\ntype: " + typ + "\nwith:\n" + with
+}

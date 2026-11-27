@@ -116,18 +116,21 @@ type entry struct {
 	typ, category, label, description string
 	schema                            *schema.Schema
 	ref                               action.Reference
+	// test and example: of a connection type only (E15e).
+	test, example string
 }
 
 func actionEntry(d action.Descriptor) entry {
-	return entry{"action", d.Type, d.Category, d.Label, d.Description, d.Schema, d.Reference}
+	return entry{kind: "action", typ: d.Type, category: d.Category, label: d.Label, description: d.Description, schema: d.Schema, ref: d.Reference}
 }
 
 func transformEntry(d transform.Descriptor) entry {
-	return entry{"transform", d.Type, d.Category, d.Label, d.Description, d.Schema, d.Reference}
+	return entry{kind: "transform", typ: d.Type, category: d.Category, label: d.Label, description: d.Description, schema: d.Schema, ref: d.Reference}
 }
 
 func connectionEntry(d connection.Descriptor) entry {
-	return entry{"connection", d.Type, "", d.Label, d.Description, d.Schema, action.Reference{}}
+	return entry{kind: "connection", typ: d.Type, label: d.Label, description: d.Description, schema: d.Schema,
+		ref: action.Reference{Errors: d.Errors}, test: d.Test, example: d.Example}
 }
 
 func entries(acts []action.Descriptor, trs []transform.Descriptor, conns []connection.Descriptor) []entry {
@@ -265,7 +268,7 @@ func printDescriptor(w io.Writer, e entry) error {
 }
 
 // printReference describes the output, the records, the errors and the limits of a type
-// (roadmap E15b).
+// (roadmap E15b), for a connection type also Test connection and the example (E15e).
 func printReference(p *printer, e entry) {
 	if len(e.ref.Outputs) > 0 {
 		p.printf("\n%s\n", map[string]string{"action": "Output (result.output):", "transform": "Fields set:"}[e.kind])
@@ -273,7 +276,7 @@ func printReference(p *printer, e entry) {
 			p.printf("  %s\t%s\t%s\n", o.Name, o.Type, o.Description)
 		}
 	}
-	for _, s := range []struct{ title, text string }{{"Records", e.ref.Records}, {"Errors", e.ref.Errors}} {
+	for _, s := range []struct{ title, text string }{{"Records", e.ref.Records}, {"Errors", e.ref.Errors}, {"Test connection", e.test}} {
 		if s.text != "" {
 			p.printf("\n%s:\n  %s\n", s.title, s.text)
 		}
@@ -283,6 +286,9 @@ func printReference(p *printer, e entry) {
 		for _, l := range e.ref.Limits {
 			p.printf("  - %s\n", l)
 		}
+	}
+	if e.example != "" {
+		p.printf("\nExample (connections/<name>.yaml):\n  %s\n", strings.ReplaceAll(strings.TrimSuffix(e.example, "\n"), "\n", "\n  "))
 	}
 }
 
