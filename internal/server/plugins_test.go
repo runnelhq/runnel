@@ -5,10 +5,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/runnelhq/runnel/internal/connection"
 	"github.com/runnelhq/runnel/internal/plugin"
 	"github.com/runnelhq/runnel/internal/plugin/plugintest"
 )
@@ -65,6 +67,14 @@ func TestPluginConnection(t *testing.T) {
 	}
 	if res, _ := testConnection(t, s, "svc", ""); !res.OK || res.Message != "connected to db.example.com as *** demo 1.0" {
 		t.Errorf("%+v", res)
+	}
+	// The catalog names the plugin of the type for the help of the editor (E15g).
+	var c Catalog
+	if err := json.Unmarshal(do(t, s, "GET", "/api/v1/catalog", "").Body.Bytes(), &c); err != nil {
+		t.Fatal(err)
+	}
+	if i := slices.IndexFunc(c.ConnectionTypes, func(d connection.Descriptor) bool { return d.Type == "demo" }); i < 0 || c.ConnectionTypes[i].Plugin != "demo" {
+		t.Errorf("connection types %+v", c.ConnectionTypes)
 	}
 	writeFile(t, filepath.Join(dir, "connections", "svc.yaml"),
 		"kind: Connection\napiVersion: runnel/v1\nname: svc\ntype: demo\nwith:\n  host: down\n  password: ${secret:env/RUNNEL_TEST_SVC_PASS}\n")

@@ -55,6 +55,8 @@ type Descriptor struct {
 	Example     string         `json:"example,omitempty"`
 	Errors      string         `json:"errors,omitempty"`
 	Test        string         `json:"test,omitempty"`
+	// Plugin names the plugin that provides the type; missing for built-in types (E15g).
+	Plugin string `json:"plugin,omitempty"`
 }
 
 // Registry holds the connection types.
@@ -85,7 +87,7 @@ func (r *Registry) Register(d Definition) {
 	}
 	r.defs[d.Type] = d
 	r.desc[d.Type] = Descriptor{Type: d.Type, Label: d.Label, Description: d.Description, Schema: s,
-		Example: d.Example, Errors: d.Errors, Test: d.Test}
+		Example: d.Example, Errors: d.Errors, Test: d.Test, Plugin: d.Plugin}
 }
 
 // With returns a copy of the registry with the connection types of the plugins of a

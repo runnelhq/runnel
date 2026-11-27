@@ -23,12 +23,11 @@ import (
 )
 
 // catalogReference is the machine-readable reference of the building blocks of a version
-// (roadmap E15a): the catalog of /api/v1/catalog plus the version and the built-in
-// connection types. Releases attach it as runnel-catalog.json.
+// (roadmap E15a): the catalog of /api/v1/catalog with the built-in connection types, plus
+// the version. Releases attach it as runnel-catalog.json.
 type catalogReference struct {
 	Version string `json:"version"`
 	server.Catalog
-	ConnectionTypes []connection.Descriptor `json:"connectionTypes"`
 }
 
 // expressionsReference is the reference of expressions of a version: names and functions
@@ -66,7 +65,9 @@ func newCatalogCommand() *cobra.Command {
 			case expressions:
 				return printExpressions(out, server.NewExpressions())
 			case len(args) == 0 && asJSON:
-				return writeJSON(out, catalogReference{Version: version.Version, Catalog: server.NewCatalog(acts, trs), ConnectionTypes: conns.Descriptors()})
+				c := server.NewCatalog(acts, trs)
+				c.ConnectionTypes = conns.Descriptors()
+				return writeJSON(out, catalogReference{Version: version.Version, Catalog: c})
 			case len(args) == 0:
 				return printCatalog(out, entries(acts.Descriptors(), trs.Descriptors(), conns.Descriptors()))
 			}

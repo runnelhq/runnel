@@ -21,11 +21,15 @@ import (
 	"github.com/runnelhq/runnel/internal/transform"
 )
 
-// Catalog lists the available building blocks: the actions of workflows and the transforms of pipelines.
+// Catalog lists the available building blocks: the actions of workflows, the transforms of
+// pipelines and the connection types.
 type Catalog struct {
 	Actions []action.Descriptor `json:"actions"`
 	// Transforms of pipelines (roadmap S13b); a separate namespace (ADR 0013).
 	Transforms []transform.Descriptor `json:"transforms"`
+	// ConnectionTypes are the connection types with those of trusted plugins, for the help
+	// of the editor (E15g); runnel catalog --json lists the built-in ones (E15a).
+	ConnectionTypes []connection.Descriptor `json:"connectionTypes,omitempty"`
 }
 
 // NewCatalog builds the catalog of the registries; transforms may be nil.
@@ -38,7 +42,9 @@ func NewCatalog(actions *action.Registry, transforms *transform.Registry) Catalo
 }
 
 func (s *Server) handleCatalog(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, NewCatalog(runs.WithPlugins(s.registry, s.dir), runs.WithPluginTransforms(s.transforms, s.dir)))
+	c := NewCatalog(runs.WithPlugins(s.registry, s.dir), runs.WithPluginTransforms(s.transforms, s.dir))
+	c.ConnectionTypes = runs.ConnectionTypes(s.dir).Descriptors()
+	writeJSON(w, http.StatusOK, c)
 }
 
 // handleSchema returns the JSON Schema of a file kind (project, environment, trigger;

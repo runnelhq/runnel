@@ -121,9 +121,9 @@ test("searches building blocks of both kinds with Ctrl+K", async ({ page }) => {
   await select(page, "greet");
   await page.keyboard.press("F1");
   await page.keyboard.press("Control+k");
-  await expect(help(page).getByRole("textbox", { name: "Search building blocks" })).toBeFocused();
+  await expect(help(page).getByRole("textbox", { name: "Search help" })).toBeFocused();
   await page.keyboard.type("group by");
-  const option = page.getByRole("listbox", { name: "Building blocks" }).getByRole("option").first();
+  const option = page.getByRole("listbox", { name: "Help" }).getByRole("option").first();
   await expect(option).toContainText("core.group-by");
   await expect(option).toContainText("Transform");
   await page.keyboard.press("Enter");

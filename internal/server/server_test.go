@@ -11,11 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/runnelhq/runnel/internal/actions"
+	"github.com/runnelhq/runnel/internal/connection"
 )
 
 var update = flag.Bool("update", false, "update golden files")
@@ -274,6 +276,11 @@ func TestCatalog(t *testing.T) {
 	rec := do(t, s, "GET", "/api/v1/catalog", "")
 	if err := json.Unmarshal(rec.Body.Bytes(), &c); err != nil || len(c.Actions) == 0 || c.Actions[0].Schema == nil {
 		t.Errorf("catalog %s, err %v", rec.Body, err)
+	}
+	// The connection types for the help of the editor (E15g), with test, errors and example.
+	i := slices.IndexFunc(c.ConnectionTypes, func(d connection.Descriptor) bool { return d.Type == "sftp" })
+	if i < 0 || c.ConnectionTypes[i].Test == "" || c.ConnectionTypes[i].Errors == "" || c.ConnectionTypes[i].Example == "" || c.ConnectionTypes[i].Plugin != "" {
+		t.Errorf("connection types %+v", c.ConnectionTypes)
 	}
 }
 

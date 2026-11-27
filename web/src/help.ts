@@ -3,10 +3,15 @@ import { fetchVersion } from "./api";
 import { fetchPlugins } from "./plugins";
 import { useCatalogVersion, type CatalogKind, type Schema } from "./catalog";
 
+/** What the help shows: an action, a transform or a connection type (mockup E15f). */
+export type HelpKind = CatalogKind | "connection";
+
 /** A request to show the help of a type (mockup E15c), e.g. from the palette; seq changes with every request. */
 export interface HelpRequest {
   type: string;
-  kind: CatalogKind;
+  kind: HelpKind;
+  /** Asked from the properties panel: "‹ Properties" goes back to it. */
+  back: boolean;
   seq: number;
 }
 
@@ -15,12 +20,12 @@ const listeners = new Set<(r: HelpRequest) => void>();
 let seq = 0;
 
 /** Asks the active file view to show the help of a type. */
-export function requestHelp(type: string, kind: CatalogKind) {
-  const r = { type, kind, seq: ++seq };
+export function requestHelp(type: string, kind: HelpKind, back = false) {
+  const r = { type, kind, back, seq: ++seq };
   for (const l of listeners) l(r);
 }
 
-/** Calls on for every help request while enabled (the active file view of a workflow or pipeline). */
+/** Calls on for every help request while enabled (the active file view of a workflow, pipeline or connection). */
 export function useHelpRequests(enabled: boolean, on: (r: HelpRequest) => void) {
   useEffect(() => {
     if (!enabled) return;
@@ -59,6 +64,7 @@ const formatTypes: Record<string, string> = {
   "runnel-info-field": "field",
   "runnel-connection": "connection",
   "runnel-duration": "duration",
+  "runnel-secret": "secret",
 };
 
 /** A readable type of a field (decision for mockup E15c): "list of objects", "field", "connection" … */
@@ -81,6 +87,19 @@ export function helpType(s: Schema): string {
 export function showValue(v: unknown): string {
   if (typeof v === "string") return v === "" || v.trim() !== v ? JSON.stringify(v) : v;
   return JSON.stringify(v);
+}
+
+/** The fields of a connection type in the groups of its form (x-runnel-group; "More" last), sub-fields after their field. */
+export function helpGroups(s: Schema | undefined): [string, HelpField[]][] {
+  const groups = new Map<string, HelpField[]>();
+  let group = "";
+  for (const f of helpFields(s)) {
+    if (f.depth === 0) group = f.schema["x-runnel-group"] ?? "";
+    groups.set(group, [...(groups.get(group) ?? []), f]);
+  }
+  const order = [...groups.keys()].filter((g) => g !== "More");
+  if (groups.has("More")) order.push("More");
+  return order.map((g) => [g, groups.get(g)!]);
 }
 
 /** The example of the help: the whole step (id, type, with) as in E14. */
