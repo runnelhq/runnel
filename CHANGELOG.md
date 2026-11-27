@@ -7,6 +7,12 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
 
 ## Unveröffentlicht
 
+### Behoben
+
+- **Historie beim ersten Start:** Öffneten zwei Prozesse (z. B. der Dienst und `runnel run`) gleichzeitig die noch nicht
+  vorhandene Historie eines Projekts, scheiterte oft einer mit „table runs already exists“ oder „database is locked“.
+  Die Datei entsteht jetzt in einer temporären Datei und bekommt ihren Namen erst fertig.
+
 ## v0.1.0-alpha.13 – 2026-11-27
 
 Test-Release vor dem ersten Release Candidate für 1.0; fasst alles seit `v0.1.0-alpha.7` (2026-11-21) zusammen, auch
