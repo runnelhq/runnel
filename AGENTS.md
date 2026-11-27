@@ -44,7 +44,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/schema/` | JSON Schema aus Konfigurations-Structs (Tags `json`, `doc`, `schema`; ADR 0014) und aus den Dateiformaten in `internal/model` (`ForFile`, Namen aus `yaml`; S58) |
 | `internal/engine/workflow/` | Workflow-Engine (`engine.go`: Prepare/Run, `scheduler.go`: Parallelität, Join, Timeouts) |
 | `internal/engine/runid/` | Lauf-IDs (ULID) |
-| `internal/server/` | HTTP-API für den Editor (`runnel serve`), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events, Zustand für Monitoring (`health.go`, freier Platz je Betriebssystem in `diskfree_*.go`); Doku in `docs/dev/API.md` |
+| `internal/server/` | HTTP-API für den Editor (`runnel serve`), Ordner ohne Projekt mit Startseite und Wechsel ins neue Projekt (`host.go`, R10), Datei-API mit ETag, Pfadprüfung, Läufe, Server-Sent Events, Zustand für Monitoring (`health.go`, freier Platz je Betriebssystem in `diskfree_*.go`); Doku in `docs/dev/API.md` |
 | `internal/triggers/` | Trigger: Scheduler im Server (Zeitpunkte, Intervalle, Ordner-Überwachung in `files.go`, HTTP-Trigger mit eigenem Listener in `http.go` und Antworten in `respond.go`, `overlap`, Neuladen geänderter Dateien), Prüfung gegen das Projekt in `check.go` |
 | `internal/winsvc/` | Windows-Dienst: Installieren, Steuern, Ausführen, Ereignisanzeige (`*_windows.go`; sonst `ErrNotSupported`) |
 | `internal/proc/` | Programme starten für `shell.*` (ADR 0023): ohne Shell, Timeout mit Prozessbaum (Job Object/Prozessgruppe), Grenzen der Ausgabe, Kodierung, Prüfung von Batch-Argumenten |
@@ -62,7 +62,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/plugintrust/` | Freigabe von Plugins je Projekt und Rechner (ADR 0019): Hash über den Plugin-Ordner, Dateien der Freigaben für Benutzer und Dienst |
 | `internal/history/` | Run-Historie (ADR 0026): SQLite-Datei je Projekt im Datenordner, Migrationen, Läufe, Status je Knoten, Log, Lebenszeichen und abgebrochene Läufe; geschrieben vom Manager in `internal/runs/record.go` |
 | `internal/webui/` | eingebetteter Editor-Build (`go:embed`; `dist/` nicht im Repository) |
-| `internal/scaffold/` | Neues Projekt anlegen (`runnel init`, R9; später der Editor, R10): Dateien und Ordner, Name aus dem Ordner, nicht leere Ordner ablehnen, vorhandene Dateien nie überschreiben |
+| `internal/scaffold/` | Neues Projekt anlegen (`runnel init`, R9; der Editor über `POST /api/v1/project`, R10): Dateien und Ordner, Name aus dem Ordner, nicht leere Ordner ablehnen, vorhandene Dateien nie überschreiben |
 | `internal/version/` | Versionsinformationen (`runnel version`, `/api/v1/version`) |
 | `internal/action/` | Schnittstelle Engine ↔ Actions, Registry, Descriptors |
 | `internal/actions/` | eingebaute Actions: `actions.go` (`Builtin()`), je Namensraum ein Paket, eine Datei je Action |

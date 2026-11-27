@@ -145,7 +145,11 @@ func printHealth(w io.Writer, h *server.Health) {
 	p := func(format string, args ...any) { _, _ = fmt.Fprintf(w, format, args...) }
 	p("Status:   %s\n", h.Status)
 	p("Server:   runnel %s, up %s (since %s)\n", h.Version, (time.Duration(h.UptimeSeconds) * time.Second).String(), h.StartedAt.Format(time.RFC3339))
-	p("Project:  %s (%s)\n", h.Project.Name, h.Project.Dir)
+	name := h.Project.Name
+	if name == "" {
+		name = "none" // a folder without project (R10)
+	}
+	p("Project:  %s (%s)\n", name, h.Project.Dir)
 	p("Checks:\n")
 	for _, c := range h.Checks {
 		p("  %-9s %-12s %s\n", c.Status, c.Name, c.Message)

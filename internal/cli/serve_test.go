@@ -135,10 +135,62 @@ func TestServeStopTimeout(t *testing.T) {
 	}
 }
 
+// Without a project, serve starts and the editor creates one in the folder (R10).
+func TestServeWithoutProject(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dir := t.TempDir()
+	var out, errOut syncBuffer
+	base, done := startServe(ctx, t, &out, &errOut, "--history-dir", t.TempDir(), dir)
+	if !strings.Contains(out.String(), "No project in "+dir+"; open the editor to create one") {
+		t.Errorf("output %q", out.String())
+	}
+	get := func(path string) (int, string) {
+		resp, err := http.Get(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		return resp.StatusCode, string(body)
+	}
+	if code, body := get("/api/v1/projects/current"); code != http.StatusConflict || !strings.Contains(body, "no_project") {
+		t.Errorf("without project: %d %s", code, body)
+	}
+	resp, err := http.Post(base+"/api/v1/project", "application/json", strings.NewReader(`{"name": "demo"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create: %d", resp.StatusCode)
+	}
+	if code, body := get("/api/v1/projects/current"); code != http.StatusOK || !strings.Contains(body, `"name": "demo"`) {
+		t.Errorf("after create: %d %s", code, body)
+	}
+	if !strings.Contains(out.String(), `created project "demo" in `+dir) {
+		t.Errorf("output %q", out.String())
+	}
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Errorf("exit code %d, output %q", code, out.String())
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("server did not stop")
+	}
+}
+
 func TestServeErrors(t *testing.T) {
-	code, _, errOut := run(t, "serve", t.TempDir())
-	if code != 1 || !strings.Contains(errOut, "no project (project.yaml) found") {
-		t.Errorf("without project: exit code %d, stderr %q", code, errOut)
+	code, _, errOut := run(t, "serve", filepath.Join(t.TempDir(), "missing"))
+	if code != 1 || !strings.Contains(errOut, "no project (project.yaml) found, and") || !strings.Contains(errOut, "is not a folder") {
+		t.Errorf("missing folder: exit code %d, stderr %q", code, errOut)
+	}
+	// The Windows service needs a project.
+	err := runServer(context.Background(), serveConfig{Dir: t.TempDir()})
+	if err == nil || !strings.Contains(err.Error(), "no project (project.yaml) found in") {
+		t.Errorf("service without project: %v", err)
 	}
 	code, _, errOut = run(t, "serve", "--port", "70000", ".")
 	if code != 1 || !strings.Contains(errOut, "invalid --port 70000") {

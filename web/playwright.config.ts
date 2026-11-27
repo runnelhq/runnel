@@ -7,8 +7,10 @@ const port = 7399;
 const editPort = 7398;
 /** Port of the server on examples/pipelines (documents, E17). */
 const docsPort = 7397;
+/** Port of the server in an empty folder without project (start page, R10; see e2e/serve-empty.mjs). */
+const emptyPort = 7396;
 
-/** Stop the servers with SIGTERM, so that e2e/serve.mjs and e2e/serve-copy.mjs remove their temporary folders. */
+/** Stop the servers with SIGTERM, so that the scripts in e2e/ remove their temporary folders. */
 const gracefulShutdown = { signal: "SIGTERM" as const, timeout: 5_000 };
 
 export default defineConfig({
@@ -46,6 +48,14 @@ export default defineConfig({
       // A copy of the example project for tests that save files (e2e/edit.spec.ts).
       command: `node e2e/serve-copy.mjs ${editPort}`,
       url: `http://127.0.0.1:${editPort}/api/v1/version`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+      gracefulShutdown,
+    },
+    {
+      // An empty folder without project: the start page creates one (e2e/start.spec.ts).
+      command: `node e2e/serve-empty.mjs ${emptyPort}`,
+      url: `http://127.0.0.1:${emptyPort}/api/v1/version`,
       reuseExistingServer: false,
       timeout: 30_000,
       gracefulShutdown,

@@ -22,7 +22,8 @@ import { useTheme } from "./theme";
 
 // Editor shell after the approved mockups E4–E6b (design/mockups/): header, explorer and
 // palette, tabs with file views (workflows editable on the canvas), status bar.
-export function App() {
+// openFirst is the file to open at the start instead of the README.md (a new project, R10).
+export function App(props: { openFirst?: string }) {
   const [theme, setTheme] = useTheme();
   const { state, epoch, runsTick } = useConnection();
   // The list of runs (S26e1) follows runs that start and end; after a reconnect it loads again.
@@ -158,8 +159,9 @@ export function App() {
     if (!tree || started.current) return;
     started.current = true;
     const readme = tree.children?.find((e) => e.type === "file" && e.name.toLowerCase() === "readme.md");
-    if (readme && tabs.length === 0) open(readme.path);
-  }, [tree, tabs.length, open]);
+    const first = props.openFirst ?? readme?.path;
+    if (first && tabs.length === 0) open(first);
+  }, [tree, tabs.length, open, props.openFirst]);
   // Closes tabs at once; the active one passes to its next neighbour that stays open.
   const closeNow = (paths: string[]) => {
     if (paths.length === 0) return;

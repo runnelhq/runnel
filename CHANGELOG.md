@@ -43,6 +43,10 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
   `pipelines/`, `triggers/`, `environments/` und `connections/`, das Environment `dev`, einen Beispiel-Workflow und
   `.gitignore` an. Ein nicht leerer Ordner wird abgelehnt (Exit-Code 2); mit `--force` kommen nur die fehlenden
   Dateien hinzu, vorhandene bleiben unverändert.
+- **Neues Projekt im Editor:** `runnel serve` in einem Ordner ohne Projekt startet trotzdem; der Editor zeigt „No
+  project here“ und legt mit „Create project“ ein Projekt wie `runnel init` im Ordner des Servers an (einen nicht
+  leeren Ordner nur mit „Add to the existing files“), danach öffnet er den Beispiel-Workflow – ohne Neustart des
+  Servers. Bis dahin meldet `GET /api/v1/health` den Status `degraded` mit der Prüfung `project`.
 - **Abkündigen** (ADR 0029): umbenannte Felder gelten unter beiden Namen, `validate` warnt mit Ersatz; im Katalog
   tragen sie `deprecated` und `x-runnel-replacement`. Abgekündigt ist noch nichts.
 - Relative Pfade beziehen sich auf den Projektordner (ADR 0020); dynamische Ziele mit `allowedTargets`.

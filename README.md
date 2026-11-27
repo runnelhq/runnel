@@ -47,6 +47,10 @@ kommt aus dem Ordnernamen (klein geschrieben, andere Zeichen als Buchstaben, Zif
 oder aus `--name`. Einen nicht leeren Ordner (außer `.git`) lehnt der Befehl mit Exit-Code 2 ab; mit `--force` ergänzt
 er nur die fehlenden Dateien und überschreibt nichts. Danach öffnet `runnel serve demo` das Projekt im Editor.
 
+Es geht auch ohne Terminal-Befehl zum Anlegen: `runnel serve` in einem leeren Ordner startet den Server trotzdem, und
+der Editor zeigt „No project here“ mit „Create project“ – das legt dieselben Dateien wie `runnel init` im Ordner des
+Servers an und öffnet danach den Beispiel-Workflow.
+
 ```bash
 runnel run --environment prod examples/hello/workflows/hello.workflow.yaml
 ```
@@ -83,7 +87,8 @@ Exit-Code 1 (mit `--strict` auch bei Warnungen), bei einem falschen Aufruf oder 
 runnel serve examples/hello
 ```
 
-`runnel serve [projektordner]` startet den Server für ein Projekt; der Editor ist im Browser unter
+`runnel serve [projektordner]` startet den Server für ein Projekt (ohne Projekt im Ordner bietet der Editor an, eines
+anzulegen); der Editor ist im Browser unter
 `http://127.0.0.1:7300` erreichbar (anderer Port mit `--port`). Er ist nur vom eigenen Rechner aus erreichbar und bietet
 die API für den Editor: Projektbaum, Dateien lesen und speichern mit Konfliktschutz, Katalog der Actions und
 Transforms, Prüfung von Workflows und Pipelines sowie Läufe starten, abbrechen und live verfolgen – beschrieben in

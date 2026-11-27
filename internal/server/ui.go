@@ -21,7 +21,10 @@ const contentSecurityPolicy = "default-src 'self'; img-src 'self' data: blob:; s
 // handleUI serves the embedded editor. Files under assets/ carry a content hash in
 // their name and may be cached for good; everything else is revalidated. Paths
 // without a file extension (client-side views) get index.html.
-func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) { serveUI(s.ui, w, r) }
+
+// serveUI serves the editor files in ui; also used by Host while there is no project (R10).
+func serveUI(ui fs.FS, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -36,11 +39,11 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = "index.html"
 	}
-	if _, err := fs.Stat(s.ui, name); errors.Is(err, fs.ErrNotExist) && path.Ext(name) == "" {
+	if _, err := fs.Stat(ui, name); errors.Is(err, fs.ErrNotExist) && path.Ext(name) == "" {
 		name = "index.html"
 	}
 	if name == "index.html" {
-		if _, err := fs.Stat(s.ui, name); err != nil {
+		if _, err := fs.Stat(ui, name); err != nil {
 			h.Set("Content-Type", "text/plain; charset=utf-8")
 			_, _ = fmt.Fprintf(w, "Runnel server %s. This build does not include the editor "+
 				"(build it with \"make web\", see docs/dev/EDITOR.md); the API is available under %s.\n",
@@ -53,7 +56,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.Set("Cache-Control", "no-cache")
 	}
-	http.ServeFileFS(w, r, s.ui, name) //nolint:gosec // s.ui is the embedded build of the editor, not the file system
+	http.ServeFileFS(w, r, ui, name) //nolint:gosec // ui is the embedded build of the editor, not the file system
 }
 
 func handleVersion(w http.ResponseWriter, _ *http.Request) {
