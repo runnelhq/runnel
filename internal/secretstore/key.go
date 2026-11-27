@@ -41,6 +41,16 @@ func derive(master []byte) keys {
 var ErrNoKey = errors.New("the local secret store needs a key on this system: set " + MasterKeyEnv +
 	" to 32 random bytes in base64 (e.g. from \"openssl rand -base64 32\")")
 
+// ErrInvalidKey matches the errors of an invalid RUNNEL_MASTER_KEY (errors.Is); their
+// messages say what is wrong, never the value.
+var ErrInvalidKey = errors.New("invalid " + MasterKeyEnv)
+
+// keyError is an error of ParseMasterKey; it matches ErrInvalidKey.
+type keyError struct{ msg string }
+
+func (e keyError) Error() string        { return e.msg }
+func (e keyError) Is(target error) bool { return target == ErrInvalidKey }
+
 // ParseMasterKey reads the value of RUNNEL_MASTER_KEY: exactly 32 bytes in base64
 // (standard or URL alphabet, with or without padding). The error never contains the value.
 func ParseMasterKey(text string) ([]byte, error) {
@@ -48,15 +58,15 @@ func ParseMasterKey(text string) ([]byte, error) {
 	for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding} {
 		if k, err := enc.DecodeString(text); err == nil {
 			if len(k) != 32 {
-				return nil, fmt.Errorf("%s must be 32 bytes in base64, not %d (e.g. from \"openssl rand -base64 32\")", MasterKeyEnv, len(k))
+				return nil, keyError{fmt.Sprintf("%s must be 32 bytes in base64, not %d (e.g. from \"openssl rand -base64 32\")", MasterKeyEnv, len(k))}
 			}
 			if weakKey(k) {
-				return nil, fmt.Errorf("%s is not random (all bytes are the same); create one with \"openssl rand -base64 32\"", MasterKeyEnv)
+				return nil, keyError{fmt.Sprintf("%s is not random (all bytes are the same); create one with \"openssl rand -base64 32\"", MasterKeyEnv)}
 			}
 			return k, nil
 		}
 	}
-	return nil, fmt.Errorf("%s is not valid base64; it must be 32 random bytes in base64 (e.g. from \"openssl rand -base64 32\")", MasterKeyEnv)
+	return nil, keyError{fmt.Sprintf("%s is not valid base64; it must be 32 random bytes in base64 (e.g. from \"openssl rand -base64 32\")", MasterKeyEnv)}
 }
 
 // weakKey reports keys made of one repeated byte (e.g. all zeros), a sign of a placeholder.

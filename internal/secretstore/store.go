@@ -273,7 +273,7 @@ func (s *Store) Get(projectDir, name string) (value string, ok bool, err error) 
 		return "", false, err
 	}
 	if f.KeyID != k.id {
-		return "", false, errOtherKey
+		return "", false, ErrOtherKey
 	}
 	gcm, err := newGCM(k.enc)
 	if err != nil {
@@ -286,7 +286,8 @@ func (s *Store) Get(projectDir, name string) (value string, ok bool, err error) 
 	return string(plain), true, nil
 }
 
-var errOtherKey = errors.New("the secrets of this project were stored with another key (was RUNNEL_MASTER_KEY set, changed or removed, or are they from another account?)")
+// ErrOtherKey is returned when the secrets of a project were stored with another key.
+var ErrOtherKey = errors.New("the secrets of this project were stored with another key (was RUNNEL_MASTER_KEY set, changed or removed, or are they from another account?)")
 
 // Set stores the value of a secret of a project (replacing an earlier one).
 func (s *Store) Set(projectDir, name, value string, now time.Time) error {
@@ -309,7 +310,7 @@ func (s *Store) Set(projectDir, name, value string, now time.Time) error {
 		return err
 	}
 	if len(f.Secrets) > 0 && f.KeyID != k.id {
-		return errOtherKey
+		return ErrOtherKey
 	}
 	gcm, err := newGCM(k.enc)
 	if err != nil {

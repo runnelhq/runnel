@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,14 +198,14 @@ func TestParseMasterKey(t *testing.T) {
 		base64.StdEncoding.EncodeToString(make([]byte, 64)): "not 64",
 	} {
 		_, err := ParseMasterKey(in)
-		if err == nil || !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), in) {
+		if err == nil || !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), in) || !errors.Is(err, ErrInvalidKey) {
 			t.Errorf("%q: %v, want %q", in, err, want)
 		}
 	}
 	// An invalid key in the environment stops the store before anything is written.
 	s, project := newStore(t)
 	t.Setenv(MasterKeyEnv, "secret-but-not-base64!")
-	if err := s.Set(project, "pw", "x", now); err == nil || !strings.Contains(err.Error(), "not valid base64") || strings.Contains(err.Error(), "secret-but") {
+	if err := s.Set(project, "pw", "x", now); err == nil || !errors.Is(err, ErrInvalidKey) || strings.Contains(err.Error(), "secret-but") {
 		t.Errorf("set: %v", err)
 	}
 }

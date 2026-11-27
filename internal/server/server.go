@@ -25,6 +25,7 @@ import (
 	"github.com/runnelhq/runnel/internal/httpx"
 	"github.com/runnelhq/runnel/internal/model"
 	"github.com/runnelhq/runnel/internal/runs"
+	"github.com/runnelhq/runnel/internal/secretstore"
 	"github.com/runnelhq/runnel/internal/transform"
 	"github.com/runnelhq/runnel/internal/triggers"
 	"github.com/runnelhq/runnel/internal/webui"
@@ -94,6 +95,12 @@ type Server struct {
 	triggerTLS    *tls.Config
 	historyErr    string
 	dataDir       string
+	// secrets returns the local secret store (secretstore.Default; replaced by tests).
+	// secretMu serializes its changes; secretErr is the last error of reading it in the
+	// server log, so that it is logged once.
+	secrets   func() (*secretstore.Store, error)
+	secretMu  sync.Mutex
+	secretErr string
 	// now and diskFree are replaced by tests.
 	now      func() time.Time
 	diskFree func(dir string) (free, total uint64, err error)
@@ -118,7 +125,8 @@ func New(opts Options) (*Server, error) {
 	}
 	s := &Server{dir: opts.Dir, root: root, registry: opts.Registry, transforms: opts.Transforms, ui: ui, runs: runs.NewManager(),
 		stop: make(chan struct{}), warn: warn, info: opts.Log,
-		started: time.Now(), triggerListen: opts.TriggerListen, triggerTLS: opts.TriggerTLS, now: time.Now, diskFree: diskFree}
+		started: time.Now(), triggerListen: opts.TriggerListen, triggerTLS: opts.TriggerTLS, now: time.Now, diskFree: diskFree,
+		secrets: secretstore.Default}
 	if p, err := model.LoadProject(opts.Dir); err == nil {
 		s.projectName = p.Name
 	}
@@ -261,6 +269,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST "+APIPrefix+"/connections/{name}/test", s.handleTestConnection)
 	mux.HandleFunc("POST "+APIPrefix+"/forms/edit", s.handleEditForm)
 	mux.HandleFunc("GET "+APIPrefix+"/secrets", s.handleSecrets)
+	mux.HandleFunc("PUT "+APIPrefix+"/secrets/{name}", s.handleSetSecret)
+	mux.HandleFunc("DELETE "+APIPrefix+"/secrets/{name}", s.handleDeleteSecret)
 	mux.HandleFunc("GET "+APIPrefix+"/expressions", s.handleExpressions)
 	mux.HandleFunc("POST "+APIPrefix+"/validate", s.handleValidate)
 	mux.HandleFunc("POST "+APIPrefix+"/workflows/edit", s.handleEditWorkflow)
@@ -315,7 +325,7 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 // writeErr maps an error to a response; errors of type *httpError carry their status.
 func writeErr(w http.ResponseWriter, err error) {
 	if he, ok := errors.AsType[*httpError](err); ok {
-		writeError(w, he.status, he.msg)
+		writeJSON(w, he.status, apiError{Error: he.msg, Code: he.code})
 		return
 	}
 	switch {
@@ -328,7 +338,9 @@ func writeErr(w http.ResponseWriter, err error) {
 
 type httpError struct {
 	status int
-	msg    string
+	// code is the code of the response for the editor; empty: none.
+	code string
+	msg  string
 }
 
 func (e *httpError) Error() string { return e.msg }

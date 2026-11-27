@@ -761,3 +761,33 @@ S39d ist geteilt (Store und CLI vor DPAPI und Dienst): S39d1 setzt den Store mit
   Schlüssel (Namen stehen im Klartext). `env` prüft die Umgebung der Konsole, nicht die des Dienstes.
 - **Keine neue Abhängigkeit:** DPAPI über `golang.org/x/sys/windows` (schon im Modul); Rechte des Ordners wie bei
   Log, Zertifikaten und Run-Historie des Dienstes (`internal/winsvc`).
+
+## Nachtrag 2026-11-27 (S39g1): Secrets aus dem Editor setzen
+
+S39g ist geteilt (Server vor Editor): S39g1 bringt die API, S39g2 die Oberfläche nach Mockup S39f.
+
+- **Nur `local`:** `PUT /api/v1/secrets/{name}` setzt oder ersetzt einen Wert im lokalen Store des Projekts,
+  `DELETE /api/v1/secrets/{name}` löscht ihn. Der Body nennt das Environment (dessen Standardquelle gilt) oder die
+  Quelle aus der Referenz (`${secret:local/NAME}`, hat Vorrang); ist das nicht `local`, antwortet der Server `409`
+  (`not_local`) mit einem Hinweis für `env` (Umgebungsvariable des Kontos, danach Neustart) und `inline` (Klartext in der
+  Datei). Runnel schreibt nur in `local` (Abschnitt 4); `DELETE` braucht kein Environment, der Store gehört zum Projekt.
+- **Werte:** höchstens 1 MB wie im Store (`413`; der Body darf 2 MiB haben, damit maskierte Zeilenumbrüche passen),
+  leere Werte sind ein Fehler (`400`), Zeilenumbrüche bleiben. Der Wert steht nie in einer Antwort oder im Log; das
+  Server-Log nennt Namen und Vorgang („secret X set in the local secret store (editor)“).
+- **Schlüssel:** Ohne `RUNNEL_MASTER_KEY` (Systeme ohne DPAPI) oder mit ungültigem antwortet der Server `503`
+  (`secret_key`) mit der Meldung des Stores und „then restart runnel serve“ – der Server liest die Variable beim
+  Start; Werte mit einem anderen Schlüssel ergeben `409` (`other_key`). Andere Fehler des Stores stehen nur im
+  Server-Log, die Antwort nennt keine Pfade. Dafür hat `secretstore` die Fehler `ErrInvalidKey` und `ErrOtherKey`.
+- **Store des Windows-Dienstes:** Läuft der Server als Dienst (`runnel service run`, Store des Rechners), sind Setzen und
+  Löschen aus (`403`, `secrets_read_only`): Den Store schreiben Administratoren in einer Konsole mit
+  `runnel secret set NAME --service` (Nachtrag S39d), nicht das Konto des Dienstes. `GET /secrets` meldet das in
+  `local.readOnly`.
+- **Netzbetrieb:** Heute ist der Editor nur über `127.0.0.1` erreichbar (Host- und Origin-Prüfung gelten auch für die
+  neuen Endpunkte). Mit S40b kommt `local.readOnly: network`: Setzen und Löschen sind dann aus, außer mit
+  `--allow-secret-changes` beim Start (Entscheidung des Maintainers zu Mockup S39f).
+- **Übersicht:** `GET /secrets` liefert zusätzlich je Environment die Änderungszeit gesetzter Werte aus `local`, unter
+  `local` den Store (`user`, `service`), `readOnly`, eine Meldung, wenn der Store nicht lesbar ist (ohne Pfade;
+  Einzelheiten einmal je Fehler im Server-Log), und `unused`: Werte im Store, die keine Datei des Projekts aus `local`
+  liest (z. B. nach dem Umbenennen eines Secrets; leer, wenn die Suche in den Dateien abgeschnitten wurde, damit
+  nichts Benutztes als „not used“ erscheint). Ob ein Wert mehrzeilig ist („multi-line“ im Mockup), liefert der Server
+  nicht: dafür müsste er Werte entschlüsseln.

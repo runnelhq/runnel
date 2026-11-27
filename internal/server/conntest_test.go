@@ -129,7 +129,7 @@ func TestSecretsList(t *testing.T) {
 	}
 	rec = do(t, s, "GET", "/api/v1/secrets", "")
 	_ = json.Unmarshal(rec.Body.Bytes(), &info)
-	if info.Secrets[0].Environments["dev"].State != "missing" || info.Secrets[1].Environments["prod"] != (secretState{Store: "local", State: "set"}) ||
+	if prod := info.Secrets[1].Environments["prod"]; info.Secrets[0].Environments["dev"].State != "missing" || prod.Store != "local" || prod.State != "set" || prod.Updated == "" ||
 		strings.Contains(rec.Body.String(), "T0ken-local") {
 		t.Errorf("%+v", info.Secrets)
 	}
