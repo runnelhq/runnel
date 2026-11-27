@@ -32,8 +32,8 @@ export interface ActionNodeData extends Record<string, unknown> {
   onStartRename?: () => void;
   /** Status in the current or last run (mockup E8). */
   run?: ActionRun;
-  /** The action has data in the last run started in the editor (mockup E23), and how to show it. */
-  stepData?: { onShow: () => void };
+  /** The action has data in the last run started in the editor (mockup E23): entries of forEach, and how to show it. */
+  stepData?: { entries?: number; onShow: () => void };
   /** Set while the id is edited: ids in use and the callback with the new id (null: keep). */
   rename?: { taken: Set<string>; onDone: (id: string | null) => void };
 }
@@ -98,6 +98,7 @@ export function ActionNode({ data, selected }: NodeProps<ActionNodeType>) {
           {data.forEach && (
             <Chip title="Runs once for each entry of a list (forEach)" testId="for-each">
               ↻ for each{data.parallel && data.parallel > 1 ? ` · ${data.parallel} at a time` : ""}
+              {data.stepData?.entries !== undefined ? ` · ${data.stepData.entries.toLocaleString("en-US")}` : ""}
             </Chip>
           )}
           {copies > 0 && (

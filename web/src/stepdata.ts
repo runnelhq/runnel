@@ -7,9 +7,19 @@ export interface StepSummary {
   type: string;
   runs: number;
   status: string;
+  entries?: number;
 }
 
-/** What the last execution of an action got and returned (GET /runs/{id}/steps/{action}); forEach: the whole step. */
+/** A place where the server cut the data to its limits (1 MB per step or entry). */
+export interface Truncation {
+  part: "input" | "row" | "output";
+  path?: string;
+  kind: "list" | "object" | "text";
+  length: number;
+  kept: number;
+}
+
+/** What one execution (or entry of forEach) of an action got and returned (GET /runs/{id}/steps/{action}). */
 export interface StepData {
   runId: string;
   actionId: string;
@@ -20,13 +30,18 @@ export interface StepData {
   reason?: string;
   durationMs: number;
   inputSources?: Record<string, string>;
+  entry?: number;
+  entryStatus?: string;
   attempts?: number;
   attemptErrors?: string[];
+  row?: unknown;
   input?: Record<string, unknown>;
   secrets?: string[];
   connection?: { name: string; type: string; with: Record<string, unknown>; secrets?: string[] };
   output?: unknown;
   error?: string;
+  truncated?: Truncation[];
+  dropped?: boolean;
   entries?: { index: number; status: string }[];
 }
 
@@ -49,7 +64,13 @@ export async function fetchSteps(runId: string): Promise<StepSummary[] | null> {
   }
 }
 
-export const fetchStep = (runId: string, action: string) => get<StepData>(`/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(action)}`);
+export function fetchStep(runId: string, action: string, run?: number, entry?: number): Promise<StepData> {
+  const q = new URLSearchParams();
+  if (run) q.set("run", String(run));
+  if (entry) q.set("entry", String(entry));
+  const qs = q.toString();
+  return get<StepData>(`/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(action)}${qs ? `?${qs}` : ""}`);
+}
 
 const namePattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 

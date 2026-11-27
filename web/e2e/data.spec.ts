@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// The data of each step after a run (E23b1, mockup design/mockups/e23-step-data.html): the tab
-// "Data" with input, output as tree and JSON, the path of a value, failed and skipped steps,
-// the empty state, and (mocked) runs without data.
+// The data of each step after a run (E23b, mockup design/mockups/e23-step-data.html): the tab
+// "Data" with input, output as tree, table and JSON, the path of a value, entries of forEach,
+// failed and skipped steps, the empty state, and (mocked) runs without data and cut output.
 // Against a copy of examples/hello with a key for the local secret store (e2e/serve-copy.mjs).
 test.use({ baseURL: "http://127.0.0.1:7394", permissions: ["clipboard-read", "clipboard-write"] });
 test.describe.configure({ mode: "serial" });
@@ -84,9 +84,9 @@ async function open(page: Page) {
 }
 
 /** Runs the workflow with dev and waits for its end (it fails at entry 3 of each); the first run of a page asks for the environment. */
-async function run(page: Page) {
+async function run(page: Page, first = true) {
   await page.getByRole("button", { name: "Run", exact: true }).click();
-  await page.getByRole("dialog", { name: "Run data.workflow.yaml" }).getByRole("button", { name: "Run" }).click();
+  if (first) await page.getByRole("dialog", { name: "Run data.workflow.yaml" }).getByRole("button", { name: "Run" }).click();
   await expect(page.getByTestId("log-status")).toContainText("✖ Failed", { timeout: 10_000 });
 }
 
@@ -100,12 +100,13 @@ test("shows the empty state before the first run", async ({ page }) => {
   await expect(page.getByTestId("data-sign-orders")).toHaveCount(0);
 });
 
-test("shows input and output of a step as tree and JSON with the path of a value", async ({ page }) => {
+test("shows input and output of a step as tree, table and JSON with the path of a value", async ({ page }) => {
   await open(page);
   await run(page);
   // Nodes with data carry the sign; the skipped step has none.
   for (const id of ["orders", "query", "each"]) await expect(page.getByTestId(`data-sign-${id}`)).toBeVisible();
   await expect(page.getByTestId("data-sign-after")).toHaveCount(0);
+  await expect(page.getByTestId("for-each")).toContainText("for each · 3");
 
   await page.getByTestId("data-sign-orders").click();
   await expect(data(page)).toBeVisible();
@@ -139,10 +140,13 @@ test("shows input and output of a step as tree and JSON with the path of a value
   await data(page).getByRole("button", { name: "{{ }}" }).click();
   await expect.poll(() => clipboard(page)).toBe("{{ results.orders.output.items[0].name }}");
 
-  // A key that is no name stands in brackets.
-  await output.getByRole("treeitem").filter({ hasText: "[2]" }).click();
-  await output.getByRole("treeitem").filter({ hasText: "4.25" }).click();
+  // Table: the list of objects with its columns (keys sorted as the server keeps them); a key that is no name in brackets.
+  await data(page).getByRole("button", { name: "Table" }).click();
+  const table = page.getByRole("table", { name: "Output as table" });
+  await expect(table.getByRole("columnheader")).toHaveText(["#", "customerobject", "idinteger", "namestring", "unit pricenumber"]);
+  await table.getByRole("cell", { name: "4.25" }).click();
   await expect(page.getByTestId("data-path")).toHaveText('results.orders.output.items[2]["unit price"]');
+  await expect(table.getByRole("cell", { name: "{ … }" }).first()).toHaveAttribute("title", '{"city":"Bonn"}');
 
   // JSON and Copy.
   await data(page).getByRole("button", { name: "JSON" }).click();
@@ -160,9 +164,11 @@ test("shows input and output of a step as tree and JSON with the path of a value
   await expect(conn).toContainText("sqlite · as resolved for dev");
   await conn.click();
   await expect(input.getByTestId("input-path")).toContainText('"data/e2e.db"');
+  await data(page).getByRole("button", { name: /^\+ \d+ defaults?$/ }).click();
+  await expect(input.getByTestId("input-maxRows")).toContainText("default");
 });
 
-test("shows a failed step with forEach and a skipped step", async ({ page }) => {
+test("shows the entries of forEach, a failed entry and a skipped step", async ({ page }) => {
   await open(page);
   await run(page);
   // The properties panel opens the data of the selected step.
@@ -170,13 +176,33 @@ test("shows a failed step with forEach and a skipped step", async ({ page }) => 
   await page.getByTestId("last-run").getByRole("button", { name: "Show data" }).click();
   await expect(dataTab(page)).toContainText("!");
   await expect(page.getByTestId("data-status")).toHaveText("✖ Failed");
+  await expect(page.getByTestId("data-head")).toContainText("entry 3 of 3 failed");
+  await expect(page.getByTestId("entries-summary")).toHaveText("2 succeeded · 1 failed");
 
-  // The error of the whole step instead of the output, the log open; forEach has no input of the step.
+  // The failed entry is shown at once: the error instead of the output, the log open.
+  await expect(page.getByRole("combobox", { name: "Entry" })).toHaveValue("3");
   const error = page.getByTestId("data-error");
   await expect(error).toContainText("entry 3 is broken");
   await expect(error).toContainText("results.each.error");
-  await expect(page.getByTestId("data-input")).toContainText("Each entry of forEach has an input of its own.");
+  await expect(error).toContainText("results.each.output.items[2].error");
+  await expect(page.getByTestId("data-input").getByRole("button", { name: /^row/ })).toBeVisible();
+  await expect(page.getByTestId("input-params.id")).toContainText("3");
   await expect(page.getByTestId("data-log")).toContainText("entry 3 is broken");
+
+  // Another entry: its output as in results.each.output.items[0].
+  await data(page).getByRole("button", { name: "Entry 1", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Entry" })).toHaveValue("1");
+  const output = page.getByTestId("data-output");
+  await output.getByRole("treeitem").filter({ hasText: "doubled" }).click();
+  await expect(page.getByTestId("data-path")).toHaveText("results.each.output.items[0].output.doubled");
+  await data(page).getByRole("button", { name: "Next entry" }).click();
+  await expect(page.getByRole("combobox", { name: "Entry" })).toHaveValue("2");
+  await expect(page.getByTestId("input-params.id")).toContainText("2");
+
+  // All entries: the list of the entries; no input of its own.
+  await data(page).getByRole("button", { name: "All entries" }).click();
+  await expect(page.getByRole("combobox", { name: "Entry" })).toHaveCount(0);
+  await expect(page.getByTestId("data-input")).toContainText("Each entry has an input of its own");
 
   // A skipped step: why, with its incoming links and the status of their source.
   await node(page, "after").click();
@@ -189,11 +215,40 @@ test("shows a failed step with forEach and a skipped step", async ({ page }) => 
   await expect(page.getByTestId("data-status")).toHaveText("✔ Succeeded");
 });
 
-test("shows runs without data", async ({ page }) => {
+test("shows runs without data and output cut to the limit", async ({ page }) => {
   await open(page);
+  // The output of orders as the server sends it when it was larger than 1 MB.
+  await page.route("**/api/v1/runs/*/steps/orders", async (route) => {
+    const response = await route.fetch();
+    const json = await response.json();
+    json.truncated = [{ part: "output", path: "items", kind: "list", length: 8200, kept: 3 }];
+    await route.fulfill({ response, json });
+  });
+  // The data of query as the server sends it when the run had reached its limit of 20 MB.
+  await page.route("**/api/v1/runs/*/steps/query", async (route) => {
+    const response = await route.fetch();
+    const json = await response.json();
+    delete json.input;
+    delete json.output;
+    delete json.connection;
+    json.dropped = true;
+    await route.fulfill({ response, json });
+  });
+  await run(page);
+  await page.getByTestId("data-sign-query").click();
+  await expect(page.getByTestId("data-head")).toContainText("db.query");
+  await expect(data(page).getByRole("note")).toContainText("the run reached its limit of 20 MB for the data of its steps");
+  await expect(page.getByTestId("data-input")).toContainText("Not kept: the run reached its limit of 20 MB.");
+  await expect(page.getByTestId("data-output")).toContainText("No output.");
+  await page.getByTestId("data-sign-orders").click();
+  await expect(data(page).getByRole("note")).toContainText("Output larger than 1 MB – shown up to 1 MB.");
+  await expect(data(page).getByRole("note")).toContainText("the first 3 of 8,200 entries of items");
+  await data(page).getByRole("button", { name: "Tree" }).click();
+  await expect(page.getByTestId("data-output").getByRole("treeitem", { name: /^items/ })).toContainText("8,200 entries · first 3 kept");
+
   // A run whose data the server did not keep (e.g. after a restart or another run).
   await page.route("**/api/v1/runs/*/steps", (route) => route.fulfill({ status: 404, json: { error: "no data kept for this run" } }));
-  await run(page);
+  await run(page, false);
   await node(page, "orders").click();
   await dataTab(page).click();
   await expect(data(page)).toContainText("No data kept for this run");
