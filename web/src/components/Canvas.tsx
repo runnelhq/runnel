@@ -193,7 +193,7 @@ function Graph(props: CanvasProps) {
           onShowInYAML,
           problemsInPanel,
           run: run?.actions[a.id],
-          stepData: stepData?.has(a.id) && onShowData ? { onShow: () => onShowData(a.id) } : undefined,
+          stepData: stepData?.has(a.id) && onShowData ? { entries: stepData.get(a.id)!.entries, onShow: () => onShowData(a.id) } : undefined,
           connectable: editable,
           onStartRename: editable ? () => onRenaming?.(a.id) : undefined,
           rename: renaming === a.id ? { taken: ids, onDone: (to: string | null) => finishRename(a.id, to) } : undefined,

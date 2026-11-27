@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { tileColor, useCatalog } from "../catalog";
 import { formatDuration, type RunView } from "../run";
-import { fetchStep, joinPath, keyPath, plural, typeOf, type StepData, type StepSummary } from "../stepdata";
+import { fetchStep, joinPath, keyPath, plural, typeOf, type StepData, type StepSummary, type Truncation } from "../stepdata";
 import { kindOfLink, type Workflow } from "../workflow";
 import { ago } from "./SecretField";
-import { ActionIcon, BracesIcon, ChevronIcon, CopyIcon, ExternalIcon, HistoryIcon, LockIcon, PlayIcon } from "./Icons";
+import { ActionIcon, BackIcon, BracesIcon, ChevronIcon, CopyIcon, ExternalIcon, HistoryIcon, LockIcon, PlayIcon } from "./Icons";
 
 /** The steps with data of a run; steps is null when the server keeps none for it. */
 export interface StepsState {
@@ -15,11 +15,12 @@ export interface StepsState {
 const label = "text-2xs font-semibold tracking-[.06em] text-muted-foreground uppercase";
 const smallButton =
   "inline-flex h-[22px] cursor-pointer items-center gap-1 rounded-md border border-input bg-background px-[7px] text-2xs font-medium whitespace-nowrap text-foreground hover:bg-muted disabled:cursor-default disabled:opacity-50";
+const iconButton = "inline-grid size-6 cursor-pointer place-items-center rounded-md border border-input bg-background text-foreground disabled:opacity-40";
 const segment =
   "cursor-pointer rounded-sm border-0 bg-transparent px-[7px] py-px text-2xs whitespace-nowrap text-muted-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm";
 const copy = (text: string) => void navigator.clipboard?.writeText(text);
 const viewKey = "runnel.data.view";
-type View = "tree" | "json";
+type View = "tree" | "table" | "json";
 
 const statusChip: Record<string, [string, string]> = {
   succeeded: ["✔ Succeeded", "bg-success-soft text-success"],
@@ -31,9 +32,8 @@ const statusChip: Record<string, [string, string]> = {
 
 /**
  * The tab "Data" below the canvas (mockup design/mockups/e23-step-data.html): for the step chosen on the canvas,
- * what reached it in the last run started in the editor (Input) and what it returned (Output as tree or JSON),
- * with the path of a value for expressions and its log lines. A step with forEach shows the data of the whole
- * step (the list of its entries), a step run more than once that of its last run.
+ * what reached it in the last run started in the editor (Input) and what it returned (Output as tree, table or
+ * JSON), with the path of a value for expressions, its log lines, the entries of forEach and the runs of a loop.
  */
 export function DataPanel(props: {
   workflow: Workflow;
@@ -47,7 +47,19 @@ export function DataPanel(props: {
 }) {
   const { run, actionId, steps } = props;
   const summary = steps?.steps?.find((s) => s.actionId === actionId);
-  const shown = useStep(summary && run ? run.id : null, actionId);
+  const [pos, setPos] = useState<{ key: string; run?: number; entry?: number }>({ key: "" });
+  const posKey = `${run?.id}|${actionId}`;
+  const at = pos.key === posKey ? pos : { key: posKey };
+  const choose = (p: { run?: number; entry?: number }) => setPos({ ...at, ...p, key: posKey });
+  // entry 0: "All entries" chosen; undefined: not chosen yet.
+  const entryNo = at.entry || undefined;
+  const base = useStep(summary && run ? run.id : null, actionId, at.run, undefined);
+  const entry = useStep(summary && run && entryNo ? run.id : null, actionId, at.run, entryNo);
+  // A failed entry of forEach is shown at once (mockup E23, state failed).
+  const failedEntry = base?.entries?.find((e) => e.status === "failed")?.index;
+  useEffect(() => {
+    if (failedEntry && at.entry === undefined && base?.actionId === actionId && base.runId === run?.id) setPos({ ...at, entry: failedEntry });
+  }, [failedEntry, base, actionId]);
 
   const box = (content: ReactNode) => (
     <div data-testid="data" className="flex h-[412px] min-h-0 flex-col border-t border-border">
@@ -81,8 +93,8 @@ export function DataPanel(props: {
       <ExternalIcon width={11} height={11} />
     </span>
   );
-  const headOf = (status: string, durationMs: number | undefined, d?: StepData) => (
-    <Head id={actionId} type={type} status={status} durationMs={durationMs} data={d} retries={props.workflow.actions?.find((a) => a.id === actionId)?.retry?.attempts} runLink={runLink} />
+  const headOf = (status: string, durationMs: number | undefined, extra?: ReactNode, d?: StepData) => (
+    <Head id={actionId} type={type} status={status} durationMs={durationMs} data={d} retries={props.workflow.actions?.find((a) => a.id === actionId)?.retry?.attempts} extra={extra} runLink={runLink} />
   );
   const ran = (steps?.steps ?? []).filter((s) => s.status !== "skipped").map((s) => s.actionId);
 
@@ -108,7 +120,7 @@ export function DataPanel(props: {
     return box(
       <>
         {headOf("skipped", undefined)}
-        <Empty icon="–" title={`Not run: ${shown?.reason ?? "no incoming link applies"}`}>
+        <Empty icon="–" title={`Not run: ${base?.reason ?? "no incoming link applies"}`}>
           <p className="mt-0 mb-1">A step runs when one of its incoming links applies. In this run:</p>
           <div className="mx-auto mt-1 mb-2.5 inline-grid gap-1 text-left">
             {incoming.map((l, i) => {
@@ -153,41 +165,82 @@ export function DataPanel(props: {
       </>,
     );
   }
-  if (!shown || shown.actionId !== actionId || shown.runId !== run.id) return box(<Empty icon={<BracesIcon width={20} height={20} />} title="Loading…" />);
+  if (!base || base.actionId !== actionId) return box(<Empty icon={<BracesIcon width={20} height={20} />} title="Loading…" />);
 
-  const outBase = `${keyPath("results", actionId)}.output`;
-  const failed = shown.status === "failed" && !!shown.error;
-  const lines = run.log.filter((l) => l.actionId === actionId);
+  const shown = entryNo && entry?.entry === entryNo ? entry : entryNo ? null : base;
+  const entries = base.entries ?? [];
+  const count = (s: string) => entries.filter((e) => e.status === s).length;
+  const notRun = entries.filter((e) => e.status === "skipped" || e.status === "cancelled").map((e) => e.index);
+  const extra = entries.length > 0 && (base.status === "failed" && failedEntry ? `entry ${failedEntry} of ${entries.length} failed` : `for each · ${plural(entries.length, "entry", "entries")}`);
+  const resultBase = keyPath("results", actionId);
+  const outBase = entryNo ? `${resultBase}.output.items[${entryNo - 1}]` : `${resultBase}.output`;
+  const failed = shown && (shown.entryStatus ?? shown.status) === "failed" && !!shown.error;
+  const lines = run.log.filter((l) => {
+    if (l.actionId !== actionId) return false;
+    const m = l.message.match(/^\[(\d+)\/\d+\]/);
+    return !entryNo || !m || Number(m[1]) === entryNo;
+  });
   return box(
     <>
-      {headOf(shown.status, shown.durationMs, shown)}
-      <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
-        <InputPane key={actionId} data={shown} environment={run.environment} forEach={!!shown.entries?.length} />
-        <div className="flex min-h-0 min-w-0 flex-col border-l border-border">
-          {failed ? <ErrorPane id={actionId} data={shown} /> : <OutputPane key={outBase} data={shown} base={outBase} />}
+      {headOf(base.status, base.durationMs, extra, shown ?? base)}
+      {(entries.length > 0 || base.runs > 1) && (
+        <div className="flex h-9 shrink-0 items-center gap-2.5 border-b border-border px-3 text-xs whitespace-nowrap text-muted-foreground">
+          {base.runs > 1 && <Stepper what="Run" n={base.run} of={base.runs} onChoose={(r) => choose({ run: r, entry: undefined })} />}
+          {entries.length > 0 && (
+            <>
+              <div role="group" aria-label="Show" className="inline-flex gap-0.5 rounded-md border border-border bg-muted p-0.5">
+                <button type="button" aria-pressed={!entryNo} onClick={() => choose({ entry: 0 })} className={segment}>
+                  All entries
+                </button>
+                <button type="button" aria-pressed={!!entryNo} onClick={() => choose({ entry: entryNo ?? failedEntry ?? 1 })} className={segment}>
+                  Entry
+                </button>
+              </div>
+              {entryNo && <Stepper what="Entry" n={entryNo} of={entries.length} onChoose={(e) => choose({ entry: e })} />}
+              <Strip entries={entries} current={entryNo} onChoose={(e) => choose({ entry: e })} />
+              <span className="flex-1" />
+              <span data-testid="entries-summary">
+                {[`${count("succeeded")} succeeded`, count("failed") > 0 && `${count("failed")} failed`, notRun.length > 0 && `${notRun.length} not run`].filter(Boolean).join(" · ")}
+              </span>
+            </>
+          )}
         </div>
-      </div>
-      <StepLog key={`${actionId}|${failed}`} lines={lines} open={failed} onShowInLog={() => props.onShowInLog(actionId)} />
+      )}
+      {!shown ? (
+        <Empty icon={<BracesIcon width={20} height={20} />} title="Loading…" />
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-[340px_1fr]">
+          <InputPane key={`${actionId}|${entryNo}`} data={shown} entryMode={!!entryNo} environment={run.environment} forEach={entries.length > 0} />
+          <div className="flex min-h-0 min-w-0 flex-col border-l border-border">
+            {failed ? (
+              <ErrorPane id={actionId} data={shown} entry={entryNo} notRun={notRun} />
+            ) : (
+              <OutputPane key={outBase} data={shown} base={outBase} entryMode={!!entryNo} />
+            )}
+          </div>
+        </div>
+      )}
+      <StepLog key={`${actionId}|${entryNo}|${!!failed}`} lines={lines} open={!!failed} entry={entryNo} onShowInLog={() => props.onShowInLog(actionId)} />
     </>,
   );
 }
 
 const linkKindText: Record<string, string> = { success: "On success", failure: "On failure", always: "Always" };
 
-/** Loads the data of a step (its last execution); the last one stays while the next loads. */
-function useStep(runId: string | null, action: string | null): StepData | null {
+/** Loads the data of an execution or entry of a step; the last one stays while the next loads. */
+function useStep(runId: string | null, action: string | null, run?: number, entry?: number): StepData | null {
   const [data, setData] = useState<StepData | null>(null);
   useEffect(() => {
     if (!runId || !action) return setData(null);
     let live = true;
-    fetchStep(runId, action).then(
+    fetchStep(runId, action, run, entry).then(
       (d) => live && setData(d),
       () => live && setData(null),
     );
     return () => {
       live = false;
     };
-  }, [runId, action]);
+  }, [runId, action, run, entry]);
   return data;
 }
 
@@ -203,7 +256,7 @@ function Empty(props: { icon: ReactNode; title: string; children?: ReactNode }) 
   );
 }
 
-function Head(props: { id: string; type: string; status: string; durationMs?: number; data?: StepData; retries?: number; runLink: ReactNode }) {
+function Head(props: { id: string; type: string; status: string; durationMs?: number; data?: StepData; retries?: number; extra?: ReactNode; runLink: ReactNode }) {
   const d = useCatalog("workflow").get(props.type);
   const [text, cls] = statusChip[props.status] ?? statusChip.cancelled;
   const attempts = props.data?.attempts ?? 0;
@@ -240,9 +293,76 @@ function Head(props: { id: string; type: string; status: string; durationMs?: nu
             </span>
           </>
         )}
+        {props.extra && (
+          <>
+            {sep}
+            <span>{props.extra}</span>
+          </>
+        )}
       </span>
       <span className="flex-1" />
       {props.runLink}
+    </div>
+  );
+}
+
+function Stepper(props: { what: string; n: number; of: number; onChoose: (n: number) => void }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <button type="button" aria-label={`Previous ${props.what.toLowerCase()}`} disabled={props.n <= 1} onClick={() => props.onChoose(props.n - 1)} className={iconButton}>
+        <BackIcon width={12} height={12} />
+      </button>
+      <select
+        aria-label={props.what}
+        value={props.n}
+        onChange={(e) => props.onChoose(Number(e.target.value))}
+        className="h-6 rounded-md border border-input bg-background px-2 text-xs text-foreground tabular-nums"
+      >
+        {Array.from({ length: props.of }, (_, i) => (
+          <option key={i} value={i + 1}>
+            {props.what} {i + 1} of {props.of}
+          </option>
+        ))}
+      </select>
+      <button type="button" aria-label={`Next ${props.what.toLowerCase()}`} disabled={props.n >= props.of} onClick={() => props.onChoose(props.n + 1)} className={iconButton}>
+        <ChevronIcon open={false} width={12} height={12} />
+      </button>
+    </span>
+  );
+}
+
+/** One mark per entry of forEach: ✔, ✖, or its number dashed when it did not run (at most 30 around the current). */
+function Strip(props: { entries: { index: number; status: string }[]; current?: number; onChoose: (n: number) => void }) {
+  const from = Math.max(0, Math.min((props.current ?? 1) - 15, props.entries.length - 30));
+  return (
+    <div aria-label="Entries" className="flex gap-[3px]">
+      {props.entries.slice(from, from + 30).map((e) => {
+        const ok = e.status === "succeeded" || e.status === "running";
+        const err = e.status === "failed";
+        const on = e.index === props.current;
+        return (
+          <button
+            key={e.index}
+            type="button"
+            title={`Entry ${e.index}${ok || err ? "" : " – not run"}`}
+            aria-label={`Entry ${e.index}`}
+            aria-current={on || undefined}
+            onClick={() => props.onChoose(e.index)}
+            className={
+              "grid h-5 w-[22px] cursor-pointer place-items-center rounded-sm border font-mono text-[10px] font-semibold tabular-nums " +
+              (on
+                ? "border-node-selected bg-accent text-accent-foreground"
+                : err
+                  ? "border-transparent bg-danger-soft text-destructive"
+                  : ok
+                    ? "border-transparent bg-muted text-success"
+                    : "border-dashed border-border bg-transparent text-muted-foreground opacity-50")
+            }
+          >
+            {err ? "✖" : ok ? "✔" : e.index}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -258,13 +378,27 @@ function PaneHead(props: { title: string; sub: ReactNode; children?: ReactNode }
   );
 }
 
-function Note(props: { tone: "info" | "err"; children: ReactNode }) {
-  const look = { info: ["i", "bg-muted text-muted-foreground", "rounded-full border-[1.5px] border-current text-[10px]"], err: ["✖", "bg-danger-soft text-foreground", "text-[13px] text-destructive"] }[props.tone];
+function Note(props: { tone: "info" | "warn" | "err"; children: ReactNode; flat?: boolean }) {
+  const look = { info: ["i", "bg-muted text-muted-foreground", "rounded-full border-[1.5px] border-current text-[10px]"], warn: ["⚠", "bg-warning-soft text-foreground", "text-[13px] text-warning"], err: ["✖", "bg-danger-soft text-foreground", "text-[13px] text-destructive"] }[props.tone];
   return (
-    <div role={props.tone === "info" ? undefined : "note"} className={`mx-2.5 my-2 grid grid-cols-[18px_1fr] gap-2 rounded-md px-2.5 py-2 text-2xs leading-normal ${look[1]}`}>
+    <div role={props.tone === "info" ? undefined : "note"} className={`grid grid-cols-[18px_1fr] gap-2 px-2.5 py-2 text-2xs leading-normal ${look[1]} ` + (props.flat ? "" : "mx-2.5 my-2 rounded-md")}>
       <span className={`grid size-4 place-items-center font-bold ${look[2]}`}>{look[0]}</span>
       <div>{props.children}</div>
     </div>
+  );
+}
+
+const cutText = (c: Truncation) => `the first ${c.kept.toLocaleString("en-US")} of ${plural(c.length, c.kind === "list" ? "entry" : c.kind === "object" ? "key" : "byte", c.kind === "list" ? "entries" : undefined)}`;
+
+/** Where the server cut a part: the note above it (mockup E23, state truncated). */
+function CutNote(props: { cuts: Truncation[]; part: string }) {
+  if (props.cuts.length === 0) return null;
+  const c = props.cuts[0];
+  return (
+    <Note tone="warn" flat>
+      <b className="font-semibold">{props.part} larger than 1 MB – shown up to 1 MB.</b> Kept: {cutText(c)} of <span className="font-mono">{c.path || props.part.toLowerCase()}</span>
+      {props.cuts.length > 1 ? ` and ${props.cuts.length - 1} more cut` : ""}. The step itself had the whole value; only what the editor shows is cut.
+    </Note>
   );
 }
 
@@ -273,43 +407,83 @@ function Note(props: { tone: "info" | "err"; children: ReactNode }) {
 interface InputContext {
   sources: Record<string, string>;
   secrets: Set<string>;
+  cuts: Truncation[];
 }
 
-function InputPane(props: { data: StepData; environment: string; forEach: boolean }) {
+function InputPane(props: { data: StepData; entryMode: boolean; environment: string; forEach: boolean }) {
   const { data } = props;
-  const order = Object.keys(useCatalog("workflow").get(data.type)?.schema?.properties ?? {});
+  const schema = useCatalog("workflow").get(data.type)?.schema?.properties ?? {};
+  const [defaults, setDefaults] = useState(false);
   const [connOpen, setConnOpen] = useState(false);
+  const [rowOpen, setRowOpen] = useState(false);
+  const order = Object.keys(schema);
   const input = data.input ?? {};
   const keys = Object.keys(input).sort((a, b) => (order.indexOf(a) + 1 || 999) - (order.indexOf(b) + 1 || 999));
-  const ctx: InputContext = { sources: data.inputSources ?? {}, secrets: new Set(data.secrets) };
+  const unset = Object.entries(schema).filter(([k, s]) => s.default !== undefined && !(k in input));
+  const ctx: InputContext = { sources: data.inputSources ?? {}, secrets: new Set(data.secrets), cuts: (data.truncated ?? []).filter((c) => c.part === "input") };
   const c = data.connection;
+  const row = data.row;
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
-      <PaneHead title="Input" sub={<><span className="font-mono">with:</span> as it reached the step</>} />
+      <PaneHead title="Input" sub={<><span className="font-mono">with:</span> as it reached the step</>}>
+        {unset.length > 0 && data.input && (
+          <button type="button" title="Also show fields with their default value" onClick={() => setDefaults(!defaults)} className={smallButton + " border-transparent bg-transparent text-muted-foreground"}>
+            {defaults ? "Hide defaults" : `+ ${plural(unset.length, "default")}`}
+          </button>
+        )}
+      </PaneHead>
       <div data-testid="data-input" className="min-h-0 flex-1 overflow-auto border-t border-border">
-        {!data.input && <p className="m-0 px-3 py-2 text-2xs text-muted-foreground">{props.forEach ? "Each entry of forEach has an input of its own." : "No input."}</p>}
+        <CutNote cuts={ctx.cuts} part="Input" />
+        {row !== undefined && (
+          <>
+            <Group open={rowOpen} onToggle={() => setRowOpen(!rowOpen)} right={typeof row === "object" && row ? plural(Object.keys(row).length, "key") : typeOf(row)}>
+              row <span className="truncate font-mono font-medium text-foreground">{preview(row)}</span>
+            </Group>
+            {rowOpen && row && typeof row === "object" && <InputEntries obj={row as Record<string, unknown>} path="row" depth={1} ctx={{ sources: {}, secrets: new Set(), cuts: [] }} />}
+          </>
+        )}
+        {!data.input && (
+          <p className="m-0 px-3 py-2 text-2xs text-muted-foreground">
+            {props.forEach && !props.entryMode ? "Each entry has an input of its own: choose Entry to see it." : data.dropped ? "Not kept: the run reached its limit of 20 MB." : "No input."}
+          </p>
+        )}
         {keys.map((k) => (
           <div key={k}>
             <InputEntry name={k} value={input[k]} path={keyPath("", k)} depth={0} ctx={ctx} />
             {k === "connection" && c && (
               <>
-                <button
-                  type="button"
-                  aria-expanded={connOpen}
-                  onClick={() => setConnOpen(!connOpen)}
-                  className="flex h-[26px] w-full cursor-pointer items-center gap-1.5 border-0 border-b border-border bg-muted px-3 text-left text-2xs font-semibold text-muted-foreground"
-                >
-                  <ChevronIcon open={connOpen} width={11} height={11} className="shrink-0" />
+                <Group open={connOpen} onToggle={() => setConnOpen(!connOpen)} right={`${c.type} · as resolved for ${props.environment || "the run"}`}>
                   Connection <span className="font-mono font-medium text-foreground">{c.name}</span>
-                  <span className="ml-auto shrink-0 font-normal">{`${c.type} · as resolved for ${props.environment || "the run"}`}</span>
-                </button>
-                {connOpen && <InputEntries obj={c.with} path="" depth={1} ctx={{ sources: {}, secrets: new Set(c.secrets) }} />}
+                </Group>
+                {connOpen && <InputEntries obj={c.with} path="" depth={1} ctx={{ sources: {}, secrets: new Set(c.secrets), cuts: [] }} />}
               </>
             )}
           </div>
         ))}
+        {defaults && unset.map(([k, s]) => <InputEntry key={k} name={k} value={s.default} path={k} depth={0} ctx={ctx} isDefault />)}
       </div>
     </div>
+  );
+}
+
+function preview(v: unknown): string {
+  if (!v || typeof v !== "object") return JSON.stringify(v) ?? "";
+  const [k, x] = Object.entries(v)[0] ?? [];
+  return k === undefined ? "{ }" : `{ ${k}: ${typeof x === "object" && x !== null ? "…" : JSON.stringify(x)}, … }`;
+}
+
+function Group(props: { open: boolean; onToggle: () => void; right: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={props.open}
+      onClick={props.onToggle}
+      className="flex h-[26px] w-full cursor-pointer items-center gap-1.5 border-0 border-b border-border bg-muted px-3 text-left text-2xs font-semibold text-muted-foreground"
+    >
+      <ChevronIcon open={props.open} width={11} height={11} className="shrink-0" />
+      {props.children}
+      <span className="ml-auto shrink-0 font-normal">{props.right}</span>
+    </button>
   );
 }
 
@@ -318,7 +492,7 @@ function InputEntries(props: { obj: Record<string, unknown> | unknown[]; path: s
   return list.map(([k, v]) => <InputEntry key={k} name={typeof k === "number" ? `[${k}]` : k} value={v} path={keyPath(props.path, k)} depth={props.depth} ctx={props.ctx} />);
 }
 
-function InputEntry(props: { name: string; value: unknown; path: string; depth: number; ctx: InputContext }) {
+function InputEntry(props: { name: string; value: unknown; path: string; depth: number; ctx: InputContext; isDefault?: boolean }) {
   const { value, ctx, path } = props;
   const [open, setOpen] = useState(true);
   const secret = ctx.secrets.has(path);
@@ -346,14 +520,11 @@ function InputEntry(props: { name: string; value: unknown; path: string; depth: 
               <ChevronIcon open={open} width={10} height={10} />
             </button>
           ) : t === "string" ? (
-            (value as string).includes("\n") ? (
-              <span className="block whitespace-pre-wrap">{(value as string).replace(/\n$/, "")}</span>
-            ) : (
-              <span>"{value as string}"</span>
-            )
+            <LongText text={value as string} cut={ctx.cuts.find((c) => c.path === path)} />
           ) : (
             <span className={t === "null" ? "font-sans text-muted-foreground italic" : "text-expression"}>{String(value ?? "null")}</span>
           )}
+          {props.isDefault && <span className="ml-1.5 font-sans text-muted-foreground">default</span>}
           {src && (
             <span title={src} className="mt-px block truncate text-[10px] whitespace-nowrap text-expression">
               <span className="font-sans text-muted-foreground">from </span>
@@ -367,14 +538,35 @@ function InputEntry(props: { name: string; value: unknown; path: string; depth: 
   );
 }
 
+/** A text of the input; more than 3 lines or 300 characters are cut with "Show all". */
+function LongText(props: { text: string; cut?: Truncation }) {
+  const [all, setAll] = useState(false);
+  const lines = props.text.replace(/\n$/, "").split("\n").length;
+  const long = lines > 3 || props.text.length > 300;
+  if (lines > 1 && !long) return <span className="block whitespace-pre-wrap">{props.text.replace(/\n$/, "")}</span>;
+  if (!long) return <span>"{props.text}"</span>;
+  return (
+    <>
+      <span className={"block whitespace-pre-wrap " + (all ? "" : "max-h-12 overflow-hidden")}>{props.text}</span>
+      <span className="mt-0.5 inline-flex gap-1 font-sans text-[10px] text-muted-foreground">
+        {props.text.length > 300 ? plural(props.text.length, "character") : plural(lines, "line")}
+        {props.cut && ` · ${cutText(props.cut)} kept`} ·
+        <button type="button" onClick={() => setAll(!all)} className="cursor-pointer border-0 bg-transparent p-0 text-[10px] font-medium text-primary underline underline-offset-2">
+          {all ? "Show less" : "Show all"}
+        </button>
+      </span>
+    </>
+  );
+}
+
 // ---------- Output ----------
 
-function OutputPane(props: { data: StepData; base: string }) {
+function OutputPane(props: { data: StepData; base: string; entryMode: boolean }) {
   const { data } = props;
   const [view, setView] = useState<View>(() => {
     try {
       const v = localStorage.getItem(viewKey);
-      return v === "json" ? v : "tree";
+      return v === "table" || v === "json" ? v : "tree";
     } catch {
       return "tree";
     }
@@ -388,13 +580,28 @@ function OutputPane(props: { data: StepData; base: string }) {
       // only a convenience
     }
   };
-  const value = data.output;
+  // An entry of forEach as in results.<id>.output.items[i] (KONZEPT 12.1).
+  const value = props.entryMode ? { row: data.row, success: data.entryStatus === "succeeded", output: data.output ?? null, error: data.error ?? "" } : data.output;
+  const cuts = (data.truncated ?? []).filter((c) => c.part === "output");
+  const table = view === "table" ? findTable(value) : null;
+  const sub = (
+    <>
+      <span className="font-mono">result.output</span>
+      {props.entryMode && ` › entry ${data.entry}`}
+      {table && (
+        <>
+          {" › "}
+          <span className="font-mono">{table.rel || "output"}</span> · {plural(table.list.length, "entry", "entries")} · {plural(table.columns.length, "column")}
+        </>
+      )}
+    </>
+  );
   const select = (rel: string) => setPath(joinPath(props.base, rel));
   return (
     <>
-      <PaneHead title="Output" sub={<span className="font-mono">result.output</span>}>
+      <PaneHead title="Output" sub={sub}>
         <div role="group" aria-label="View" className="inline-flex gap-0.5 rounded-md border border-border bg-muted p-0.5">
-          {(["tree", "json"] as const).map((v) => (
+          {(["tree", "table", "json"] as const).map((v) => (
             <button key={v} type="button" aria-pressed={view === v} onClick={() => choose(v)} className={segment}>
               {v === "json" ? "JSON" : v[0].toUpperCase() + v.slice(1)}
             </button>
@@ -405,13 +612,25 @@ function OutputPane(props: { data: StepData; base: string }) {
           Copy
         </button>
       </PaneHead>
+      <CutNote cuts={cuts} part="Output" />
+      {data.dropped && (
+        <Note tone="warn" flat>
+          <b className="font-semibold">Not kept:</b> the run reached its limit of 20 MB for the data of its steps; this step keeps only status, attempts and error.
+        </Note>
+      )}
       <div data-testid="data-output" className="min-h-0 flex-1 overflow-auto border-t border-border">
         {value === undefined || value === null ? (
           <p className="m-0 px-3 py-2 text-2xs text-muted-foreground">No output.</p>
         ) : view === "json" ? (
           <JSONView value={value} />
+        ) : view === "table" ? (
+          table ? (
+            <Table table={table} selected={path} base={props.base} onSelect={select} />
+          ) : (
+            <p className="m-0 px-3 py-2 text-2xs text-muted-foreground">Table shows a list of objects; this output has none.</p>
+          )
         ) : (
-          <Tree value={value} selected={path} base={props.base} onSelect={select} />
+          <Tree value={value} cuts={cuts} selected={path} base={props.base} onSelect={select} open={props.entryMode ? ["output"] : []} />
         )}
       </div>
       <div className="flex h-8 shrink-0 items-center gap-1.5 border-t border-border bg-muted pr-2 pl-3 text-2xs whitespace-nowrap text-muted-foreground">
@@ -436,15 +655,17 @@ function OutputPane(props: { data: StepData; base: string }) {
   );
 }
 
-function Tree(props: { value: unknown; selected: string | null; base: string; onSelect: (rel: string) => void }) {
-  const [open, setOpen] = useState(() => new Set<string>());
+function Tree(props: { value: unknown; cuts: Truncation[]; selected: string | null; base: string; onSelect: (rel: string) => void; open: string[] }) {
+  const [open, setOpen] = useState(() => new Set(props.open));
   const [more, setMore] = useState<Record<string, number>>({});
+  const cutAt = (rel: string) => props.cuts.find((c) => (c.path ?? "") === rel);
   const toggle = (rel: string) => setOpen((o) => new Set(o.has(rel) ? [...o].filter((x) => x !== rel) : [...o, rel]));
   const rows: ReactNode[] = [];
   const row = (key: string | number, v: unknown, rel: string, depth: number) => {
     const t = typeOf(v);
     const container = t === "list" || t === "object";
     const isOpen = open.has(rel);
+    const cut = cutAt(rel);
     const full = joinPath(props.base, rel);
     const n = container ? Object.keys(v as object).length : 0;
     rows.push(
@@ -467,7 +688,13 @@ function Tree(props: { value: unknown; selected: string | null; base: string; on
         </span>
         <span className="text-[10px] text-muted-foreground">{t}</span>
         <span className={"truncate " + (container || t === "null" ? "font-sans text-muted-foreground italic" : t === "string" ? "" : "text-expression")}>
-          {t === "list" ? plural(n, "entry", "entries") : t === "object" ? plural(n, "key") : t === "string" ? `"${v as string}"` : String(v ?? "null")}
+          {t === "list"
+            ? plural(cut ? cut.length : n, "entry", "entries") + (cut ? ` · first ${cut.kept.toLocaleString("en-US")} kept` : "")
+            : t === "object"
+              ? plural(cut ? cut.length : n, "key") + (cut ? ` · first ${cut.kept.toLocaleString("en-US")} kept` : "")
+              : t === "string"
+                ? `"${v as string}"` + (cut ? ` … (${cutText(cut)} kept)` : "")
+                : String(v ?? "null")}
         </span>
       </div>,
     );
@@ -478,6 +705,7 @@ function Tree(props: { value: unknown; selected: string | null; base: string; on
     const limit = Array.isArray(v) ? (more[rel] ?? 100) : list.length;
     for (const [k, x] of list.slice(0, limit)) row(k, x, keyPath(rel, k), depth);
     if (list.length > limit) {
+      const cut = cutAt(rel);
       rows.push(
         <div key={rel + "…"} className="grid min-h-6 grid-cols-[minmax(150px,210px)_64px_1fr] items-center pr-2.5 pl-1 text-2xs">
           <span className="font-mono text-muted-foreground" style={{ paddingLeft: depth * 14 + 16 }}>
@@ -485,7 +713,7 @@ function Tree(props: { value: unknown; selected: string | null; base: string; on
           </span>
           <span />
           <span className="text-muted-foreground italic">
-            {`${list.length - limit} more entries`}
+            {cut ? `${(cut.kept - limit).toLocaleString("en-US")} more kept · ${(cut.length - cut.kept).toLocaleString("en-US")} not kept` : `${list.length - limit} more entries`}
             <button type="button" onClick={() => setMore((m) => ({ ...m, [rel]: limit + 100 }))} className="ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-2xs text-primary not-italic underline underline-offset-2">
               Show more
             </button>
@@ -499,6 +727,75 @@ function Tree(props: { value: unknown; selected: string | null; base: string; on
   return <div role="tree" aria-label="Output">{rows}</div>;
 }
 
+interface TableData {
+  rel: string;
+  list: Record<string, unknown>[];
+  columns: [string, string][];
+}
+
+const isObjects = (v: unknown): v is Record<string, unknown>[] => Array.isArray(v) && v.length > 0 && v.every((x) => typeOf(x) === "object");
+
+/** The output if it is a list of objects, else its first part that is one (e.g. items). */
+function findTable(v: unknown): TableData | null {
+  let found: [string, Record<string, unknown>[]] | undefined;
+  if (isObjects(v)) found = ["", v];
+  else if (typeOf(v) === "object") found = Object.entries(v as object).find((e): e is [string, Record<string, unknown>[]] => isObjects(e[1]));
+  if (!found) return null;
+  const [key, list] = found;
+  const columns = new Map<string, string>();
+  for (const o of list) for (const [k, x] of Object.entries(o)) if (!columns.get(k) || columns.get(k) === "null") columns.set(k, typeOf(x));
+  return { rel: keyPath("", key), list, columns: [...columns] };
+}
+
+function Table(props: { table: TableData; selected: string | null; base: string; onSelect: (rel: string) => void }) {
+  const { rel, list, columns } = props.table;
+  const th = "sticky top-0 z-[1] h-[30px] border-r border-b border-border bg-muted px-2.5 text-left text-2xs font-medium whitespace-nowrap";
+  const td = "h-6 max-w-[180px] cursor-pointer truncate border-r border-b border-border px-2.5 font-mono text-2xs whitespace-nowrap";
+  return (
+    <table aria-label="Output as table" className="min-w-full border-collapse">
+      <thead>
+        <tr>
+          <th className={th + " w-9 text-right text-muted-foreground"}>#</th>
+          {columns.map(([c, t]) => (
+            <th key={c} className={th}>
+              {c}
+              <span className="block font-mono text-[10px] leading-none font-normal text-muted-foreground">{t}</span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {list.slice(0, 1000).map((o, i) => (
+          <tr key={i} className="hover:bg-muted">
+            <td className={td + " text-right text-muted-foreground tabular-nums"}>{i}</td>
+            {columns.map(([c]) => {
+              const v = o[c];
+              const t = typeOf(v);
+              const cell = keyPath(`${rel}[${i}]`, c);
+              const on = props.selected === joinPath(props.base, cell);
+              return (
+                <td
+                  key={c}
+                  title={t === "object" || t === "list" ? JSON.stringify(v) : String(v ?? "null")}
+                  aria-selected={on}
+                  onClick={() => props.onSelect(cell)}
+                  className={
+                    td +
+                    (t === "object" || t === "list" || t === "null" ? " font-sans text-muted-foreground italic" : t === "integer" || t === "number" ? " text-right tabular-nums" : "") +
+                    (on ? " bg-accent text-accent-foreground outline-2 -outline-offset-2 outline-ring" : "")
+                  }
+                >
+                  {t === "object" ? "{ … }" : t === "list" ? "[ … ]" : String(v ?? "null")}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 /** The output as JSON: keys stand out, numbers and true/false/null in the colour of expressions. */
 function JSONView(props: { value: unknown }) {
   const text = JSON.stringify(props.value, null, 2);
@@ -510,11 +807,11 @@ function JSONView(props: { value: unknown }) {
   );
 }
 
-function ErrorPane(props: { id: string; data: StepData }) {
+function ErrorPane(props: { id: string; data: StepData; entry?: number; notRun: number[] }) {
   const err = keyPath("results", props.id);
   return (
     <>
-      <PaneHead title="Error" sub="of the step">
+      <PaneHead title="Error" sub={props.entry ? `entry ${props.entry}` : "of the step"}>
         <button type="button" title="Copy the error" onClick={() => copy(props.data.error ?? "")} className={smallButton}>
           <CopyIcon width={12} height={12} />
           Copy
@@ -523,17 +820,38 @@ function ErrorPane(props: { id: string; data: StepData }) {
       <div data-testid="data-error" className="min-h-0 flex-1 overflow-auto border-t border-border">
         <Note tone="err">
           <b className="font-semibold break-words text-destructive">{props.data.error}</b>
-          <div className="mt-1.5 text-muted-foreground">No output: the step failed.</div>
+          <div className="mt-1.5 text-muted-foreground">
+            No output: the step failed.
+            {props.notRun.length > 0 && ` ${props.notRun.length === 1 ? "Entry" : "Entries"} ${ranges(props.notRun)} did not run (continueOnEntryError is off).`}
+          </div>
         </Note>
         <Note tone="info">
-          In expressions the error is <span className="font-mono text-expression">{err}.error</span>.
+          In expressions the error is <span className="font-mono text-expression">{err}.error</span>
+          {props.entry ? (
+            <>
+              ; each entry in <span className="font-mono text-expression">{`${err}.output.items[${props.entry - 1}].error`}</span>
+            </>
+          ) : null}
+          .
         </Note>
       </div>
     </>
   );
 }
 
-function StepLog(props: { lines: RunView["log"]; open: boolean; onShowInLog: () => void }) {
+/** "8–12", "3, 5–6". */
+function ranges(ns: number[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < ns.length; i++) {
+    let j = i;
+    while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j++;
+    out.push(j > i ? `${ns[i]}–${ns[j]}` : String(ns[i]));
+    i = j;
+  }
+  return out.join(", ");
+}
+
+function StepLog(props: { lines: RunView["log"]; open: boolean; entry?: number; onShowInLog: () => void }) {
   const [open, setOpen] = useState(props.open);
   return (
     <div data-testid="data-log" className="shrink-0 border-t border-border">
@@ -541,7 +859,7 @@ function StepLog(props: { lines: RunView["log"]; open: boolean; onShowInLog: () 
         <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-2xs text-muted-foreground">
           <ChevronIcon open={open} width={11} height={11} />
           <b className="font-medium text-foreground">Log of this step</b>
- · {plural(props.lines.length, "line")}
+          {props.entry ? ` · entry ${props.entry}` : ""} · {plural(props.lines.length, "line")}
         </button>
         <button type="button" onClick={props.onShowInLog} className="ml-auto cursor-pointer border-0 bg-transparent p-0 text-2xs text-primary underline underline-offset-2">
           Show in Log
