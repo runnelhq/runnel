@@ -259,13 +259,24 @@ func TestSecretsOfTheService(t *testing.T) {
 }
 
 func TestSecretsUnreadable(t *testing.T) {
-	_, s, log := secretProject(t)
-	// A file where the folder of the store should be: it cannot be read.
+	dir, s, log := secretProject(t)
+	// A damaged file of the project in the store: it cannot be read. (A file where the
+	// folder should be is not enough: Windows reports such a path as not existing.)
 	blocked := filepath.Join(t.TempDir(), "secrets")
-	if err := os.WriteFile(blocked, []byte("x"), 0o600); err != nil {
+	store := &secretstore.Store{Dir: blocked}
+	if err := store.Set(dir, "other", "x", time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	s.secrets = func() (*secretstore.Store, error) { return &secretstore.Store{Dir: blocked}, nil }
+	entries, err := os.ReadDir(blocked)
+	if err != nil || len(entries) == 0 {
+		t.Fatalf("store files %v %v", entries, err)
+	}
+	for _, e := range entries {
+		if err := os.WriteFile(filepath.Join(blocked, e.Name()), []byte("not a store file"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.secrets = func() (*secretstore.Store, error) { return store, nil }
 	for range 2 {
 		info := secretsOf(t, s)
 		if !strings.Contains(info.Local.Error, "cannot be read; details are in the server log") || strings.Contains(info.Local.Error, blocked) ||
