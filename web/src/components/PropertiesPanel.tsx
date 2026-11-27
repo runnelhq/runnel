@@ -66,6 +66,8 @@ export interface PropertiesProps {
   /** The current or last run, to show the result of the selected action (mockup E8). */
   run?: RunView | null;
   onShowInLog?: (actionId: string) => void;
+  /** Workflows: shows the data of the action in the tab "Data" (mockup E23). */
+  onShowData?: (actionId: string) => void;
   /** Input transforms that can propose their fields: opens "Detect fields" (S46). */
   onDetectFields?: (id: string) => void;
   /** Pipelines: runs the data preview up to a transform (S44). */
@@ -2485,14 +2487,17 @@ function LastRun(props: PropertiesProps & { id: string }) {
   return (
     <div
       data-testid="last-run"
-      className={"mx-4 mt-0 mb-2.5 rounded-md px-2.5 py-2 text-xs " + (failed ? "bg-danger-soft text-destructive" : "bg-muted text-foreground")}
+      className={
+        "mx-4 mt-0 mb-2.5 rounded-md px-2.5 py-2 text-xs " +
+        (failed ? "bg-danger-soft text-destructive" : a.status === "succeeded" ? "bg-success-soft text-success" : a.status === "skipped" ? "bg-muted text-muted-foreground" : "bg-muted text-foreground")
+      }
     >
       <b>
-        {failed ? "✖ " : a.status === "succeeded" ? "✔ " : ""}
+        {failed ? "✖ " : a.status === "succeeded" ? "✔ " : a.status === "skipped" ? "– " : ""}
         {props.run?.history ? lastRunText[a.status].replace("in the last run", "in this run") : lastRunText[a.status]}
       </b>
       {a.durationMs !== undefined && ` after ${formatDuration(a.durationMs)}`}
-      {a.error && <div className="mt-0.5">{a.error}</div>}
+      {a.error && <div className="mt-0.5 font-mono text-2xs text-foreground">{a.error}</div>}
       {a.counts && (
         <div data-testid="run-counts" className={"mt-1.5 grid gap-1 text-2xs text-muted-foreground " + (a.counts.info ? "grid-cols-4" : "grid-cols-3")}>
           {a.counts.info ? (
@@ -2514,15 +2519,18 @@ function LastRun(props: PropertiesProps & { id: string }) {
           ) : null}
         </div>
       )}
-      {props.onShowInLog && (
-        <button
-          type="button"
-          onClick={() => props.onShowInLog!(props.id)}
-          className="mt-1 block cursor-pointer border-0 bg-transparent p-0 font-mono text-2xs text-muted-foreground underline"
-        >
-          Show in log
-        </button>
-      )}
+      <div className="mt-1 flex gap-3 text-2xs">
+        {props.onShowData && !props.run?.history && a.status !== "running" && a.status !== "waiting" && (
+          <button type="button" onClick={() => props.onShowData!(props.id)} className={"cursor-pointer border-0 bg-transparent p-0 text-2xs underline " + (a.status === "skipped" ? "text-inherit" : "text-foreground")}>
+            {a.status === "skipped" ? "Why?" : "Show data"}
+          </button>
+        )}
+        {props.onShowInLog && (a.status !== "skipped" || !props.onShowData || props.run?.history) && (
+          <button type="button" onClick={() => props.onShowInLog!(props.id)} className="cursor-pointer border-0 bg-transparent p-0 text-2xs text-foreground underline">
+            Show in log
+          </button>
+        )}
+      </div>
     </div>
   );
 }

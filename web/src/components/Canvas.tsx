@@ -33,6 +33,7 @@ import {
   type Workflow,
 } from "../workflow";
 import type { RunView } from "../run";
+import type { StepSummary } from "../stepdata";
 import { ActionNode, type ActionNodeType } from "./ActionNode";
 import { ActionIcon, CopyIcon, CutIcon, EyeIcon, FitIcon, LayoutIcon, MinusIcon, PasteIcon, PlusIcon, TrashIcon } from "./Icons";
 import { LinkEdge, linkPath, pipelineKinds, type LinkEdgeType, type SettableKind } from "./LinkEdge";
@@ -86,6 +87,9 @@ export interface CanvasProps {
   problemsInPanel?: boolean;
   /** The current or last run, shown as status at the actions and links (mockup E8). */
   run?: RunView | null;
+  /** Actions with data in the run shown (mockup E23), and how to show the data of one. */
+  stepData?: Map<string, StepSummary>;
+  onShowData?: (id: string) => void;
   /** The run shown is a data preview (S44): record counts are drawn dashed, and a hint says up to which transform it ran. */
   preview?: { upTo: string; limit: number; onClose: () => void } | null;
   /** Copy or cut the given actions (context menu, E16). */
@@ -119,15 +123,31 @@ export function Canvas(props: CanvasProps) {
 function Graph(props: CanvasProps) {
   const { workflow, problems, onShowInYAML, onMove, onDelete, onAdd, onRename, onConnect, onLinkKind, renaming, onRenaming, onSelect, selection, problemsInPanel, run, preview } =
     props;
-  const { onClipboard, onPaste, canPaste, pointer, onInsert } = props;
+  const { onClipboard, onPaste, canPaste, pointer, onInsert, stepData, onShowData } = props;
   const pipeline = workflow.kind === "pipeline";
   const catalog = useCatalog(workflow.kind);
   const editable = onMove !== undefined;
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getViewport, setViewport } = useReactFlow();
   const [menu, setMenu] = useState<string | null>(null);
   // Context menu of the selection or the free canvas (E16): position in the container and on the canvas.
   const [context, setContext] = useState<{ x: number; y: number; at: { x: number; y: number }; ids: string[] } | null>(null);
   const container = useRef<HTMLDivElement>(null);
+  // When the panel below opens or closes (e.g. the tab "Data", mockup E23), the middle of the canvas stays in the middle.
+  useEffect(() => {
+    const el = container.current;
+    if (!el) return;
+    let height = el.clientHeight;
+    const observer = new ResizeObserver(() => {
+      const next = el.clientHeight;
+      if (height > 0 && next > 0 && next !== height) {
+        const v = getViewport();
+        void setViewport({ ...v, y: v.y + (next - height) / 2 });
+      }
+      height = next;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [getViewport, setViewport]);
   const [ghost, setGhost] = useState<GhostState | null>(null);
   // Starts with the selection of the file view, e.g. when switching back from the YAML view.
   const selectedRef = useRef(new Set<string>(props.selection?.actions ?? []));
@@ -173,6 +193,7 @@ function Graph(props: CanvasProps) {
           onShowInYAML,
           problemsInPanel,
           run: run?.actions[a.id],
+          stepData: stepData?.has(a.id) && onShowData ? { onShow: () => onShowData(a.id) } : undefined,
           connectable: editable,
           onStartRename: editable ? () => onRenaming?.(a.id) : undefined,
           rename: renaming === a.id ? { taken: ids, onDone: (to: string | null) => finishRename(a.id, to) } : undefined,
@@ -203,7 +224,7 @@ function Graph(props: CanvasProps) {
         },
       }));
     return { computed, computedEdges, auto };
-  }, [workflow, pipeline, problems, catalog, onShowInYAML, problemsInPanel, run, preview, editable, renaming, onRenaming, finishRename]);
+  }, [workflow, pipeline, problems, catalog, onShowInYAML, problemsInPanel, run, preview, editable, renaming, onRenaming, finishRename, stepData, onShowData]);
 
   // Local node and edge state for dragging and selection; it follows the workflow and keeps the selection.
   // The nodes start with the current selection, so that React Flow does not report an empty one first.

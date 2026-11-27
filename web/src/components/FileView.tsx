@@ -27,6 +27,8 @@ import { RunInfoBar, type RunChanges } from "./RunInfoBar";
 import { fetchRun } from "../runs";
 import { DetectFieldsDialog } from "./DetectFieldsDialog";
 import { PreviewPanel, type PreviewSelection } from "./PreviewPanel";
+import { DataPanel, type StepsState } from "./DataPanel";
+import { fetchSteps } from "../stepdata";
 import { listItems, type Item } from "../yaml";
 import { previewRun, runPreview, type PreviewResult } from "../preview";
 import type { ProjectInfo } from "../api";
@@ -706,6 +708,40 @@ export function FileView(props: {
     if (active) onRun(run);
   }, [active, run, onRun]);
 
+  // The data of each step (mockup E23): which steps have data once a run of a workflow has ended,
+  // and the step shown in the tab "Data" – the one selected, else the last selected, else the first failed.
+  const [stepsOfRun, setSteps] = useState<StepsState | null>(null);
+  const [dataStep, setDataStep] = useState<string | null>(null);
+  const runId = run?.id;
+  const runEnded = !!run && run.status !== "running";
+  useEffect(() => {
+    if (graphKind !== "workflow" || !runId || !runEnded) return setSteps(null);
+    let live = true;
+    fetchSteps(runId).then(
+      (s) => live && setSteps({ runId, steps: s }),
+      () => live && setSteps({ runId, steps: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [graphKind, runId, runEnded, epoch]);
+  useEffect(() => {
+    if (selection.actions.length === 1) setDataStep(selection.actions[0]);
+  }, [selection]);
+  const stepData = useMemo(
+    () => (shownRun && stepsOfRun?.runId === shownRun.id && stepsOfRun.steps ? new Map(stepsOfRun.steps.filter((s) => s.status !== "skipped").map((s) => [s.actionId, s] as const)) : undefined),
+    [shownRun, stepsOfRun],
+  );
+  const dataAction =
+    dataStep && graph?.actions?.some((a) => a.id === dataStep)
+      ? dataStep
+      : (Object.entries(shownRun?.actions ?? {}).find(([, a]) => a.status === "failed")?.[0] ?? stepsOfRun?.steps?.[0]?.actionId ?? null);
+  const showData = useCallback((id: string) => {
+    setSelection({ actions: [id], links: [] });
+    setDataStep(id);
+    setBottomTab("data");
+  }, []);
+
   const doRun = useCallback(
     async (settings: RunSettings) => {
       const wf = graph;
@@ -1223,6 +1259,8 @@ export function FileView(props: {
             selection={selection}
             problemsInPanel={showPanel}
             run={preview?.result && graph ? previewRun(preview.result, graph, preview.upTo) : shownRun}
+            stepData={preview ? undefined : stepData}
+            onShowData={showData}
             preview={preview ? { upTo: preview.upTo, limit: preview.limit, onClose: endPreview } : null}
           />
         ) : validation ? (
@@ -1252,6 +1290,29 @@ export function FileView(props: {
                         limit={preview.limit}
                         onLimit={(limit) => void startPreview(preview.upTo, limit)}
                         onRefresh={() => void startPreview(preview.upTo, preview.limit)}
+                      />
+                    ),
+                  }
+                : null
+            }
+            data={
+              graphKind === "workflow" && graph
+                ? {
+                    failed: !!dataAction && shownRun?.actions[dataAction]?.status === "failed",
+                    following: !!shownRun,
+                    content: (
+                      <DataPanel
+                        workflow={graph}
+                        run={shownRun}
+                        steps={stepsOfRun}
+                        actionId={dataAction}
+                        onSelect={showData}
+                        onRun={() => requestRun(false)}
+                        onShowInLog={(actionId) => {
+                          setBottomTab("log");
+                          setLogFocus((f) => ({ actionId, seq: (f?.seq ?? 0) + 1 }));
+                        }}
+                        onOpenRuns={() => props.onRunsOf?.(path)}
                       />
                     ),
                   }
@@ -1325,6 +1386,7 @@ export function FileView(props: {
             setBottomTab("log");
             setLogFocus((f) => ({ actionId, seq: (f?.seq ?? 0) + 1 }));
           }}
+          onShowData={graphKind === "workflow" ? showData : undefined}
           onSet={onSet}
           onSetWorkflow={onSetWorkflow}
           onSetMap={onSetMap}
