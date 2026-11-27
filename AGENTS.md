@@ -77,7 +77,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/transforms/` | eingebaute Transforms: `transforms.go` (`Builtin()`), Aufbau wie `internal/actions/` |
 | `web/` | Editor (React, Vite, TypeScript, Tailwind); Anleitung `docs/dev/EDITOR.md` |
 | `examples/` | Beispiele, in Tests mitgeprüft |
-| `docs/` | Konzept, Roadmap, ADRs, Testplan, Entwickleranleitungen (`docs/dev/`) |
+| `docs/` | Konzept, Roadmap (dazu `PLUGINS-ROADMAP.md` für offizielle Plugins und SDKs), ADRs, Testplan, Entwickleranleitungen (`docs/dev/`) |
 
 ## Konventionen
 
