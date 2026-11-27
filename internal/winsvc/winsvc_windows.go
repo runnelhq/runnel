@@ -123,6 +123,16 @@ func Install(c Config) error {
 			return undo(err)
 		}
 	}
+	if c.SecretsDir != "" {
+		err := PrepareSecretsDir(c.SecretsDir)
+		if err == nil && account != AccountLocalSystem {
+			err = grant(c.SecretsDir, account, windows.GENERIC_READ|windows.GENERIC_EXECUTE)
+		}
+		if err != nil {
+			_ = eventlog.Remove(c.Name)
+			return undo(err)
+		}
+	}
 	if c.HistoryDir != "" {
 		prepare := prepareTLSDir // the history holds outputs and errors of runs (ADR 0026)
 		if c.HistoryShared {
@@ -191,6 +201,11 @@ func prepareLogDir(dir, account string) error {
 	if account == AccountLocalSystem {
 		return nil
 	}
+	return grant(dir, account, windows.GENERIC_READ|windows.GENERIC_WRITE|windows.GENERIC_EXECUTE|windows.DELETE)
+}
+
+// grant adds access for the account to the permissions of dir, inherited by its content.
+func grant(dir, account string, access windows.ACCESS_MASK) error {
 	sid, _, _, err := windows.LookupSID("", account)
 	if err != nil {
 		return fmt.Errorf("account %q not found: %w", account, err)
@@ -204,7 +219,7 @@ func prepareLogDir(dir, account string) error {
 		return fmt.Errorf("cannot read the permissions of %s: %w", dir, err)
 	}
 	acl, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
-		AccessPermissions: windows.GENERIC_READ | windows.GENERIC_WRITE | windows.GENERIC_EXECUTE | windows.DELETE,
+		AccessPermissions: access,
 		AccessMode:        windows.GRANT_ACCESS,
 		Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
 		Trustee: windows.TRUSTEE{
@@ -432,6 +447,23 @@ func PrepareTrustDir(dir string) error {
 		return fmt.Errorf("cannot set the permissions of %s: %w", dir, err)
 	}
 	return nil
+}
+
+// SecretsDir returns the folder of the local secret store of services (ADR 0022, S39d2):
+// %ProgramData%\runnel\secrets.
+func SecretsDir() string {
+	return filepath.Join(programData(), "runnel", "secrets")
+}
+
+// PrepareSecretsDir creates the folder of the local secret store of services, for
+// Administrators and SYSTEM only; inherited permissions (e.g. read for all users of
+// %ProgramData%) are removed. "runnel service install" lets the account of the service
+// read it. An existing folder is left as it is, so that this access is kept.
+func PrepareSecretsDir(dir string) error {
+	if _, err := os.Stat(dir); err == nil {
+		return nil
+	}
+	return prepareTLSDir(dir, AccountLocalSystem)
 }
 
 func programData() string {

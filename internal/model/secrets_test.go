@@ -278,7 +278,7 @@ func TestLocalSecrets(t *testing.T) {
 	if _, state := SecretStatus(p, nil, "local", "other"); state != SecretMissing {
 		t.Errorf("status missing: %s", state)
 	}
-	if state := localSecretState(nil, "erp-pw"); state != SecretUnavailable {
+	if state := LocalSecretState(nil, "erp-pw", nil); state != SecretUnavailable {
 		t.Errorf("no project: %s", state)
 	}
 }

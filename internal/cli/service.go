@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/runnelhq/runnel/internal/logfile"
+	"github.com/runnelhq/runnel/internal/secretstore"
 	"github.com/runnelhq/runnel/internal/winsvc"
 )
 
@@ -124,6 +125,7 @@ func serviceConfig(o installOptions, root, exe string) (winsvc.Config, error) {
 		// The default folder is protected like the certificate; an own one may be shared
 		// with runnel serve of a user (ADR 0026), so the account only gets write access.
 		HistoryShared: o.historyDir != "",
+		SecretsDir:    winsvc.SecretsDir(),
 	}
 	if listener.TLS == "auto" {
 		c.TLSDir = winsvc.TLSDir()
@@ -182,6 +184,7 @@ func newServiceInstallCommand() *cobra.Command {
 			cmd.Printf("  account %s, start %s, http://127.0.0.1:%d, stop timeout %s\n", c.Account, o.start, o.port, o.stopTimeout)
 			cmd.Printf("  log %s (%s, level %s)\n", serviceLogFile(o.name, o.log.file), o.log.format, o.log.level)
 			cmd.Printf("  run history in %s\n", c.HistoryDir)
+			cmd.Printf("  local secrets in %s (runnel secret set --service)\n", c.SecretsDir)
 			cmd.Printf("Start it with: runnel service start%s\n", nameOpt(o.name))
 			return nil
 		},
@@ -356,6 +359,8 @@ func runService(ctx context.Context, events winsvc.Logger, name, dir string, por
 	if err != nil {
 		return err
 	}
+	// ${secret:local/…} reads from the store of the service (runnel secret set --service).
+	secretstore.SetDefault(serviceSecrets())
 	err = runServer(ctx, serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen, TLSDir: winsvc.TLSDir(), HistoryDir: historyDir,
 		Logger: logger,
 		Log:    func(msg string) { logger.Info(msg) },

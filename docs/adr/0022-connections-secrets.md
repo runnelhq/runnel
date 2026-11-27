@@ -698,8 +698,8 @@ S39d ist geteilt (Store und CLI vor DPAPI und Dienst): S39d1 setzt den Store mit
   Schlüssel aus einem einzigen wiederholten Byte sind Fehler; die Meldung nennt den Wert nie. Ein Passwort mit
   Ableitung (scrypt) gibt es nicht: ein zu schwaches Passwort ließe sich nicht erkennen, ein Zufallsschlüssel schon.
   Ohne die Variable meldet jedes Lesen oder Setzen eines Werts „set RUNNEL_MASTER_KEY to 32 random bytes in base64 …“;
-  unter Windows tritt mit S39d2 ein mit DPAPI geschützter Zufallsschlüssel an diese Stelle, die Variable hat dann
-  Vorrang (z. B. im Container oder für den portablen Betrieb). Aus dem Schlüssel werden mit HMAC-SHA256 der Schlüssel
+  unter Windows tritt seit S39d2 ein mit DPAPI geschützter Zufallsschlüssel an diese Stelle (unten), die Variable hat
+  dann Vorrang (z. B. im Container oder für den portablen Betrieb). Aus dem Schlüssel werden mit HMAC-SHA256 der Schlüssel
   für AES und die `keyId` abgeleitet; mit einem anderen Schlüssel meldet Runnel „stored with another key“ statt eines
   Fehlers je Wert, und `set` mischt keine Schlüssel in einer Datei.
 - **Bedienung:** `runnel secret set NAME [projektordner]` liest den Wert verdeckt von der Konsole (Windows; sonst ein
@@ -713,3 +713,51 @@ S39d ist geteilt (Store und CLI vor DPAPI und Dienst): S39d1 setzt den Store mit
   unbekannte oder nicht lesbare Quellen. `secretStore: local` ist in Schema und Editor wieder ein Wert (additiv zu R5a).
 - **Keine neue Abhängigkeit:** `crypto/aes`, `crypto/cipher`, `crypto/hmac` der Standardbibliothek. Paket
   `internal/secretstore`.
+
+**Umsetzung in S39d2:**
+
+- **Schlüssel per DPAPI:** Ohne `RUNNEL_MASTER_KEY` erzeugt Runnel unter Windows beim ersten `set` einen
+  Zufallsschlüssel (32 Byte) und speichert ihn mit **DPAPI** geschützt als `key.dpapi` im Ordner des Stores, neben den
+  Dateien der Projekte. DPAPI bekommt eine eigene Entropie (`runnel secret store v1`), damit andere Programme desselben
+  Kontos den Schlüssel nicht einfach mit der Datei entschlüsseln; Rückfragen von DPAPI sind abgeschaltet
+  (`CRYPTPROTECT_UI_FORBIDDEN`). Angelegt wird die Datei über eine temporäre Datei und eine harte Verknüpfung: Die
+  Verknüpfung scheitert, wenn die Datei schon besteht, dann gilt der Schlüssel des anderen Prozesses; zwei Prozesse
+  ersetzen sich den Schlüssel also nie gegenseitig. Lesen (`Get`) legt keinen Schlüssel an. Ein Schlüssel, den DPAPI
+  nicht entschlüsseln kann (anderes Konto, anderer Rechner, beschädigte Datei), wird mit „cannot decrypt the key of the
+  local secret store … (DPAPI; was it made by another account or on another computer?)“ gemeldet. Für den Store des
+  Benutzers gilt DPAPI des **Benutzers** (an Konto und Anmeldung gebunden). Ist `RUNNEL_MASTER_KEY` gesetzt, hat er
+  auch unter Windows Vorrang; die Meldung „set RUNNEL_MASTER_KEY …“ gibt es nur noch auf Systemen ohne DPAPI.
+- **`RUNNEL_MASTER_KEY` unter Windows:** Ist die Variable gesetzt, gilt sie für den Store des Benutzers **und** den des
+  Dienstes; DPAPI und `key.dpapi` werden dann nicht benutzt (Test `TestMasterKeyBeforeDPAPI`). Sinnvoll für Umzug auf
+  einen anderen Rechner oder ein anderes Konto (ein DPAPI-Schlüssel lässt sich dort nicht entschlüsseln), portablen
+  Betrieb und CI. Zu beachten:
+  - **Kein Mischen:** Ein Store, den DPAPI schützt, lässt sich mit `RUNNEL_MASTER_KEY` nicht lesen und umgekehrt
+    („stored with another key“); beim Wechsel setzt man die Secrets mit `runnel secret set` neu.
+  - **Schwächerer Schutz:** Der Schlüssel liegt dann ungeschützt dort, wo die Variable gesetzt ist (Umgebung des
+    Benutzers, Skript, Registry des Dienstes); wer ihn und die Datei des Stores hat, kann alle Werte entschlüsseln. Im
+    normalen Betrieb unter Windows ist DPAPI die Empfehlung.
+  - **Dienst:** Die Variable muss in der Umgebung des Dienstes gesetzt sein **und** beim Setzen mit
+    `runnel secret set --service` in der Konsole, mit demselben Wert; sonst schreibt die Konsole mit DPAPI und der Dienst
+    liest mit dem Master-Key oder umgekehrt.
+- **Store des Dienstes (`--service`):** `runnel secret set/list/delete/missing --service` arbeiten auf
+  `%ProgramData%\runnel\secrets\`. Der Schalter heißt wie bei `runnel plugins` `--service` (nicht `--service-name`
+  wie bei `runnel health`, das einen Dienst über seinen Namen findet; hier geht es um den Store der Dienste). DPAPI
+  schützt den Schlüssel dort **für den Rechner** (`CRYPTPROTECT_LOCAL_MACHINE`, Entscheidung oben); den Zugriff
+  begrenzen die Rechte des Ordners: `secret set --service` legt ihn bei Bedarf nur für Administratoren und SYSTEM an
+  (geerbte Rechte, etwa Lesen für alle Benutzer von `%ProgramData%`, entfallen), `runnel service install` gibt dem
+  Konto des Dienstes (LocalService, NetworkService oder ein eigenes) Lesen dazu und nennt den Ordner in seiner
+  Ausgabe. Ein vorhandener Ordner behält seine Rechte, damit dieses Lesen bleibt. Ohne Administratorrechte endet
+  `set`/`delete --service` mit „… (run the console as administrator)“. Andere Systeme melden „exists only on Windows“.
+  `runnel service run` setzt diesen Store als Store des Prozesses (`secretstore.SetDefault`): Läufe, Trigger und
+  `GET /api/v1/secrets` des Dienstes lesen daraus; `runnel serve`, `run` und `validate` weiter aus dem des Benutzers.
+  Administratoren des Rechners können die Werte lesen; das ist bei Diensten ohnehin so (sie könnten das Konto des
+  Dienstes nutzen).
+- **`runnel secret missing [projektordner]`:** nennt je Environment jedes `${secret:…}` des Projekts, das in seiner
+  Quelle fehlt (`local` im Store des Benutzers bzw. mit `--service` in dem des Dienstes, `env` in der Umgebung der
+  Konsole, `inline` in den Dateien), mit Quelle, Zustand und erster Fundstelle (weitere als „(+n)“). Gelesen werden die
+  YAML-Dateien des Projekts innerhalb von `os.Root` (ohne versteckte Ordner und Verknüpfungen, höchstens 10 000
+  Dateien, Dateien über 4 MB gelten als Daten); kaputte Dateien meldet `validate`. Exit-Code 0, wenn nichts fehlt, 1,
+  wenn eines fehlt, 2, wenn das Projekt nicht gelesen werden kann (wie `validate`, R5a). `missing` braucht keinen
+  Schlüssel (Namen stehen im Klartext). `env` prüft die Umgebung der Konsole, nicht die des Dienstes.
+- **Keine neue Abhängigkeit:** DPAPI über `golang.org/x/sys/windows` (schon im Modul); Rechte des Ordners wie bei
+  Log, Zertifikaten und Run-Historie des Dienstes (`internal/winsvc`).

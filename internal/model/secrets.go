@@ -87,7 +87,7 @@ func SecretStatus(p *Project, env *Environment, store, name string) (from, state
 		}
 		return store, SecretSet
 	case SecretStoreLocal:
-		return store, localSecretState(p, name)
+		return store, LocalSecretState(p, name, nil)
 	}
 	if v, ok := os.LookupEnv(name); ok && v != "" {
 		return store, SecretSet
@@ -134,15 +134,17 @@ func localSecret(p *Project, name string) (string, error) {
 	return v, nil
 }
 
-// localSecretState tells whether a secret of the project is set in the local store of
-// the account the program runs as, without reading its value.
-func localSecretState(p *Project, name string) string {
+// LocalSecretState tells whether a secret of the project is set in a local store (nil:
+// that of the account the program runs as), without reading its value.
+func LocalSecretState(p *Project, name string, s *secretstore.Store) string {
 	if p == nil || p.Dir == "" {
 		return SecretUnavailable
 	}
-	s, err := secretstore.Default()
-	if err != nil {
-		return SecretUnavailable
+	if s == nil {
+		var err error
+		if s, err = secretstore.Default(); err != nil {
+			return SecretUnavailable
+		}
 	}
 	ok, err := s.Has(p.Dir, name)
 	switch {

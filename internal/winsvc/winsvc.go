@@ -56,6 +56,9 @@ type Config struct {
 	// e.g. shared with runnel serve of a user), made writable for the account.
 	HistoryDir    string
 	HistoryShared bool
+	// SecretsDir is the local secret store of services (S39d2): created like by
+	// PrepareSecretsDir if needed; the account may read it.
+	SecretsDir string
 }
 
 // Info describes an installed service.

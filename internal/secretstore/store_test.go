@@ -219,8 +219,11 @@ func TestSetRejects(t *testing.T) {
 	}
 }
 
-// Without RUNNEL_MASTER_KEY, the store reports how to set a key.
+// Without RUNNEL_MASTER_KEY, systems without DPAPI report how to set a key.
 func TestNoKey(t *testing.T) {
+	if dpapiAvailable {
+		t.Skip("DPAPI is available")
+	}
 	s, project := newStore(t)
 	t.Setenv(MasterKeyEnv, "")
 	if err := s.Set(project, "pw", "x", now); err == nil || !strings.Contains(err.Error(), "set RUNNEL_MASTER_KEY") {
@@ -232,13 +235,32 @@ func TestDefault(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("LOCALAPPDATA", t.TempDir())
 	u, err := Default()
-	if err != nil || !strings.HasSuffix(u.Dir, filepath.Join("runnel", "secrets")) {
+	if err != nil || !strings.HasSuffix(u.Dir, filepath.Join("runnel", "secrets")) || u.Machine {
 		t.Fatalf("%+v %v", u, err)
 	}
-	svc := &Store{Dir: t.TempDir()}
+	svc := &Store{Dir: t.TempDir(), Machine: true}
 	SetDefault(svc)
 	defer SetDefault(nil)
 	if d, _ := Default(); d != svc {
 		t.Errorf("default %+v", d)
+	}
+}
+
+// TestMasterKeyBeforeDPAPI: RUNNEL_MASTER_KEY wins over DPAPI for the store of the user and
+// of the service, so no key file is made (on Windows too).
+func TestMasterKeyBeforeDPAPI(t *testing.T) {
+	t.Setenv(MasterKeyEnv, testKey)
+	project := t.TempDir()
+	for _, machine := range []bool{false, true} {
+		s := &Store{Dir: filepath.Join(t.TempDir(), "secrets"), Machine: machine}
+		if err := s.Set(project, "pw", "Pa55word!", now); err != nil {
+			t.Fatal(err)
+		}
+		if v, ok, err := s.Get(project, "pw"); err != nil || !ok || v != "Pa55word!" {
+			t.Fatalf("machine=%v: Get = %q, %v, %v", machine, v, ok, err)
+		}
+		if _, err := os.Stat(filepath.Join(s.Dir, keyFile)); !os.IsNotExist(err) {
+			t.Fatalf("machine=%v: key file made although %s is set: %v", machine, MasterKeyEnv, err)
+		}
 	}
 }

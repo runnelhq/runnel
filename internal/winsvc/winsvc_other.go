@@ -45,3 +45,9 @@ func TrustDir() string { return "" }
 
 // PrepareTrustDir creates the folder of the plugin approvals of services.
 func PrepareTrustDir(string) error { return ErrNotSupported }
+
+// SecretsDir returns the folder of the local secret store of services.
+func SecretsDir() string { return "" }
+
+// PrepareSecretsDir creates the folder of the local secret store of services.
+func PrepareSecretsDir(string) error { return ErrNotSupported }
