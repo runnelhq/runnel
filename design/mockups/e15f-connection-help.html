@@ -374,7 +374,6 @@
     ftp: {
       label: "FTP", icon: "srv", cls: "",
       description: "A server for file transfer over FTP without encryption; only with <span class=mono>insecure: true</span>",
-      caution: "<b>FTP sends the password and all data unencrypted.</b> Use it only for a server without TLS in a trusted network; if the server offers TLS, use <a href=\"#\">FTPS</a>.",
       fields: [
         ["Server", [{ n: "host", req: 1, ty: "string", d: "Name or address of the server", eg: "ftp.example.com" },
                     { n: "port", ty: "string", d: "TCP port; empty: 21", eg: "21" }]],
@@ -438,7 +437,7 @@
     }
     html += `<div class="hs"><h3>Errors <small>when connecting and signing in fail</small></h3><p>${t.errors}</p></div>`;
     html += `<div class="hs"><h3>Example <small><span class="mono">connections/&lt;name&gt;.yaml</span></small></h3><div class="ex">${exampleHtml(t.example)}</div>
-      <div class="acts"><button class="btn small">${icon(I.copy, 12)}Copy example</button><button class="btn small">${icon(I.newfile, 12)}New connection from example…</button>
+      <div class="acts"><button class="btn small">${icon(I.copy, 12)}Copy example</button>
       <small>Also in the terminal: <span class="mono">runnel catalog ${type}</span></small></div></div>`;
     return html;
   }
@@ -490,8 +489,7 @@
   } else if (ctype === "ftp") {
     form = head("legacy-ftp", "ftp", "Old FTP server in the plant network", "") + `
       <div class="sec"><h3>${chev}Server</h3><div class="grid2">${fld("Host", "host", inp("ftp.plant.local", { mono: 1 }), { req: 1 })}${fld("Port", "port", inp("21 (default)", { ph: 1 }))}</div></div>
-      <div class="sec"><h3>${chev}Security</h3><div class="fld"><span class="check"><span class="box on">${icon(I.check)}</span>Connect without encryption <span class="mono" style="color:var(--muted-foreground);font-size:10px">insecure</span></span>
-        <div class="note warn"><span>⚠</span><span><b>Unencrypted:</b> the password and all data can be read in the network.</span></div></div></div>
+      <div class="sec"><h3>${chev}Security</h3><div class="fld"><span class="check"><span class="box on">${icon(I.check)}</span>Connect without encryption <span class="mono" style="color:var(--muted-foreground);font-size:10px">insecure</span></span></div></div>
       <div class="sec"><h3>${chev}Sign-in</h3>${fld("User", "user", inp("runnel", { mono: 1 }), { req: 1 })}${fld("Password", "password", secret("legacy-ftp-password"))}</div>
       <div class="sec closed"><h3>${chevRight}More<span class="count">timeout</span></h3></div>`;
   } else {
@@ -550,7 +548,7 @@
       ["db", "db", "PostgreSQL", "postgres", "A PostgreSQL database"], ["sqlite", "db", "SQLite", "sqlite", "A database in a single file, e.g. for local data and tests"],
       ["http", "", "HTTP API", "http", "An HTTP API with its base address and sign-in, e.g. a REST API"], ["smtp", "", "SMTP", "smtp", "A mail server for sending mails"],
       ["srv", "", "SFTP", "sftp", "A server for file transfer over SSH"], ["srv", "", "FTPS", "ftps", "A server for file transfer over FTP with TLS"],
-      ["srv", "", "FTP", "ftp", "A server for file transfer over FTP without encryption; only with insecure: true", "unencrypted"],
+      ["srv", "", "FTP", "ftp", "A server for file transfer over FTP without encryption; only with insecure: true", ""],
       ["plug", "gen", "IBAN service", "iban", "Account of the IBAN service", "", "iban 1.2.0"],
       ["plug", "gen", "Archive", "dms", "Document archive of the DMS", "", "dms 0.4.0", true]];
     const card = ([k, cls, label, ty, d, warn, plugin, noTest]) => `<div class="type ${ty === "sftp" ? "sel" : ""}">${tile(k, cls)}<div style="min-width:0"><b>${label}</b><span class="dsc">${d}</span>
