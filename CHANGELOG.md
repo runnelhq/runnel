@@ -26,6 +26,13 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
   Windows-Dienst (dort `runnel secret set --service` als Administrator); Werte stehen nie in Antwort oder Log.
   `GET /api/v1/secrets` nennt zusätzlich die Änderungszeit, nicht mehr genutzte Werte und ob der Store lesbar und
   schreibbar ist. Die Oberfläche im Editor folgt mit S39g2.
+- **Secrets im Editor setzen** (S39g2): Unter einem Secret-Feld steht je Environment, woher der Wert kommt und was zu
+  tun ist – für den lokalen Store „Set value…“, „Replace value…“ und „Delete value“ (mit Rückfrage), für `env` die
+  Erklärung, für `inline` die Warnung mit „Open dev.yaml“, bei nicht lesbarem Store die Meldung mit „Check again“. Der
+  Dialog „Set value“ zeigt den Wert nie, auch nicht beim Tippen; Einfügen ist erlaubt, Zeilenumbrüche bleiben. Das
+  Formular von `project.yaml` zeigt im Abschnitt „Secrets“ alle Secrets mit ihrem Stand je Environment, Filtern „All ·
+  Missing · Plain text · Not used“ und nicht mehr genutzte Werte zum Löschen; der Explorer zeigt an `project.yaml` die
+  Zahl der fehlenden Werte.
 
 ### Behoben
 

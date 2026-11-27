@@ -55,24 +55,48 @@ export function useConnections(key?: unknown): ConnectionInfo[] | null {
   return list;
 }
 
-/** A secret of the project as GET /secrets returns it (S39c1): never a value. */
+/** A secret of the project as GET /secrets returns it (S39c1, S39g1): never a value. */
 export interface SecretInfo {
   name: string;
   /** The store named in the reference (${secret:env/NAME}); empty for the default store. */
   store?: string;
   uses: { file: string; line: number; column: number }[];
-  /** By environment ("" without environments): where it comes from and whether it is set. */
-  environments: Record<string, { store: string; state: "set" | "missing" | "unavailable" }>;
+  /** By environment ("" without environments): where it comes from, whether it is set, when a local value changed. */
+  environments: Record<string, SecretState>;
+}
+
+export interface SecretState {
+  store: string;
+  state: "set" | "missing" | "unavailable";
+  updated?: string;
 }
 
 export interface SecretsInfo {
   environments: string[];
   secrets: SecretInfo[];
+  truncated?: boolean;
+  /** The local store of this server (S39g1): whose it is, why the editor may not change it, why it cannot be read, values no file uses. */
+  local?: { store: "user" | "service"; readOnly?: string; error?: string; unused: { name: string; updated: string }[] };
 }
 
-/** useSecrets loads the secrets of the project and their state per environment, again whenever key changes. */
+// Set and delete change the states everywhere: every useSecrets loads again.
+let secretsTick = 0;
+const secretsListeners = new Set<(tick: number) => void>();
+
+/** reloadSecrets makes every useSecrets load again, e.g. after setting a value or "Check again". */
+export function reloadSecrets() {
+  secretsTick++;
+  secretsListeners.forEach((l) => l(secretsTick));
+}
+
+/** useSecrets loads the secrets of the project and their state per environment, again whenever key changes or after reloadSecrets. */
 export function useSecrets(key?: unknown): SecretsInfo | null {
   const [info, setInfo] = useState<SecretsInfo | null>(null);
+  const [tick, setTick] = useState(secretsTick);
+  useEffect(() => {
+    secretsListeners.add(setTick);
+    return () => void secretsListeners.delete(setTick);
+  }, []);
   useEffect(() => {
     let live = true;
     fetch(`${apiBase}/secrets`)
@@ -81,8 +105,54 @@ export function useSecrets(key?: unknown): SecretsInfo | null {
     return () => {
       live = false;
     };
-  }, [key]);
+  }, [key, tick]);
   return info;
+}
+
+/**
+ * changeSecret sets (value) or deletes (null) the value of a secret in the local store of the
+ * project (PUT/DELETE /secrets/{name}, S39g1); the error carries the message of the server.
+ */
+export async function changeSecret(name: string, value: string | null, where: { environment?: string; store?: string }): Promise<void> {
+  const url = `${apiBase}/secrets/${encodeURIComponent(name)}`;
+  const body: Record<string, string> = value === null ? {} : { value };
+  if (where.store) body.store = where.store;
+  else if (where.environment) body.environment = where.environment;
+  const res = await fetch(url, value === null ? { method: "DELETE" } : { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error ?? `${res.status} ${res.statusText}`);
+  }
+  reloadSecrets();
+}
+
+/** Missing values: secret and environment pairs where a used secret is not set (the ⚠ count of project.yaml, mockup S39f). */
+export const missingSecrets = (info: SecretsInfo | null) =>
+  (info?.secrets ?? []).reduce((n, s) => n + Object.values(s.environments).filter((e) => e.state === "missing").length, 0);
+
+/**
+ * Opening a file or the overview of the secrets from a secret field (mockup S39f): the
+ * field sits deep in forms, so it asks the editor by an event of the window.
+ */
+export const openFileEvent = "runnel:open-file";
+let secretsRequested = false;
+
+export function openFile(path: string) {
+  window.dispatchEvent(new CustomEvent(openFileEvent, { detail: path }));
+}
+
+/** openSecretsOverview opens project.yaml as a form at its section "Secrets". */
+export function openSecretsOverview() {
+  secretsRequested = true;
+  openFile("project.yaml");
+  window.dispatchEvent(new Event("runnel:secrets-overview"));
+}
+
+/** takeSecretsRequest says once whether the overview was asked for. */
+export function takeSecretsRequest() {
+  const r = secretsRequested;
+  secretsRequested = false;
+  return r;
 }
 
 /** A variable of the project as GET /variables returns it (E18a). */

@@ -17,6 +17,8 @@ export interface ProjectInfo {
 
 export interface VersionInfo {
   version: string;
+  /** Operating system of the server (GOOS), e.g. windows. */
+  os?: string;
 }
 
 async function getJSON<T>(path: string): Promise<T> {

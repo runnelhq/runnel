@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { categoryColor } from "../catalog";
 import { useForm, useFormChange, type FieldChange, type SettingsData } from "../forms";
-import { missingIn, useVariables, type VariableInfo } from "../reference";
+import { missingIn, useSecrets, useVariables, type VariableInfo } from "../reference";
 import type { Problem } from "../workflow";
 import { ChevronIcon, LinesIcon, PlusIcon, ProjectIcon, TrashIcon } from "./Icons";
 import { Field, OnErrorField, TextInput, inputClass } from "./PropertiesPanel";
+import { SecretsBadges, SecretsOverview, SecretsReadOnly } from "./SecretsOverview";
 
 /**
  * An environment or project.yaml as a form (mockup E20, states "environment" and
@@ -39,6 +40,8 @@ export function SettingsForm(props: {
   const form = useForm(path, text);
   const data = form === undefined ? undefined : ((kind === "project" ? form?.project : form?.environment) ?? null);
   const vars = useVariables(`${props.saved}:${path}`);
+  // All secrets of the project in the form of project.yaml (mockup S39f).
+  const secrets = useSecrets(kind === "project" ? `${props.saved}:${path}` : null);
   const [more, setMore] = useState(false);
   const apply = useFormChange(path, text, props.onText, onError);
   const change = (c: FieldChange) => apply(c).then(() => undefined);
@@ -133,7 +136,12 @@ export function SettingsForm(props: {
 
         <Variables data={data} env={env} info={info} environments={vars?.environments ?? []} problems={props.problems} onChange={change} />
 
-        <Section title="Secrets" count={data.secrets.length || undefined}>
+        <Section
+          title="Secrets"
+          count={env ? data.secrets.length || undefined : secrets?.secrets.length}
+          right={env ? undefined : <SecretsBadges info={secrets} />}
+        >
+          {!env && <SecretsReadOnly info={secrets} />}
           <Field
             label="Secret store"
             fieldKey="secretStore"
@@ -152,6 +160,7 @@ export function SettingsForm(props: {
             )}
           </Field>
           {(data.secrets.length > 0 || data.secretStore === "inline") && <InlineSecrets data={data} file={env ? "this environment" : "project.yaml"} onChange={change} />}
+          {!env && <SecretsOverview info={secrets} />}
         </Section>
 
         {!env && (
@@ -248,7 +257,7 @@ function HistorySection(props: { data: SettingsData; problems: Problem[]; onChan
   );
 }
 
-function Section(props: { title: string; count?: number; folded?: boolean; onToggle?: () => void; summary?: string; children: React.ReactNode }) {
+function Section(props: { title: string; count?: number; folded?: boolean; onToggle?: () => void; summary?: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="border-t border-border pt-2.5 pb-1" aria-label={props.title}>
       <h3 className="m-0 mb-2 flex items-center gap-1.5 text-sm font-semibold">
@@ -263,6 +272,7 @@ function Section(props: { title: string; count?: number; folded?: boolean; onTog
         </button>
         {props.count !== undefined && <span className="text-2xs font-normal text-muted-foreground">{props.count}</span>}
         {props.folded && <span className="text-2xs font-normal text-muted-foreground">{props.summary}</span>}
+        {props.right}
       </h3>
       {!props.folded && <div className="-mx-4">{props.children}</div>}
     </section>
