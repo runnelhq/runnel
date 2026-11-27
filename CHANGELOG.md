@@ -21,6 +21,12 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
   „Search help“ und findet auch Connection-Typen. `GET /api/v1/catalog` liefert dafür `connectionTypes` (mit `plugin`
   bei Typen von Plugins).
 
+- **Secrets über die API setzen und löschen** (S39g1): `PUT /api/v1/secrets/{name}` setzt oder ersetzt einen Wert im
+  lokalen Store des Projekts, `DELETE /api/v1/secrets/{name}` löscht ihn – nur für die Quelle `local`, nicht beim
+  Windows-Dienst (dort `runnel secret set --service` als Administrator); Werte stehen nie in Antwort oder Log.
+  `GET /api/v1/secrets` nennt zusätzlich die Änderungszeit, nicht mehr genutzte Werte und ob der Store lesbar und
+  schreibbar ist. Die Oberfläche im Editor folgt mit S39g2.
+
 ### Behoben
 
 - **Historie beim ersten Start:** Öffneten zwei Prozesse (z. B. der Dienst und `runnel run`) gleichzeitig die noch nicht
