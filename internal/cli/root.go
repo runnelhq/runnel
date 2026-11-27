@@ -29,7 +29,7 @@ func NewRootCommand(out, errOut io.Writer) *cobra.Command {
 	root.SetErr(errOut)
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
 
-	root.AddCommand(newVersionCommand(), newValidateCommand(), newRunCommand(), newCatalogCommand(), newServeCommand(), newTriggersCommand(), newRunsCommand(), newServiceCommand(), newSchemaCommand(), newPluginsCommand(), newHealthCommand())
+	root.AddCommand(newVersionCommand(), newInitCommand(), newValidateCommand(), newRunCommand(), newCatalogCommand(), newServeCommand(), newTriggersCommand(), newRunsCommand(), newServiceCommand(), newSchemaCommand(), newPluginsCommand(), newHealthCommand())
 	wrapArgs(root)
 	return root
 }

@@ -35,6 +35,19 @@ Noch vor Version 1.0 (Stand: Phase 0.5 abgeschlossen, siehe [Roadmap](docs/ROADM
 Die vollständige Liste der Bausteine zeigt `runnel catalog`.
 
 ```bash
+runnel init demo
+runnel validate demo
+runnel run demo/workflows/hello.workflow.yaml
+```
+
+`runnel init [ordner]` legt ein neues Projekt an (ohne Ordner im aktuellen Verzeichnis; fehlende Ordner werden
+erstellt): `project.yaml`, die Ordner `workflows/`, `pipelines/`, `triggers/`, `environments/` und `connections/`, das
+Environment `dev`, den Beispiel-Workflow `workflows/hello.workflow.yaml` und eine `.gitignore`. Der Name des Projekts
+kommt aus dem Ordnernamen (klein geschrieben, andere Zeichen als Buchstaben, Ziffern, `-`, `_` und `.` werden zu `-`)
+oder aus `--name`. Einen nicht leeren Ordner (außer `.git`) lehnt der Befehl mit Exit-Code 2 ab; mit `--force` ergänzt
+er nur die fehlenden Dateien und überschreibt nichts. Danach öffnet `runnel serve demo` das Projekt im Editor.
+
+```bash
 runnel run --environment prod examples/hello/workflows/hello.workflow.yaml
 ```
 

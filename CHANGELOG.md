@@ -39,6 +39,10 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
 - **Bilder und Binärdateien im Editor:** PNG, JPEG, GIF, WebP und SVG öffnen als Bild mit Abmessungen und
   Dateigröße statt als Text; andere Binärdateien zeigen „Binary file – can't be shown“. Der Server erkennt
   Binärdateien zusätzlich am Inhalt (Nullbytes, weder UTF-8 noch Windows-1252) und antwortet mit `415`.
+- **Neues Projekt:** `runnel init [ordner] [--name] [--force]` legt `project.yaml`, die Ordner `workflows/`,
+  `pipelines/`, `triggers/`, `environments/` und `connections/`, das Environment `dev`, einen Beispiel-Workflow und
+  `.gitignore` an. Ein nicht leerer Ordner wird abgelehnt (Exit-Code 2); mit `--force` kommen nur die fehlenden
+  Dateien hinzu, vorhandene bleiben unverändert.
 - **Abkündigen** (ADR 0029): umbenannte Felder gelten unter beiden Namen, `validate` warnt mit Ersatz; im Katalog
   tragen sie `deprecated` und `x-runnel-replacement`. Abgekündigt ist noch nichts.
 - Relative Pfade beziehen sich auf den Projektordner (ADR 0020); dynamische Ziele mit `allowedTargets`.

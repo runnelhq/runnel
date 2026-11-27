@@ -1,0 +1,57 @@
+=== project.yaml
+# The project: settings and variables for all workflows and pipelines in this folder.
+# Check it with:  runnel validate
+kind: Project
+apiVersion: runnel/v1
+name: demo
+defaultEnvironment: dev
+variables:
+  TARGET: World
+=== environments/dev.yaml
+# Variables for local development; add environments/prod.yaml for the production system.
+kind: Environment
+apiVersion: runnel/v1
+name: dev
+description: Local development
+variables:
+  STAGE: development
+=== workflows/hello.workflow.yaml
+# A small example workflow. Run it with:  runnel run workflows/hello.workflow.yaml
+kind: Workflow
+apiVersion: runnel/v1
+name: hello
+description: Logs a greeting and ends successfully.
+parameters:
+  - name: GREETING
+    description: Word to greet with
+    default: Hello
+actions:
+  - id: start
+    type: core.start
+  - id: greet
+    type: core.log
+    with:
+      message: "${GREETING}, ${TARGET}! (${STAGE})"
+  - id: done
+    type: core.success
+links:
+  - { from: start, to: greet }
+  - { from: greet, to: done }
+layout:
+  start: { x: 40, y: 120 }
+  greet: { x: 280, y: 120 }
+  done: { x: 520, y: 120 }
+=== pipelines/
+=== triggers/
+=== connections/
+=== .gitignore
+# Runnel keeps run history, logs, certificates and plugin approvals in its data folder,
+# not in the project. Secrets belong in ${env:NAME} or ${secret:NAME}, not in these files.
+
+# Output of runs: relative paths write into the project folder
+/out/
+
+# Windows and Office files
+Thumbs.db
+desktop.ini
+~$*
