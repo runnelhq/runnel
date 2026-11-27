@@ -72,6 +72,9 @@ Wechsel des Zustands und Verlauf über die Zeit gehören nicht dazu; geprüft wi
 
 - **Plattformen:** Windows über die Windows-API (`golang.org/x/sys/windows`), ohne PowerShell; `disk`, `cpu` und
   `memory` auch unter Linux, `system.services` nur unter Windows mit klarer Meldung auf anderen Systemen.
+- **Alternative zu P34:** eine Action `system.service` mit `do: start|stop|restart` statt drei Actions. Drei getrennte
+  Namen sind leichter zu finden und zu dokumentieren (Katalog, Hilfe, Icons); eine Action hält die gemeinsamen Optionen
+  (`timeout`, abhängige Dienste) an einer Stelle. Entschieden wird bei der Umsetzung.
 - **Rechte:** Abfragen gehen ohne Administratorrechte, auch im Dienst als LocalService. Starten, Stoppen und Neustart
   brauchen das Recht am jeweiligen Dienst (meist Administrator); fehlt es, eine verständliche Meldung (Testplan unter
   Windows).
