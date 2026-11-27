@@ -1,0 +1,804 @@
+<!doctype html>
+<!--
+  Mockup E23 – Data per step in a workflow: after a run, the tab "Data" below the canvas shows
+  for the selected action what reached it (Input: with: after variables and expressions,
+  secrets masked) and what it returned (Output: result.output as a tree, a table or JSON),
+  with the path of a value for expressions, its own log lines, the entry of forEach and the
+  run of a loop. Nodes that have data carry a small sign on the canvas; the tab follows the
+  selection. Builds on the approved mockups E4 (shell), E7 (properties), E8 (run, log),
+  S26d (runs), S35 (expressions), S39f (secrets) and S44 (data preview). Static, design tokens only.
+
+  Query parameters:
+    theme = light | dark                                                    (default light)
+    state = output | table | input | loop | failed | skipped | empty | history | truncated
+                                                                            (default output)
+    controls = 0                                   hides the mockup control bar (screenshots)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sync-orders – Runnel</title>
+<link rel="icon" href="../logo/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens/runnel.css">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--rn-font-sans); font-size: var(--rn-text-sm); line-height: 1.5; color: var(--foreground);
+         background: var(--background); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  code, .mono { font-family: var(--rn-font-mono); }
+  a { color: var(--primary); text-underline-offset: 2px; }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6;
+          stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Shell (E4) */
+  .app { display: grid; grid-template-rows: 48px 1fr 24px; height: 100vh; position: relative; }
+  .app.with-controls { height: calc(100vh - 40px); }
+  .body { display: grid; grid-template-columns: 248px 1fr 320px; min-height: 0; }
+  header { display: flex; align-items: center; gap: var(--rn-space-4); padding: 0 var(--rn-space-4); border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: var(--rn-space-2); }
+  .brand .on-dark { display: none; }
+  [data-theme="dark"] .brand .on-light { display: none; }
+  [data-theme="dark"] .brand .on-dark { display: inline; }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .label { font-size: var(--rn-text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .segmented { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--border); border-radius: var(--rn-radius-md); background: var(--muted); }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 3px 8px;
+                      border-radius: var(--rn-radius-sm); font-size: var(--rn-text-xs); color: var(--muted-foreground); cursor: pointer; white-space: nowrap; }
+  .segmented button[aria-pressed="true"] { background: var(--background); color: var(--foreground); box-shadow: var(--rn-shadow-sm); }
+  .segmented svg.i { width: 14px; height: 14px; }
+  .segmented.small button { padding: 1px 7px; font-size: var(--rn-text-2xs); }
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--sidebar); color: var(--sidebar-foreground);
+          border-right: 1px solid var(--sidebar-border); }
+  .panel-title { display: flex; align-items: center; height: 36px; padding: 0 16px; flex: none; }
+  .tree { list-style: none; margin: 0; padding: 0 8px; }
+  .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--rn-radius-sm); white-space: nowrap; }
+  .row.selected { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+  .row .k { color: var(--muted-foreground); display: inline-flex; }
+  .row.selected .k { color: var(--accent-foreground); }
+  .row .tag { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); }
+  .chev { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .d1 { padding-left: 26px; }
+  .count { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); font-weight: 400; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; height: 36px; border-bottom: 1px solid var(--border); background: var(--muted); flex: none; }
+  .tab { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-right: 1px solid var(--border); color: var(--muted-foreground); white-space: nowrap; }
+  .tab.active { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px 0 var(--primary); margin-bottom: -1px; }
+  .filebar { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--border); flex: none; white-space: nowrap; }
+  .crumbs { font-family: var(--rn-font-mono); font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .crumbs b { color: var(--foreground); font-weight: 500; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--input);
+         border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); font-weight: 500; white-space: nowrap; cursor: pointer; }
+  .btn.small { height: 22px; padding: 0 7px; font-size: var(--rn-text-2xs); gap: 4px; }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--muted-foreground); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .btn svg.i { width: 13px; height: 13px; }
+  .btn kbd, kbd { font: 10px var(--rn-font-mono); }
+  .btn kbd { opacity: .75; }
+  .btn .play { color: var(--status-success); display: inline-flex; }
+  .splitbtn { display: inline-flex; }
+  .splitbtn .btn:first-child { border-radius: var(--rn-radius-md) 0 0 var(--rn-radius-md); }
+  .splitbtn .btn:last-child { border-radius: 0 var(--rn-radius-md) var(--rn-radius-md) 0; border-left: 0; padding: 0 6px; }
+  .icon-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid transparent; border-radius: var(--rn-radius-md);
+              background: transparent; color: var(--muted-foreground); cursor: pointer; }
+  .icon-btn.bordered { border-color: var(--input); background: var(--background); color: var(--foreground); }
+  .icon-btn[disabled] { opacity: .4; }
+  footer { display: flex; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--border);
+           background: var(--muted); color: var(--muted-foreground); font-size: var(--rn-text-xs); white-space: nowrap; }
+  footer .ok { color: var(--success); }
+
+  /* Run opened from the history (S26d) */
+  .runinfo { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 16px; border-bottom: 1px solid var(--border);
+             background: var(--muted); font-size: var(--rn-text-xs); flex: none; white-space: nowrap; }
+  .runinfo .mono { font-size: var(--rn-text-2xs); }
+
+  /* Canvas (design/README.md, 6.1) */
+  .work { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .canvas { position: relative; flex: 1; overflow: hidden; background-color: var(--canvas);
+            background-image: radial-gradient(circle, var(--canvas-grid) 1px, transparent 1.2px); background-size: 16px 16px; }
+  .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  svg.edges { position: absolute; left: 0; top: 0; overflow: visible; }
+  .edge { fill: none; stroke-width: 2; }
+  .edge.success { stroke: var(--link-success); }
+  .edge.failure { stroke: var(--link-failure); }
+  .edge.dead { opacity: .3; }
+  .edge-label { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+                border-radius: var(--rn-radius-full); background: var(--card); border: 1.5px solid currentColor; font-size: 11px; font-weight: 700; line-height: 1; }
+  .edge-label.success { color: var(--link-success); }
+  .edge-label.failure { color: var(--link-failure); }
+  .edge-label.dead { opacity: .45; }
+  .node { position: absolute; width: 190px; height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 10px;
+          background: var(--node); border: 1px solid var(--node-border); border-radius: var(--rn-radius-lg); box-shadow: var(--rn-shadow-sm); cursor: pointer; }
+  .node.selected { outline: 2px solid var(--node-selected); outline-offset: 1px; }
+  .node.dim { opacity: .55; }
+  .node .text { min-width: 0; line-height: 1.25; }
+  .node .id { font-weight: 600; white-space: nowrap; }
+  .node .type { font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .type .dur { color: var(--foreground); }
+  .tile { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--rn-radius-md);
+          background: var(--rn-kategorie-allgemein); color: var(--rn-tiefe-0); flex: none; }
+  .port { position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--node); border: 1.5px solid var(--node-border); }
+  .port.in { left: -5px; } .port.out { right: -5px; }
+  .runbar { position: absolute; left: 6px; right: 6px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; }
+  .runbar.succeeded { background: var(--status-success); }
+  .runbar.failed { background: var(--status-failed); }
+  .runbar.skipped { height: 0; border-top: 3px dashed var(--status-skipped); }
+  .marker { position: absolute; top: -9px; right: -9px; display: grid; place-items: center; width: 20px; height: 20px;
+            border-radius: 50%; font-size: 11px; font-weight: 700; color: var(--rn-tiefe-0); box-shadow: var(--rn-shadow-sm); }
+  .marker.succeeded { background: var(--status-success); }
+  .marker.failed { background: var(--status-failed); }
+  .marker.skipped { background: var(--status-skipped); }
+  .chips { position: absolute; left: -2px; top: -22px; display: flex; gap: 4px; }
+  .join { height: 18px; padding: 0 6px; display: inline-flex; align-items: center; border-radius: var(--rn-radius-sm); border: 1px solid var(--border);
+          background: var(--card); font: 500 10px/1 var(--rn-font-mono); color: var(--muted-foreground); white-space: nowrap; }
+  /* New in E23: the node has data of the last run */
+  .datasign { position: absolute; right: 10px; bottom: -9px; display: inline-flex; align-items: center; gap: 3px; height: 17px; padding: 0 5px;
+              border-radius: var(--rn-radius-full); background: var(--card); border: 1px solid var(--border); box-shadow: var(--rn-shadow-sm);
+              font: 600 10px/1 var(--rn-font-mono); color: var(--muted-foreground); }
+  .node.selected .datasign { border-color: var(--node-selected); color: var(--foreground); }
+  .controls-panel { position: absolute; left: 16px; bottom: 16px; display: flex; flex-direction: column; background: var(--card);
+                    border: 1px solid var(--border); border-radius: var(--rn-radius-md); box-shadow: var(--rn-shadow-sm); overflow: hidden; }
+  .controls-panel span { display: grid; place-items: center; width: 28px; height: 28px; color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+  .controls-panel span:last-child { border-bottom: 0; }
+  .zoom { position: absolute; left: 52px; bottom: 16px; height: 22px; padding: 0 8px; display: inline-flex; align-items: center;
+          background: var(--card); border: 1px solid var(--border); border-radius: var(--rn-radius-sm); font: 11px var(--rn-font-mono); color: var(--muted-foreground); }
+  .tooltip { position: absolute; z-index: 5; max-width: 320px; padding: 6px 10px; border-radius: var(--rn-radius-md); background: var(--popover);
+             color: var(--popover-foreground); border: 1px solid var(--border); box-shadow: var(--rn-shadow-md); font-size: var(--rn-text-xs); line-height: 1.4; white-space: nowrap; }
+  .tooltip small { display: block; color: var(--muted-foreground); font-size: var(--rn-text-2xs); }
+
+  /* Panel below the canvas (E7, E8, S44) */
+  .bottom { flex: none; border-top: 1px solid var(--border); background: var(--background); display: flex; flex-direction: column; }
+  .splitter { height: 5px; margin-top: -3px; cursor: row-resize; }
+  .tabs2 { display: flex; align-items: center; height: 32px; padding: 0 8px; gap: 2px; flex: none; }
+  .t2 { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--rn-radius-sm);
+        font-size: var(--rn-text-xs); color: var(--muted-foreground); white-space: nowrap; }
+  .t2.active { background: var(--muted); color: var(--foreground); font-weight: 500; }
+  .t2 .n { display: inline-grid; place-items: center; min-width: 18px; height: 16px; padding: 0 5px; border-radius: var(--rn-radius-full);
+           font-size: 10px; font-weight: 600; background: var(--danger-soft); color: var(--destructive); }
+  .tabs2 .follow { margin-left: auto; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .data { height: 412px; display: flex; flex-direction: column; border-top: 1px solid var(--border); min-height: 0; }
+
+  /* Head of the step (new in E23) */
+  .dhead { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border-bottom: 1px solid var(--border); flex: none; white-space: nowrap; }
+  .dhead .tile { width: 24px; height: 24px; border-radius: var(--rn-radius-sm); }
+  .dhead .tile svg.i { width: 14px; height: 14px; }
+  .dhead .who { display: flex; align-items: baseline; gap: 6px; }
+  .dhead .who b { font-weight: 600; }
+  .dhead .who .mono { font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .dhead .meta { display: flex; align-items: center; gap: 8px; font-size: var(--rn-text-xs); color: var(--muted-foreground); }
+  .dhead .meta .sep { color: var(--border); }
+  .dhead .runlink { font-size: var(--rn-text-2xs); color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 4px; }
+  .dhead .runlink a { font-family: var(--rn-font-mono); }
+  .st { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--rn-radius-full);
+        font-size: var(--rn-text-2xs); font-weight: 600; white-space: nowrap; }
+  .st.succeeded { background: var(--success-soft); color: var(--success); }
+  .st.failed { background: var(--danger-soft); color: var(--destructive); }
+  .st.skipped { background: var(--muted); color: var(--muted-foreground); border: 1px dashed var(--status-skipped); }
+  .attempts { display: inline-flex; align-items: center; gap: 4px; }
+  .attempts .w { color: var(--warning); font-weight: 700; }
+
+  /* Entries of forEach and runs of a loop */
+  .entries { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-bottom: 1px solid var(--border); flex: none;
+             font-size: var(--rn-text-xs); color: var(--muted-foreground); white-space: nowrap; }
+  .stepper { display: inline-flex; align-items: center; gap: 4px; }
+  .stepper .pos { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid var(--input);
+                  border-radius: var(--rn-radius-md); background: var(--background); color: var(--foreground); font-variant-numeric: tabular-nums; }
+  .stepper .pos svg.i { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .strip { display: flex; gap: 3px; }
+  .strip span { display: grid; place-items: center; width: 22px; height: 20px; border-radius: var(--rn-radius-sm); font: 600 10px/1 var(--rn-font-mono);
+                background: var(--muted); color: var(--muted-foreground); border: 1px solid transparent; font-variant-numeric: tabular-nums; }
+  .strip span.ok { color: var(--success); }
+  .strip span.err { background: var(--danger-soft); color: var(--destructive); }
+  .strip span.none { opacity: .5; border-style: dashed; border-color: var(--border); background: transparent; }
+  .strip span.on { border-color: var(--node-selected); background: var(--accent); color: var(--accent-foreground); }
+
+  /* Input | Output */
+  .panes { display: grid; grid-template-columns: 340px 1fr; flex: 1; min-height: 0; }
+  .pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .pane + .pane { border-left: 1px solid var(--border); }
+  .phead { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 12px; flex: none; white-space: nowrap; }
+  .phead .sub { font-size: var(--rn-text-2xs); color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; }
+  .phead .sub .mono { font-size: var(--rn-text-2xs); }
+  .pscroll { flex: 1; overflow: auto; min-height: 0; border-top: 1px solid var(--border); }
+
+  /* Tree of values (key, type, value) */
+  .tr { display: grid; grid-template-columns: minmax(150px, 210px) 64px 1fr; align-items: center; min-height: 24px; padding: 0 10px 0 4px;
+        font: var(--rn-text-2xs) var(--rn-font-mono); white-space: nowrap; }
+  .tr:hover, .tr.hover { background: var(--muted); }
+  .tr.sel { background: var(--accent); color: var(--accent-foreground); }
+  .tr .key { display: flex; align-items: center; gap: 2px; overflow: hidden; }
+  .tr .key .tw { display: inline-grid; place-items: center; width: 14px; color: var(--muted-foreground); flex: none; }
+  .tr .key .tw svg.i { width: 11px; height: 11px; }
+  .tr .key .idx { color: var(--muted-foreground); }
+  .tr .ty { color: var(--muted-foreground); font-size: 10px; }
+  .tr .val { overflow: hidden; text-overflow: ellipsis; }
+  .tr .val.str { color: var(--foreground); }
+  .tr .val.num { color: var(--expression); }
+  .tr .val.bool { color: var(--expression); }
+  .tr .val.null, .tr .val.sum { color: var(--muted-foreground); font-style: italic; font-family: var(--rn-font-sans); }
+  .tr .val .more { font-family: var(--rn-font-sans); font-style: normal; margin-left: 6px; }
+
+  /* Input: values as they reached the action */
+  .ir { display: grid; grid-template-columns: 112px 1fr; gap: 8px; padding: 4px 12px; border-bottom: 1px solid var(--border); font-size: var(--rn-text-2xs); }
+  .ir:last-child { border-bottom: 0; }
+  .ir .k { font-family: var(--rn-font-mono); font-weight: 500; padding-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ir .k.child { padding-left: 12px; color: var(--muted-foreground); font-weight: 400; }
+  .ir .k.child b { color: var(--foreground); font-weight: 500; }
+  .ir .v { min-width: 0; font-family: var(--rn-font-mono); overflow-wrap: anywhere; }
+  .ir .v .def { margin-left: 6px; font-family: var(--rn-font-sans); color: var(--muted-foreground); }
+  .ir .v .src { display: block; margin-top: 1px; color: var(--expression); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ir .v .src::before { content: "from "; color: var(--muted-foreground); font-family: var(--rn-font-sans); }
+  .ir .v .num { color: var(--expression); }
+  .ir .v .long { white-space: pre-wrap; display: block; max-height: 48px; overflow: hidden; position: relative; }
+  .ir .v .showall { display: inline-flex; gap: 4px; margin-top: 2px; font-family: var(--rn-font-sans); font-size: 10px; color: var(--muted-foreground); }
+  .ir .v .showall a { font-weight: 500; }
+  .secret { display: inline-flex; align-items: center; gap: 5px; }
+  .secret .stars { letter-spacing: .1em; }
+  .secret svg.i { width: 12px; height: 12px; color: var(--muted-foreground); }
+  .secret .ref { color: var(--expression); font-size: 10px; }
+  .igroup { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px; font-size: var(--rn-text-2xs); font-weight: 600;
+            background: var(--muted); border-bottom: 1px solid var(--border); color: var(--muted-foreground); }
+  .igroup .mono { font-weight: 500; color: var(--foreground); }
+  .igroup .r { margin-left: auto; font-weight: 400; }
+
+  /* Table of a list of objects (as the data preview S44) */
+  .pvtable table { border-collapse: collapse; min-width: 100%; }
+  .pvtable th { position: sticky; top: 0; z-index: 1; background: var(--muted); text-align: left; font-weight: 500; height: 30px; font-size: var(--rn-text-2xs);
+                padding: 0 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); white-space: nowrap; }
+  .pvtable th .ty { display: block; font: 10px var(--rn-font-mono); color: var(--muted-foreground); font-weight: 400; line-height: 1; }
+  .pvtable th.n, .pvtable td.n { width: 36px; text-align: right; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+  .pvtable td { height: 24px; padding: 0 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);
+                font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  .pvtable td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pvtable td.obj { color: var(--muted-foreground); font-style: italic; font-family: var(--rn-font-sans); }
+  .pvtable tr:hover td { background: var(--muted); }
+  .pvtable td.sel { outline: 2px solid var(--ring); outline-offset: -2px; background: var(--accent); color: var(--accent-foreground); }
+  .pvjson { margin: 0; padding: 8px 12px; font: var(--rn-text-2xs)/1.6 var(--rn-font-mono); color: var(--foreground); }
+  .pvjson .k { font-weight: 500; }
+  .pvjson .s { color: var(--muted-foreground); }
+  .pvjson .num { color: var(--expression); }
+
+  /* Path of the chosen value */
+  .pathbar { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 12px; border-top: 1px solid var(--border); flex: none;
+             background: var(--muted); font-size: var(--rn-text-2xs); color: var(--muted-foreground); white-space: nowrap; }
+  .pathbar .p { flex: 0 1 auto; font-family: var(--rn-font-mono); color: var(--expression); background: var(--expression-soft); padding: 1px 6px; border-radius: var(--rn-radius-sm);
+                overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .pathbar .btn.small { background: var(--background); }
+
+  /* Notes inside the panes */
+  .note { display: grid; grid-template-columns: 18px 1fr; gap: 8px; margin: 8px 10px; padding: 8px 10px; border-radius: var(--rn-radius-md);
+          font-size: var(--rn-text-2xs); line-height: 1.5; background: var(--muted); color: var(--muted-foreground); }
+  .note .sym { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor; font-weight: 700; font-size: 10px; }
+  .note b { color: var(--foreground); font-weight: 600; }
+  .note.warn { background: var(--warning-soft); color: var(--foreground); }
+  .note.warn .sym { border: 0; color: var(--warning); font-size: 13px; }
+  .note.err { background: var(--danger-soft); color: var(--foreground); }
+  .note.err .sym { border: 0; color: var(--destructive); font-size: 13px; }
+  .note.err b { color: var(--destructive); }
+  .note .mono { font-size: var(--rn-text-2xs); }
+  .note .acts { display: flex; gap: 6px; margin-top: 6px; }
+  .note .acts .btn { background: var(--background); }
+
+  /* Log lines of the step, collapsed (E8) */
+  .steplog { flex: none; border-top: 1px solid var(--border); }
+  .steplog .lh { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; font-size: var(--rn-text-2xs); color: var(--muted-foreground); }
+  .steplog .lh b { color: var(--foreground); font-weight: 500; }
+  .steplog .lh .r { margin-left: auto; }
+  .lrow { display: grid; grid-template-columns: 88px 44px 1fr; gap: 8px; align-items: center; min-height: 22px; padding: 0 12px;
+          font: var(--rn-text-2xs) var(--rn-font-mono); white-space: nowrap; }
+  .lrow .t { color: var(--muted-foreground); }
+  .lrow .lv { font-weight: 600; }
+  .lrow .lv.debug { color: var(--muted-foreground); }
+  .lrow .lv.warn { color: var(--warning); }
+  .lrow .lv.error { color: var(--destructive); }
+  .lrow .m { overflow: hidden; text-overflow: ellipsis; }
+  .lrow.error { background: var(--danger-soft); }
+
+  /* Empty states */
+  .empty { flex: 1; display: grid; place-items: center; padding: 16px; }
+  .empty .box { max-width: 460px; text-align: center; color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .empty .box .big { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--muted);
+                     color: var(--muted-foreground); margin-bottom: 8px; }
+  .empty .box .big svg.i { width: 20px; height: 20px; }
+  .empty .box h3 { margin: 0 0 4px; font-size: var(--rn-text-sm); font-weight: 600; color: var(--foreground); }
+  .empty .box p { margin: 0 0 10px; }
+  .empty .box .acts { display: inline-flex; gap: 8px; }
+  .linklist { margin: 4px auto 10px; text-align: left; display: inline-grid; gap: 4px; }
+  .linklist div { display: flex; align-items: center; gap: 8px; font-size: var(--rn-text-2xs); }
+  .linklist .sym { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor;
+                   font-size: 10px; font-weight: 700; background: var(--card); }
+  .linklist .sym.success { color: var(--link-success); }
+  .linklist .sym.failure { color: var(--link-failure); }
+  .linklist .mono { color: var(--foreground); }
+
+  /* Properties (E7) */
+  .side { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: var(--background); }
+  .side .panel-title { justify-content: space-between; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border); }
+  .scroll { overflow: auto; flex: 1; min-height: 0; padding-bottom: 16px; }
+  .ph { display: flex; gap: 10px; align-items: center; padding: 14px 16px 6px; }
+  .ph .tile { width: 32px; height: 32px; }
+  .ph h3 { margin: 0; font-size: var(--rn-text-base); font-weight: 600; line-height: 1.2; }
+  .ph .t { font: var(--rn-text-2xs) var(--rn-font-mono); color: var(--muted-foreground); }
+  .ph-desc { margin: 0 16px 8px; color: var(--muted-foreground); font-size: var(--rn-text-xs); }
+  .lastrun { margin: 0 16px 10px; padding: 8px 10px; border-radius: var(--rn-radius-md); font-size: var(--rn-text-xs); }
+  .lastrun.failed { background: var(--danger-soft); color: var(--destructive); }
+  .lastrun.ok { background: var(--success-soft); color: var(--success); }
+  .lastrun.skipped { background: var(--muted); color: var(--muted-foreground); }
+  .lastrun .err { color: var(--foreground); font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); margin-top: 2px; }
+  .lastrun .links { display: flex; gap: 12px; margin-top: 4px; font-size: var(--rn-text-2xs); }
+  .lastrun .links a { color: var(--foreground); }
+  .section { border-top: 1px solid var(--border); margin-top: 8px; }
+  .section > h4 { display: flex; align-items: center; gap: 6px; margin: 0; height: 34px; padding: 0 16px; font-size: var(--rn-text-xs); font-weight: 600; }
+  .section > h4 .sum { margin-left: auto; font-weight: 400; color: var(--muted-foreground); font-family: var(--rn-font-mono); font-size: var(--rn-text-2xs); }
+  .field { padding: 0 16px; margin-bottom: 12px; }
+  .field > label { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; font-size: var(--rn-text-xs); font-weight: 500; }
+  .field > label .key { margin-left: auto; font: 10px var(--rn-font-mono); color: var(--muted-foreground); font-weight: 400; }
+  .input { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 30px; padding: 0 8px; border: 1px solid var(--input);
+           border-radius: var(--rn-radius-md); background: var(--background); font-size: var(--rn-text-xs); white-space: nowrap; overflow: hidden; }
+  .input.mono { font-family: var(--rn-font-mono); }
+  .input .x { color: var(--expression); }
+  .input svg.i { width: 14px; height: 14px; color: var(--muted-foreground); }
+
+  .mock-controls { height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px; font: 12px/1 var(--rn-font-mono);
+                   background: var(--rn-tiefe-950); color: var(--rn-tiefe-300); }
+  .mock-controls a { color: var(--rn-strom-300); }
+  .mock-controls b { color: var(--rn-tiefe-0); }
+</style>
+</head>
+<body>
+<div class="mock-controls" id="mock">
+  <b>Mockup E23</b> theme: <a data-theme="light" href="#">light</a> <a data-theme="dark" href="#">dark</a> · state:
+  <a data-state="output" href="#">output</a> <a data-state="table" href="#">table</a> <a data-state="input" href="#">input</a>
+  <a data-state="loop" href="#">loop</a> <a data-state="failed" href="#">failed</a> <a data-state="skipped" href="#">skipped</a>
+  <a data-state="empty" href="#">empty</a> <a data-state="history" href="#">history</a> <a data-state="truncated" href="#">truncated</a>
+</div>
+
+<div class="app" id="app">
+  <header>
+    <div class="brand">
+      <img src="../logo/runnel-icon.svg" alt="" width="20" height="20">
+      <img class="on-light" src="../logo/runnel-wordmark.svg" alt="Runnel" height="15">
+      <img class="on-dark" src="../logo/runnel-wordmark-inverse.svg" alt="Runnel" height="15">
+    </div>
+    <div class="divider"></div>
+    <span class="label">Project</span><b>shop</b>
+    <span class="mono" style="font-size:12px;color:var(--muted-foreground)">C:\Runnel\projects\shop</span>
+    <div class="spacer"></div>
+    <div class="segmented">
+      <button aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>System</button>
+      <button><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Light</button>
+      <button><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>Dark</button>
+    </div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="panel-title"><span class="label">Explorer</span></div>
+      <ul class="tree" id="tree"></ul>
+    </aside>
+    <main>
+      <div class="tabs" id="tabs"></div>
+      <div class="filebar" id="filebar"></div>
+      <div id="runinfo"></div>
+      <div class="work">
+        <div class="canvas" id="canvas"></div>
+        <div class="bottom" id="bottom"></div>
+      </div>
+    </main>
+    <section class="side" aria-label="Properties">
+      <div class="panel-title"><span class="label">Properties</span><button class="icon-btn" aria-label="Hide properties">×</button></div>
+      <div class="scroll" id="props"></div>
+    </section>
+  </div>
+  <footer id="status"></footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const theme = params.get("theme") === "dark" ? "dark" : "light";
+  const state = params.get("state") || "output";
+  document.documentElement.dataset.theme = theme;
+  if (params.get("controls") === "0") document.getElementById("mock").remove();
+  else {
+    document.getElementById("app").classList.add("with-controls");
+    document.querySelectorAll("[data-theme]").forEach(a => a.href = `?theme=${a.dataset.theme}&state=${state}`);
+    document.querySelectorAll("[data-state]").forEach(a => a.href = `?theme=${theme}&state=${a.dataset.state}`);
+  }
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const icon = (d, size = 16) => `<svg class="i" viewBox="0 0 24 24" style="width:${size}px;height:${size}px">${d}</svg>`;
+  const chev = '<svg class="i chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const chevRight = '<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
+  const I = {
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    wf: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h3a3 3 0 0 1 3 3v6a3 3 0 0 0 3 3"/>',
+    env: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    proj: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    db: '<ellipse cx="12" cy="6" rx="7" ry="2.8"/><path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/>',
+    http: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+    smtp: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    code: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    down: '<path d="M6 9l6 6 6-6"/>',
+    left: '<path d="M15 6l-6 6 6 6"/>',
+    right: '<path d="M9 6l6 6-6 6"/>',
+    play: '<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>',
+    ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    braces: '<path d="M8 4H7a2 2 0 0 0-2 2v3a2 2 0 0 1-2 2 2 2 0 0 1 2 2v3a2 2 0 0 0 2 2h1M16 4h1a2 2 0 0 1 2 2v3a2 2 0 0 0 2 2 2 2 0 0 0-2 2v3a2 2 0 0 1-2 2h-1"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
+  };
+  // Icons of the building blocks as in the editor (E13, web/src/components/Icons.tsx).
+  const T = {
+    "core.start": '<path d="M8 5l11 7-11 7z" fill="currentColor"/>',
+    "http.request": '<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',
+    "core.check": '<path d="M12 3l9 9-9 9-9-9zM8.5 12l2.5 2.5 4.5-5"/>',
+    "db.execute": '<ellipse cx="10" cy="6" rx="6" ry="2.5"/><path d="M4 6v12c0 1.4 2.7 2.5 6 2.5M16 6v4"/><path d="M15 13v8l6-4z"/>',
+    "mail.send": '<rect x="3" y="5" width="14" height="11" rx="1.5"/><path d="M3 6.5l7 5 7-5M14 19.5h7.5M18.5 16.5l3 3-3 3"/>',
+    "core.log": '<path d="M5 6h14M5 12h14M5 18h9"/>',
+  };
+  const cat = { "core.start": "allgemein", "http.request": "netzwerk", "core.check": "allgemein", "db.execute": "datenbank",
+                "mail.send": "netzwerk", "core.log": "allgemein" };
+  const tile = type => `<span class="tile" style="background:var(--rn-kategorie-${cat[type]})">${icon(T[type])}</span>`;
+
+  // ---------- The workflow: workflows/sync-orders.workflow.yaml ----------
+  // start → fetch (http.request, paginate) → any (core.check) → save (db.execute, forEach) → notify (mail.send);
+  // save → failed (core.log) on failure.
+  const failedRun = state === "failed" || state === "skipped";
+  const noRun = state === "empty";
+  const big = state === "truncated";
+  const sel = { output: "fetch", table: "fetch", input: "notify", loop: "save", failed: "save", skipped: "notify",
+                empty: "fetch", history: "fetch", truncated: "fetch" }[state];
+  const nodes = [
+    { id: "start", type: "core.start", x: 16, y: 70, st: "succeeded", d: "0 s" },
+    { id: "fetch", type: "http.request", x: 236, y: 70, st: "succeeded", d: big ? "38 s" : "1.8 s" },
+    { id: "any", type: "core.check", x: 456, y: 70, st: "succeeded", d: "0 s" },
+    { id: "save", type: "db.execute", x: 676, y: 70, st: failedRun ? "failed" : "succeeded", d: failedRun ? "0.4 s" : big ? "3 min 12 s" : "0.6 s", forEach: true },
+    { id: "notify", type: "mail.send", x: 896, y: 70, st: failedRun ? "skipped" : "succeeded", d: "1.1 s" },
+    { id: "failed", type: "core.log", x: 896, y: 210, st: failedRun ? "succeeded" : "skipped", d: "0 s" },
+  ];
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const links = [["start", "fetch", "success"], ["fetch", "any", "success"], ["any", "save", "success"], ["save", "notify", "success"], ["save", "failed", "failure"]];
+
+  // ---------- Explorer ----------
+  const rows = [["folder", "connections", 0, "3"], ["db", "erp-sql.yaml", 1, "", "sqlserver"], ["smtp", "mail.yaml", 1, "", "smtp"],
+    ["http", "shop-api.yaml", 1, "", "http"], ["folder", "environments", 0, "2"], ["env", "dev.yaml", 1], ["env", "prod.yaml", 1],
+    ["folder", "triggers", 0, "1"], ["folder", "workflows", 0, "2"], ["wf", "report.workflow.yaml", 1], ["wf", "sync-orders.workflow.yaml", 1],
+    ["proj", "project.yaml", 0]];
+  document.getElementById("tree").innerHTML = rows.map(([k, n, d, c, t]) =>
+    `<li><div class="row ${d ? "d1" : ""} ${n === "sync-orders.workflow.yaml" ? "selected" : ""}">` +
+    (k === "folder" ? (n === "triggers" ? chevRight : chev) : '<span style="width:12px"></span>') +
+    `<span class="k">${icon(I[k])}</span>${n}${c ? `<span class="count">${c}</span>` : ""}${t ? `<span class="tag">${t}</span>` : ""}</div></li>`).join("");
+
+  // ---------- Tabs, file bar ----------
+  document.getElementById("tabs").innerHTML = `<div class="tab active">${icon(I.wf)} sync-orders.workflow.yaml ×</div>`;
+  document.getElementById("filebar").innerHTML = `<span class="crumbs">workflows / <b>sync-orders.workflow.yaml</b></span><div class="spacer"></div>
+    <span class="splitbtn"><button class="btn" title="Run with dev (F5)"><span class="play">${icon(I.play, 13)}</span>Run</button><button class="btn" aria-label="Run with other values">${icon(I.down, 13)}</button></span>
+    <button class="btn" style="opacity:.5">Save <kbd>Ctrl+S</kbd></button>
+    <div class="segmented"><button aria-pressed="true">${icon(I.wf, 14)}Canvas</button><button>${icon(I.code, 14)}YAML</button></div>`;
+  if (state === "history") {
+    document.getElementById("runinfo").innerHTML = `<div class="runinfo">${icon(I.history, 14)}<span class="st succeeded">✔ Succeeded</span>
+      <span>Run <span class="mono">01JDF2W8K4NQ</span> · Today 02:00:00 · 1.9 s · <span class="mono">cron:nightly</span> · prod</span>
+      <span class="spacer"></span><button class="icon-btn bordered" aria-label="Older run">${icon(I.left, 13)}</button><button class="icon-btn bordered" aria-label="Newer run">${icon(I.right, 13)}</button>
+      <button class="btn small">All runs of this file</button><button class="icon-btn" aria-label="Hide">×</button></div>`;
+  }
+
+  // ---------- Canvas ----------
+  const W = 190, H = 52, zoom = 0.78;
+  let svg = `<svg class="edges" width="1200" height="400">`, labels = "";
+  for (const [from, to, type] of links) {
+    const a = byId[from], b = byId[to];
+    const x1 = a.x + W + 4, y1 = a.y + H / 2, x2 = b.x - 4, y2 = b.y + H / 2;
+    let d, mx, my;
+    if (y1 === y2) {
+      d = `M${x1},${y1} L${x2},${y2}`; mx = x1 + (x2 - x1) * 0.35; my = y1;
+    } else {
+      // down to a step below: out to the right, then into the input from the left
+      const c = 56;
+      d = `M${x1},${y1} C${x1 + c},${y1} ${x2 - c},${y2} ${x2},${y2}`;
+      const t = 0.35, u = 1 - t;
+      mx = u*u*u*x1 + 3*u*u*t*(x1 + c) + 3*u*t*t*(x2 - c) + t*t*t*x2;
+      my = u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2;
+    }
+    const followed = !noRun && byId[to].st !== "skipped";
+    const dead = noRun ? "" : followed ? "" : "dead";
+    svg += `<path class="edge ${type} ${dead}" d="${d}"/>`;
+    labels += `<span class="edge-label ${type} ${dead}" style="left:${mx}px;top:${my}px">${type === "success" ? "✔" : "✖"}</span>`;
+  }
+  svg += "</svg>";
+  const hasData = n => !noRun && state !== "history" && n.st !== "skipped";
+  const stage = svg + labels + nodes.map(n => {
+    const ran = !noRun;
+    const sub = ran && n.st !== "skipped" ? `${n.type} · <span class="dur">${n.d}</span>` : n.type;
+    const mark = !ran ? "" : n.st === "succeeded" ? '<span class="marker succeeded" title="succeeded">✔</span>'
+      : n.st === "failed" ? '<span class="marker failed" title="failed">✖</span>' : '<span class="marker skipped" title="skipped">–</span>';
+    const chips = n.forEach ? `<span class="chips"><span class="join" title="forEach">↻ for each${ran ? failedRun ? " · 7 of 12" : big ? " · 8,200" : " · 12" : ""}</span></span>` : "";
+    const sign = hasData(n) ? `<span class="datasign" title="Data of the last run – click to show">${icon(I.braces, 10)}</span>` : "";
+    return `<div class="node ${n.id === sel ? "selected" : ""} ${ran && n.st === "skipped" ? "dim" : ""}" style="left:${n.x}px;top:${n.y}px">
+      ${n.type === "core.start" ? "" : '<span class="port in"></span>'}${tile(n.type)}<div class="text"><div class="id">${n.id}</div><div class="type">${sub}</div></div>
+      <span class="port out"></span>${chips}${ran ? `<span class="runbar ${n.st}"></span>` : ""}${mark}${sign}</div>`;
+  }).join("");
+  const canvas = document.getElementById("canvas");
+  canvas.innerHTML = `<div class="stage" style="transform:translate(12px, 0) scale(${zoom})">${stage}</div>
+    <div class="controls-panel"><span>+</span><span>−</span><span>⛶</span></div><span class="zoom">78 %</span>`;
+  if (state === "output") {
+    canvas.insertAdjacentHTML("beforeend", `<div class="tooltip" style="left:${12 + (236 + 150) * zoom}px;top:${(70 + 64) * zoom + 14}px">Data of the last run<small>Click the step to show it under Data</small></div>`);
+  }
+
+  // ---------- Status bar ----------
+  const runSummary = noRun ? "" : state === "history" ? '<span style="color:var(--status-success)">✔ Showing run 01JDF2W8K4NQ · succeeded · 1.9 s</span>'
+    : failedRun ? '<span style="color:var(--status-failed)">✖ Failed (dev) · 2.3 s</span>'
+    : `<span style="color:var(--status-success)">✔ Succeeded (dev) · ${big ? "3 min 51 s" : "3.6 s"}</span>`;
+  document.getElementById("status").innerHTML = `<span class="ok">● Connected</span><span class="mono" style="font-size:11px">127.0.0.1:7300</span>
+    <span>Workflow · 6 actions · 5 links</span>${runSummary}<span class="spacer"></span><span>Runnel v0.1.0</span>`;
+
+  // ---------- Data of the last run (what the server would keep, E23a) ----------
+  const orders = [
+    [10231, "SO-2026-10231", ["C-4711", "Müller GmbH"], 1249.5, "2026-11-26T08:14:03Z", 3],
+    [10232, "SO-2026-10232", ["C-4802", "Schmidt & Söhne KG"], 318.0, "2026-11-26T09:02:41Z", 1],
+    [10233, "SO-2026-10233", ["C-5120", "Weber, Anna"], 89.9, "2026-11-26T09:47:15Z", 2],
+    [10234, "SO-2026-10234", ["C-4711", "Müller GmbH"], 2410.75, "2026-11-26T10:20:08Z", 5],
+    [10235, "SO-2026-10235", ["C-6033", "Bäckerei Krause"], 56.4, "2026-11-26T11:05:52Z", 1],
+    [10236, "SO-2026-10236", ["C-6190", "Klein & Partner"], 734.2, "2026-11-26T12:31:19Z", 4],
+    [10237, "SO-2026-10237", ["C-4802", "Schmidt & Söhne KG"], 1120.0, "2026-11-26T13:44:37Z", 2],
+    [10238, "SO-2026-10238", ["C-7001", "Nordlicht Handel"], 412.35, "2026-11-26T14:12:04Z", 3],
+    [10239, "SO-2026-10239", ["C-5120", "Weber, Anna"], 24.99, "2026-11-26T15:28:46Z", 1],
+    [10240, "SO-2026-10240", ["C-7045", "Hofmann Technik"], 3980.0, "2026-11-26T16:03:10Z", 6],
+    [10241, "SO-2026-10241", ["C-6033", "Bäckerei Krause"], 61.8, "2026-11-26T17:19:33Z", 1],
+    [10242, "SO-2026-10242", ["C-7102", "Lange Logistik"], 845.6, "2026-11-26T18:47:58Z", 3],
+  ];
+  const item = o => ({ id: o[0], number: o[1], status: "open", customer: { id: o[2][0], name: o[2][1] }, total: o[3], currency: "EUR", created: o[4], lines: o[5] });
+  const items = orders.map(item);
+  const fetchOut = {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8", date: "Fri, 27 Nov 2026 09:12:44 GMT", "x-ratelimit-remaining": "4987", "x-request-id": "3f2c9a71-5be0-4f0e-9d0c-6a1e2b7d8f40" },
+    items, count: big ? 8200 : 12, pages: big ? 82 : 2,
+  };
+
+  // ---------- Tree of values: key, type, value ----------
+  const typeOf = v => v === null ? "null" : Array.isArray(v) ? "list" : typeof v === "object" ? "object"
+    : typeof v === "number" ? (Number.isInteger(v) ? "integer" : "number") : typeof v === "boolean" ? "boolean" : "string";
+  const keyPath = (base, k) => typeof k === "number" ? `${base}[${k}]` : /^[A-Za-z_][A-Za-z0-9_]*$/.test(k) ? `${base}.${k}` : `${base}["${k}"]`;
+  function treeRows(v, key, path, depth, open, opts) {
+    const t = typeOf(v);
+    const pad = `<span style="width:${depth * 14}px;flex:none"></span>`;
+    const isOpen = open.has(path);
+    const tw = t === "list" || t === "object" ? `<span class="tw">${icon(isOpen ? I.down : I.right, 11)}</span>` : '<span class="tw"></span>';
+    const k = typeof key === "number" ? `<span class="idx">[${key}]</span>` : esc(key);
+    let val;
+    if (t === "list") {
+      const n = path.endsWith(".items") && opts.total ? opts.total : v.length;
+      val = `<span class="val sum">${n.toLocaleString("en")} ${n === 1 ? "entry" : "entries"}${opts.kept && path.endsWith(".items") ? ` · first ${opts.kept.toLocaleString("en")} kept` : ""}</span>`;
+    } else if (t === "object") val = `<span class="val sum">${Object.keys(v).length} ${Object.keys(v).length === 1 ? "key" : "keys"}</span>`;
+    else if (t === "string") val = `<span class="val str">"${esc(v)}"</span>`;
+    else if (t === "null") val = '<span class="val null">null</span>';
+    else val = `<span class="val ${t === "boolean" ? "bool" : "num"}">${v}</span>`;
+    const cls = path === opts.sel ? "sel" : path === opts.hover ? "hover" : "";
+    let html = `<div class="tr ${cls}" title="${esc(path)}"><span class="key">${pad}${tw}${k}</span><span class="ty">${t}</span>${val}</div>`;
+    if (isOpen && (t === "list" || t === "object")) {
+      const entries = t === "list" ? v.map((x, i) => [i, x]) : Object.entries(v);
+      const limit = opts.limit && t === "list" ? opts.limit : entries.length;
+      for (const [ck, cv] of entries.slice(0, limit)) html += treeRows(cv, ck, keyPath(path, ck), depth + 1, open, opts);
+      if (entries.length > limit) html += `<div class="tr"><span class="key"><span style="width:${(depth + 1) * 14 + 14}px;flex:none"></span><span class="idx">…</span></span><span class="ty"></span>
+        <span class="val sum">${opts.kept ? `${(opts.kept - limit).toLocaleString("en")} more kept · ${(opts.total - opts.kept).toLocaleString("en")} not kept` : `${entries.length - limit} more entries`}<a class="more" href="#">Show more</a></span></div>`;
+    }
+    return html;
+  }
+  const tree = (obj, base, open, opts = {}) => Object.entries(obj).map(([k, v]) => treeRows(v, k, keyPath(base, k), 0, new Set(open), opts)).join("");
+
+  // ---------- Input: with: after variables and expressions ----------
+  // [key, value, source expression, flags]; flags: def (default), child, secret, long, num
+  const irow = ([k, v, src, f = {}]) => {
+    let val;
+    if (f.secret) val = `<span class="secret">${icon(I.lock, 12)}<span class="stars">***</span><span class="ref">${esc(f.secret)}</span></span>`;
+    else if (f.long) val = `<span class="long">${esc(v)}</span><span class="showall">${f.long} · <a href="#">Show all</a></span>`;
+    else if (f.group) val = `<span style="color:var(--muted-foreground);font-family:var(--rn-font-sans)">${v}</span>`;
+    else val = `<span class="${f.num ? "num" : ""}">${f.num ? v : `"${esc(v)}"`}</span>${f.def ? '<span class="def">default</span>' : ""}`;
+    return `<div class="ir"><span class="k ${f.child ? "child" : ""}" title="${esc(k)}">${f.child ? "└ " : ""}${esc(k)}</span>
+      <span class="v">${val}${src ? `<span class="src" title="${esc(src)}">${esc(src)}</span>` : ""}</span></div>`;
+  };
+  const inputs = {
+    fetch: [
+      ["connection", "shop-api"], ["method", "GET", "", { def: true }], ["url", "orders"],
+      ["query", "2 keys", "", { group: true }], ["status", "open", "", { child: true }],
+      ["since", big ? "2026-01-01" : "2026-11-26", big ? "${SINCE}" : "{{ formatDate(addDays(today(), -1), 'yyyy-MM-dd') }}", { child: true }],
+      ["timeout", "30s"], ["paginate", "5 keys", "", { group: true }], ["style", "cursor", "", { child: true }], ["items", "data", "", { child: true }],
+      ["next", "meta.next_cursor", "", { child: true }], ["size", 100, "", { child: true, num: true }], ["sizeParam", "limit", "", { child: true }],
+    ],
+    notify: [
+      ["connection", "mail"], ["to", "orders@shop.example", "${ADMIN_MAIL}"],
+      ["subject", "12 new orders since 2026-11-26", "{{ results.fetch.output.count }} new orders since {{ formatDate(addDays(today(), -1), 'yyyy-MM-dd') }}"],
+      ["body", "Hello,\n\n12 new orders were imported into the ERP:\nSO-2026-10231 Müller GmbH 1,249.50 EUR\nSO-2026-10232 Schmidt & Söhne KG 318.00 EUR\nSO-2026-10233 …", "{{ join(map(results.fetch.output.items, …), '\\n') }}", { long: "1,912 characters" }],
+      ["attachments", "1 entry", "", { group: true }], ["[0]", "exports/orders-2026-11-26.csv", "", { child: true }],
+    ],
+    save: [
+      ["connection", "erp-sql"],
+      ["sql", "INSERT INTO dbo.orders (id, number, customer_id, total, currency, created)\nVALUES (@id, @number, @customer, @total, @currency, @created)", "", { long: "2 lines" }],
+      ["params", "6 keys", "", { group: true }],
+      ["id", failedRun ? 10237 : 10233, "{{ row.id }}", { child: true, num: true }],
+      ["number", failedRun ? "SO-2026-10237" : "SO-2026-10233", "{{ row.number }}", { child: true }],
+      ["customer", failedRun ? "C-4802" : "C-5120", "{{ row.customer.id }}", { child: true }],
+      ["total", failedRun ? 1120.0.toFixed(1) : 89.9, "{{ row.total }}", { child: true, num: true }],
+      ["currency", "EUR", "{{ row.currency }}", { child: true }],
+      ["created", failedRun ? "2026-11-26T13:44:37Z" : "2026-11-26T09:47:15Z", "{{ row.created }}", { child: true }],
+    ],
+  };
+  // The connection as resolved for the run: secret fields masked, the reference shown.
+  const conns = {
+    fetch: ["shop-api", "http", [["baseUrl", "https://shop.example/api/v1/"], ["auth", "bearer"], ["token", "", "", { secret: "${secret:shop-api-token}" }]]],
+    notify: ["mail", "smtp", [["host", "smtp.office365.com"], ["port", 587, "", { num: true }], ["auth", "oauth2"],
+      ["clientId", "6b1f0c2e-…-9d41"], ["clientSecret", "", "", { secret: "${secret:mail-client-secret}" }], ["from", "runnel@shop.example"]]],
+    save: ["erp-sql", "sqlserver", [["server", "erp01.shop.local"], ["database", "ERP"], ["user", "runnel"], ["password", "", "", { secret: "${secret:erp-sql-password}" }]]],
+  };
+  function inputPane(id, opts = {}) {
+    const [cn, ct, cf] = conns[id];
+    const head = `<div class="phead"><span class="label">Input</span><span class="sub"><span class="mono">with:</span> as it reached the step</span><span class="spacer"></span>
+      ${opts.defaults ? `<button class="btn small ghost" title="Also show fields with their default value">+ ${opts.defaults} defaults</button>` : ""}</div>`;
+    const rowsHtml = (opts.row ? `<div class="igroup">row<span class="mono">{ id: 10233, … }</span><span class="r">8 keys ${icon(I.right, 11)}</span></div>` : "") +
+      // The connection as resolved, right below the field connection.
+      inputs[id].map((r, i) => irow(r) + (i === 0
+        ? `<div class="igroup">${icon(opts.connOpen ? I.down : I.right, 11)}Connection <span class="mono">${cn}</span><span class="r">${ct} · as resolved for dev</span></div>` +
+          (opts.connOpen ? cf.map(c => irow([c[0], c[1], c[2], { ...(c[3] || {}), child: true }])).join("") : "")
+        : "")).join("");
+    return `<div class="pane">${head}<div class="pscroll">${rowsHtml}</div></div>`;
+  }
+
+  // ---------- Output ----------
+  const outHead = (view, extra = "") => `<div class="phead"><span class="label">Output</span><span class="sub"><span class="mono">result.output</span></span>${extra}<span class="spacer"></span>
+    <div class="segmented small" role="group" aria-label="View"><button aria-pressed="${view === "tree"}">Tree</button><button aria-pressed="${view === "table"}">Table</button><button aria-pressed="${view === "json"}">JSON</button></div>
+    <button class="btn small" title="Copy the output as JSON">${icon(I.copy, 12)}Copy</button></div>`;
+  const pathBar = (path, value) => `<div class="pathbar"><span>Path</span><span class="p" title="${esc(path)}">${esc(path)}</span>
+<span class="spacer"></span>
+    <button class="btn small">${icon(I.copy, 12)}Copy path</button><button class="btn small" title="Copy as {{ … }} to paste into a field">{{ }}</button></div>`;
+  function tablePane(list, cellSel) {
+    const cols = [["id", "integer"], ["number", "string"], ["status", "string"], ["customer", "object"], ["total", "number"], ["currency", "string"], ["created", "string"], ["lines", "integer"]];
+    return `<div class="pscroll pvtable"><table><thead><tr><th class="n">#</th>${cols.map(([c, t]) => `<th>${c}<span class="ty">${t}</span></th>`).join("")}</tr></thead><tbody>` +
+      list.map((o, i) => `<tr><td class="n">${i}</td>${cols.map(([c, t]) => {
+        const v = o[c];
+        const on = cellSel && cellSel[0] === i && cellSel[1] === c ? "sel" : "";
+        if (t === "object") return `<td class="obj ${on}" title="${esc(JSON.stringify(v))}">{ ${esc(v.name)} … }</td>`;
+        return `<td class="${typeof v === "number" ? "num" : ""} ${on}">${esc(typeof v === "number" && !Number.isInteger(v) ? v.toFixed(2) : v)}</td>`;
+      }).join("")}</tr>`).join("") + `</tbody></table></div>`;
+  }
+
+  // ---------- Log lines of the step ----------
+  const logs = {
+    fetch: [["09:12:42.118", "debug", "started (http.request)"],
+      ["09:12:42.120", "warn", "attempt 1 of 3 failed: GET https://shop.example/api/v1/orders: no answer within 30s; retrying in 10s"],
+      ["09:12:52.640", "debug", "GET https://shop.example/api/v1/orders: 200 OK (61834 bytes in 812ms)"],
+      ["09:12:53.402", "info", "GET https://shop.example/api/v1/orders: 12 items on 2 pages in 1.8s"]],
+    notify: [["09:12:55.300", "debug", "started (mail.send)"], ["09:12:56.410", "info", "sent to 1 recipient through smtp.office365.com (48213 bytes)"]],
+    save: failedRun
+      ? [["09:12:53.420", "debug", "started (db.execute)"], ["09:12:53.611", "debug", "[6/12] succeeded in 31ms"],
+         ["09:12:53.650", "error", "[7/12] Violation of PRIMARY KEY constraint 'PK_orders'. Cannot insert duplicate key in object 'dbo.orders'. The duplicate key value is (10237)."],
+         ["09:12:53.651", "error", "failed in 0.4s: entry 7 of 12 failed"]]
+      : [["09:12:53.420", "debug", "started (db.execute)"], ["09:12:53.498", "debug", "[3/12] succeeded in 38ms"]],
+  };
+  function stepLog(id, open, note) {
+    const l = logs[id];
+    const head = `<div class="lh">${icon(open ? I.down : I.right, 11)}<b>Log of this step</b>${note || ""} · ${l.length} lines<span class="r"><a href="#">Show in Log</a></span></div>`;
+    return `<div class="steplog">${head}${open ? l.map(([t, lv, m]) => `<div class="lrow ${lv === "error" ? "error" : ""}"><span class="t">${t}</span><span class="lv ${lv}">${lv}</span><span class="m" title="${esc(m)}">${esc(m)}</span></div>`).join("") : ""}</div>`;
+  }
+
+  // ---------- Head of the step ----------
+  function dhead(id, o) {
+    const n = byId[id];
+    const st = o.st || n.st;
+    const label = { succeeded: "✔ Succeeded", failed: "✖ Failed", skipped: "– Skipped" }[st];
+    const parts = [`<span class="st ${st}">${label}</span>`];
+    if (st !== "skipped") parts.push(`<span>${n.d}</span>`);
+    if (o.attempts) parts.push(`<span class="attempts" title="Attempt 1 of 3 failed: no answer within 30s. Input and output are those of the last attempt."><span class="w">⚠</span>${o.attempts}</span>`);
+    if (o.extra) parts.push(o.extra);
+    return `<div class="dhead">${tile(n.type)}<span class="who"><b>${id}</b><span class="mono">${n.type}</span></span>
+      <span class="meta">${parts.join('<span class="sep">|</span>')}</span><span class="spacer"></span>
+      <span class="runlink">${o.run || `Run <a href="#" title="Open this run in Runs">01JDH3K8Q2VB</a> · dev · 2 min ago ${icon(I.ext, 11)}`}</span></div>`;
+  }
+
+  // ---------- Content of the tab "Data" per state ----------
+  const base = "results.fetch.output";
+  let data;
+  if (state === "output") {
+    data = dhead("fetch", { attempts: "2 of 3 attempts" }) + `<div class="panes">${inputPane("fetch", { defaults: 7, connOpen: true })}
+      <div class="pane">${outHead("tree")}<div class="pscroll">${tree(fetchOut, base,
+        [base + ".items", base + ".items[0]", base + ".items[0].customer"], { hover: base + ".items[0].customer.name", limit: 3 })}</div>
+        ${pathBar(base + ".items[0].customer.name", '"Müller GmbH"')}</div></div>` + stepLog("fetch", false);
+  } else if (state === "table") {
+    data = dhead("fetch", { attempts: "2 of 3 attempts" }) + `<div class="panes">${inputPane("fetch", { defaults: 7 })}
+      <div class="pane">${outHead("table", `<span class="sub" style="margin-left:6px">› <span class="mono">items</span> · 12 entries · 8 columns</span>`)}${tablePane(items, [2, "total"])}
+        ${pathBar(base + ".items[2].total", "89.9")}</div></div>` + stepLog("fetch", false);
+  } else if (state === "input") {
+    const out = { messageId: "<20261127091256.4c1e8b2f@shop.example>", recipients: 1, size: 48213 };
+    data = dhead("notify", {}) + `<div class="panes" style="grid-template-columns:420px 1fr">${inputPane("notify", { defaults: 4, connOpen: true })}
+      <div class="pane">${outHead("tree")}<div class="pscroll">${tree(out, "results.notify.output", [], { hover: "results.notify.output.messageId" })}</div>
+        ${pathBar("results.notify.output.messageId", '"<20261127091256.4c1e8b2f@shop.example>"')}</div></div>` + stepLog("notify", false);
+  } else if (state === "loop" || state === "failed") {
+    const f = state === "failed";
+    const pos = f ? 7 : 3;
+    const strip = Array.from({ length: 12 }, (_, i) => {
+      const k = i + 1;
+      const cls = f ? (k < 7 ? "ok" : k === 7 ? "err" : "none") : "ok";
+      const sym = cls === "ok" ? "✔" : cls === "err" ? "✖" : "";
+      return `<span class="${cls} ${k === pos ? "on" : ""}" title="Entry ${k}${cls === "none" ? " – not run" : ""}">${sym || k}</span>`;
+    }).join("");
+    const entries = `<div class="entries"><div class="segmented small" role="group" aria-label="Show"><button aria-pressed="false">All entries</button><button aria-pressed="true">Entry</button></div>
+      <span class="stepper"><button class="icon-btn bordered" aria-label="Previous entry">${icon(I.left, 12)}</button>
+        <span class="pos">Entry <b>${pos}</b> of 12 ${icon(I.down)}</span><button class="icon-btn bordered" aria-label="Next entry">${icon(I.right, 12)}</button></span>
+      <div class="strip" aria-label="Entries">${strip}</div><span class="spacer"></span>
+      <span>${f ? "6 succeeded · 1 failed · 5 not run" : "12 succeeded"}</span></div>`;
+    const entryOut = { rowsAffected: 1 };
+    const right = f
+      ? `<div class="pane"><div class="phead"><span class="label">Error</span><span class="sub">entry 7 · after 39 ms</span><span class="spacer"></span>
+          <button class="btn small">${icon(I.copy, 12)}Copy</button></div><div class="pscroll">
+          <div class="note err"><span class="sym">✖</span><div><b>Violation of PRIMARY KEY constraint 'PK_orders'.</b> Cannot insert duplicate key in object 'dbo.orders'. The duplicate key value is (10237).
+            <div style="margin-top:6px;color:var(--muted-foreground)">No output: the step failed. Entries 8–12 did not run (<span class="mono">continueOnEntryError</span> is off).</div></div></div>
+          <div class="note"><span class="sym">i</span><div>The input on the left is what the entry sent to <span class="mono">erp-sql</span>. In expressions the error is
+            <span class="mono" style="color:var(--expression)">results.save.error</span>; each entry in <span class="mono" style="color:var(--expression)">results.save.output.items[6].error</span>.</div></div></div></div>`
+      : `<div class="pane">${outHead("tree", `<span class="sub" style="margin-left:6px">› entry 3</span>`)}<div class="pscroll">${tree({ row: items[2], success: true, output: entryOut, error: null }, "results.save.output.items[2]",
+          ["results.save.output.items[2].output"], { sel: "results.save.output.items[2].output.rowsAffected" })}</div>
+          ${pathBar("results.save.output.items[2].output.rowsAffected", "1")}</div>`;
+    data = dhead("save", f ? { extra: "<span>entry 7 of 12 failed</span>" } : { extra: "<span>for each · 12 entries</span>" }) + entries +
+      `<div class="panes">${inputPane("save", { connOpen: false, row: !f })}${right}</div>` + stepLog("save", f, f ? "" : " · entry 3");
+  } else if (state === "skipped") {
+    data = dhead("notify", { st: "skipped", run: `Run <a href="#">01JDH3M1T7XC</a> · dev · just now ${icon(I.ext, 11)}` }) + `<div class="empty"><div class="box">
+      <div class="big">–</div><h3>Not run: no incoming link applies</h3>
+      <p>A step runs when one of its incoming links applies. In this run:</p>
+      <div class="linklist"><div><span class="sym success">✔</span><span class="mono">save → notify</span> On success · <span class="mono">save</span> failed</div></div>
+      <p>Without a run there is no input or output. Data shows the steps that ran: <a href="#">fetch</a>, <a href="#">any</a>, <a href="#">save</a>, <a href="#">failed</a>.</p></div></div>`;
+  } else if (state === "empty") {
+    data = `<div class="empty"><div class="box"><div class="big">${icon(I.braces)}</div><h3>No run yet</h3>
+      <p>Run the workflow (F5) to see the data of each step: what reached it and what it returned. Select a step on the canvas to show its data here.</p>
+      <div class="acts"><button class="btn"><span class="play">${icon(I.play, 13)}</span>Run <kbd>F5</kbd></button></div></div></div>`;
+  } else if (state === "history") {
+    data = dhead("fetch", { run: `Run <a href="#">01JDF2W8K4NQ</a> · prod · cron:nightly · today 02:00 ${icon(I.ext, 11)}` }) + `<div class="empty"><div class="box">
+      <div class="big">${icon(I.history)}</div><h3>No data kept for this run</h3>
+      <p>The data of each step is kept only for the last run started in the editor, until the next run or a restart of the server.
+        Runs in the history keep status, duration, error and log.</p>
+      <p>To keep the data of all runs: <span class="mono">settings.history.stepData</span> in <a href="#">project.yaml</a> (off by default; the data may contain business data).</p>
+      <div class="acts"><button class="btn small">${icon(I.ext, 12)}Show in Log</button><button class="btn small">${icon(I.settings, 12)}Open project settings</button></div></div></div>`;
+  } else if (state === "truncated") {
+    data = dhead("fetch", { extra: "<span>8,200 items · 82 pages</span>", run: `Run <a href="#">01JDH3Q0B5RW</a> · dev · just now ${icon(I.ext, 11)}` }) +
+      `<div class="panes">${inputPane("fetch", { defaults: 7, connOpen: false })}
+      <div class="pane">${outHead("tree")}<div class="note warn" style="margin:0;border-radius:0"><span class="sym">⚠</span><div><b>Output larger than 1 MB – shown up to 1 MB.</b>
+        Kept: the first 2,431 of 8,200 entries of <span class="mono">items</span>. The step itself had the whole output; only what the editor shows is cut.</div></div>
+        <div class="pscroll">${tree({ ...fetchOut, items: items }, base, [base + ".items"], { limit: 4, total: 8200, kept: 2431, hover: base + ".count" })}</div>
+        ${pathBar(base + ".count", "8200")}</div></div>` + stepLog("fetch", false);
+  }
+
+  const showData = true;
+  document.getElementById("bottom").innerHTML = `<div class="splitter" title="Drag to resize"></div><div class="tabs2">
+      <span class="t2">${chevRight}Problems</span><span class="t2">${chevRight}Log</span>
+      <span class="t2 ${showData ? "active" : ""}">${chev}${icon(I.braces, 13)}Data${failedRun && state === "failed" ? ' <span class="n">!</span>' : ""}</span>
+      ${noRun ? "" : `<span class="follow">Follows the selection on the canvas</span>`}</div>
+    <div class="data">${data}</div>`;
+
+  // ---------- Properties of the selected step (E7, E8) ----------
+  const n = byId[sel];
+  const title = { "http.request": "HTTP Request", "mail.send": "Send Mail", "db.execute": "Execute SQL" }[n.type];
+  const desc = { "http.request": "Sends an HTTP request, e.g. to a REST API; output: status, headers and body of the answer",
+                 "mail.send": "Sends a mail through a mail server, with text or HTML and attachments",
+                 "db.execute": "Runs an SQL statement on a database, e.g. to insert, update or delete rows" }[n.type];
+  let last = "";
+  if (!noRun) {
+    const links = `<div class="links"><a href="#">Show data</a><a href="#">Show in log</a></div>`;
+    if (state === "history") last = `<div class="lastrun ok"><b>✔ Succeeded in run 01JDF2W8K4NQ</b> after 1.8 s<div class="links"><a href="#">Show in log</a></div></div>`;
+    else if (n.st === "failed") last = `<div class="lastrun failed"><b>✖ Failed in the last run</b> after 0.4 s<div class="err">[7/12] Violation of PRIMARY KEY constraint 'PK_orders'. …</div>${links}</div>`;
+    else if (n.st === "skipped") last = `<div class="lastrun skipped"><b>– Skipped in the last run</b><div class="links"><a href="#" style="color:inherit">Why?</a></div></div>`;
+    else last = `<div class="lastrun ok"><b>✔ Succeeded in the last run</b> after ${n.d}${links}</div>`;
+  }
+  const fieldsBy = {
+    "http.request": [["Connection", "shop-api", "with.connection"], ["URL", "orders", "with.url"], ["Method", "GET", "with.method"]],
+    "mail.send": [["Connection", "mail", "with.connection"], ["To", '<span class="x">${ADMIN_MAIL}</span>', "with.to"],
+                  ["Subject", '<span class="x">{{ results.fetch.output.count }}</span>&nbsp;new orders…', "with.subject"]],
+    "db.execute": [["For each", '<span class="x">{{ results.fetch.output.items }}</span>', "forEach"], ["Connection", "erp-sql", "with.connection"],
+                   ["SQL", "INSERT INTO dbo.orders (id, number, …", "with.sql"]],
+  }[n.type];
+  document.getElementById("props").innerHTML = `<div class="ph">${tile(n.type)}<div><h3>${title}</h3><div class="t">${n.type}</div></div></div>
+    <p class="ph-desc">${desc}</p>${last}
+    <div class="field"><label>ID<span class="key">id</span></label><div class="input mono">${sel}</div></div>
+    <div class="section"><h4>${chev}Configuration</h4>${fieldsBy.map(([l, v, k]) => `<div class="field"><label>${l}<span class="key">${k}</span></label><div class="input mono">${v}</div></div>`).join("")}</div>
+    <div class="section"><h4>${chevRight}Execution<span class="sum">${n.type === "http.request" ? "retry 3 · timeout 2m" : n.type === "db.execute" ? "for each" : "defaults"}</span></h4></div>`;
+</script>
+</body>
+</html>
