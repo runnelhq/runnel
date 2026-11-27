@@ -52,6 +52,31 @@ Die aktuellen Versionen stehen in den Releases der Repositorys.
 | P14 | SAP, DATEV | Anbindung je nach Bedarf | – |
 | P15 | Tresore | z. B. Azure Key Vault als Secret-Quelle | `secrets.get` im Protokoll |
 
+## Ideen für weitere Bausteine
+
+Notizen zu Actions und Transforms, die als Plugin kommen könnten. Eine Zeile je Thema; Actions liefern einen Wert für
+den Workflow, Transforms Datensätze für Pipelines (z. B. eine Zeile je Laufwerk oder Dienst).
+
+### System (`plugin-system`)
+
+Zustand des eigenen Rechners abfragen, zunächst **nur die aktuellen Werte**. Vergleiche mit Grenzwerten, Meldung beim
+Wechsel des Zustands und Verlauf über die Zeit gehören nicht dazu; geprüft wird im Workflow mit `core.check`.
+
+| Nr. | Baustein | Art | Inhalt |
+|---|---|---|---|
+| P30 | `system.disk` | Action, Transform | Laufwerke bzw. Ordner (auch UNC-Pfade): `free`, `total`, `percentFree`; ohne Angabe alle lokalen Laufwerke |
+| P31 | `system.cpu` | Action | mittlere Auslastung über eine kurze Messdauer (`duration`, Standard 5 s, mit Obergrenze): `percent`, `cores` |
+| P32 | `system.memory` | Action | Arbeitsspeicher: `used`, `total`, `percent` |
+| P33 | `system.services` | Action, Transform | Windows-Dienste nach Namen oder Muster (`MSSQL*`): `name`, `displayName`, `state`, `startType` |
+
+- **Plattformen:** Windows über die Windows-API (`golang.org/x/sys/windows`), ohne PowerShell; `disk`, `cpu` und
+  `memory` auch unter Linux, `system.services` nur unter Windows mit klarer Meldung auf anderen Systemen.
+- **Rechte:** Abfragen gehen ohne Administratorrechte, auch im Dienst als LocalService.
+- **Nur der eigene Rechner;** andere Rechner (Remote-SCM, WMI) wären ein eigenes Thema.
+- **Sprache:** Go mit `sdk-go`. Den freien Platz liest Runnel für `/health` schon selbst (`internal/server/diskfree_*.go`).
+- **Später, nicht Teil des Plugins:** Dienste starten oder neu starten; Grenzwerte und Meldung beim Wechsel brauchen
+  einen Zustand zwischen Läufen im Kern (wäre ein Schritt der [Roadmap](ROADMAP.md) mit ADR).
+
 ## Ideen für neue SDKs (nach 1.0)
 
 | Nr. | SDK | Repository |
