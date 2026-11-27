@@ -115,6 +115,8 @@ export function Explorer(props: {
   changes?: ExplorerChanges;
   /** Shows a file: opens its folders and scrolls its row into view ("Reveal in explorer", E21). */
   reveal?: { path: string; seq: number } | null;
+  /** Signs beside files, e.g. ⚠ with the number of missing secrets at project.yaml (mockup S39f). */
+  marks?: Map<string, { text: string; title: string }>;
 }) {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -414,6 +416,7 @@ export function Explorer(props: {
             connectionTypes={connectionTypes}
             plugins={plugins}
             reveal={props.reveal ?? null}
+            marks={props.marks}
             folders={folders}
           />
         ))}
@@ -572,6 +575,7 @@ function Node(props: {
   /** The plugins by folder (plugins/<name>), with version and state (mockup S52). */
   plugins: Map<string, PluginInfo>;
   reveal: { path: string; seq: number } | null;
+  marks?: Map<string, { text: string; title: string }>;
   folders: Folders;
 }) {
   const { entry, depth, editing, folders } = props;
@@ -677,6 +681,11 @@ function Node(props: {
         <span className="truncate">{entry.name}</span>
         <span className="ml-auto inline-flex items-center gap-1">
           {typeTag && <span className="font-mono text-[10px] text-muted-foreground">{typeTag}</span>}
+          {props.marks?.has(entry.path) && (
+            <span data-testid="explorer-mark" title={props.marks.get(entry.path)!.title} className="text-[10px] font-semibold text-warning">
+              {props.marks.get(entry.path)!.text}
+            </span>
+          )}
           {plugin ? <PluginState plugin={plugin} /> : isDir && !isPluginDir && <span className="text-2xs text-muted-foreground">{entry.children?.length ?? 0}</span>}
           <button
             type="button"

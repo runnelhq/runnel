@@ -692,3 +692,25 @@ export const TriggerTypeIcon = ({ type, ...p }: P & { type: string }) => (
     )}
   </Icon>
 );
+
+/** Setting the value of a secret (mockup S39f). */
+export const KeyIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="M11 12l9-9M17 6l3 3M15 8l2 2" />
+  </Icon>
+);
+
+/** The store of the Windows service (mockup S39f): a plain shield. */
+export const ServiceStoreIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z" />
+  </Icon>
+);
+
+/** Going up: closing a list below a field (mockup S39f). */
+export const ChevronUpIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M6 15l6-6 6 6" />
+  </Icon>
+);

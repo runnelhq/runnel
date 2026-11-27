@@ -791,3 +791,14 @@ S39g ist geteilt (Server vor Editor): S39g1 bringt die API, S39g2 die Oberfläch
   liest (z. B. nach dem Umbenennen eines Secrets; leer, wenn die Suche in den Dateien abgeschnitten wurde, damit
   nichts Benutztes als „not used“ erscheint). Ob ein Wert mehrzeilig ist („multi-line“ im Mockup), liefert der Server
   nicht: dafür müsste er Werte entschlüsseln.
+
+## Nachtrag 2026-11-27 (S39g2): Secrets im Editor
+
+- **Ein Wert für alle Environments mit `local`:** Der lokale Store gehört zum Projekt, nicht zum Environment. Lesen
+  mehrere Environments aus `local`, nennen Dialog und Rückfrage beim Löschen alle; der Editor setzt über `environment`
+  (bzw. die Quelle aus der Referenz) und löscht ohne Environment.
+- **Kein Anzeigen:** Der Editor kennt einen Wert nur zwischen Tippen bzw. Einfügen und dem `PUT`; das Wertfeld zeigt
+  nur Punkte und die Zahl der Zeichen, auch kein Kopieren. Zeilenumbrüche bleiben (eigenes Feld statt
+  `<input type="password">`).
+- **Ordner des Stores:** Kann der Store nicht gelesen werden, nennt der Editor den Ordner als festen Text nach dem
+  Betriebssystem des Servers (`os` aus `/version`), weil die Antwort keine Pfade enthält.

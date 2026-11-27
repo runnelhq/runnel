@@ -10,7 +10,7 @@ import { RunsView } from "./components/RunsView";
 import { ImageView } from "./components/ImageView";
 import { Palette, type PaletteTarget } from "./components/Palette";
 import { ReferencePanel, type ReferenceAction, type ReferenceTarget } from "./components/ReferencePanel";
-import { missingIn, useVariables } from "./reference";
+import { missingIn, missingSecrets, openFileEvent, useSecrets, useVariables } from "./reference";
 import { Splitter, useExplorerHeight } from "./components/Splitter";
 import { StatusBar } from "./components/StatusBar";
 import { Tabs } from "./components/Tabs";
@@ -46,6 +46,8 @@ export function App(props: { openFirst?: string }) {
   // The variables of the project (E18a), loaded again after every save and file change.
   const [varsKey, setVarsKey] = useState(0);
   const variables = useVariables(varsKey);
+  // Missing values of secrets: ⚠ with their number at project.yaml (mockup S39f).
+  const secretsMissing = missingSecrets(useSecrets(`${epoch}:${varsKey}`));
   const [run, setRun] = useState<RunView | null>(null);
   const triggers = useTriggers(`${epoch}:${varsKey}`);
   // A run of the history to open on the canvas, and a filter for the list of runs (S26e2).
@@ -120,6 +122,12 @@ export function App(props: { openFirst?: string }) {
     setTabs((t) => (t.includes(path) ? t : [...t, path]));
     setActive(path);
   }, []);
+  // Secret fields open files and the overview of the secrets by an event (mockup S39f).
+  useEffect(() => {
+    const onOpen = (e: Event) => open((e as CustomEvent<string>).detail);
+    window.addEventListener(openFileEvent, onOpen);
+    return () => window.removeEventListener(openFileEvent, onOpen);
+  }, [open]);
   // Requests of the reference go to their file, which opens if needed.
   const onReferenceAction = useCallback(
     (action: ReferenceAction) => {
@@ -133,11 +141,14 @@ export function App(props: { openFirst?: string }) {
     if (!variables) return null;
     const envs = path === "project.yaml" ? (variables.environments ?? []) : path.startsWith("environments/") ? [path.slice(13).replace(/\.ya?ml$/, "")] : [];
     const missing = variables.variables.filter((v) => envs.some((e) => missingIn(v, e)));
-    if (missing.length === 0) return null;
+    // project.yaml also counts the missing values of secrets (mockup S39f).
+    const secrets = path === "project.yaml" ? secretsMissing : 0;
+    if (missing.length + secrets === 0) return null;
     const text = missing
       .map((v) => `⚠ ${v.name} is used, but not set for ${envs.filter((e) => missingIn(v, e)).join(", ")} (${v.uses.filter((u) => !u.parameter).map((u) => `${u.file}:${u.line}`).join(", ")})`)
+      .concat(secrets > 0 ? [`⚠ ${secrets === 1 ? "1 value" : `${secrets} values`} of secrets missing (section Secrets)`] : [])
       .join("\n");
-    return { count: missing.length, text };
+    return { count: missing.length + secrets, text };
   };
   // Without an open file the palette stays, with the hint to open a workflow or pipeline.
   const onRuns = active === runsTab;
@@ -203,6 +214,7 @@ export function App(props: { openFirst?: string }) {
               onOpen={open}
               onReload={loadTree}
               reveal={reveal}
+              marks={secretsMissing > 0 ? new Map([["project.yaml", { text: `⚠ ${secretsMissing}`, title: "Secrets missing for an environment" }]]) : undefined}
               changes={{
                 projectDir: project?.dir ?? null,
                 isDirty: (path) => dirty.has(path),
