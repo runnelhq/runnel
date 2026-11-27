@@ -69,12 +69,17 @@ Wechsel des Zustands und Verlauf über die Zeit gehören nicht dazu; geprüft wi
 | P32 | `system.memory` | Action | Arbeitsspeicher: `used`, `total`, `percent` |
 | P33 | `system.services` | Action, Transform | Windows-Dienste nach Namen oder Muster (`MSSQL*`): `name`, `displayName`, `state`, `startType` |
 | P34 | `system.service-start`, `system.service-stop`, `system.service-restart` | Action | Windows-Dienst starten, stoppen bzw. neu starten und warten, bis er läuft bzw. steht (`timeout`); Output der Zustand danach; abhängige Dienste nur mit ausdrücklicher Option |
+| P35 | `system.file-info` | Action, Transform | Angaben zu Dateien und Ordnern über `file.list` hinaus (dort: `path`, `name`, `size`, `modified`, `folder`): `created`, `accessed`, Attribute (`readOnly`, `hidden`, `system`, `archive`), Besitzer (`owner`, z. B. `DOMAIN\user`), Berechtigungen als Liste der ACL-Einträge (`account`, `rights`, `allow`/`deny`, `inherited`), Version von `.exe`/`.dll`; nur lesen |
+| P36 | `system.file-hash` | Action, Transform | Prüfsumme einer Datei (`sha256`, wahlweise weitere), gestreamt gelesen |
 
 - **Plattformen:** Windows über die Windows-API (`golang.org/x/sys/windows`), ohne PowerShell; `disk`, `cpu` und
   `memory` auch unter Linux, `system.services` nur unter Windows mit klarer Meldung auf anderen Systemen.
 - **Alternative zu P34:** eine Action `system.service` mit `do: start|stop|restart` statt drei Actions. Drei getrennte
   Namen sind leichter zu finden und zu dokumentieren (Katalog, Hilfe, Icons); eine Action hält die gemeinsamen Optionen
   (`timeout`, abhängige Dienste) an einer Stelle. Entschieden wird bei der Umsetzung.
+- **Dateien (P35, P36):** Besitzer und Berechtigungen über die Sicherheits-API von Windows; Kontonamen aus dem Active
+  Directory können langsam sein (Zwischenspeicher je Lauf). Unter Linux nur, was es dort gibt (`readOnly` aus den
+  Rechten, Besitzer als Benutzername). Rechte setzen gehört nicht dazu.
 - **Rechte:** Abfragen gehen ohne Administratorrechte, auch im Dienst als LocalService. Starten, Stoppen und Neustart
   brauchen das Recht am jeweiligen Dienst (meist Administrator); fehlt es, eine verständliche Meldung (Testplan unter
   Windows).
