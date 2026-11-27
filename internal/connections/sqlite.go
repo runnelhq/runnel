@@ -10,6 +10,11 @@ var sqliteDefinition = connection.Definition{
 	Label:       "SQLite",
 	Description: "A database in a single file, e.g. for local data and tests",
 	Config:      SQLite{},
+	Example:     example("shop", "Orders of the shop", TypeSQLite, "  path: data/shop.db\n"),
+	Errors: "Fails when the folder of the database file cannot be created, the file is not an SQLite database or, " +
+		"with readOnly: true, does not exist. A locked database is waited for up to 5 seconds.",
+	Test: "Opens the database file and reads the version of SQLite. A file that does not exist yet is reported, " +
+		"not created; a run creates it.",
 }
 
 // SQLite are the fields of a connection of type sqlite.

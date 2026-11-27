@@ -15,6 +15,16 @@ var smtpDefinition = connection.Definition{
 	Label:       "SMTP",
 	Description: "A mail server for sending mails",
 	Config:      SMTP{},
+	Example: example("mail", "Office 365 mailbox that sends the reports", TypeSMTP,
+		"  host: smtp.office365.com\n  auth: oauth2\n  user: reports@example.com\n  tenant: contoso.onmicrosoft.com\n"+
+			"  clientId: 00000000-0000-0000-0000-000000000000\n  clientSecret: ${secret:smtp-client-secret}\n"+
+			"  from: Reports <reports@example.com>\n"),
+	Errors: "Fails when the server does not answer within timeout, does not offer STARTTLS (tls: starttls), has a " +
+		"certificate that is not trusted, offers no sign-in or refuses it, and with oauth2 when user, clientId, " +
+		"clientSecret or tenant (or tokenUrl) is missing or the token request is refused. A password or token is " +
+		"never sent unencrypted (tls: none) to another computer.",
+	Test: "Connects, starts TLS as set in tls and signs in (with oauth2 after getting a token), then ends the " +
+		"dialog. No mail is sent.",
 	Warn: func(with map[string]any) map[string]string {
 		// A mail server on the own computer (e.g. a test server) needs no encryption.
 		if v, _ := with["tls"].(string); v == "none" && !httpx.IsLoopback(fmt.Sprint(with["host"])) {

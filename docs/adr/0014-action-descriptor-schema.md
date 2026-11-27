@@ -195,7 +195,8 @@ bleiben unverändert; leere fehlen im JSON:
   Vertragstests verlangen `errors` für jeden Baustein, `records` für jeden Transform und `outputs` für jede Action mit
   `output` (Ausnahmen stehen als Liste im Test).
 - Connection-Typen bekommen die Schlüssel nicht: Ihre Felder beschreibt das Schema, Grenzen und Fehler gehören zu den
-  Bausteinen, die sie nutzen.
+  Bausteinen, die sie nutzen. (Überholt: seit E15e haben Connection-Typen eigene Schlüssel, siehe Nachtrag
+  2026-11-27.)
 - **Plugins** dürfen dieselben Schlüssel in `describe` liefern, alle optional (ADR 0019); Runnel übernimmt sie
   ungeprüft in den Katalog, `records` nur bei Transforms.
 
@@ -233,3 +234,25 @@ bzw. `transform.DecodeConfig` – nicht mehr je Baustein:
   Variable der Start des Laufs. Bereiche (z. B. `status` 200–599, `maxRecords` ab 1) prüft weiter der Baustein.
 - Regeln zwischen Feldern, die einen Wert brauchen, gelten für einen erst später aufgelösten Wert beim Start; Beispiel:
   `paginate.sizeParam` braucht `size`, auch wenn `size` `${SIZE}` ist.
+
+## Nachtrag 2026-11-27 (E15e)
+
+**Connection-Typen** im Katalog (`connectionTypes` von `runnel catalog --json` und `runnel-catalog.json`, Issue #264)
+haben zusätzlich zu `type`, `label`, `description` und `schema` drei Schlüssel; leere fehlen im JSON:
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `example` | eine vollständige Connection-Datei (`kind: Connection` … `with:`) in YAML, mit Geheimnissen als `${secret:NAME}` in den Feldern für Geheimnisse |
+| `errors` | wann das Verbinden scheitert (z. B. unbekannter Host-Key, nicht vertrautes Zertifikat, abgelehnte Anmeldung), Sätze mit Punkt wie bei Actions |
+| `test` | was „Test connection“ im Editor prüft, Sätze mit Punkt; fehlt der Schlüssel, bietet der Typ keinen Test |
+
+- In Go sind es die Felder `Example`, `Errors` und `Test` von `connection.Definition` und `connection.Descriptor`
+  (nicht `action.Reference`: `outputs`, `records` und `limits` gelten für Connections nicht). `errors` beschreibt nur
+  das Verbinden und Anmelden; was beim Lesen oder Schreiben scheitert, steht weiter bei den Bausteinen.
+- Alle eingebauten Typen haben alle drei Schlüssel. Ein Vertragstest (`internal/connections`) liest jedes Beispiel als
+  Datei `connections/<name>.yaml` und prüft es wie `runnel validate` (Felder des Typs, Geheimnisse nur in Feldern für
+  Geheimnisse, keine Warnungen außer der für `ftp`).
+- **Plugins:** Ein Connection-Typ mit `test: true` in `describe` (ADR 0019) bekommt im Katalog einen festen Text für
+  `test` („Asks the plugin to check the connection …“); `example` und `errors` liefern Plugins für Connection-Typen
+  (noch) nicht.
+- `runnel catalog <connection-typ>` zeigt die Abschnitte „Errors“, „Test connection“ und „Example“.

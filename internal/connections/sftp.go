@@ -10,6 +10,15 @@ var sftpDefinition = connection.Definition{
 	Label:       "SFTP",
 	Description: "A server for file transfer over SSH",
 	Config:      SFTP{},
+	Example: example("partner-sftp", "SFTP server of the partner", TypeSFTP,
+		"  host: sftp.example.com\n  hostKey: SHA256:ExampleFingerprintOfTheServerHostKeyAbcdefg\n  user: runnel\n"+
+			"  privateKey: ${secret:partner-sftp-key}\n"),
+	Errors: "Fails without hostKey, naming the fingerprint of the server to check with its administrator, and when " +
+		"the host key does not match hostKey; Runnel never trusts a host key on first use. Also fails when the " +
+		"server does not answer within timeout, the sign-in is refused (user, password or key), neither password " +
+		"nor privateKey is set, privateKey is no PEM key or needs passphrase, or the server offers no SFTP.",
+	Test: "Connects, checks the host key against hostKey, signs in and lists the start folder; without hostKey it " +
+		"names the fingerprint of the server. Nothing is written.",
 	Warn: func(with map[string]any) map[string]string {
 		// Without the fingerprint no run connects; Test connection shows the one of the server.
 		if v, _ := with["hostKey"].(string); v == "" {

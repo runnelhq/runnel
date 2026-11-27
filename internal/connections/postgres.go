@@ -10,6 +10,12 @@ var postgresDefinition = connection.Definition{
 	Label:       "PostgreSQL",
 	Description: "A PostgreSQL database",
 	Config:      Postgres{},
+	Example: example("shop-db", "Database of the shop", TypePostgres,
+		"  host: db01.example.local\n  database: shop\n  user: runnel\n  password: ${secret:shop-db-password}\n"),
+	Errors: "Fails when the server does not answer within timeout, user or password are refused, the database does not " +
+		"exist, or the server offers no TLS while sslMode is not disable. With verify-full (the default) and verify-ca " +
+		"the certificate of the server must be trusted; verify-full also checks that it names host.",
+	Test: "Connects and signs in like a run, then pings the server and reads its version. Nothing is written.",
 	Warn: func(with map[string]any) map[string]string {
 		switch v, _ := with["sslMode"].(string); v {
 		case "disable":

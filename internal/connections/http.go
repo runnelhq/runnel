@@ -16,6 +16,15 @@ var httpDefinition = connection.Definition{
 	Label:       "HTTP API",
 	Description: "An HTTP API with its base address and sign-in, e.g. a REST API",
 	Config:      HTTP{},
+	Example: example("shop-api", "REST API of the shop", TypeHTTP,
+		"  baseUrl: https://api.example.com/v1/\n  headers:\n    Accept: application/json\n  auth: bearer\n"+
+			"  token: ${secret:shop-api-token}\n"),
+	Errors: "Fails when baseUrl is no http:// or https:// address, a field of the chosen auth is missing (e.g. token " +
+		"for bearer), a sign-in would be sent unencrypted over http:// to another computer, the certificate of the " +
+		"server is not trusted, or with oauth2 tokenUrl is no https:// address or the token request is refused. " +
+		"Requests to another host than that of baseUrl are refused, so that the sign-in goes nowhere else.",
+	Test: "Sends GET to baseUrl with the headers and the sign-in of the connection (with oauth2 after getting a token). " +
+		"Any answer counts as reached, except 401 and 403: the API refused the sign-in.",
 	Warn: func(with map[string]any) map[string]string {
 		base, _ := with["baseUrl"].(string)
 		if u, err := url.Parse(base); err == nil && u.Scheme == "http" && !httpx.IsLoopback(u.Host) {

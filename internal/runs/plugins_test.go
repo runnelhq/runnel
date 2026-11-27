@@ -273,6 +273,10 @@ func TestPluginConnectionTest(t *testing.T) {
 			t.Errorf("not trusted: %v", err)
 		}
 		trustDemo(t, dir)
+		// The catalog tells that the type has a test (key test, E15e).
+		if d, _ := ConnectionTypes(dir).Descriptor("demo"); d.Test != plugin.PluginConnectionTest {
+			t.Errorf("test of the type: %q", d.Test)
+		}
 		c, mask, err := ResolveConnection(ctx, p, "", "svc")
 		if err != nil {
 			t.Fatal(err)

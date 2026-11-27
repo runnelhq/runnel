@@ -279,6 +279,10 @@ Ein Plugin kann eigene Connection-Typen anbieten, z. B. für ein ERP oder ein DM
   Runnel startet das Plugin dafür, wartet höchstens 15 s und beendet es danach. Nichts soll dabei geschrieben oder
   gesendet werden außer der Anmeldung.
 
+  Im Katalog des Projekts steht für so einen Typ unter `test` ein fester Text („Asks the plugin to check the connection
+  (connection.test) …“, seit E15e); ohne `"test": true` fehlt der Schlüssel. `example` und `errors` wie bei den
+  eingebauten Connection-Typen nimmt `describe` für Connection-Typen nicht an.
+
 ## In Pipelines
 
 ```yaml
