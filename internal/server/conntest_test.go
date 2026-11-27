@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/runnelhq/runnel/internal/secretstore"
 )
 
 func testConnection(t *testing.T, s *Server, name, body string) (testResult, int) {
@@ -89,6 +92,8 @@ func TestTestConnection(t *testing.T) {
 func TestSecretsList(t *testing.T) {
 	dir, s := newProject(t)
 	t.Setenv("RUNNEL_TEST_DB_PW", "Pa55-db")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir()) // an empty local secret store
+	t.Setenv("LOCALAPPDATA", t.TempDir())
 	writeFile(t, filepath.Join(dir, "environments", "dev.yaml"), "kind: Environment\napiVersion: runnel/v1\nname: dev\nsecretStore: env\n")
 	writeFile(t, filepath.Join(dir, "environments", "prod.yaml"), "kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: inline\nsecrets:\n  RUNNEL_TEST_DB_PW: Inline-Pa55\n")
 	writeFile(t, filepath.Join(dir, "connections", "db.yaml"), "kind: Connection\napiVersion: runnel/v1\nname: db\ntype: postgres\nwith:\n  host: h\n  database: d\n  user: u\n  password: ${secret:RUNNEL_TEST_DB_PW}\n")
@@ -109,12 +114,23 @@ func TestSecretsList(t *testing.T) {
 		pw.Environments["dev"] != (secretState{Store: "env", State: "set"}) || pw.Environments["prod"] != (secretState{Store: "inline", State: "set"}) {
 		t.Errorf("%+v", pw)
 	}
-	if token.Name != "api-token" || token.Store != "local" || token.Environments["dev"] != (secretState{Store: "local", State: "unavailable"}) {
+	if token.Name != "api-token" || token.Store != "local" || token.Environments["dev"] != (secretState{Store: "local", State: "missing"}) {
 		t.Errorf("%+v", token)
 	}
 	t.Setenv("RUNNEL_TEST_DB_PW", "")
-	_ = json.Unmarshal(do(t, s, "GET", "/api/v1/secrets", "").Body.Bytes(), &info)
-	if info.Secrets[0].Environments["dev"].State != "missing" {
-		t.Errorf("%+v", info.Secrets[0])
+	// Set in the local store of the user (S39d); the answer still holds no value.
+	t.Setenv(secretstore.MasterKeyEnv, base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789ABCDEF")))
+	local, err := secretstore.User()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := local.Set(dir, "api-token", "T0ken-local", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	rec = do(t, s, "GET", "/api/v1/secrets", "")
+	_ = json.Unmarshal(rec.Body.Bytes(), &info)
+	if info.Secrets[0].Environments["dev"].State != "missing" || info.Secrets[1].Environments["prod"] != (secretState{Store: "local", State: "set"}) ||
+		strings.Contains(rec.Body.String(), "T0ken-local") {
+		t.Errorf("%+v", info.Secrets)
 	}
 }

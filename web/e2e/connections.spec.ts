@@ -166,12 +166,12 @@ test("shows secrets by reference and warns about plain text", async ({ page, req
     await picker.getByRole("button", { name: /Use new secret/ }).click();
     await expect(token.getByTestId("secret")).toContainText("${secret:e2e-token}");
     // The state comes from the saved files: after saving, the default store of hello is
-    // local, which comes with S39d.
+    // local (S39d), where the secret is not set.
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
     await page.goto("/");
     await page.getByRole("tree").getByText("e2e-secret.yaml", { exact: true }).click();
-    await expect(token.getByTestId("secret-state-dev")).toContainText("local not available yet");
+    await expect(token.getByTestId("secret-state-dev")).toContainText("⚠ dev missing");
 
     // Plain text is shown with a warning.
     await token.getByRole("button", { name: "Change…" }).click();

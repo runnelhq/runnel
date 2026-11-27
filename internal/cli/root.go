@@ -29,7 +29,7 @@ func NewRootCommand(out, errOut io.Writer) *cobra.Command {
 	root.SetErr(errOut)
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
 
-	root.AddCommand(newVersionCommand(), newInitCommand(), newValidateCommand(), newRunCommand(), newCatalogCommand(), newServeCommand(), newTriggersCommand(), newRunsCommand(), newServiceCommand(), newSchemaCommand(), newPluginsCommand(), newHealthCommand())
+	root.AddCommand(newVersionCommand(), newInitCommand(), newValidateCommand(), newRunCommand(), newCatalogCommand(), newServeCommand(), newTriggersCommand(), newRunsCommand(), newServiceCommand(), newSchemaCommand(), newPluginsCommand(), newHealthCommand(), newSecretCommand())
 	wrapArgs(root)
 	return root
 }
@@ -91,7 +91,15 @@ func Execute(args []string, out, errOut io.Writer) int {
 
 // ExecuteContext is Execute with a context; cancelling it stops a running workflow.
 func ExecuteContext(ctx context.Context, args []string, out, errOut io.Writer) int {
+	return execute(ctx, args, nil, out, errOut)
+}
+
+// execute is ExecuteContext with the input of the commands (nil: stdin).
+func execute(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) int {
 	root := NewRootCommand(out, errOut)
+	if in != nil {
+		root.SetIn(in)
+	}
 	root.SetArgs(args)
 	cmd, err := root.ExecuteContextC(ctx)
 	if err == nil {

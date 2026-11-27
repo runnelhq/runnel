@@ -2,16 +2,19 @@ package runs
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runnelhq/runnel/internal/action"
 	"github.com/runnelhq/runnel/internal/actions"
 	"github.com/runnelhq/runnel/internal/engine/workflow"
 	"github.com/runnelhq/runnel/internal/model"
+	"github.com/runnelhq/runnel/internal/secretstore"
 )
 
 // loginAction stands for an action with a password field (as later db.* or mail.send);
@@ -114,11 +117,46 @@ func TestRunMissingSecret(t *testing.T) {
 	if !ok || !strings.Contains(err.Error(), `workflows/login.workflow.yaml:11:17: action "login": password: secret "RUNNEL_TEST_PW": environment variable RUNNEL_TEST_PW is not set`) {
 		t.Fatalf("%v (%d)", err, len(diags))
 	}
-	// Without secretStore, secrets read from the local store, which comes later.
+	// Without secretStore, secrets read from the local store (S39d).
+	useLocalStore(t)
 	t.Setenv("RUNNEL_TEST_PW", "Pa55word!")
 	_, _, err = prepareLogin(t, "kind: Project\napiVersion: runnel/v1\nname: t\n", loginWorkflow)
-	if err == nil || !strings.Contains(err.Error(), "the local secret store is not available yet") {
+	if err == nil || !strings.Contains(err.Error(), `secret "RUNNEL_TEST_PW" is not set in the local secret store of this project`) {
 		t.Errorf("local: %v", err)
+	}
+}
+
+// useLocalStore makes a local secret store in a temporary folder the store of the
+// program, with a master key.
+func useLocalStore(t *testing.T) *secretstore.Store {
+	t.Helper()
+	t.Setenv(secretstore.MasterKeyEnv, base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789ABCDEF")))
+	s := &secretstore.Store{Dir: t.TempDir()}
+	secretstore.SetDefault(s)
+	t.Cleanup(func() { secretstore.SetDefault(nil) })
+	return s
+}
+
+// A secret from the local store is read before the run and masked like any other.
+func TestRunMasksLocalSecret(t *testing.T) {
+	store := useLocalStore(t)
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, "project.yaml"), "kind: Project\napiVersion: runnel/v1\nname: t\n")
+	if err := store.Set(dir, "RUNNEL_TEST_PW", "L0cal-Pa55", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	rec := &recorder{}
+	p, err := Prepare(Spec{Name: "workflows/login.workflow.yaml", Data: []byte(strings.Replace(loginWorkflow, "${secret:", "${secret:local/", 1)), ProjectDir: dir,
+		Params: map[string]string{"USER": "ada"}, Registry: secretRegistry(), Observer: rec.observe})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := p.Runner.Run(context.Background())
+	if res.Status != workflow.Succeeded || res.Outputs["SESSION"] != "s-***" {
+		t.Fatalf("%s: %v %v", res.Status, res.Err, res.Outputs)
+	}
+	if logs := rec.logs(); !strings.Contains(logs, "login ada with ***") || strings.Contains(logs, "L0cal-Pa55") {
+		t.Errorf("log:\n%s", logs)
 	}
 }
 
