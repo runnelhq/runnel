@@ -28,7 +28,7 @@ type Project struct {
 	Description        string            `yaml:"description,omitempty" json:"description,omitempty" doc:"What the project does; shown in the editor"`
 	DefaultEnvironment string            `yaml:"defaultEnvironment,omitempty" json:"defaultEnvironment,omitempty" doc:"Environment used when a run names none, e.g. dev; the name of a file in environments/" schema:"example=dev"`
 	Variables          map[string]string `yaml:"variables,omitempty" json:"variables,omitempty" doc:"Variables for all environments, used as ${NAME}; an environment can override them. Values may use other variables, e.g. ${BASE}\\inbox"`
-	SecretStore        string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables) or inline (secrets: in the file, plain text); empty: the local secret store, which is not available yet" schema:"enum=env|inline"`
+	SecretStore        string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from, unless an environment sets its own: env (environment variables), inline (secrets: in the file, plain text) or local (the local secret store of the account, set with runnel secret set); empty: local" schema:"enum=env|inline|local"`
 	Secrets            map[string]string `yaml:"secrets,omitempty" json:"-" doc:"Secrets in plain text for secretStore: inline, used as ${secret:NAME} where no environment has its own; only for development and simple APIs"`
 	// Settings control the runs of the project as a whole (roadmap S37) and hold the
 	// defaults for its workflows (R5b, before: the block workflow).
@@ -97,7 +97,7 @@ type Environment struct {
 	Name        string            `yaml:"name" json:"name" doc:"Name of the environment; must match the file name" schema:"required,example=prod"`
 	Description string            `yaml:"description,omitempty" json:"description,omitempty" doc:"What the environment is for, e.g. the production system"`
 	Variables   map[string]string `yaml:"variables,omitempty" json:"variables,omitempty" doc:"Variables of this environment, used as ${NAME}; they override those of project.yaml"`
-	SecretStore string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables) or inline (secrets: in this file, plain text)" schema:"enum=env|inline"`
+	SecretStore string            `yaml:"secretStore,omitempty" json:"secretStore,omitempty" doc:"Where ${secret:NAME} reads secrets from in this environment, instead of secretStore of project.yaml: env (environment variables), inline (secrets: in this file, plain text) or local (the local secret store of the account, set with runnel secret set)" schema:"enum=env|inline|local"`
 	Secrets     map[string]string `yaml:"secrets,omitempty" json:"-" doc:"Secrets of this environment in plain text for secretStore: inline, used as ${secret:NAME}; only for development and simple APIs"`
 
 	src *source

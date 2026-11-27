@@ -104,7 +104,7 @@ export function SecretInput(props: { id: string; invalid: boolean; value: string
   );
 }
 
-/** The state per environment: ● set (with its store), ⚠ missing, – store not available yet. */
+/** The state per environment: ● set (with its store), ⚠ missing, – store cannot be read (e.g. unknown). */
 function States(props: { info: SecretInfo }) {
   return (
     <>
@@ -115,12 +115,12 @@ function States(props: { info: SecretInfo }) {
             ? ["bg-success-soft text-success", "●", s.store]
             : s.state === "missing"
               ? ["bg-warning-soft text-warning", "⚠", "missing"]
-              : ["bg-muted text-muted-foreground border border-border", "–", `${s.store} not available yet`];
+              : ["bg-muted text-muted-foreground border border-border", "–", `${s.store} cannot be read`];
         return (
           <span
             key={env}
             data-testid={`secret-state-${label}`}
-            title={`${label}: ${s.state === "set" ? `set in ${s.store}` : s.state === "missing" ? `missing in ${s.store}` : `the store ${s.store} is not available yet`}`}
+            title={`${label}: ${s.state === "set" ? `set in ${s.store}` : s.state === "missing" ? `missing in ${s.store}` : `the store ${s.store} cannot be read`}`}
             className={"inline-flex h-5 items-center gap-1 rounded-full px-1.5 text-[10px] font-semibold whitespace-nowrap " + tone}
           >
             {sign} {label} <span className="font-normal opacity-85">{text}</span>

@@ -1,14 +1,18 @@
 package model
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/runnelhq/runnel/internal/secretstore"
 )
 
 // Secret stores (ADR 0022, roadmap S39a): the default store comes from the environment,
-// else project.yaml, else local; only env can be read so far.
+// else project.yaml, else local.
 func TestSecretStores(t *testing.T) {
 	p := &Project{SecretStore: "env"}
 	prod := &Environment{Name: "prod", SecretStore: "local"}
@@ -35,16 +39,16 @@ func TestSecretStores(t *testing.T) {
 	}
 	for _, tt := range []struct{ store, name, want string }{
 		{"", "RUNNEL_TEST_UNSET", `secret "RUNNEL_TEST_UNSET": environment variable RUNNEL_TEST_UNSET is not set (secret store env)`},
-		{"local", "pw", `secret "pw": the local secret store is not available yet; set secretStore: env`},
-		{"shared", "pw", `unknown secret store "shared" (available: env, inline)`},
-		{"vault", "pw", `unknown secret store "vault" (available: env, inline)`},
+		{"local", "pw", `secret "pw": the local secret store needs a project (project.yaml)`},
+		{"shared", "pw", `unknown secret store "shared" (available: env, inline, local)`},
+		{"vault", "pw", `unknown secret store "vault" (available: env, inline, local)`},
 	} {
 		if _, err := lookup(tt.store, tt.name); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("lookup(%q, %q): %v, want %q", tt.store, tt.name, err, tt.want)
 		}
 	}
 	// Without secretStore anywhere, ${secret:NAME} reads from local.
-	if _, err := SecretLookup(nil, nil)("", "RUNNEL_TEST_SECRET"); err == nil || !strings.Contains(err.Error(), "local secret store is not available yet") {
+	if _, err := SecretLookup(nil, nil)("", "RUNNEL_TEST_SECRET"); err == nil || !strings.Contains(err.Error(), "local secret store needs a project") {
 		t.Errorf("default store: %v", err)
 	}
 	if v, err := SecretLookup(nil, nil)("env", "RUNNEL_TEST_SECRET"); err != nil || v != "s3cret" {
@@ -66,26 +70,23 @@ func TestSecretStores(t *testing.T) {
 func TestSecretsInProjectFiles(t *testing.T) {
 	_, err := ReadProject("project.yaml", []byte("kind: Project\napiVersion: runnel/v1\nname: p\nsecretStore: vault\nvariables:\n  PW: ${secret:pw}\n"), nil)
 	for _, want := range []string{
-		`project.yaml:4:14: unknown secret store "vault" (expected env, inline)`,
+		`project.yaml:4:14: unknown secret store "vault" (expected env, inline, local)`,
 		`project.yaml:6:7: ${secret:pw} is not allowed here: secrets may only be used in fields for secrets`,
 	} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("project: %v\nwant %s", err, want)
 		}
 	}
-	// Until S39d, local cannot be set; shared (S39e) is no store (R5a).
-	for store, want := range map[string]string{
-		"local":  `environments/prod.yaml:4:14: the local secret store is not available yet (expected env or inline; without secretStore it will be the default)`,
-		"shared": `environments/prod.yaml:4:14: unknown secret store "shared" (expected env, inline)`,
-	} {
-		_, err := ReadEnvironment("environments/prod.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: "+store+"\n"))
-		if err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%s: %v\nwant %s", store, err, want)
-		}
+	// shared (S39e) is no store (R5a); local can be set since S39d.
+	_, err = ReadEnvironment("environments/prod.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: shared\n"))
+	if want := `environments/prod.yaml:4:14: unknown secret store "shared" (expected env, inline, local)`; err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("shared: %v\nwant %s", err, want)
 	}
-	env, err := ReadEnvironment("environments/prod.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: env\n"))
-	if err != nil || env.SecretStore != "env" {
-		t.Errorf("environment: %+v, %v", env, err)
+	for _, store := range []string{"env", "local"} {
+		env, err := ReadEnvironment("environments/prod.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: prod\nsecretStore: "+store+"\n"))
+		if err != nil || env.SecretStore != store {
+			t.Errorf("environment: %+v, %v", env, err)
+		}
 	}
 	_, err = ReadEnvironment("environments/prod.yaml", []byte("kind: Environment\napiVersion: runnel/v1\nname: prod\nvariables:\n  TOKEN: x${secret:env/T}\n"))
 	if err == nil || !strings.Contains(err.Error(), "${secret:env/T} is not allowed here") {
@@ -133,9 +134,8 @@ func TestWorkflowCheckSecrets(t *testing.T) {
 			t.Errorf("error %d = %v, want %q", i, e, want[i])
 		}
 	}
-	// With local as the default store of an environment, the field cannot be read yet.
-	errs = w.CheckSecrets(isSecret, []string{"env", "local"})
-	if !strings.Contains(errs.Error(), "w.workflow.yaml:11:17: ${secret:pw}: the local secret store is not available yet") {
+	// local can be read (validate checks the stores, not their values).
+	if errs := w.CheckSecrets(isSecret, []string{"env", "local"}); len(errs) != 2 {
 		t.Errorf("local: %v", errs)
 	}
 	// Without known stores (no project) only stores named in the reference are checked.
@@ -251,5 +251,34 @@ func writeFile(t *testing.T, path, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The local store (S39d) of the account the program runs as: values per project, the
+// state without reading the value, and a message without value for missing secrets.
+func TestLocalSecrets(t *testing.T) {
+	t.Setenv(secretstore.MasterKeyEnv, base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789ABCDEF")))
+	store := &secretstore.Store{Dir: t.TempDir()}
+	secretstore.SetDefault(store)
+	defer secretstore.SetDefault(nil)
+	p := &Project{Dir: t.TempDir()}
+	if err := store.Set(p.Dir, "erp-pw", "Pa55word!", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := SecretLookup(p, nil)("", "erp-pw"); err != nil || v != "Pa55word!" {
+		t.Errorf("default store: %q %v", v, err)
+	}
+	if _, err := SecretLookup(&Project{Dir: t.TempDir()}, nil)("local", "erp-pw"); err == nil ||
+		err.Error() != `secret "erp-pw" is not set in the local secret store of this project (set it with: runnel secret set erp-pw)` {
+		t.Errorf("other project: %v", err)
+	}
+	if from, state := SecretStatus(p, nil, "", "erp-pw"); from != "local" || state != SecretSet {
+		t.Errorf("status: %s %s", from, state)
+	}
+	if _, state := SecretStatus(p, nil, "local", "other"); state != SecretMissing {
+		t.Errorf("status missing: %s", state)
+	}
+	if state := localSecretState(nil, "erp-pw"); state != SecretUnavailable {
+		t.Errorf("no project: %s", state)
 	}
 }

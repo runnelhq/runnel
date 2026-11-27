@@ -7,15 +7,16 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runnelhq/runnel/internal/secretstore"
 	"github.com/runnelhq/runnel/internal/vars"
 )
 
 // Secret stores (ADR 0022): ${secret:NAME} reads from the default store of the
 // environment (secretStore: in the environment, else in project.yaml, else local);
 // ${secret:STORE/NAME} names the store. Built in are env (environment variables) and
-// inline (secrets: in the environment or project.yaml, plain text; Nachtrag S39a2).
-// local, the local secret store of the computer, is the default but follows with S39d;
-// until then it cannot be set (R5a). A shared store (S39e) is not planned for 1.0.
+// inline (secrets: in the environment or project.yaml, plain text; Nachtrag S39a2) and
+// local, the local secret store of the account (S39d, package secretstore), which is the
+// default. A shared store (S39e) is not planned for 1.0.
 const (
 	SecretStoreLocal  = "local"
 	SecretStoreEnv    = "env"
@@ -23,7 +24,7 @@ const (
 )
 
 // SecretStores are the names of the secret stores secretStore can be set to.
-var SecretStores = []string{SecretStoreEnv, SecretStoreInline}
+var SecretStores = []string{SecretStoreEnv, SecretStoreInline, SecretStoreLocal}
 
 // DefaultSecretStore returns the store ${secret:NAME} reads from in an environment:
 // secretStore of the environment, else of the project, else local. p and env may be nil.
@@ -48,8 +49,11 @@ func SecretLookup(p *Project, env *Environment) func(store, name string) (string
 		if err := secretStoreAvailable(store); err != nil {
 			return "", fmt.Errorf("secret %q: %w", name, err)
 		}
-		if store == SecretStoreInline {
+		switch store {
+		case SecretStoreInline:
 			return inlineSecret(p, env, name)
+		case SecretStoreLocal:
+			return localSecret(p, name)
 		}
 		v, ok := os.LookupEnv(name)
 		if !ok || v == "" {
@@ -63,7 +67,7 @@ func SecretLookup(p *Project, env *Environment) func(store, name string) (string
 const (
 	SecretSet         = "set"
 	SecretMissing     = "missing"
-	SecretUnavailable = "unavailable" // the store cannot be read (yet), e.g. local before S39d
+	SecretUnavailable = "unavailable" // the store cannot be read, e.g. an unknown store
 )
 
 // SecretStatus tells from which store a secret of an environment comes and whether it is
@@ -76,11 +80,14 @@ func SecretStatus(p *Project, env *Environment, store, name string) (from, state
 	if secretStoreAvailable(store) != nil {
 		return store, SecretUnavailable
 	}
-	if store == SecretStoreInline {
+	switch store {
+	case SecretStoreInline:
 		if _, err := inlineSecret(p, env, name); err != nil {
 			return store, SecretMissing
 		}
 		return store, SecretSet
+	case SecretStoreLocal:
+		return store, localSecretState(p, name)
 	}
 	if v, ok := os.LookupEnv(name); ok && v != "" {
 		return store, SecretSet
@@ -105,6 +112,46 @@ func inlineSecret(p *Project, env *Environment, name string) (string, error) {
 		where = EnvironmentsDir + "/" + env.Name + ".yaml or " + ProjectFile
 	}
 	return "", fmt.Errorf("secret %q is not set under secrets: in %s (secret store inline)", name, where)
+}
+
+// localSecret reads a secret of the project from the local store of the account the
+// program runs as (secretstore.Default).
+func localSecret(p *Project, name string) (string, error) {
+	if p == nil || p.Dir == "" {
+		return "", fmt.Errorf("secret %q: the local secret store needs a project (%s); set secretStore: env or write ${secret:env/NAME}", name, ProjectFile)
+	}
+	s, err := secretstore.Default()
+	if err != nil {
+		return "", fmt.Errorf("secret %q: %w", name, err)
+	}
+	v, ok, err := s.Get(p.Dir, name)
+	switch {
+	case err != nil:
+		return "", fmt.Errorf("secret %q: %w", name, err)
+	case !ok:
+		return "", fmt.Errorf("secret %q is not set in the local secret store of this project (set it with: runnel secret set %s)", name, name)
+	}
+	return v, nil
+}
+
+// localSecretState tells whether a secret of the project is set in the local store of
+// the account the program runs as, without reading its value.
+func localSecretState(p *Project, name string) string {
+	if p == nil || p.Dir == "" {
+		return SecretUnavailable
+	}
+	s, err := secretstore.Default()
+	if err != nil {
+		return SecretUnavailable
+	}
+	ok, err := s.Has(p.Dir, name)
+	switch {
+	case err != nil:
+		return SecretUnavailable
+	case ok:
+		return SecretSet
+	}
+	return SecretMissing
 }
 
 func checkSecretNames(s *source, secrets map[string]string) Errors {
@@ -141,13 +188,10 @@ func (env *Environment) InlineSecretWarnings() Errors {
 	return Errors{env.src.warnf("$.secrets", inlineWarning)}
 }
 
-// secretStoreAvailable reports why a store cannot be read; nil for env and inline.
+// secretStoreAvailable reports why a store cannot be read; nil for the built-in stores.
 func secretStoreAvailable(store string) error {
-	switch store {
-	case SecretStoreEnv, SecretStoreInline:
+	if slices.Contains(SecretStores, store) {
 		return nil
-	case SecretStoreLocal:
-		return fmt.Errorf("the %s secret store is not available yet; set secretStore: env in the environment or project.yaml, or write ${secret:env/NAME}", store)
 	}
 	return fmt.Errorf("unknown secret store %q (available: %s)", store, strings.Join(SecretStores, ", "))
 }
@@ -155,9 +199,6 @@ func secretStoreAvailable(store string) error {
 func checkSecretStore(s *source, store string) Errors {
 	if store == "" || slices.Contains(SecretStores, store) {
 		return nil
-	}
-	if store == SecretStoreLocal {
-		return Errors{s.errorf("$.secretStore", "the local secret store is not available yet (expected %s; without secretStore it will be the default)", strings.Join(SecretStores, " or "))}
 	}
 	return Errors{s.errorf("$.secretStore", "unknown secret store %q (expected %s)", store, strings.Join(SecretStores, ", "))}
 }

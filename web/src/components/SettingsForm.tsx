@@ -13,10 +13,11 @@ import { Field, OnErrorField, TextInput, inputClass } from "./PropertiesPanel";
  * POST /forms/edit, which changes only its line.
  */
 
-/** The secret stores that can be set, with what they mean (ADR 0022); local follows with S39d, shared with S39e (R5a). */
+/** The secret stores that can be set, with what they mean (ADR 0022); shared follows with S39e (R5a). */
 const stores: [string, string][] = [
   ["env", "env – environment variables of the computer"],
   ["inline", "inline – secrets: in this file, plain text"],
+  ["local", "local – local secret store of the computer (runnel secret set)"],
 ];
 
 const namePattern = /^[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -137,7 +138,7 @@ export function SettingsForm(props: {
             label="Secret store"
             fieldKey="secretStore"
             problems={at("$.secretStore")}
-            help={env ? `Where \${secret:NAME} is read from with ${env}; empty: that of project.yaml` : "For all environments that set none; empty: the local secret store (not available yet)"}
+            help={env ? `Where \${secret:NAME} is read from with ${env}; empty: that of project.yaml` : "For all environments that set none; empty: the local secret store (runnel secret set)"}
           >
             {(f) => (
               <select id={f.id} value={data.secretStore ?? ""} onChange={(e) => void change({ field: "secretStore", value: e.target.value || null })} className={inputClass(f.invalid) + " cursor-pointer"}>

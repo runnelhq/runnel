@@ -134,6 +134,8 @@ func TestCheckHTTPTrigger(t *testing.T) {
 		return tr
 	}
 	t.Setenv("RUNNEL_TEST_TOKEN", "x")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir()) // an empty local secret store
+	t.Setenv("LOCALAPPDATA", t.TempDir())
 	if errs := CheckTrigger(http("/days/{DAYS}", `{ token: "${env:RUNNEL_TEST_TOKEN}" }`, "params: { MODE: full }\n"), p, dir); len(errs) != 0 {
 		t.Errorf("valid: %v", errs)
 	}
@@ -146,8 +148,8 @@ func TestCheckHTTPTrigger(t *testing.T) {
 		{"/x", "none", "params: { MODE: half }\n", "parameter MODE (string) of workflow workflows/target.workflow.yaml"},
 		{"/x", "none", "params: { YEARS: 1 }\n", "parameter YEARS is not declared"},
 		{"/x", `{ token: "${env:RUNNEL_TEST_UNSET}" }`, "", "environment variable RUNNEL_TEST_UNSET with the token is not set"},
-		// Without secretStore, ${secret:…} reads from the local store, which comes later (S39d).
-		{"/x", `{ token: "${secret:import-token}" }`, "", `secret "import-token": the local secret store is not available yet`},
+		// Without secretStore, ${secret:…} reads from the local store (S39d).
+		{"/x", `{ token: "${secret:import-token}" }`, "", `secret "import-token" is not set in the local secret store of this project`},
 		{"/x", `{ token: "${secret:env/RUNNEL_TEST_UNSET}" }`, "", "environment variable RUNNEL_TEST_UNSET is not set (secret store env)"},
 	} {
 		errs := CheckTrigger(http(c.path, c.auth, c.params), p, dir)

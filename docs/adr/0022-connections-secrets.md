@@ -116,7 +116,7 @@ variables: { … }
 
 - **Standardquelle:** `secretStore` im Environment, sonst in `project.yaml`, sonst `local`. So nutzt z. B. dev den lokalen
   Store und prod einen Tresor, ohne dass sich Workflows oder Connections ändern.
-- **Eingebaut immer vorhanden** (ohne Datei; seit R5a nur `env` und `inline` setzbar, siehe Nachtrag 2026-11-26): `local` (lokaler Store des Projekts), `shared` (lokaler Store, für alle
+- **Eingebaut immer vorhanden** (ohne Datei; seit R5a nur `env` und `inline` setzbar, seit S39d wieder `local`, siehe Nachträge 2026-11-26 und 2026-11-27): `local` (lokaler Store des Projekts), `shared` (lokaler Store, für alle
   Projekte des Kontos gemeinsam) und `env` (Umgebungsvariablen; `${env:NAME}` bleibt als Schreibweise für nicht
   geheime Werte). Diese Namen sind für eigene Quellen reserviert.
 - **Typen:**
@@ -658,3 +658,58 @@ Standardwert; S39d fügt `local` wieder hinzu (additiv). So sagt 1.0 keine Bedeu
 - **`transfer.download`:** `maxSize` hat den Standard 1 GB wie `http.request` mit `saveTo`; eine Datei ohne Grenze gibt
   es nicht mehr, größere Werte (z. B. `20GB`) sind möglich.
 - Alte Namen sind unbekannte Felder, alte Werte ungültige Werte, ohne Übergangszeit (bewusster Bruch vor 1.0, ADR 0029).
+
+## Nachtrag 2026-11-27 (S39d): lokaler Store
+
+S39d ist geteilt (Store und CLI vor DPAPI und Dienst): S39d1 setzt den Store mit `RUNNEL_MASTER_KEY` und
+`runnel secret set/list/delete` um, S39d2 den Schlüssel per DPAPI, den Store des Windows-Dienstes (`--service`) und
+`runnel secret missing`.
+
+**Entscheidungen des Maintainers (2026-11-27):**
+
+- Für 1.0 gibt es nur `runnel secret set`, `list`, `delete` und `missing`. Ablaufdatum (`--expires`),
+  `export`/`import`, ein Master-Passwort beim Start und das Setzen von Secrets im Editor (vorher Mockup) stehen im
+  Backlog („S39d (Teil)“).
+- Der Store des Windows-Dienstes (S39d2) schützt seinen Schlüssel mit DPAPI **für den Rechner**
+  (`CRYPTPROTECT_LOCAL_MACHINE`), nicht für ein Benutzerkonto: ihn schreiben Administratoren, lesen das Konto des
+  Dienstes. Den Zugriff begrenzen die Rechte des Ordners (Administratoren und SYSTEM, Lesen für das Konto des Dienstes).
+- Werte sind an den Projektordner gebunden: Wird das Projekt verschoben, müssen die Secrets neu gesetzt werden.
+- `RUNNEL_MASTER_KEY` ist Base64 von genau 32 Byte; eine Passphrase gibt es nicht.
+
+**Umsetzung in S39d1:**
+
+- **Ablage:** eine JSON-Datei je Projekt im Ordner des Benutzers, nie im Projekt: `%LOCALAPPDATA%\runnel\secrets\`
+  (nicht `%AppData%`, damit nichts mit dem Profil wandert; sonst `<Konfigurationsordner>/runnel/secrets/`, also
+  `$XDG_CONFIG_HOME` bzw. `~/.config`). Der Dateiname ist der Name des Projektordners mit 16 Hex-Ziffern eines SHA-256
+  über den absoluten Pfad (unter Windows klein geschrieben), wie bei der Run-Historie (ADR 0026); die Datei nennt den
+  Pfad selbst, eine Datei unter fremdem Namen ist ein Fehler. Statt `secrets.db` (SQLite) genügt JSON: wenige
+  Einträge, keine Abfragen.
+- **Format (Version 1):** `version`, `project`, `keyId` und je Secret `nonce`, `value` (AES-256-GCM, Base64) und
+  `updated`. Jeder Wert ist einzeln mit eigener Zufalls-Nonce verschlüsselt; die zusätzlichen Daten von GCM
+  (`runnel secret v1`, Projekt, Name) binden ihn an Projekt und Namen, vertauschte oder kopierte Werte lassen sich
+  nicht entschlüsseln. Namen und Zeiten stehen im Klartext: `list`, `delete` und der Zustand im Editor brauchen
+  keinen Schlüssel. Wer die Datei schreiben darf, kann Einträge löschen oder einen alten Stand zurückspielen, aber
+  keinen Wert lesen oder unterschieben. Geschrieben wird über eine temporäre Datei mit Umbenennen (Rechte `0600`,
+  Ordner `0700`; unter Windows schützt das Benutzerprofil). Zwei gleichzeitige `secret set` für dasselbe Projekt
+  können sich überschreiben (der letzte gewinnt); eine Sperre gibt es nicht. Ein Wert hat höchstens 1 MB, eine Datei
+  wird bis 32 MB gelesen; der Leser der Datei hat ein Fuzz-Ziel (`FuzzDecodeFile`).
+- **Schlüssel:** `RUNNEL_MASTER_KEY` ist der Schlüssel, auf jedem System: genau 32 Byte in Base64 (Standard- oder
+  URL-Alphabet, mit oder ohne `=`), etwa aus `openssl rand -base64 32`. Andere Längen, ungültiges Base64 und ein
+  Schlüssel aus einem einzigen wiederholten Byte sind Fehler; die Meldung nennt den Wert nie. Ein Passwort mit
+  Ableitung (scrypt) gibt es nicht: ein zu schwaches Passwort ließe sich nicht erkennen, ein Zufallsschlüssel schon.
+  Ohne die Variable meldet jedes Lesen oder Setzen eines Werts „set RUNNEL_MASTER_KEY to 32 random bytes in base64 …“;
+  unter Windows tritt mit S39d2 ein mit DPAPI geschützter Zufallsschlüssel an diese Stelle, die Variable hat dann
+  Vorrang (z. B. im Container oder für den portablen Betrieb). Aus dem Schlüssel werden mit HMAC-SHA256 der Schlüssel
+  für AES und die `keyId` abgeleitet; mit einem anderen Schlüssel meldet Runnel „stored with another key“ statt eines
+  Fehlers je Wert, und `set` mischt keine Schlüssel in einer Datei.
+- **Bedienung:** `runnel secret set NAME [projektordner]` liest den Wert verdeckt von der Konsole (Windows; sonst ein
+  Hinweis auf stdin oder `--from-file`), von stdin (ein Zeilenumbruch am Ende entfällt) oder mit `--from-file` (Inhalt
+  unverändert, muss UTF-8 sein), nie als Argument; `--base64` speichert Binärdateien wie PFX als Base64. `list` zeigt
+  Namen und Änderungszeit, `delete` meldet ein nicht gesetztes Secret als Fehler. `--json` gibt es vorerst nicht (wie
+  `triggers` und `plugins`). `runnel serve`, `run` und `validate` lesen den Store des Benutzers.
+- **Prüfung:** `validate` meldet für `local` wie für `env` keine fehlenden Werte (es ruft keine Werte ab). Ein Lauf,
+  dem ein Secret fehlt, startet nicht: „secret "X" is not set in the local secret store of this project (set it with:
+  runnel secret set X)“. `GET /api/v1/secrets` meldet für `local` jetzt `set` oder `missing`; `unavailable` bleibt für
+  unbekannte oder nicht lesbare Quellen. `secretStore: local` ist in Schema und Editor wieder ein Wert (additiv zu R5a).
+- **Keine neue Abhängigkeit:** `crypto/aes`, `crypto/cipher`, `crypto/hmac` der Standardbibliothek. Paket
+  `internal/secretstore`.

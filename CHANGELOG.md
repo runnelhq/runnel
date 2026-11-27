@@ -17,6 +17,9 @@ Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch 
   (`settings.history`), Liste der Läufe und Lauf aus der Historie auf dem Canvas im Editor.
 - **Fehler-Workflow** (ADR 0027): `settings.onError` in Projekt, Workflow und Pipeline, `runnel run --no-on-error`.
 - **JavaScript** (ADR 0028): Action und Transform `core.script` mit Code-Feldern im Editor.
+- **Lokaler Secret-Store** (ADR 0022, S39d1): Quelle `local` je Projekt außerhalb des Projektordners, verschlüsselt mit
+  AES-256-GCM, Schlüssel aus `RUNNEL_MASTER_KEY` (32 Byte in Base64); `runnel secret set/list/delete` mit
+  `--from-file` und `--base64`; `secretStore: local` ist wieder setzbar.
 - **Connections und Secrets** (ADR 0022): Secret-Quellen `env` und `inline`, Connection-Typen `sqlite`, `sqlserver`,
   `postgres`, `http`, `smtp` (mit OAuth2), `sftp`, `ftps`, `ftp`; Test von Connections und Formular im Editor.
 - **Neue Bausteine:** `db.*` (SQL ausführen, Tabellen lesen und schreiben, Upsert, Lookup, `db.query`), `http.request`

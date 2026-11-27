@@ -104,6 +104,7 @@ fuzz:
 	go test ./internal/model -run '^$$' -fuzz FuzzReadPlugin -fuzztime $(FUZZTIME)
 	go test ./internal/jsonrpc -run '^$$' -fuzz FuzzRead -fuzztime $(FUZZTIME)
 	go test ./internal/plugin -run '^$$' -fuzz FuzzEmit -fuzztime $(FUZZTIME)
+	go test ./internal/secretstore -run '^$$' -fuzz FuzzDecodeFile -fuzztime $(FUZZTIME)
 
 ## bench: run the benchmarks (load probes, e.g. requests to an http trigger)
 bench:
