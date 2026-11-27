@@ -54,6 +54,28 @@ export interface Descriptor {
   limits?: string[];
 }
 
+/** A connection type of the catalog (E15e): its fields, what Test connection checks, errors and an example. */
+export interface ConnectionType {
+  type: string;
+  label: string;
+  description: string;
+  schema?: Schema;
+  /** A complete connection file in YAML; missing for plugins. */
+  example?: string;
+  /** When connecting and signing in fail; missing for plugins. */
+  errors?: string;
+  /** What Test connection checks; missing without a test. */
+  test?: string;
+  /** The plugin the type comes from; missing for built-in types. */
+  plugin?: string;
+}
+
+/** The colour of the tile of a connection type (S39b): network, database, or general for plugins. */
+export function connectionColor(type: string, plugin?: string): string {
+  if (plugin) return categoryColor.general;
+  return ["http", "smtp", "sftp", "ftps", "ftp"].includes(type) ? categoryColor.network : categoryColor.database;
+}
+
 /** A part of the output of an action or a field set by a transform (E15b). */
 export interface OutputField {
   name: string;
@@ -119,18 +141,19 @@ export const paletteMime = "application/x-runnel-action";
 
 /** Actions and transforms have separate namespaces (ADR 0013). */
 export type CatalogKind = "workflow" | "pipeline";
-type Catalogs = Record<CatalogKind, Map<string, Descriptor>>;
+type Catalogs = Record<CatalogKind, Map<string, Descriptor>> & { connection: Map<string, ConnectionType> };
 
 let cache: Promise<Catalogs> | null = null;
 
 function load(): Promise<Catalogs> {
   cache ??= fetch(`${apiBase}/catalog`)
     .then((r) =>
-      r.ok ? (r.json() as Promise<{ actions?: Descriptor[]; transforms?: Descriptor[] }>) : Promise.reject(new Error(r.statusText)),
+      r.ok ? (r.json() as Promise<{ actions?: Descriptor[]; transforms?: Descriptor[]; connectionTypes?: ConnectionType[] }>) : Promise.reject(new Error(r.statusText)),
     )
     .then((c) => ({
       workflow: new Map((c.actions ?? []).map((d) => [d.type, d])),
       pipeline: new Map((c.transforms ?? []).map((d) => [d.type, d])),
+      connection: new Map((c.connectionTypes ?? []).map((d) => [d.type, d])),
     }))
     .catch((err: unknown) => {
       cache = null; // retry on the next use
@@ -171,6 +194,17 @@ export function useCatalogVersion(): number {
  * workflow, of the transforms for a pipeline.
  */
 export function useCatalog(kind: CatalogKind = "workflow"): Map<string, Descriptor> {
+  return useCatalogs()?.[kind] ?? none;
+}
+
+const noConnections = new Map<string, ConnectionType>();
+
+/** The connection types of the catalog by type (E15e), with those of trusted plugins; empty until loaded. */
+export function useConnectionTypes(): Map<string, ConnectionType> {
+  return useCatalogs()?.connection ?? noConnections;
+}
+
+function useCatalogs(): Catalogs | null {
   const [catalogs, setCatalogs] = useState<Catalogs | null>(null);
   const v = useCatalogVersion();
   useEffect(() => {
@@ -183,5 +217,5 @@ export function useCatalog(kind: CatalogKind = "workflow"): Map<string, Descript
       live = false;
     };
   }, [v]);
-  return catalogs?.[kind] ?? none;
+  return catalogs;
 }

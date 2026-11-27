@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { apiBase } from "../api";
-import { categoryColor, type Schema } from "../catalog";
+import { connectionColor, useConnectionTypes, type Schema } from "../catalog";
 import { useReference, type ExprContext } from "../expressions";
 import { useSchema, useVariables } from "../reference";
 import type { Problem } from "../workflow";
@@ -30,6 +30,8 @@ export function ConnectionForm(props: {
   text: string;
   problems: Problem[];
   result: TestResult | null;
+  /** Opens the help of the connection type ("?" next to the type, mockup E15f). */
+  onHelp: (type: string) => void;
   onText: (text: string) => void;
   onError: (message: string) => void;
 }) {
@@ -55,7 +57,6 @@ export function ConnectionForm(props: {
   const variant = schema.properties?.with?.["x-runnel-variants"]?.[data.type];
   const label = variant?.description?.split(": ")[0] ?? data.type;
   const what = variant?.description?.split(": ").slice(1).join(": ") ?? "";
-  const net = data.type === "http" || data.type === "smtp" || data.type === "sftp" || data.type === "ftps" || data.type === "ftp";
 
   // Sections in the order of their first field; "More" is folded and comes last.
   const sections = new Map<string, [string, Schema][]>();
@@ -71,7 +72,7 @@ export function ConnectionForm(props: {
     <div className="flex-1 overflow-auto bg-background" data-testid="connection-form">
       <div className="mx-auto max-w-[680px] px-7 pt-4 pb-10">
         <div className="mb-1 flex items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md text-white" style={{ background: categoryColor[net ? "network" : "database"] }}>
+          <span className="grid size-9 shrink-0 place-items-center rounded-md text-white" style={{ background: connectionColor(data.type) }}>
             <ConnectionIcon type={data.type} width={20} height={20} />
           </span>
           <div className="min-w-0">
@@ -79,6 +80,17 @@ export function ConnectionForm(props: {
             <div className="text-xs text-muted-foreground">
               {label}
               {what && ` · ${what.charAt(0).toLowerCase()}${what.slice(1)}`}
+              {variant && (
+                <button
+                  type="button"
+                  aria-label={`Help for ${label}`}
+                  title={`Help for ${label} (F1)`}
+                  onClick={() => props.onHelp(data.type)}
+                  className="ml-1 inline-grid size-5 cursor-pointer place-items-center rounded-full border border-border bg-transparent align-middle text-xs leading-none font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                >
+                  ?
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -170,8 +182,9 @@ function ResultBanner(props: { result: TestResult }) {
 }
 
 /** "Test connection" with the environment beside it, like Run (mockup S39b). */
-export function TestButton(props: { name: string; onResult: (r: TestResult | null) => void }) {
+export function TestButton(props: { name: string; type: string; onResult: (r: TestResult | null) => void }) {
   const vars = useVariables(props.name);
+  const t = useConnectionTypes().get(props.type);
   const envs = vars?.environments ?? [];
   const [env, setEnv] = useState("");
   const [busy, setBusy] = useState(false);
@@ -199,7 +212,12 @@ export function TestButton(props: { name: string; onResult: (r: TestResult | nul
         type="button"
         disabled={busy}
         onClick={() => void run()}
-        title="Test the saved connection with the environment"
+        // What the test checks, from the catalog (mockup E15f).
+        title={
+          `Test the saved connection${current ? ` with the environment ${current}` : ""}` +
+          (t?.test ? `: ${t.test.charAt(0).toLowerCase()}${t.test.slice(1)}` : "") +
+          (t ? `\n? next to the type or F1 for the help of ${t.label}` : "")
+        }
         className={
           "inline-flex h-7 cursor-pointer items-center gap-1.5 border border-input bg-background px-2.5 text-xs font-medium hover:bg-muted disabled:cursor-default " +
           (envs.length > 0 ? "rounded-l-md" : "rounded-md")

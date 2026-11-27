@@ -20,8 +20,8 @@ export function Dialog(props: {
   icon?: ReactNode;
   iconClass?: string;
   form?: boolean;
-  /** Wider, e.g. for lists of paths. */
-  wide?: boolean;
+  /** Wider, e.g. for lists of paths; "xl" for a grid of choices (New → Connection). */
+  wide?: boolean | "xl";
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const cancel = useRef(props.onCancel);
@@ -30,7 +30,8 @@ export function Dialog(props: {
   useEffect(() => {
     const first = form ? ref.current?.querySelector<HTMLElement>("input, select") : null;
     (first ?? ref.current?.querySelector<HTMLButtonElement>("button"))?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && cancel.current();
+    // Esc handled inside, e.g. by the help beside the dialog, does not cancel it.
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && cancel.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [form]);
@@ -52,7 +53,7 @@ export function Dialog(props: {
         role={props.form ? "dialog" : "alertdialog"}
         aria-modal="true"
         aria-label={props.title}
-        className={`${props.wide ? "w-[600px]" : "w-[480px]"} max-w-[calc(100vw-32px)] rounded-xl border border-border bg-popover px-6 py-5 text-popover-foreground shadow-lg`}
+        className={`${props.wide === "xl" ? "w-[780px]" : props.wide ? "w-[600px]" : "w-[480px]"} max-w-[calc(100vw-32px)] rounded-xl border border-border bg-popover px-6 py-5 text-popover-foreground shadow-lg`}
       >
         <h2 className="m-0 mb-2 flex items-center gap-2.5 text-md font-semibold">
           <span className={`inline-grid size-7 place-items-center rounded-full text-sm ${props.iconClass ?? "bg-warning-soft text-warning"}`}>

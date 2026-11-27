@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { tileColor, useCatalog, type Schema } from "../catalog";
+import { tileColor, useCatalog, useConnectionTypes, type Schema } from "../catalog";
 import {
   entryNamePattern,
   graphOf,
@@ -26,6 +26,7 @@ import { linkColors, linkSymbols, type SettableKind } from "./LinkEdge";
 import { formatDuration, type RunView } from "../run";
 import { exprContext, locate, useReference, type ExprContext } from "../expressions";
 import { useConnections } from "../reference";
+import { requestHelp } from "../help";
 import { SecretInput } from "./SecretField";
 import { ExpressionInput } from "./ExpressionInput";
 import { ScriptInput, type ScriptContext } from "./ScriptInput";
@@ -473,6 +474,8 @@ export function Field(props: {
   messages?: string[];
   /** Corrections offered below the problems, e.g. "Replace with result". */
   fixes?: { label: string; apply: () => void }[];
+  /** After the label, e.g. "?" for the help of the connection type. */
+  labelEnd?: ReactNode;
   children: (p: { id: string; labelId: string; invalid: boolean }) => ReactNode;
 }) {
   const [id] = useState(() => `field-${++nextFieldId}`);
@@ -487,6 +490,7 @@ export function Field(props: {
             *
           </span>
         )}
+        {props.labelEnd}
         <span aria-hidden="true" className="ml-auto font-mono text-[10px] font-normal text-muted-foreground">
           {props.keyLabel ?? props.fieldKey}
         </span>
@@ -877,6 +881,7 @@ function ConnectionField(props: {
   onChange: (value: string | null) => void;
 }) {
   const all = useConnections();
+  const connectionTypes = useConnectionTypes();
   const types = props.schema["x-runnel-connection"] ?? [];
   const fitting = (all ?? []).filter((c) => types.length === 0 || types.includes(c.type));
   const current = props.value === undefined || props.value === null ? "" : String(props.value);
@@ -886,8 +891,30 @@ function ConnectionField(props: {
     all && fitting.length === 0
       ? `No connection of type ${types.join(" or ")} in connections/ yet`
       : props.schema.description;
+  // The help of the type of the chosen connection, or of the first type the step accepts (mockup E15f).
+  const helpType = other?.type ?? types[0];
+  const label = (helpType && connectionTypes.get(helpType)?.label) || helpType;
   return (
-    <Field label={props.label} fieldKey={props.fieldKey} required={props.required} help={help} problems={props.problems}>
+    <Field
+      label={props.label}
+      fieldKey={props.fieldKey}
+      required={props.required}
+      help={help}
+      problems={props.problems}
+      labelEnd={
+        helpType && (
+          <button
+            type="button"
+            aria-label={`Help for ${label}`}
+            title={`Help for the connection type ${label}`}
+            onClick={() => requestHelp(helpType, "connection", true)}
+            className="grid size-4 cursor-pointer place-items-center self-center rounded-full border border-border bg-transparent text-[10px] leading-none font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            ?
+          </button>
+        )
+      }
+    >
       {(p) => (
         <select
           id={p.id}

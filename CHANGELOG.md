@@ -13,6 +13,13 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
   Connection-Typ zusätzlich `example` (eine vollständige Connection-Datei), `errors` (wann das Verbinden scheitert,
   z. B. unbekannter Host-Key oder nicht vertrautes Zertifikat) und `test` (was „Test connection“ prüft);
   `runnel catalog sftp` zeigt sie als „Errors“, „Test connection“ und „Example“.
+- **Hilfe zu Connection-Typen im Editor** (E15g): F1 oder „?“ neben dem Typ im Formular einer Connection öffnet die
+  Hilfe des Typs mit Feldern nach den Gruppen des Formulars, „Test connection“, „Errors“ und „Example“ mit „Copy
+  example“; „Test connection“ nennt im Tooltip, was der Test prüft. „New → Connection“ zeigt je Typ Beschreibung und
+  „Test“ bzw. „No test“ und unter den Karten den Test des gewählten Typs; „?“ an einer Karte und F1 öffnen die Hilfe.
+  Das Feld `connection` eines Schritts hat ein „?“ für die Hilfe seines Connection-Typs. Die Suche der Hilfe heißt
+  „Search help“ und findet auch Connection-Typen. `GET /api/v1/catalog` liefert dafür `connectionTypes` (mit `plugin`
+  bei Typen von Plugins).
 
 ### Behoben
 

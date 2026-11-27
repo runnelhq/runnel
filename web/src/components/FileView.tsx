@@ -798,18 +798,26 @@ export function FileView(props: {
   }, [active, canvasEdit, paste]);
 
   // Help (mockup E15c): requests of the palette, and F1 for the selected step.
-  // Opened from the palette, there is only × (decision for mockup E15c).
-  const onHelpRequest = useCallback((r: HelpRequest) => setHelp({ type: r.type, kind: r.kind, back: false }), []);
-  useHelpRequests(active && isGraph, onHelpRequest);
+  // Opened from the palette, there is only × (decision for mockup E15c); from the field
+  // connection of a step, "‹ Properties" goes back (mockup E15f).
+  const onHelpRequest = useCallback((r: HelpRequest) => setHelp({ type: r.type, kind: r.kind, back: r.back }), []);
+  useHelpRequests(active && (isGraph || isConnection), onHelpRequest);
+  // The type of a connection file, for F1 in its form and the tooltip of Test connection (mockup E15f).
+  const connectionType = isConnection ? (/^type:[ \t]*["']?([\w.-]+)/m.exec(doc?.text ?? "")?.[1] ?? "") : "";
   // The handler reads the latest state through a ref: re-registering it after each render
   // left a gap in which F1 right after selecting a step still saw the old selection.
-  const f1State = useRef({ graphKind, selection, graph, panel, view });
-  f1State.current = { graphKind, selection, graph, panel, view };
+  const f1State = useRef({ graphKind, selection, graph, panel, view, connectionType });
+  f1State.current = { graphKind, selection, graph, panel, view, connectionType };
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "F1" || e.defaultPrevented) return;
       const s = f1State.current;
+      if (s.connectionType && s.view === "canvas") {
+        e.preventDefault();
+        setHelp({ type: s.connectionType, kind: "connection", back: false });
+        return;
+      }
       if (!s.graphKind) return;
       e.preventDefault(); // instead of the help of the browser
       const one = s.selection.actions.length === 1 ? s.graph?.actions?.find((a) => a.id === s.selection.actions[0]) : undefined;
@@ -942,19 +950,21 @@ export function FileView(props: {
   // properties panel, so that nothing moves when switching between canvas and YAML: the
   // name with the path in its tooltip, "Copy path" as a symbol next to it, no kind badge.
   const compact = isGraph;
+  // With the help beside a connection, the file bar keeps only the name (mockup E15f).
+  const narrow = isConnection && !!help;
   // The badges open the list of problems below the canvas, also from the YAML view.
   const openProblems = editsText ? () => setBottomTab("problems") : undefined;
   return (
     <>
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border px-4">
         <span className="font-mono text-xs whitespace-nowrap text-muted-foreground" data-testid="crumbs" title={path}>
-          {slash >= 0 && !compact && `${path.slice(0, slash).split("/").join(" / ")} / `}
+          {slash >= 0 && !compact && !narrow && `${path.slice(0, slash).split("/").join(" / ")} / `}
           <b className="font-medium text-foreground">{path.slice(slash + 1)}</b>
         </span>
         {compact ? (
           <CopyPath path={props.projectDir ? fullPath(props.projectDir, path) : path} compact />
         ) : (
-          <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
+          !narrow && <Badge testId="kind">{kindLabel[kindOf(path)]}</Badge>
         )}
         {!editsText && (
           <Badge title="This file can be changed in your text editor">
@@ -1030,7 +1040,7 @@ export function FileView(props: {
               </button>
             </span>
           ))}
-        {isConnection && <TestButton name={path.split("/").pop()!.replace(/\.yaml$/, "")} onResult={setTestResult} />}
+        {isConnection && <TestButton name={path.split("/").pop()!.replace(/\.yaml$/, "")} type={connectionType} onResult={setTestResult} />}
         {isPlugin && pluginInfo && (
           <PluginActions
             info={pluginInfo}
@@ -1133,6 +1143,7 @@ export function FileView(props: {
             text={doc.text}
             problems={validation?.problems ?? []}
             result={testResult}
+            onHelp={(type) => setHelp({ type, kind: "connection", back: false })}
             onText={(next) => setText(next, "push")}
             onError={setEditError}
           />
@@ -1294,7 +1305,7 @@ export function FileView(props: {
           </div>
         )}
       </div>
-      {help && graph ? (
+      {help && (graph || isConnection) ? (
         <HelpPanel
           target={{ ...help, step: helpStep }}
           onOpen={(type, kind) => setHelp((h) => ({ type, kind, back: h?.back ?? false, step: h?.step }))}
