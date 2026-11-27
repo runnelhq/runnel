@@ -305,7 +305,7 @@ flowchart LR
 |---|---|---|
 | Neues Projekt | `runnel init [ordner] [--name <name>] [--force]` (seit R9) | Legt `project.yaml`, die Ordner `workflows/`, `pipelines/`, `triggers/`, `environments/`, `connections/`, das Environment `dev`, einen Beispiel-Workflow und `.gitignore` an. Exit-Code: 0 angelegt, 1 Datei nicht schreibbar, 2 nichts angelegt (Ordner nicht leer, ungültiger Name, falscher Aufruf); `--force` ergänzt nur fehlende Dateien |
 | Einmal-Ausführung | `runnel run <datei> [--environment prod] [--param k=v]` (`--run-config` mit S42, Backlog) | Aufgabenplanung, CI, Skripte. Exit-Code: 0 erfolgreich, 1 fehlgeschlagen, 2 nicht gestartet (auch bei falschem Aufruf, seit R5a), 130 abgebrochen |
-| Server | `runnel serve [projektordner] [--port 7300] [--triggers 127.0.0.1:7301] [--stop-timeout]` | Editor + Scheduler + HTTP-Trigger (eigener Listener) |
+| Server | `runnel serve [projektordner] [--port 7300] [--triggers 127.0.0.1:7301] [--stop-timeout]` | Editor + Scheduler + HTTP-Trigger (eigener Listener). Ohne Projekt im Ordner und darüber startet er trotzdem; der Editor zeigt „No project here“ und legt mit „Create project“ ein Projekt wie `runnel init` im Ordner des Servers an, danach bedient der Server es ohne Neustart (seit R10) |
 | Desktop | `runnel desktop` (geplant) | Server + WebView2-Fenster (Einzelplatz) |
 | Windows-Dienst | `runnel service install/start/stop/status/uninstall` (seit S41) | Dauerbetrieb auf Server |
 | Validierung | `runnel validate <datei/ordner>` (Workflows, Pipelines, Trigger) | Lint/Prüfung in CI. Exit-Code: 0 keine Fehler, 1 Fehler gefunden (mit `--strict` auch Warnungen), 2 nichts geprüft (falscher Aufruf, Pfad fehlt; seit R5a) |

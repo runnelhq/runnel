@@ -9,6 +9,13 @@ runnel serve examples/hello            # Projekt im Ordner oder darüber, Port 7
 runnel serve --port 0 .                 # freier Port; die Ausgabe nennt die Adresse
 ```
 
+**Ohne Projekt (seit R10):** Findet `runnel serve` im Ordner und darüber keine `project.yaml`, startet der Server
+trotzdem für den angegebenen Ordner (ohne Argument das aktuelle Verzeichnis; er muss existieren). Bis ein Projekt
+angelegt ist, antworten nur `/version`, `/health`, `/project` und der Editor (Startseite); alle übrigen Endpunkte unter
+`/api/v1` antworten `409` mit `{"error": "…", "code": "no_project"}`. Nach `POST /project` – oder sobald eine
+`project.yaml` auf anderem Weg entsteht, z. B. mit `runnel init` im Terminal – bedient der Server das Projekt wie nach
+einem Start, mit Run-Historie und Triggern, ohne Neustart. Der Windows-Dienst braucht weiterhin ein Projekt.
+
 Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITOR.md](EDITOR.md)).
 
 ## Grundsätze
@@ -18,7 +25,7 @@ Außerhalb von `/api/v1` liefert der Server den eingebetteten Editor aus ([EDITO
 | Adresse | nur `127.0.0.1` (Netzwerkbetrieb des Editors mit Zugangsschlüssel und TLS folgt mit S40b; HTTP-Trigger haben seit S38a/S40a einen eigenen Listener, siehe unten) |
 | Präfix | alle Endpunkte unter `/api/v1` |
 | Format | JSON (UTF-8, eingerückt); Dateiinhalte als Rohdaten |
-| Fehler | Statuscode und `{"error": "…"}` mit englischer, verständlicher Meldung |
+| Fehler | Statuscode und `{"error": "…"}` mit englischer, verständlicher Meldung; manche Fehler tragen zusätzlich einen festen `code` (seit R10: `no_project`, `project_exists`, `not_empty`, `invalid_name`) |
 | Schutz | Anfragen müssen an `localhost`, `127.0.0.1` oder `[::1]` gerichtet sein (`Host`-Header, Schutz vor DNS-Rebinding); ein `Origin`-Header muss zum Server passen (Schutz vor Anfragen fremder Webseiten). Sonst `403` |
 | Pfade | relativ zum Projektordner, Trenner `/`; versteckte Einträge (`.git`, `.env` …), `..`, `\`, `:` und unter Windows unzulässige oder reservierte Namen (`CON`, `NUL`, `COM1` …) werden mit `400` abgelehnt. Symbolische Links aus dem Projekt heraus sind nicht erreichbar |
 
@@ -36,6 +43,8 @@ zugesagt, nicht im Netz erreichbar.
 |---|---|---|---|
 | GET | `/version` | **öffentlich** | `{"version", "commit", "date", "goVersion", "os", "arch"}` wie `runnel version --json` |
 | GET | `/health` | **öffentlich** | Zustand für Monitoring (S43a): `200` bei `ok` und `degraded`, `503` bei `fail`, siehe [Zustand](#zustand-health) |
+| GET | `/project` | intern | Ob der Ordner des Servers ein Projekt hat (R10): `{"exists": true, "dir": "C:\\…\\hello", "name": "hello", "empty": false}`; ohne Projekt `{"exists": false, "dir", "defaultName": "my-flows", "empty": true}` – `defaultName` ist der Name, den `runnel init` vergäbe, `empty`, ob der Ordner außer `.git` nichts enthält |
+| POST | `/project` | intern | Projekt im Ordner des Servers anlegen wie `runnel init` (R10): Body `{"name": "flows", "force": false}`, beides optional (ohne `name` der Vorschlag aus dem Ordner; `force` ergänzt einen nicht leeren Ordner, vorhandene Dateien bleiben). Einen Pfad nimmt der Endpunkt nicht an. `201` + `{"name", "dir", "created": ["project.yaml", …, "pipelines/"], "skipped": […]}`; danach bedient der Server das Projekt. `400` ungültiger Name (`invalid_name`) oder Body, `409` Projekt schon da (`project_exists`) oder Ordner nicht leer ohne `force` (`not_empty`), `413` Body über 4 KiB, `503` beim Beenden |
 | GET | `/projects/current` | intern | `{"name": "hello", "dir": "C:\\…\\hello", "environments": ["dev", "prod"], "defaultEnvironment": "dev", "history": {"keepDays": 30, "maxRuns": 10000}}`; `history` ist die Aufbewahrung der Run-Historie mit den Standardwerten (seit S26e1); `onError` der Fehler-Workflow aus `settings.onError` (fehlt, wenn keiner gesetzt ist; seit S72b) |
 | GET | `/projects/current/tree` | intern | Dateibaum: `{name, path, type: "dir"\|"file", kind, size, children}`; Ordner vor Dateien, alphabetisch; `kind`: `workflow`, `pipeline`, `project`, `environment`, `trigger` (seit E10), `connection`, `plugin` (`plugins/<name>/plugin.yaml`, seit S52b1), `binary` (Programme, Bibliotheken, Archive, Datenbanken, Office-Dateien, z. B. `.exe`, `.dll`, `.zip`, `.db`, `.xlsx`, `.pdf`; öffnet der Editor nicht), `document` (`*.md`), `image` (`*.png`, `*.jpg`, `*.jpeg`, `*.gif`, `*.webp`; beide seit E17; `*.svg` seit R8), `other`; versteckte Einträge und symbolische Links fehlen |
 | GET | `/files/{path}` | intern | Inhalt der Datei, Header `ETag`; `415` für Binärdateien: `kind: binary` oder – außer bei Bildern – binärer Inhalt in den ersten 8 KiB (seit R8): Nullbytes oder Bytes, die weder gültiges UTF-8 noch Text in Windows-1252 sind (Steuerzeichen außer Tab, Zeilenumbruch und Seitenvorschub, in Windows-1252 nicht belegte Bytes); ein an der Grenze von 8 KiB abgeschnittenes UTF-8-Zeichen zählt nicht, UTF-16 mit BOM und leere Dateien sind Text. Am Status `415` erkennt der Editor Binärdateien und zeigt den Hinweis statt des Texts, `422` für Dateien über 10 MiB (sie werden nicht gelesen); Bilder (siehe `kind: image`) mit ihrem Typ (`image/png` …, `image/svg+xml`), damit Dokumente und die Bildansicht sie zeigen können. Dateien des Projekts sind Daten, keine Seiten des Editors: `X-Content-Type-Options: nosniff` und `Content-Security-Policy: default-src 'none'; …; sandbox` (seit E17), direkt im Browser geöffnet führt etwa eine SVG- oder HTML-Datei keine Skripte aus; der Editor zeigt SVG nur als `<img>` (R8), das ebenfalls keine Skripte ausführt |
@@ -126,6 +135,11 @@ Historie der Projektordner); `listener.notAfter` das Ende des Zertifikats, bei e
 geladene. Der Stand der Läufe gilt seit dem Start des Servers (aus dem Speicher, nicht aus der Historie); „schreibbar“
 heißt: geöffnet, und der letzte Schreibvorgang gelang – ein Fehler zeigt sich also beim nächsten Lauf. Secrets und
 Stacktraces enthält die Antwort nicht; Pfade schon, wie die übrige API.
+
+**Ohne Projekt** (seit R10, `runnel serve` in einem Ordner ohne `project.yaml`) ist der Status `degraded` (`200`): Die
+einzige Prüfung neben `disk` heißt `project` („no project in …; create one in the editor or with runnel init“),
+`project.name` ist leer, `project.dir` der Ordner des Servers, `scheduler.running` ist `false`. Sobald das Projekt
+angelegt ist, gelten die Prüfungen oben; `startedAt` bleibt der Start des Servers.
 
 ## Konfliktschutz (ETag)
 

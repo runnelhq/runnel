@@ -175,7 +175,7 @@ func (s *Server) health() Health {
 	}
 
 	s.healthHistory(&h, rh.HistoryError, check)
-	s.healthDisk(&h, check)
+	healthDisk(&h, s.dataDir, s.diskFree, check)
 	s.healthListener(&h, httpWanted, now, check)
 	return h
 }
@@ -204,9 +204,10 @@ func (s *Server) healthHistory(h *Health, writeErr string, check func(name, stat
 	}
 }
 
-func (s *Server) healthDisk(h *Health, check func(name, status, msg string)) {
-	h.Disk.Path = s.dataDir
-	free, total, err := s.diskFree(s.dataDir)
+// healthDisk checks the free space of the disk with dir, the data folder.
+func healthDisk(h *Health, dir string, diskFree func(string) (uint64, uint64, error), check func(name, status, msg string)) {
+	h.Disk.Path = dir
+	free, total, err := diskFree(dir)
 	if err != nil {
 		h.Disk.Error = err.Error()
 		check("disk", HealthOK, "free space unknown: "+err.Error())
@@ -214,7 +215,7 @@ func (s *Server) healthDisk(h *Health, check func(name, status, msg string)) {
 	}
 	h.Disk.FreeBytes, h.Disk.TotalBytes = free, total
 	low := min(uint64(DiskLowBytes), total/100*DiskLowPercent)
-	msg := fmt.Sprintf("%d MB free of %d MB in %s", free>>20, total>>20, s.dataDir)
+	msg := fmt.Sprintf("%d MB free of %d MB in %s", free>>20, total>>20, dir)
 	if free < low {
 		check("disk", HealthDegraded, "low disk space: "+msg)
 	} else {

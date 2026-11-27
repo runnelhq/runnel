@@ -23,9 +23,11 @@ func IsLoopback(hostport string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// ErrorBody is the body of error responses: {"error": "…"}.
+// ErrorBody is the body of error responses: {"error": "…"}, with a stable code for
+// some of them (e.g. "no_project", R10).
 type ErrorBody struct {
 	Error string `json:"error"`
+	Code  string `json:"code,omitempty"`
 }
 
 // WriteJSON writes v as JSON with the status; indent makes it readable (API for the editor).

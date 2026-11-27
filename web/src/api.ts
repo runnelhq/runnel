@@ -34,6 +34,34 @@ async function getJSON<T>(path: string): Promise<T> {
 }
 
 export const fetchProject = () => getJSON<ProjectInfo>("/projects/current");
+
+/** Whether the server's folder has a project; without one, what a new project would get (R10). */
+export interface ProjectStatus {
+  exists: boolean;
+  dir: string;
+  name?: string;
+  defaultName?: string;
+  /** The folder has no files yet (apart from .git). */
+  empty: boolean;
+}
+
+export const fetchProjectStatus = () => getJSON<ProjectStatus>("/project");
+
+/**
+ * Creates the project in the server's folder, like "runnel init" (R10); the folder is the
+ * server's, never one of the browser. force adds the files to a folder that is not empty
+ * (existing files are kept). Returns the paths created.
+ */
+export async function createProject(name: string, force: boolean): Promise<string[]> {
+  const res = await fetch(apiBase + "/project", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, force }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; created?: string[] };
+  if (!res.ok) throw new Error(body.error ?? `${res.status} ${res.statusText}`);
+  return body.created ?? [];
+}
 export const fetchVersion = () => getJSON<VersionInfo>("/version");
 
 export type Connection = "connecting" | "connected" | "disconnected";

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -33,7 +35,8 @@ func newServeCommand() *cobra.Command {
 		Use:   "serve [project-dir]",
 		Short: "Start the server for a project (API for the editor)",
 		Long: "Starts the server for the project in project-dir (or the current directory), found by its\n" +
-			"project.yaml in that directory or above. The server listens on 127.0.0.1 only and serves the\n" +
+			"project.yaml in that directory or above. Without a project, the editor offers to create one\n" +
+			"in project-dir, like \"runnel init\". The server listens on 127.0.0.1 only and serves the\n" +
 			"API under " + server.APIPrefix + " (files, catalog, validation, runs, live events).\n" +
 			"It starts the runs of the project's triggers (" + model.TriggersDir + "/, also in subfolders) at their times; changed\n" +
 			"trigger files are picked up while it runs. HTTP triggers get their own listener (--triggers),\n" +
@@ -58,7 +61,7 @@ func newServeCommand() *cobra.Command {
 			}
 			return runServer(cmd.Context(), serveConfig{Dir: dir, Port: port, StopTimeout: stopTimeout, Triggers: listen, TLSDir: userTLSDir(),
 				HistoryDir: historyDir, Logger: logger, Log: func(m string) { logger.Info(m) }, Warn: func(m string) { logger.Warn(m) },
-				Print: func(msg string) { cmd.Println(msg) }, StopHint: "; press Ctrl+C to stop"})
+				Print: func(msg string) { cmd.Println(msg) }, StopHint: "; press Ctrl+C to stop", AllowNoProject: true})
 		},
 	}
 	cmd.Flags().IntVar(&port, "port", DefaultPort, "TCP port on 127.0.0.1 (0 picks a free port)")
@@ -89,6 +92,9 @@ type serveConfig struct {
 	HistoryDir string
 	// Logger gets a line per run that has ended (S71); nil: none.
 	Logger *slog.Logger
+	// AllowNoProject serves Dir without a project: the editor then offers to create one
+	// there (R10, "runnel serve"; not the Windows service).
+	AllowNoProject bool
 }
 
 // findProject returns the project directory of dir: dir or the first directory above
@@ -104,6 +110,26 @@ func findProject(dir string) (string, error) {
 	return root, nil
 }
 
+// serveDir returns the folder to serve: the project directory of dir, or – with
+// allowNone and no project in dir or above – dir itself, which must be a folder.
+func serveDir(dir string, allowNone bool) (string, error) {
+	if !allowNone {
+		return findProject(dir)
+	}
+	root, found, err := model.FindProjectDir(dir)
+	if err != nil || found {
+		return root, err
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
+		return "", fmt.Errorf("no project (%s) found, and %s is not a folder that exists", model.ProjectFile, dir)
+	}
+	return abs, nil
+}
+
 // runServer serves the project until ctx is done.
 func runServer(ctx context.Context, c serveConfig) error {
 	if c.Port < 0 || c.Port > 65535 {
@@ -115,7 +141,7 @@ func runServer(ctx context.Context, c serveConfig) error {
 	if c.StopTimeout < 0 {
 		return fmt.Errorf("invalid --stop-timeout %s (expected 0 or more, e.g. 30s)", c.StopTimeout)
 	}
-	root, err := findProject(c.Dir)
+	root, err := serveDir(c.Dir, c.AllowNoProject)
 	if err != nil {
 		return err
 	}
@@ -123,7 +149,7 @@ func runServer(ctx context.Context, c serveConfig) error {
 	if err != nil {
 		return err
 	}
-	srv, err := server.New(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin(), Log: c.Log, Warn: c.Warn,
+	srv, err := server.Open(server.Options{Dir: root, Registry: actions.Builtin(), Transforms: transforms.Builtin(), Log: c.Log, Warn: c.Warn,
 		TriggerListen: c.Triggers.Address, TriggerTLS: tlsConfig, HistoryDir: c.HistoryDir, Logger: c.Logger})
 	if err != nil {
 		return err
@@ -160,7 +186,11 @@ func runServer(ctx context.Context, c serveConfig) error {
 
 	// The version first: after an update, the log shows which runnel.exe serves.
 	c.Print("Starting " + version.Get().String())
-	c.Print(fmt.Sprintf("Serving project %s", root))
+	if srv.HasProject() {
+		c.Print(fmt.Sprintf("Serving project %s", root))
+	} else {
+		c.Print(fmt.Sprintf("No project in %s; open the editor to create one", root))
+	}
 	c.Print(fmt.Sprintf("Listening on http://%s (API under %s)%s", ln.Addr(), server.APIPrefix, c.StopHint))
 	srv.StartTriggers(ctx)
 	err = hs.Serve(ln)

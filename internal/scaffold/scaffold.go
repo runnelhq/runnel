@@ -133,7 +133,7 @@ func Create(dir string, opts Options) (*Result, error) {
 	if err := CheckName(name); err != nil {
 		return nil, err
 	}
-	empty, err := isEmpty(dir)
+	empty, err := IsEmpty(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -173,8 +173,9 @@ func Create(dir string, opts Options) (*Result, error) {
 	return res, nil
 }
 
-// isEmpty reports whether dir is missing or has no entries other than .git.
-func isEmpty(dir string) (bool, error) {
+// IsEmpty reports whether dir is missing or has no entries other than .git: whether
+// Create accepts it without Options.Force.
+func IsEmpty(dir string) (bool, error) {
 	info, err := os.Stat(dir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return true, nil

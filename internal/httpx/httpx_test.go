@@ -19,7 +19,7 @@ func TestIsLoopback(t *testing.T) {
 
 func TestWriteJSON(t *testing.T) {
 	w := httptest.NewRecorder()
-	WriteJSON(w, 418, ErrorBody{"short"}, false)
+	WriteJSON(w, 418, ErrorBody{Error: "short"}, false)
 	if w.Code != 418 || w.Body.String() != "{\"error\":\"short\"}\n" || w.Header().Get("Content-Type") != "application/json; charset=utf-8" {
 		t.Errorf("%d %q", w.Code, w.Body)
 	}
