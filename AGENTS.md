@@ -57,7 +57,7 @@ Temporäre Dateien, Profile und Test-Binaries nicht im Repository ablegen (z. B.
 | `internal/pagination/` | Seiten einer HTTP-API lesen (`link`, `url`, `cursor`, `page`, `offset`): Liste je Seite, nächste Adresse, Grenzen, gleicher Host (S63c; für `http.request`, später `http.input`) |
 | `internal/httpx/` | gemeinsame HTTP-Helfer von Server und Trigger-Listener (`IsLoopback`, JSON-Antworten) |
 | `internal/tlscert/` | Zertifikate des Trigger-Listeners: selbst erzeugt und wiederverwendet, eigene PEM-Dateien mit Neuladen |
-| `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Parameter prüfen, Prüfung für `validate` und Editor (`validate.go`), Texte der Lauf-Ereignisse (`describe.go`), Zwischenspeicher geprüfter Dateien, Läufe und Ereignisse im Speicher |
+| `internal/runs/` | Läufe vorbereiten (gemeinsam für `runnel run` und Server), Parameter prüfen, Prüfung für `validate` und Editor (`validate.go`), Texte der Lauf-Ereignisse (`describe.go`), Zwischenspeicher geprüfter Dateien, Läufe und Ereignisse im Speicher, Daten je Schritt des letzten Laufs aus dem Editor (`steps.go`, Grenzen in `steplimit.go`; E23a) |
 | `internal/jsonrpc/` | JSON-RPC 2.0 über zwei Ströme, eine Nachricht je Zeile (Plugins, später MCP): Anfragen mit Zuordnung der Antworten, Notifications, `$/cancelRequest`, Grenze 16 MiB |
 | `internal/plugin/` | Plugins ausführen (ADR 0019): Prozess mit Prozessbaum, Handshake, `describe`, `action.execute`, Transforms als Strom mit Krediten (`stream.go`), stderr als Log, Maskierung; Test-Plugin in `plugintest/` |
 | `internal/plugintrust/` | Freigabe von Plugins je Projekt und Rechner (ADR 0019): Hash über den Plugin-Ordner, Dateien der Freigaben für Benutzer und Dienst |

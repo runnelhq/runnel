@@ -45,7 +45,8 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Runs of the editor and the API start no error workflow, also not "Run target now" (ADR 0027).
-	opts := startOptions{env: req.Environment, params: req.Params, noOnError: true}
+	// The data of the steps is kept for the last run of a file (E23a), not of a trigger.
+	opts := startOptions{env: req.Environment, params: req.Params, noOnError: true, stepData: true}
 	if req.Trigger != "" {
 		if req.Path != "" || req.Environment != "" || len(req.Params) > 0 {
 			writeError(w, http.StatusBadRequest, "a run of a trigger takes path, environment and params from the trigger")
@@ -127,6 +128,41 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ok {
 		writeError(w, http.StatusNotFound, "run not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// handleSteps lists the actions with data in the last run started in the editor (E23a).
+func (s *Server) handleSteps(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	list, err := s.runs.Steps(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"runId": id, "steps": list})
+}
+
+// handleStep returns the input and output of an action in the last run started in the
+// editor (E23a): ?run= chooses the execution (loops, join each), ?entry= an entry of forEach.
+func (s *Server) handleStep(w http.ResponseWriter, r *http.Request) {
+	var n [2]int
+	for i, name := range []string{"run", "entry"} {
+		v := r.URL.Query().Get(name)
+		if v == "" {
+			continue
+		}
+		x, err := strconv.Atoi(v)
+		if err != nil || x < 1 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid %s %q (expected a number from 1)", name, v))
+			return
+		}
+		n[i] = x
+	}
+	d, err := s.runs.StepData(r.PathValue("id"), r.PathValue("action"), n[0], n[1])
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
@@ -290,10 +326,12 @@ type startOptions struct {
 	env, trigger, client, history string
 	// noOnError: no error workflow when the run fails (runs of the editor, ADR 0027).
 	noOnError bool
-	params    map[string]string
-	request   map[string]any  // workflows (http triggers)
-	rows      []record.Record // pipelines (JSON list of an http request)
-	respond   action.Responder
+	// stepData keeps the input and output of each step of a workflow (runs of the editor, E23a).
+	stepData bool
+	params   map[string]string
+	request  map[string]any  // workflows (http triggers)
+	rows     []record.Record // pipelines (JSON list of an http request)
+	respond  action.Responder
 }
 
 // startFile starts a run of the saved workflow or pipeline name of the project. The
@@ -308,7 +346,8 @@ func (s *Server) startFile(name string, data []byte, o startOptions) (runs.Run, 
 	} else {
 		pend, _, err = s.runs.PrepareRun(name, runs.Spec{Name: name, File: filepath.Join(s.dir, filepath.FromSlash(name)), Data: data,
 			ProjectDir: s.dir, Env: o.env, Params: o.params, Registry: s.registry, Transforms: s.transforms, Trigger: o.trigger,
-			Client: o.client, Request: o.request, Respond: o.respond, History: o.history, NoOnError: o.noOnError})
+			Client: o.client, Request: o.request, Respond: o.respond, History: o.history, NoOnError: o.noOnError,
+			StepData: o.stepData})
 	}
 	if err != nil {
 		return runs.Run{}, nil, err

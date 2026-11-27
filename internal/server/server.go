@@ -282,6 +282,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET "+APIPrefix+"/runs", s.handleListRuns)
 	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}", s.handleGetRun)
 	mux.HandleFunc("POST "+APIPrefix+"/runs/{id}/cancel", s.handleCancelRun)
+	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}/steps", s.handleSteps)
+	mux.HandleFunc("GET "+APIPrefix+"/runs/{id}/steps/{action}", s.handleStep)
 	mux.HandleFunc("GET "+APIPrefix+"/events", s.handleEvents)
 	mux.HandleFunc("GET "+APIPrefix+"/triggers", s.handleTriggers)
 	mux.HandleFunc("GET "+APIPrefix+"/plugins", s.handlePlugins)
