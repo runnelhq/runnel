@@ -7,7 +7,10 @@ in Major-Versionen). Neue Einträge kommen mit dem PR unter „Unveröffentlicht
 
 ## Unveröffentlicht
 
-Seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch ohne Abkündigung.
+## v0.1.0-rc.1 – 2026-11-27
+
+Erster Release Candidate für 1.0, seit `v0.1.0-alpha.7` (2026-11-21). Vor 1.0 ändern sich Formate und Namen noch ohne
+Abkündigung; ab diesem Stand prüft der Vertragstest jede Änderung gegen diese Version (ADR 0029).
 
 ### Neu
 

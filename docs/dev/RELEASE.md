@@ -43,5 +43,7 @@ cp internal/cli/testdata/catalog.golden.json internal/cli/testdata/catalog-expre
 bleibt und wird abgekündigt ([ACTIONS.md](ACTIONS.md#felder-umbenennen-oder-abkündigen-deprecated-adr-0029)), oder der
 Bruch wartet auf die nächste Major-Version.
 
-**Vor `v1.0.0`** gilt die Basis vom Stand der Einführung (R4). Ein bewusster Bruch vor 1.0 (z. B. aus der Durchsicht der
+**Vor `v1.0.0`** galt die Basis vom Stand der Einführung (R4); mit `v0.1.0-rc.1` wurde sie erneuert (Entscheidung
+des Maintainers vom 2026-11-27), damit der Test ab dem Release Candidate gegen den Stand prüft, der unter Windows
+getestet wird. Jeder weitere Release Candidate erneuert sie wie ein Release. Ein bewusster Bruch vor 1.0 (z. B. aus der Durchsicht der
 Namen, R5) ändert die Basis im selben PR; der PR-Text nennt das unter „Golden-Dateien“ und „Stabilität (ADR 0029)“.
