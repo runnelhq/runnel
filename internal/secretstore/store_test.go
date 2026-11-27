@@ -219,8 +219,11 @@ func TestSetRejects(t *testing.T) {
 	}
 }
 
-// Without RUNNEL_MASTER_KEY, the store reports how to set a key.
+// Without RUNNEL_MASTER_KEY, systems without DPAPI report how to set a key.
 func TestNoKey(t *testing.T) {
+	if dpapiAvailable {
+		t.Skip("DPAPI is available")
+	}
 	s, project := newStore(t)
 	t.Setenv(MasterKeyEnv, "")
 	if err := s.Set(project, "pw", "x", now); err == nil || !strings.Contains(err.Error(), "set RUNNEL_MASTER_KEY") {
@@ -232,10 +235,10 @@ func TestDefault(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("LOCALAPPDATA", t.TempDir())
 	u, err := Default()
-	if err != nil || !strings.HasSuffix(u.Dir, filepath.Join("runnel", "secrets")) {
+	if err != nil || !strings.HasSuffix(u.Dir, filepath.Join("runnel", "secrets")) || u.Machine {
 		t.Fatalf("%+v %v", u, err)
 	}
-	svc := &Store{Dir: t.TempDir()}
+	svc := &Store{Dir: t.TempDir(), Machine: true}
 	SetDefault(svc)
 	defer SetDefault(nil)
 	if d, _ := Default(); d != svc {

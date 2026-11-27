@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -51,11 +52,20 @@ links:
 
 func TestSecretCommands(t *testing.T) {
 	dir := secretTestProject(t)
+	t.Setenv("API_TOKEN_UNSET", "")
 
 	// Nothing set yet.
 	code, out, _ := run(t, "secret", "list", dir)
 	if code != 0 || !strings.Contains(out, "No secrets for the project") {
 		t.Fatalf("list: %d\n%s", code, out)
+	}
+
+	// Nothing set: missing lists each use per environment and ends with 1.
+	code, out, _ = run(t, "secret", "missing", dir)
+	if code != 1 || !strings.Contains(out, "api-token  ci           env    missing  connections/api.yaml:8:10") ||
+		!strings.Contains(out, "api-token  dev          local  missing  connections/api.yaml:8:10") ||
+		!strings.Contains(out, "api-token  ci           local  missing  workflows/s.workflow.yaml:11:16") || !strings.Contains(out, "4 secrets not set.") {
+		t.Fatalf("missing: %d\n%s", code, out)
 	}
 
 	// From stdin, one line break at the end is removed.
@@ -77,6 +87,18 @@ func TestSecretCommands(t *testing.T) {
 	}
 	if v, _, _ := store.Get(dir, "api-token"); v != "T0ken-fr0m-stdin" {
 		t.Errorf("stdin: %q", v)
+	}
+
+	// Only the environment with secretStore: env still misses it.
+	code, out, _ = run(t, "secret", "missing", dir)
+	if code != 1 || strings.Contains(out, "local") || !strings.Contains(out, "1 secret not set.") {
+		t.Errorf("missing: %d\n%s", code, out)
+	}
+	t.Setenv("api-token", "x")
+	if runtime.GOOS != "windows" { // names of environment variables with - work on Unix only
+		if code, out, _ = run(t, "secret", "missing", dir); code != 0 || !strings.Contains(out, "No secrets missing (2 secrets used by the project).") {
+			t.Errorf("missing: %d\n%s", code, out)
+		}
 	}
 
 	// A run reads the secret from the store and masks it.
@@ -124,6 +146,7 @@ func TestSecretErrors(t *testing.T) {
 		{"", []string{"secret", "set", "pw", dir, "--from-file", big}, 1, "larger than 1 MB"},
 		{"x", []string{"secret", "set", "pw", t.TempDir()}, 1, "no project (project.yaml) found"},
 		{"", []string{"secret", "list", t.TempDir()}, 1, "no project (project.yaml) found"},
+		{"", []string{"secret", "missing", t.TempDir()}, exitUsage, "no project (project.yaml) found"},
 	} {
 		code, out, errOut := runIn(t, tt.stdin, tt.args...)
 		if code != tt.code || !strings.Contains(errOut, tt.want) {
@@ -143,9 +166,14 @@ func TestSecretErrors(t *testing.T) {
 	if code, _, errOut := runIn(t, "x", "secret", "set", "pw", dir); code != 1 || !strings.Contains(errOut, "RUNNEL_MASTER_KEY is not valid base64") || strings.Contains(errOut, "not-a-key") {
 		t.Errorf("master key: %d %s", code, errOut)
 	}
-	// Without it, the store says how to set one.
-	t.Setenv(secretstore.MasterKeyEnv, "")
-	if code, _, errOut := runIn(t, "x", "secret", "set", "pw", dir); code != 1 || !strings.Contains(errOut, "set RUNNEL_MASTER_KEY to 32 random bytes in base64") {
-		t.Errorf("no master key: %d %s", code, errOut)
+	if runtime.GOOS != "windows" {
+		// Without it, systems without DPAPI say how to set one.
+		t.Setenv(secretstore.MasterKeyEnv, "")
+		if code, _, errOut := runIn(t, "x", "secret", "set", "pw", dir); code != 1 || !strings.Contains(errOut, "set RUNNEL_MASTER_KEY to 32 random bytes in base64") {
+			t.Errorf("no master key: %d %s", code, errOut)
+		}
+		if code, _, errOut := run(t, "secret", "list", dir, "--service"); code != 1 || !strings.Contains(errOut, "exists only on Windows") {
+			t.Errorf("service: %d %s", code, errOut)
+		}
 	}
 }

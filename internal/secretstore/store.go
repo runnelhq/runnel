@@ -1,9 +1,10 @@
 // Package secretstore is the local secret store (ADR 0022, S39d): the source "local" of
 // ${secret:local/NAME}. Values belong to one project and lie outside of it, in one file
 // per project in the data folder of the account: %LOCALAPPDATA%\runnel\secrets for the
-// user (elsewhere <config>/runnel/secrets). Each value is encrypted with AES-256-GCM; the
-// associated data binds it to the project and its name, so that values cannot be swapped
-// between names or projects. The key comes from RUNNEL_MASTER_KEY.
+// user (elsewhere <config>/runnel/secrets), %ProgramData%\runnel\secrets for the Windows
+// service. Each value is encrypted with AES-256-GCM; the associated data binds it to the
+// project and its name, so that values cannot be swapped between names or projects. The
+// key comes from RUNNEL_MASTER_KEY or, on Windows, is a random key protected by DPAPI.
 package secretstore
 
 import (
@@ -40,8 +41,12 @@ const (
 
 // Store is the local secret store of one account: a folder with one file per project.
 type Store struct {
-	// Dir holds the files of the projects.
+	// Dir holds the files of the projects and, with DPAPI, the protected key.
 	Dir string
+	// Machine protects the key with DPAPI for the computer instead of the user: the
+	// store of the Windows service, written by administrators and read by the service
+	// account; the permissions of Dir protect it.
+	Machine bool
 }
 
 // Info describes a secret without its value.
@@ -70,8 +75,8 @@ var (
 	defaultStore *Store
 )
 
-// SetDefault sets the store that Default returns (e.g. in tests); nil: the store of the
-// user.
+// SetDefault sets the store that Default returns, e.g. that of the service; nil: the
+// store of the user.
 func SetDefault(s *Store) {
 	defaultMu.Lock()
 	defer defaultMu.Unlock()
@@ -187,7 +192,7 @@ func (s *Store) read(key string) (*file, string, error) {
 
 // write replaces the file of a project via a temporary file, so that a reader never sees
 // half of it; only the account may read it (0600; on Windows the permissions of the
-// folder, the user profile).
+// folder: the user profile, or the protected folder of the service).
 func write(path string, f *file) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
@@ -263,7 +268,7 @@ func (s *Store) Get(projectDir, name string) (value string, ok bool, err error) 
 	if !ok {
 		return "", false, nil
 	}
-	k, err := s.key()
+	k, err := s.key(false)
 	if err != nil {
 		return "", false, err
 	}
@@ -299,7 +304,7 @@ func (s *Store) Set(projectDir, name, value string, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	k, err := s.key()
+	k, err := s.key(true)
 	if err != nil {
 		return err
 	}
