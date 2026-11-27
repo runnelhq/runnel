@@ -35,6 +35,8 @@ test("reports a lost connection", async ({ page }) => {
 
 test("uses the design tokens and the embedded fonts", async ({ page }) => {
   await page.goto("/");
+  // The editor renders after the project status (R10); only then does the page use, and load, Inter.
+  await expect(page.getByRole("tree")).toBeVisible();
   const font = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
   expect(font).toContain("Inter");
   await page.evaluate(() => document.fonts.ready);
