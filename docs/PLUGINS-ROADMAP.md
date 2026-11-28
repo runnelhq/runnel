@@ -106,3 +106,13 @@ Diese Punkte ändern Runnel selbst und werden als Schritt in der [Roadmap](ROADM
   ablehnt.
 - **`example` und `errors` für Connection-Typen aus Plugins:** Eingebaute Typen haben sie seit E15e; `describe` nimmt
   sie bei Connection-Typen noch nicht an ([PLUGINS.md](dev/PLUGINS.md)).
+- **Kern-Bausteine in Plugins nutzen** (Idee, noch kein Beschluss): Viele Plugins wären vorkonfigurierte Kern-Bausteine
+  mit etwas Zusatzlogik (z. B. `plugin-msgraph` um `http.request`). Heute geht das nicht; ein Plugin muss HTTP,
+  Anmeldung und Paginierung selbst mitbringen. Wege:
+  - **A. Zusammengesetzte Bausteine** ohne Code (Empfehlung): Backlog-Zeile „Zusammengesetzte Bausteine“ der
+    [Roadmap](ROADMAP.md); Plugins sind dort eine von vier Quellen neben Kern, Bibliotheken und Projekt.
+  - **B. Rückruf an den Host:** Methode wie `host.execute` im Protokoll, mit der ein Plugin eine Kern-Action ausführen
+    lässt und `output` zurückbekommt; erlaubte Typen in `plugin.yaml` und bei der Freigabe angezeigt, Connections nur
+    über den Namen (ohne Werte), Grenzen für Tiefe und Zeit, zunächst nur Actions. Neue Sicherheitsgrenze, braucht eine
+    ADR; nach 1.0 additiv möglich, daher erst, wenn ein Plugin es braucht.
+  - **C. Kern als Go-Bibliothek** (`pkg/`): nicht verfolgt – hilft nur Go-Plugins und koppelt die Versionen.
