@@ -833,6 +833,22 @@ type Transform interface {
 - **Ausdrücke je Datensatz** (S16a, ADR 0006): `record` und die Werte des Laufs (`vars`, `params`, `env`, `run`);
   Dezimalzahlen exakt, Rechnen mit `null` ergibt `null`, Größenvergleiche mit `null` sind `false`.
 
+**Sammeln oder strömen** – zwei Arten, Datensätze an eine andere Pipeline zu geben:
+
+- **Sammeln im Speicher** (Action `core.run-pipeline` mit `rows`, S24a): Der Workflow übergibt alle Datensätze auf
+  einmal, die Pipeline liest sie mit `core.from-result`, sammelt das Ergebnis in `core.to-result` und gibt es erst am
+  Ende als `output.rows` zurück. Alles liegt gleichzeitig im Speicher (50.000 Datensätze zu je 2 KB: rund 100 MB, hinein
+  und heraus); daher die Grenze `maxRecords` (Standard 100.000). Gut für einige tausend Datensätze, nicht für Millionen.
+- **Strömen mit Backpressure** (Transform `core.run-pipeline`, „Mapping“, geplant: S56, [ADR 0021](adr/0021-unter-pipelines.md)):
+  Die Unter-Pipeline sitzt wie ein Rohrstück mitten in der Pipeline; die Datensätze fließen in Batches durch die
+  Puffer fester Größe, wie zwischen zwei Transforms. Im Speicher liegt immer nur ein kleiner Ausschnitt, gleich ob
+  1.000 oder 10 Millionen Datensätze durchlaufen.
+- **Backpressure** (Gegendruck) heißt: Ist ein Baustein weiter hinten langsamer, laufen die Puffer vor ihm voll, und
+  der Baustein davor wartet, bis wieder Platz ist – der Rückstau reicht bis zum Anfang, `csv.input` pausiert also mit
+  dem Lesen, statt die Datei in den Speicher zu laden. Beispiel: 2 Millionen Zeilen gehen durch die Unter-Pipeline
+  „Adresse bereinigen“ in `db.table-output`; schreibt die Datenbank langsam, staut es sich bis zum Lesen der Datei
+  zurück, der Speicherbedarf bleibt klein und gleich, nichts geht verloren.
+
 ### 6.3 Datenvorschau & Debugging (Editor)
 
 - **Preview**: Pipeline bis zu einem gewählten Transform mit `limit: 100` ausführen, Records je Link anzeigen (Tabelle + JSON).
